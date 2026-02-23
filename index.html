@@ -48,7 +48,7 @@
   #panel-subtitle{margin-top:5px;font-size:.42rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(0,0,0,.3);line-height:1.5}
   #panel-close{flex-shrink:0;width:24px;height:24px;border-radius:50%;background:rgba(0,0,0,.07);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;color:rgba(0,0,0,.4);transition:background .15s,color .15s;font-size:14px;line-height:1}
   #panel-close:hover{background:rgba(0,0,0,.14);color:rgba(0,0,0,.7)}
-  #panel-body{flex:1;overflow-y:auto;padding:14px 16px 20px;scrollbar-width:thin;scrollbar-color:rgba(0,0,0,.15) transparent}
+  #panel-body{flex:1;overflow-y:auto;padding:14px 16px 20px;scrollbar-width:thin;scrollbar-color:rgba(0,0,0,.15) transparent;display:flex;flex-direction:column;gap:10px}
   #panel-body::-webkit-scrollbar{width:4px}
   #panel-body::-webkit-scrollbar-thumb{background:rgba(0,0,0,.15);border-radius:2px}
   #highlight-toggle{display:none;align-items:center;gap:5px;background:transparent;border:1.5px solid rgba(0,0,0,.14);border-radius:14px;padding:4px 10px 4px 8px;cursor:pointer;font-family:'Inter',sans-serif;font-size:.42rem;font-weight:500;letter-spacing:.12em;color:rgba(0,0,0,.38);text-transform:uppercase;transition:background .18s,border-color .18s,color .18s;white-space:nowrap;margin-top:8px}
@@ -61,29 +61,28 @@
   .hl-icon::after{bottom:2px}
   mark.kw{background:transparent;color:inherit;border-bottom:2px solid var(--g-border,currentColor);padding:0;border-radius:0;font-weight:600}
 
-  .panel-group{border-radius:8px;overflow:hidden;margin-bottom:12px;border:1.5px solid var(--g-border);box-shadow:0 3px 18px var(--g-shadow);animation:grp-in .32s cubic-bezier(.34,1.2,.64,1) both}
-  .panel-group:last-child{margin-bottom:0}
+  /* Each matched entry is now its own card */
+  .panel-group{display:flex;flex-direction:column;gap:10px;margin-bottom:0}
   @keyframes grp-in{from{opacity:0;transform:translateX(14px)}to{opacity:1;transform:translateX(0)}}
-  .same-dim-badge{font-size:.38rem;letter-spacing:.12em;text-transform:uppercase;padding:2px 7px;border-radius:10px;background:var(--g-border);color:#fff;opacity:.85;font-weight:600;flex-shrink:0}
-  .pg-head{padding:9px 14px 8px;background:var(--g-bg);display:flex;align-items:center;gap:8px}
-  .pg-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;background:var(--g-border)}
-  .pg-name{font-size:.48rem;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--g-heading);flex:1}
-  .pg-count{font-size:.42rem;letter-spacing:.08em;color:var(--g-label);font-weight:400}
-  .pe{background:var(--g-bg);border-top:1px solid var(--g-rule);padding:10px 14px;animation:pe-in .28s cubic-bezier(.34,1.1,.64,1) both;animation-delay:var(--ed,0ms);cursor:pointer;transition:background .15s}
-  .pe:hover{background:color-mix(in srgb,var(--g-bg) 85%,var(--g-border) 15%)}
-  .pe.expanded{background:color-mix(in srgb,var(--g-bg) 80%,var(--g-border) 20%)}
-  @keyframes pe-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
-  /* Category · subcategory line per entry in sidebar */
-  .pe-location{font-size:.4rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--g-label);margin-bottom:4px}
-  .pe-location-sub{opacity:.6}
+  .pe{border-radius:8px;overflow:hidden;border:1.5px solid var(--g-border);box-shadow:0 3px 18px var(--g-shadow);animation:pe-in .3s cubic-bezier(.34,1.2,.64,1) both;animation-delay:var(--ed,0ms);cursor:pointer}
+  @keyframes pe-in{from{opacity:0;transform:translateX(10px)}to{opacity:1;transform:translateX(0)}}
+  .pe-head{padding:8px 14px 7px;background:var(--g-border);display:flex;align-items:center;gap:8px;flex-wrap:nowrap;position:relative}
+  .pe-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;background:rgba(255,255,255,.7)}
+  .pe-dim{font-size:.42rem;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.9);flex:0 0 auto;min-width:0}
+  .pe-cat-line{font-size:.4rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.65);font-weight:500;width:auto;white-space:nowrap}
+  .pe-body{padding:10px 14px;background:var(--g-bg);transition:background .15s}
+  .pe:hover .pe-body{background:color-mix(in srgb,var(--g-bg) 88%,var(--g-border) 12%)}
+  .pe.expanded .pe-body{background:color-mix(in srgb,var(--g-bg) 82%,var(--g-border) 18%)}
   .pe-field{font-size:.6rem;line-height:1.5;color:var(--g-text);word-break:break-word;margin-top:3px}
   .pe-field.srch{color:var(--g-label);font-style:italic}
   .pe-flabel{font-size:.38rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;opacity:.55;margin-right:4px;color:var(--g-label)}
   .pe-goto{display:none;margin-top:10px;width:100%;padding:6px 0;border-radius:6px;border:1.5px solid var(--g-border);background:transparent;color:var(--g-border);font-family:'Inter',sans-serif;font-size:.42rem;font-weight:600;letter-spacing:.14em;text-transform:uppercase;cursor:pointer;transition:background .15s,color .15s}
   .pe-goto:hover{background:var(--g-border);color:#fff}
   .pe.expanded .pe-goto{display:block}
+  .pg-section{margin-bottom:16px}
+  .pg-section:last-child{margin-bottom:0}
 
-  #seed-card{border-radius:8px;overflow:hidden;margin-bottom:14px;border:2px solid var(--sc-border,rgba(0,0,0,.18));box-shadow:0 3px 18px var(--sc-shadow,rgba(0,0,0,.08));background:var(--sc-bg,#fff);animation:grp-in .28s cubic-bezier(.34,1.2,.64,1) both}
+  #seed-card{border-radius:8px;overflow:hidden;border:2px solid var(--sc-border,rgba(0,0,0,.18));box-shadow:0 3px 18px var(--sc-shadow,rgba(0,0,0,.08));background:var(--sc-bg,#fff);animation:grp-in .28s cubic-bezier(.34,1.2,.64,1) both;flex-shrink:0}
   #sc-head{padding:8px 14px 7px;background:var(--sc-border);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
   #sc-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;background:rgba(255,255,255,.7)}
   #sc-label{font-size:.42rem;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.9);flex:1}
@@ -101,8 +100,7 @@
   .plane-inner{position:absolute;inset:0;display:flex;flex-direction:column;padding:30px 38px 20px}
   .plane-title{font-weight:600;font-size:1.08rem;letter-spacing:.2em;margin-bottom:12px;flex-shrink:0;text-transform:uppercase;color:var(--p-heading);user-select:none}
 
-  /* TABLE — change --w-cat and --w-sub to resize gutter columns */
-  .table-wrap{--w-cat:80px;--w-sub:110px}
+  .table-wrap{--w-cat:40px;--w-sub:80px}
   .table-wrap{flex:1;overflow-y:auto;overflow-x:hidden;min-height:0;scrollbar-width:thin;scrollbar-color:var(--p-label) transparent;display:flex;flex-direction:column;padding-right:14px}
   .table-wrap::-webkit-scrollbar{width:5px}
   .table-wrap::-webkit-scrollbar-thumb{background:var(--p-label);border-radius:3px}
@@ -131,7 +129,6 @@
   .entry-row{display:flex;width:100%;border-bottom:1px solid var(--p-entry-rule)}
   .entry-row:last-child{border-bottom:none}
 
-  /* COL_GROW_DEFAULT is set in JS — all columns share one value, always aligned */
   .ecell{flex-shrink:1;flex-basis:0;min-width:0;padding:7px 10px;font-size:.68rem;line-height:1.5;color:var(--p-text);word-break:break-word;border-left:1px solid var(--p-entry-rule);transition:background .22s,box-shadow .22s;cursor:pointer;position:relative}
   .ecell:first-child{border-left:none}
   .ecell:hover{background:var(--p-hover)}
@@ -140,10 +137,8 @@
 
   .entry-row.muted{opacity:.1;filter:saturate(.15);pointer-events:none}
 
-  /* Seed cells — individually highlighted */
   .ecell.seed-cell{background:var(--p-cluster-seed)!important;box-shadow:0 0 0 2px var(--p-border),0 0 20px var(--p-shadow);animation:spulse 2s ease-in-out infinite;z-index:1}
   .ecell.match-cell{background:var(--p-cluster-match)!important;box-shadow:0 0 0 1px var(--p-border-faint),0 0 12px var(--p-shadow-faint);animation:mglow 2.6s ease-in-out infinite;animation-delay:var(--gd,0s);z-index:1}
-  /* Merge borders between adjacent highlighted cells */
   .ecell.seed-cell+.ecell.seed-cell{border-left:none;clip-path:inset(-20px -20px -20px 0)}
   .ecell.seed-cell:has(+.ecell.seed-cell){clip-path:inset(-20px 0 -20px -20px)}
   .ecell.match-cell+.ecell.match-cell{border-left:none;clip-path:inset(-20px -20px -20px 0)}
@@ -162,6 +157,23 @@
   .dot:hover{opacity:.7!important;transform:scale(1.3)!important}
   .dot.active{outline-color:rgba(0,0,0,.22)}
   .dot-label{font-size:.48rem;letter-spacing:.18em;color:rgba(0,0,0,.32);text-transform:uppercase;font-weight:400;text-align:center;min-height:1.1em;max-width:400px;transition:color .22s}
+
+  /* Overrides for sidebar field tags and single-line header */
+  .pe-field, .sc-field { position: relative; padding-right: 56px; }
+  .cell-tag {
+    position: absolute; right: 0; bottom: 0;
+    font-size: .36rem; letter-spacing: .14em; text-transform: uppercase;
+    padding: 2px 6px; border-radius: 10px; border: 1px solid currentColor; opacity: .85;
+  }
+  .pe .cell-tag { color: var(--g-label); border-color: var(--g-border); background: rgba(255,255,255,.14); }
+  #seed-card .cell-tag { color: var(--sc-label); border-color: var(--sc-border); background: rgba(255,255,255,.14); }
+  
+  .empty-placeholder {
+  opacity: .35;
+  font-style: italic;
+}
+  
+  
 </style>
 </head>
 <body>
@@ -248,10 +260,6 @@ const PLANES=[
 ];
 const STOP_WORDS=new Set(['a','an','the','and','or','of','in','on','at','to','for','by','with','from','is','are','was','were','be','been','have','has','had','do','does','did','will','would','could','should','may','might','not','no','but','so','than','that','their','them','then','there','these','they','this','those','through','what','when','where','which','who','how','all','any','each','some','such','its','our','as','if','into','about','after','before','during','including','pp','vol','ed','eds','de','van','von','et','al','doi','housing','cohousing','living','urban','design','community','space','social','people','study','case','research','analysis','journal','review','international','new','city','based']);
 const MIN_KW=5,MIN_SHARED=2;
-
-// ── COL_GROW_DEFAULT ─────────────────────────────────────────────────────────
-// Change this single value to adjust all column widths equally.
-// Headers always match cells because both read from col._grow which is set from this.
 const COL_GROW_DEFAULT=1;
 
 let SCENE_W=1360,SCENE_H=960,PLANE_W=99999,PLANE_H=99999,PLANE_L=40,PLANE_T=100;
@@ -308,7 +316,19 @@ const planeEls=PLANES.map((p,pi)=>{
   stackEl.appendChild(el);return el;
 });
 
-function extractKW(text){return[...new Set(String(text).toLowerCase().replace(/[^a-z\s]/g,' ').split(/\s+/).filter(w=>w.length>=MIN_KW&&!STOP_WORDS.has(w)))];}
+// extractTag: if the last whitespace-separated token of a string is exactly (something), return {display, tag}.
+function extractTag(raw){
+  const s=String(raw??'').trimEnd();
+  const m=s.match(/^([\s\S]*?)(?:^| )(\([^()]+\))$/);
+  if(!m)return{display:s,tag:''};
+  const tag=m[2].slice(1,-1).trim();
+  const display=m[1].trimEnd();
+  return{display,tag};
+}
+
+function extractKW(text){
+  return[...new Set(String(text).toLowerCase().replace(/[^a-z\s]/g,' ').split(/\s+/).filter(w=>w.length>=MIN_KW&&!STOP_WORDS.has(w)))];
+}
 function highlightKW(text,kwSet){
   if(!kwSet||!kwSet.size)return escH(text);
   const pat=new RegExp(`\\b(${[...kwSet].map(k=>k.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('|')})\\b`,'gi');
@@ -340,8 +360,14 @@ function parseTab(ws){
     if(!catMap[catVal]){catMap[catVal]={subOrder:[],subMap:{}};catOrder.push(catVal);}
     const cm=catMap[catVal];
     if(!cm.subMap[subVal]){cm.subMap[subVal]=[];cm.subOrder.push(subVal);}
-    const values={};cols.forEach(col=>{values[col.ci]=String(row[col.ci]??'').trim();});
-    cm.subMap[subVal].push({id:String(ri-hdrRowIdx),values});
+    const values={};const tags={};
+    cols.forEach(col=>{
+      const raw=String(row[col.ci]??'').trim();
+      const{display,tag}=extractTag(raw);
+      values[col.ci]=display;
+      if(tag)tags[col.ci]=tag;
+    });
+    cm.subMap[subVal].push({id:String(ri-hdrRowIdx),values,tags});
   }
   return{cats:catOrder.map(val=>({val,subs:catMap[val].subOrder.map(sv=>({val:sv,entries:catMap[val].subMap[sv]}))})),cols};
 }
@@ -393,16 +419,16 @@ function fillPlane(pi,parsed){
         const row=document.createElement('div');
         row.className='entry-row';
         row.dataset.planeIdx=pi;row.dataset.catVal=val;row.dataset.subVal=sv;row.dataset.entryId=e.id;
-        // keywords computed from searchable cols
         row.dataset.keywords=extractKW(cols.filter(c=>c.searchable).map(c=>e.values[c.ci]||'').join(' ')).join(' ');
+        row.dataset.tags=JSON.stringify(e.tags||{});
         cols.forEach(col=>{
           const ec=document.createElement('div');
           ec.className='ecell'+(col.searchable?'':' not-searchable');
           ec.style.flexGrow=col._grow;ec.style.flexBasis='0';
           ec.dataset.ci=col.ci;ec.dataset.planeIdx=pi;ec.dataset.entryId=e.id;
-          const txt=document.createElement('span');txt.className='ecell-text';txt.textContent=e.values[col.ci]||'';
+          const txt=document.createElement('span');txt.className='ecell-text';
+          txt.textContent=e.values[col.ci]||'';
           ec.appendChild(txt);
-          // Each cell individually clickable; non-searchable cells do nothing
           ec.addEventListener('click',ev=>{
             ev.stopPropagation();
             if(!col.searchable)return;
@@ -425,24 +451,20 @@ function recomputeRowKW(pi){
   });
 }
 
-// ── Selection: each cell is an independent entity ─────────────────────────────
-// activeSeedCells: Set of .ecell DOM elements currently selected as seed
+// Selection
 let activeSeedCells=new Set();
 let hlOn=true;
 
 function toggleCell(ecell){
   if(activeSeedCells.has(ecell)){
-    // Deselect this cell only
     activeSeedCells.delete(ecell);
     ecell.classList.remove('seed-cell');
     if(activeSeedCells.size===0){
-      // All gone — clear everything but do NOT deselect other cells
       clearMatchState();
       showPanelEmpty();
       return;
     }
   } else {
-    // Add this cell — never deselects anything else
     activeSeedCells.add(ecell);
     ecell.classList.add('seed-cell');
   }
@@ -450,13 +472,11 @@ function toggleCell(ecell){
 }
 
 function clearMatchState(){
-  // Only remove muted + match highlights — never touches seed-cell
   document.querySelectorAll('.entry-row.muted').forEach(r=>r.classList.remove('muted'));
   document.querySelectorAll('.ecell.match-cell').forEach(ec=>ec.classList.remove('match-cell'));
 }
 
 function clearAll(){
-  // Full reset including seed cells
   activeSeedCells.forEach(ec=>ec.classList.remove('seed-cell'));
   activeSeedCells.clear();
   clearMatchState();
@@ -471,20 +491,28 @@ function showPanelEmpty(msg){
 function runCluster(){
   if(activeSeedCells.size===0){clearAll();showPanelEmpty();return;}
 
-  // Collect all keywords from selected cells
+  // Build per-cell seeds; and which categories are allowed per plane
+  const seeds=[];
   const allKws=new Set();
+  const allowedCatsByPlane=new Map();
   activeSeedCells.forEach(ec=>{
-    extractKW(ec.querySelector('.ecell-text')?.textContent||'').forEach(k=>allKws.add(k));
+    const row=ec.closest('.entry-row'); if(!row) return;
+    const pi=parseInt(ec.dataset.planeIdx);
+    const ci=parseInt(ec.dataset.ci);
+    const cat=row.dataset.catVal;
+    const kws=new Set(extractKW(ec.querySelector('.ecell-text')?.textContent||''));
+    seeds.push({pi,ci,cat,kws});
+    kws.forEach(k=>allKws.add(k));
+    if(!allowedCatsByPlane.has(pi))allowedCatsByPlane.set(pi,new Set());
+    allowedCatsByPlane.get(pi).add(cat);
   });
 
-  // Which rows contain at least one seed cell?
+  // Seed rows never muted
   const seedRows=new Set();
   activeSeedCells.forEach(ec=>{const r=ec.closest('.entry-row');if(r)seedRows.add(r);});
-
-  // Apply muted state — seed rows are never muted
   document.querySelectorAll('.entry-row').forEach(r=>r.classList.toggle('muted',!seedRows.has(r)));
 
-  // Clear old match highlights
+  // Clear old highlights
   document.querySelectorAll('.ecell.match-cell').forEach(ec=>ec.classList.remove('match-cell'));
 
   const byPlane=new Map();
@@ -493,23 +521,45 @@ function runCluster(){
   if(allKws.size>=1){
     document.querySelectorAll('.entry-row').forEach(row=>{
       if(seedRows.has(row))return;
-      const rKws=new Set(row.dataset.keywords.split(' ').filter(Boolean));
-      const shared=[];allKws.forEach(k=>{if(rKws.has(k))shared.push(k);});
-      if(shared.length<MIN_SHARED)return;
-      row.classList.remove('muted');
-      shared.forEach(k=>matchedKws.add(k));total++;
       const rpi=parseInt(row.dataset.planeIdx);
-      const rCols=planeEls[rpi]._cols||[];
-      // Highlight only searchable cells in matched row
-      rCols.forEach(col=>{
-        if(!col.searchable)return;
-        const ec=row.querySelector(`.ecell[data-ci="${col.ci}"]`);
+      const allowedCats=allowedCatsByPlane.get(rpi);
+      if(!allowedCats||!allowedCats.has(row.dataset.catVal))return;
+
+      // Compare per selected cell column only
+      const sharedByCi={}; // ci -> Set(keywords)
+      let sharedCount=0;
+      seeds.forEach(s=>{
+        if(s.pi!==rpi)return;
+        if(!allowedCats.has(row.dataset.catVal))return;
+        const cellText=row.querySelector(`.ecell[data-ci="${s.ci}"] .ecell-text`)?.textContent||'';
+        const rKws=new Set(extractKW(cellText));
+        s.kws.forEach(k=>{
+          if(rKws.has(k)){
+            if(!sharedByCi[s.ci])sharedByCi[s.ci]=new Set();
+            if(!sharedByCi[s.ci].has(k)){ sharedByCi[s.ci].add(k); sharedCount++; }
+            matchedKws.add(k);
+          }
+        });
+      });
+      if(sharedCount<MIN_SHARED)return;
+
+      // It's a match
+      row.classList.remove('muted');
+      Object.keys(sharedByCi).forEach(ci=>{
+        const ec=row.querySelector(`.ecell[data-ci="${ci}"]`);
         if(ec){ec.classList.add('match-cell');ec.style.setProperty('--gd',`${Math.min(delay,1.2)}s`);}
       });
-      delay+=0.08;
+      delay+=0.08; total++;
+
       if(!byPlane.has(rpi))byPlane.set(rpi,[]);
-      const fv={};rCols.forEach(col=>{fv[col.ci]=row.querySelector(`.ecell[data-ci="${col.ci}"] .ecell-text`)?.textContent||'';});
-      byPlane.get(rpi).push({id:row.dataset.entryId,cat:row.dataset.catVal,sub:row.dataset.subVal,fv,cols:rCols,sharedKws:new Set(shared)});
+      const rCols=planeEls[rpi]._cols||[];
+      const fv={},ftags={};
+      const rowTags=JSON.parse(row.dataset.tags||'{}');
+      rCols.forEach(col=>{
+        fv[col.ci]=row.querySelector(`.ecell[data-ci="${col.ci}"] .ecell-text`)?.textContent||'';
+        if(rowTags[col.ci])ftags[col.ci]=rowTags[col.ci];
+      });
+      byPlane.get(rpi).push({id:row.dataset.entryId,cat:row.dataset.catVal,sub:row.dataset.subVal,fv,ftags,cols:rCols,sharedByCi});
     });
   }
 
@@ -517,10 +567,29 @@ function runCluster(){
 }
 
 function buildPanel(byPlane,matchedKws,total,allKws){
-  panelSub.textContent=total?`${total} match${total===1?'':'es'} · shared: ${[...matchedKws].slice(0,4).join(', ')}`:'No related entries found';
+  // If the user selected cell(s) but all are empty → show the simple message and nothing else
+  const hasSelection = activeSeedCells.size > 0;
+  const allSelectedEmpty = hasSelection && [...activeSeedCells].every(ec => {
+    const t = ec.querySelector('.ecell-text')?.textContent || '';
+    return t.trim()==='';
+  });
+  if(allSelectedEmpty){
+    panelSub.textContent = ''; // no subtitle
+    panelBody.innerHTML = emptyMsg('The cell is empty'); // same style as "No matches found"
+    hlToggle.classList.remove('visible','active');
+    const wasOpen=clusterPanel.classList.contains('open');
+    clusterPanel.classList.add('open');syncPanelBtn();
+    if(!wasOpen)fitScene();
+    return;
+  }
+
+  // Normal path
+  panelSub.textContent = total
+    ? `${total} match${total===1?'':'es'} · shared: ${[...matchedKws].slice(0,4).join(', ')}`
+    : 'No related entries found';
   panelBody.innerHTML='';
 
-  // Seed card — group by plane, show cat · sub
+  // ── Seed card(s) — show ONLY the actually selected cells; skip empties ──
   const seedsByPlane=new Map();
   activeSeedCells.forEach(ec=>{
     const pi=parseInt(ec.dataset.planeIdx);
@@ -531,19 +600,43 @@ function buildPanel(byPlane,matchedKws,total,allKws){
     const sc=PLANE_COLORS[pi];
     const card=document.createElement('div');card.id='seed-card';
     [['--sc-bg',sc.bg],['--sc-border',sc.border],['--sc-shadow',sc.shadow],['--sc-text',sc.text],['--sc-label',sc.label]].forEach(([k,v])=>card.style.setProperty(k,v));
+
     const row=cells[0].closest('.entry-row');
     const cat=row?.dataset.catVal||'',sub=row?.dataset.subVal||'';
     const seedCols=planeEls[pi]._cols||[];
+    const rowTags=JSON.parse(row?.dataset.tags||'{}');
+
+    // Selected column indexes for THIS plane; keep in sheet column order
+    const selCIs=new Set(cells.map(ec=>parseInt(ec.dataset.ci)));
+    const colOrder=new Map(seedCols.map((c,idx)=>[c.ci,idx]));
+    const orderedSel=[...selCIs].sort((a,b)=>(colOrder.get(a)??0)-(colOrder.get(b)??0));
+
     let sFields='';
-    seedCols.forEach(col=>{
-      const val=row?.querySelector(`.ecell[data-ci="${col.ci}"] .ecell-text`)?.textContent||'';if(!val)return;
-      const isSel=cells.some(ec=>parseInt(ec.dataset.ci)===col.ci);
-      sFields+=`<div class="sc-field${isSel?' srch':''}"><span class="sc-flabel">${escH(col.label)}</span>${isSel?highlightKW(val,allKws):escH(val)}</div>`;
+    orderedSel.forEach(ci=>{
+      const col=seedCols.find(c=>c.ci===ci); if(!col) return;
+      const val=row?.querySelector(`.ecell[data-ci="${ci}"] .ecell-text`)?.textContent||'';
+      if(!val.trim()) return; // skip empty selected cells — message already handled above if all were empty
+      const tag=rowTags && rowTags[ci] ? rowTags[ci] : '';
+      const kwSet=new Set(extractKW(val));
+      let inner=`<span class="sc-flabel">${escH(col.label)}</span>${highlightKW(val,kwSet)}`;
+      if(tag){ inner+=`<span class="cell-tag">${escH(tag)}</span>`; }
+      sFields+=`<div class="sc-field srch">${inner}</div>`;
     });
-    card.innerHTML=`<div id="sc-head"><div id="sc-dot"></div><div id="sc-label">${escH(PLANES[pi].title)}</div><span class="sc-badge">Selected</span><div id="sc-cat">${escH(cat)}${sub?' · '+escH(sub):''}</div></div><div id="sc-body">${sFields||'<span style="opacity:.35;font-size:.6rem">—</span>'}</div>`;
-    panelBody.appendChild(card);
+
+    // Only append the seed card if there is at least one non-empty selected field for this plane
+    if(sFields){
+      card.innerHTML=`<div id="sc-head">
+          <div id="sc-dot"></div>
+          <div id="sc-label">${escH(PLANES[pi].title)}</div>
+          <span class="sc-badge">Selected</span>
+          <div id="sc-cat">${escH(cat)}${sub?' · '+escH(sub):''}</div>
+        </div>
+        <div id="sc-body">${sFields}</div>`;
+      panelBody.appendChild(card);
+    }
   });
 
+  // Matches
   if(!byPlane.size){
     panelBody.insertAdjacentHTML('beforeend',emptyMsg('No matches found'));
     hlToggle.classList.remove('visible','active');
@@ -551,30 +644,50 @@ function buildPanel(byPlane,matchedKws,total,allKws){
     hlToggle.classList.add('visible','active');
     const ic=document.createElement('span');ic.className='hl-icon';
     hlToggle.innerHTML='';hlToggle.appendChild(ic);hlToggle.appendChild(document.createTextNode(' Highlight keywords'));
-    let gd=0;
+
+    let globalDelay=0;
     [...byPlane.keys()].sort((a,b)=>a-b).forEach(pi=>{
       const entries=byPlane.get(pi);const c=PLANE_COLORS[pi];
-      const grp=document.createElement('div');grp.className='panel-group';grp.style.animationDelay=`${gd}ms`;
-      [['--g-bg',c.bg],['--g-border',c.border],['--g-shadow',c.shadow],['--g-heading',c.heading],['--g-text',c.text],['--g-label',c.label],['--g-rule',c.rule]].forEach(([k,v])=>grp.style.setProperty(k,v));
-      gd+=80;
-      grp.innerHTML=`<div class="pg-head"><div class="pg-dot"></div><div class="pg-name">${escH(PLANES[pi].title)}</div><div class="pg-count">${entries.length}</div></div>`;
-      let ed=gd;
+
       entries.forEach(e=>{
-        const div=document.createElement('div');div.className='pe';div.style.setProperty('--ed',`${ed}ms`);ed+=50;
-        // Category · subcategory per entry (same style as seed card header)
-        let html=`<div class="pe-location">${escH(e.cat)}${e.sub?` <span class="pe-location-sub">· ${escH(e.sub)}</span>`:''}</div>`;
+        const card=document.createElement('div');
+        card.className='pe';
+        card.style.setProperty('--ed',`${globalDelay}ms`);
+        [['--g-bg',c.bg],['--g-border',c.border],['--g-shadow',c.shadow],['--g-heading',c.heading],['--g-text',c.text],['--g-label',c.label],['--g-rule',c.rule]].forEach(([k,v])=>card.style.setProperty(k,v));
+        globalDelay+=60;
+
+        const head=document.createElement('div');
+        head.className='pe-head';
+        head.innerHTML=`<div class="pe-dot"></div><div class="pe-dim">${escH(PLANES[pi].title)}</div><div class="pe-cat-line"> · ${escH(e.cat)}${e.sub?' · '+escH(e.sub):''}</div>`;
+
+        const body=document.createElement('div');
+        body.className='pe-body';
         e.cols.forEach(col=>{
-          const val=e.fv[col.ci]||'';if(!val)return;
-          html+=`<div class="pe-field${col.searchable?' srch':''}"><span class="pe-flabel">${escH(col.label)}</span>${col.searchable?highlightKW(val,e.sharedKws):escH(val)}</div>`;
+          const val=e.fv[col.ci]||''; if(!val) return;
+          const field=document.createElement('div');
+          field.className='pe-field'+(col.searchable?' srch':'');
+          const tag=(e.ftags&&e.ftags[col.ci])?e.ftags[col.ci]:'';
+          const matchedSet=e.sharedByCi && e.sharedByCi[col.ci] ? e.sharedByCi[col.ci] : null;
+          let html=`<span class="pe-flabel">${escH(col.label)}</span>`;
+          html+=col.searchable && matchedSet ? highlightKW(val, matchedSet) : escH(val);
+          if(tag){ html+=`<span class="cell-tag">${escH(tag)}</span>`; }
+          field.innerHTML=html;
+          body.appendChild(field);
         });
-        div.innerHTML=html;
-        const gotoBtn=document.createElement('button');gotoBtn.className='pe-goto';gotoBtn.textContent='Go to cell';div.appendChild(gotoBtn);
-        div.addEventListener('click',ev=>{
+
+        const gotoBtn=document.createElement('button');gotoBtn.className='pe-goto';gotoBtn.textContent='Go to cell';
+        body.appendChild(gotoBtn);
+
+        card.appendChild(head);
+        card.appendChild(body);
+
+        card.addEventListener('click',ev=>{
           if(ev.target===gotoBtn)return;
-          const isExp=div.classList.contains('expanded');
-          grp.querySelectorAll('.pe.expanded').forEach(p=>p.classList.remove('expanded'));
-          if(!isExp)div.classList.add('expanded');
+          const isExp=card.classList.contains('expanded');
+          panelBody.querySelectorAll('.pe.expanded').forEach(p=>{if(p!==card)p.classList.remove('expanded');});
+          card.classList.toggle('expanded',!isExp);
         });
+
         gotoBtn.addEventListener('click',ev=>{
           ev.stopPropagation();
           const targetRow=document.querySelector(`.entry-row[data-plane-idx="${pi}"][data-entry-id="${e.id}"]`);
@@ -587,11 +700,12 @@ function buildPanel(byPlane,matchedKws,total,allKws){
             if(ec)toggleCell(ec);
           },order[0]===pi?0:700);
         });
-        grp.appendChild(div);
+
+        panelBody.appendChild(card);
       });
-      panelBody.appendChild(grp);
     });
   }
+
   const wasOpen=clusterPanel.classList.contains('open');
   clusterPanel.classList.add('open');syncPanelBtn();
   if(!wasOpen)fitScene();
@@ -618,7 +732,6 @@ panelOpenBtn.addEventListener('click',()=>{
   showPanelEmpty();clusterPanel.classList.add('open');syncPanelBtn();fitScene();
 });
 
-// Deselect ALL only when clicking truly empty space
 stackEl.addEventListener('click',e=>{
   const isInteractive=e.target.closest('.ecell,.resize-handle,.hdr-cell');
   if(!isInteractive&&activeSeedCells.size>0){
