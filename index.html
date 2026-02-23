@@ -271,7 +271,7 @@ const MIN_KW=5,MIN_SHARED=2;
 
 // ── Layout state ──────────────────────────────────────────────────
 let SCENE_W=1360,SCENE_H=960,PLANE_W=99999,PLANE_H=99999,PLANE_L=40,PLANE_T=100;
-const PAD_X=300,PAD_Y=100,GAP=144,N=PLANES.length,VISIBLE=3;
+const PAD_X=SCENE_W/5,PAD_Y=100,GAP=144,N=PLANES.length,VISIBLE=3;
 const VIEW_FLAT={rotX:0,rotY:0},VIEW_3D={rotX:-20,rotY:15};
 let is3D=false,order=[0,1,2,3],animating=false;
 
