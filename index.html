@@ -458,7 +458,7 @@ function recomputeRowKW(pi){
 let activeSeedCells=new Set();
 let hlOn=true;
   
-  function applyHlState(){
+function applyHlState(){
   panelBody.querySelectorAll('mark.kw').forEach(m=>{
     m.style.borderBottomColor = hlOn ? '' : 'transparent';
     m.style.fontWeight = hlOn ? '' : 'inherit';
@@ -501,70 +501,73 @@ function showPanelEmpty(msg){
 function runCluster(){
   if(activeSeedCells.size===0){clearAll();showPanelEmpty();return;}
 
-  // Build per-cell seeds; and which categories are allowed per plane
-  const seeds=[];
-  const allKws=new Set();
-  const allowedCatsByPlane=new Map();
+  // Build the full set of seed keywords from ALL selected cells across ALL planes/columns
+  const allSeedKws=new Set();
   activeSeedCells.forEach(ec=>{
-    const row=ec.closest('.entry-row'); if(!row) return;
-    const pi=parseInt(ec.dataset.planeIdx);
-    const ci=parseInt(ec.dataset.ci);
-    const cat=row.dataset.catVal;
-    const kws=new Set(extractKW(ec.querySelector('.ecell-text')?.textContent||''));
-    seeds.push({pi,ci,cat,kws});
-    kws.forEach(k=>allKws.add(k));
-    if(!allowedCatsByPlane.has(pi))allowedCatsByPlane.set(pi,new Set());
-    allowedCatsByPlane.get(pi).add(cat);
+    const txt=ec.querySelector('.ecell-text')?.textContent||'';
+    extractKW(txt).forEach(k=>allSeedKws.add(k));
   });
 
-  // Seed rows never muted
+  // Collect seed rows so we never mute them
   const seedRows=new Set();
   activeSeedCells.forEach(ec=>{const r=ec.closest('.entry-row');if(r)seedRows.add(r);});
+
+  // Mute all rows that are not seed rows (will un-mute matches below)
   document.querySelectorAll('.entry-row').forEach(r=>r.classList.toggle('muted',!seedRows.has(r)));
 
-  // Clear old highlights
+  // Clear old match highlights
   document.querySelectorAll('.ecell.match-cell').forEach(ec=>ec.classList.remove('match-cell'));
 
   const byPlane=new Map();
-  let total=0;const matchedKws=new Set();let delay=0;
+  let total=0;
+  const matchedKws=new Set();
+  let delay=0;
 
-  if(allKws.size>=1){
+  if(allSeedKws.size>=1){
     document.querySelectorAll('.entry-row').forEach(row=>{
+      // Never process a seed row as a match
       if(seedRows.has(row))return;
-      const rpi=parseInt(row.dataset.planeIdx);
-      const allowedCats=allowedCatsByPlane.get(rpi);
-      if(!allowedCats||!allowedCats.has(row.dataset.catVal))return;
 
-      // Compare per selected cell column only
-      const sharedByCi={}; // ci -> Set(keywords)
+      const rpi=parseInt(row.dataset.planeIdx);
+      const rCols=planeEls[rpi]._cols||[];
+
+      // For each searchable column in this row, check for keyword overlap
+      const sharedByCi={};
       let sharedCount=0;
-      seeds.forEach(s=>{
-        if(s.pi!==rpi)return;
-        if(!allowedCats.has(row.dataset.catVal))return;
-        const cellText=row.querySelector(`.ecell[data-ci="${s.ci}"] .ecell-text`)?.textContent||'';
-        const rKws=new Set(extractKW(cellText));
-        s.kws.forEach(k=>{
-          if(rKws.has(k)){
-            if(!sharedByCi[s.ci])sharedByCi[s.ci]=new Set();
-            if(!sharedByCi[s.ci].has(k)){ sharedByCi[s.ci].add(k); sharedCount++; }
-            matchedKws.add(k);
+
+      rCols.forEach(col=>{
+        if(!col.searchable)return;
+        const cellText=row.querySelector(`.ecell[data-ci="${col.ci}"] .ecell-text`)?.textContent||'';
+        const cellKws=new Set(extractKW(cellText));
+        cellKws.forEach(k=>{
+          if(allSeedKws.has(k)){
+            if(!sharedByCi[col.ci])sharedByCi[col.ci]=new Set();
+            if(!sharedByCi[col.ci].has(k)){
+              sharedByCi[col.ci].add(k);
+              sharedCount++;
+              matchedKws.add(k);
+            }
           }
         });
       });
+
       if(sharedCount<MIN_SHARED)return;
 
-      // It's a match
+      // It's a match — un-mute and highlight matching cells
       row.classList.remove('muted');
       Object.keys(sharedByCi).forEach(ci=>{
         const ec=row.querySelector(`.ecell[data-ci="${ci}"]`);
-        if(ec){ec.classList.add('match-cell');ec.style.setProperty('--gd',`${Math.min(delay,1.2)}s`);}
+        if(ec){
+          ec.classList.add('match-cell');
+          ec.style.setProperty('--gd',`${Math.min(delay,1.2)}s`);
+        }
       });
-      delay+=0.08; total++;
+      delay+=0.08;
+      total++;
 
       if(!byPlane.has(rpi))byPlane.set(rpi,[]);
-      const rCols=planeEls[rpi]._cols||[];
-      const fv={},ftags={};
       const rowTags=JSON.parse(row.dataset.tags||'{}');
+      const fv={},ftags={};
       rCols.forEach(col=>{
         fv[col.ci]=row.querySelector(`.ecell[data-ci="${col.ci}"] .ecell-text`)?.textContent||'';
         if(rowTags[col.ci])ftags[col.ci]=rowTags[col.ci];
@@ -573,7 +576,7 @@ function runCluster(){
     });
   }
 
-  buildPanel(byPlane,matchedKws,total,allKws);
+  buildPanel(byPlane,matchedKws,total,allSeedKws);
 }
 
 function buildPanel(byPlane,matchedKws,total,allKws){
@@ -584,8 +587,8 @@ function buildPanel(byPlane,matchedKws,total,allKws){
     return t.trim()==='';
   });
   if(allSelectedEmpty){
-    panelSub.textContent = ''; // no subtitle
-    panelBody.innerHTML = emptyMsg('The cell is empty'+ "<br>" +'select a different cell'); // same style as "No matches found"
+    panelSub.textContent = '';
+    panelBody.innerHTML = emptyMsg('The cell is empty'+ "<br>" +'select a different cell');
     hlToggle.classList.remove('visible','active');
     const wasOpen=clusterPanel.classList.contains('open');
     clusterPanel.classList.add('open');syncPanelBtn();
@@ -625,7 +628,7 @@ function buildPanel(byPlane,matchedKws,total,allKws){
     orderedSel.forEach(ci=>{
       const col=seedCols.find(c=>c.ci===ci); if(!col) return;
       const val=row?.querySelector(`.ecell[data-ci="${ci}"] .ecell-text`)?.textContent||'';
-      if(!val.trim()) return; // skip empty selected cells — message already handled above if all were empty
+      if(!val.trim()) return;
       const tag=rowTags && rowTags[ci] ? rowTags[ci] : '';
       const kwSet=new Set(extractKW(val));
       let inner=`<span class="sc-flabel">${escH(col.label)}</span>${highlightKW(val,kwSet)}`;
@@ -633,7 +636,6 @@ function buildPanel(byPlane,matchedKws,total,allKws){
       sFields+=`<div class="sc-field srch">${inner}</div>`;
     });
 
-    // Only append the seed card if there is at least one non-empty selected field for this plane
     if(sFields){
       card.innerHTML=`<div id="sc-head">
           <div id="sc-dot"></div>
@@ -715,22 +717,19 @@ function buildPanel(byPlane,matchedKws,total,allKws){
       });
     });
   }
-// Show toggle if anything is highlighted (seed or matches), else hide it
-const hasAnyHighlights = !!panelBody.querySelector('mark.kw');
-if(hasAnyHighlights){
-  hlToggle.classList.add('visible');
-  hlToggle.classList.toggle('active', hlOn);
 
-  // refresh label and icon
-  const ic=document.createElement('span');ic.className='hl-icon';
-  hlToggle.innerHTML='';hlToggle.appendChild(ic);
-  hlToggle.appendChild(document.createTextNode(hlOn ? ' Hide keywords' : ' Show keywords'));
-
-  // apply current toggle state to all marks
-  applyHlState && applyHlState();
-} else {
-  hlToggle.classList.remove('visible','active');
-}
+  // Show toggle if anything is highlighted (seed or matches), else hide it
+  const hasAnyHighlights = !!panelBody.querySelector('mark.kw');
+  if(hasAnyHighlights){
+    hlToggle.classList.add('visible');
+    hlToggle.classList.toggle('active', hlOn);
+    const ic=document.createElement('span');ic.className='hl-icon';
+    hlToggle.innerHTML='';hlToggle.appendChild(ic);
+    hlToggle.appendChild(document.createTextNode(hlOn ? ' Hide keywords' : ' Show keywords'));
+    applyHlState && applyHlState();
+  } else {
+    hlToggle.classList.remove('visible','active');
+  }
 
   const wasOpen=clusterPanel.classList.contains('open');
   clusterPanel.classList.add('open');syncPanelBtn();
