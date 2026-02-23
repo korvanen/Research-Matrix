@@ -7,163 +7,165 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
-  *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
-
-  html, body {
-    width:100%; height:100%; background:#fff;
-    display:flex; flex-direction:column; align-items:center; justify-content:center;
-    overflow:hidden; font-family:'Inter',sans-serif; user-select:none;
-  }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  html,body{width:100%;height:100%;background:#fff;display:flex;flex-direction:column;align-items:center;overflow:hidden;font-family:'Inter',sans-serif}
 
   /* TOP BAR */
-  .top-bar {
-    position:relative; z-index:300; width:100%; background:#fff;
-    box-shadow:0 1px 0 rgba(0,0,0,.08);
-    display:flex; align-items:center; justify-content:center;
-    padding:14px 24px; flex-shrink:0;
-  }
-  header { text-align:center; flex:1; }
-  header h1 { font-weight:300; font-size:.72rem; letter-spacing:.42em; color:rgba(0,0,0,.38); text-transform:uppercase; }
-  header p  { margin-top:5px; font-size:.44rem; letter-spacing:.16em; color:rgba(0,0,0,.2); text-transform:uppercase; }
-
-  #status {
-    position:absolute; left:24px; font-size:.42rem; letter-spacing:.12em;
-    color:rgba(0,0,0,.28); text-transform:uppercase; font-weight:400;
-    max-width:280px; line-height:1.4; transition:opacity 1.2s;
-  }
-  #status.err { color:#c0392b; }
-
-  #view-toggle {
-    position:absolute; right:24px;
-    display:flex; align-items:center; gap:7px;
-    background:transparent; border:1.5px solid rgba(0,0,0,.14); border-radius:20px;
-    padding:6px 14px 6px 10px; cursor:pointer; font-family:'Inter',sans-serif;
-    font-size:.48rem; font-weight:500; letter-spacing:.14em;
-    color:rgba(0,0,0,.4); text-transform:uppercase;
-    transition:background .2s,border-color .2s,color .2s; white-space:nowrap;
-  }
-  #view-toggle:hover  { background:rgba(0,0,0,.04); border-color:rgba(0,0,0,.22); color:rgba(0,0,0,.6); }
-  #view-toggle.active { background:rgba(0,0,0,.06); border-color:rgba(0,0,0,.26); color:rgba(0,0,0,.7); }
-  .toggle-icon { width:18px; height:14px; position:relative; flex-shrink:0; }
-  .toggle-icon span { position:absolute; left:0; right:0; height:5px; border:1.5px solid currentColor; border-radius:1px; transition:transform .4s cubic-bezier(.4,0,.2,1); }
-  .toggle-icon span:nth-child(1) { top:0; }
-  .toggle-icon span:nth-child(2) { bottom:0; }
-  #view-toggle.active .toggle-icon span:nth-child(1) { transform:perspective(40px) rotateX(20deg) translateX(3px); }
-  #view-toggle.active .toggle-icon span:nth-child(2) { transform:perspective(40px) rotateX(20deg) translateX(-3px); }
+  .top-bar{position:relative;z-index:300;width:100%;background:#fff;box-shadow:0 1px 0 rgba(0,0,0,.08);display:flex;align-items:center;justify-content:center;padding:14px 24px;flex-shrink:0}
+  header{text-align:center;flex:1}
+  header h1{font-weight:300;font-size:.72rem;letter-spacing:.42em;color:rgba(0,0,0,.38);text-transform:uppercase}
+  header p{margin-top:5px;font-size:.44rem;letter-spacing:.16em;color:rgba(0,0,0,.2);text-transform:uppercase}
+  #status{position:absolute;left:24px;font-size:.42rem;letter-spacing:.12em;color:rgba(0,0,0,.28);text-transform:uppercase;font-weight:400;max-width:260px;line-height:1.4;transition:opacity 1.2s}
+  #status.err{color:#c0392b}
+  .top-bar-right{position:absolute;right:24px;display:flex;align-items:center;gap:8px}
+  .tbtn{display:flex;align-items:center;gap:7px;background:transparent;border:1.5px solid rgba(0,0,0,.14);border-radius:20px;padding:6px 14px 6px 10px;cursor:pointer;font-family:'Inter',sans-serif;font-size:.48rem;font-weight:500;letter-spacing:.14em;color:rgba(0,0,0,.4);text-transform:uppercase;transition:background .2s,border-color .2s,color .2s;white-space:nowrap}
+  .tbtn:hover{background:rgba(0,0,0,.04);border-color:rgba(0,0,0,.22);color:rgba(0,0,0,.6)}
+  .tbtn.active{background:rgba(0,0,0,.06);border-color:rgba(0,0,0,.26);color:rgba(0,0,0,.7)}
+  .toggle-icon{width:18px;height:14px;position:relative;flex-shrink:0}
+  .toggle-icon span{position:absolute;left:0;right:0;height:5px;border:1.5px solid currentColor;border-radius:1px;transition:transform .4s cubic-bezier(.4,0,.2,1)}
+  .toggle-icon span:nth-child(1){top:0}
+  .toggle-icon span:nth-child(2){bottom:0}
+  #view-toggle.active .toggle-icon span:nth-child(1){transform:perspective(40px) rotateX(20deg) translateX(3px)}
+  #view-toggle.active .toggle-icon span:nth-child(2){transform:perspective(40px) rotateX(20deg) translateX(-3px)}
+  .panel-icon{width:16px;height:13px;display:flex;flex-direction:column;justify-content:space-between;flex-shrink:0}
+  .panel-icon span{display:block;height:1.5px;background:currentColor;border-radius:1px;transition:width .25s ease}
+  .panel-icon span:nth-child(1){width:100%}
+  .panel-icon span:nth-child(2){width:60%}
+  .panel-icon span:nth-child(3){width:100%}
+  #panel-open-btn.active .panel-icon span:nth-child(2){width:100%}
 
   /* STAGE */
-  #stage { flex:1; width:100%; overflow:hidden; display:flex; align-items:center; justify-content:center; }
-  #scene-inner {
-    width:1360px; height:960px; flex-shrink:0;
-    transform:scale(.5); transform-origin:center center; margin:-240px -340px;
-  }
-  .scene { width:1360px; height:960px; perspective:2800px; perspective-origin:50% 42%; }
-  .stack {
-    width:100%; height:100%; position:relative; transform-style:preserve-3d;
-    transform:rotateX(0) rotateY(0); transition:transform .7s cubic-bezier(.4,0,.2,1); cursor:default;
-  }
+  #stage-wrap{flex:1;width:100%;display:flex;overflow:hidden;min-height:0}
+  #stage{flex:1;min-width:0;overflow:hidden;min-height:0;display:flex;align-items:center;justify-content:center;position:relative}
+  #scene-inner{position:absolute;top:50%;left:50%;transform-origin:center center}
+  .scene{perspective:2800px;perspective-origin:50% 42%}
+  .stack{width:100%;height:100%;position:relative;transform-style:preserve-3d;transition:transform .7s cubic-bezier(.4,0,.2,1)}
 
-  /* PLANES */
-  .plane {
-    position:absolute; width:1280px; height:760px; left:40px; top:100px;
-    transform-style:preserve-3d; border-radius:8px;
-    transition:transform .7s cubic-bezier(.4,0,.2,1), opacity .5s ease; overflow:hidden;
-  }
-  .plane::after {
-    content:''; position:absolute; inset:0;
-    background:linear-gradient(160deg,rgba(255,255,255,.07) 0%,transparent 50%);
-    pointer-events:none; border-radius:8px; z-index:10;
-  }
-  .plane-inner { position:absolute; inset:0; display:flex; flex-direction:column; padding:30px 38px 20px; }
-  .plane-title { font-weight:600; font-size:1.08rem; letter-spacing:.2em; margin-bottom:16px; flex-shrink:0; text-transform:uppercase; }
+  /* SIDE PANEL */
+  #cluster-panel{width:0;flex-shrink:0;overflow:hidden;background:#f7f7f8;border-left:1px solid rgba(0,0,0,.08);display:flex;flex-direction:column;transition:width .52s cubic-bezier(.4,0,.2,1);z-index:200}
+  #cluster-panel.open{width:380px}
+  #panel-inner{width:380px;height:100%;display:flex;flex-direction:column;overflow:hidden}
+  #panel-head{padding:18px 20px 14px;flex-shrink:0;border-bottom:1px solid rgba(0,0,0,.08);display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+  #panel-head-text{flex:1;min-width:0}
+  #panel-title{font-size:.52rem;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:rgba(0,0,0,.55)}
+  #panel-subtitle{margin-top:5px;font-size:.42rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(0,0,0,.3);line-height:1.5}
+  #panel-close{flex-shrink:0;width:24px;height:24px;border-radius:50%;background:rgba(0,0,0,.07);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;color:rgba(0,0,0,.4);transition:background .15s,color .15s;font-size:14px;line-height:1}
+  #panel-close:hover{background:rgba(0,0,0,.14);color:rgba(0,0,0,.7)}
+  #panel-body{flex:1;overflow-y:auto;padding:14px 16px 20px;scrollbar-width:thin;scrollbar-color:rgba(0,0,0,.15) transparent}
+  #panel-body::-webkit-scrollbar{width:4px}
+  #panel-body::-webkit-scrollbar-thumb{background:rgba(0,0,0,.15);border-radius:2px}
+  #highlight-toggle{display:none;align-items:center;gap:5px;background:transparent;border:1.5px solid rgba(0,0,0,.14);border-radius:14px;padding:4px 10px 4px 8px;cursor:pointer;font-family:'Inter',sans-serif;font-size:.42rem;font-weight:500;letter-spacing:.12em;color:rgba(0,0,0,.38);text-transform:uppercase;transition:background .18s,border-color .18s,color .18s;white-space:nowrap;margin-top:8px}
+  #highlight-toggle.visible{display:flex}
+  #highlight-toggle:hover{background:rgba(0,0,0,.04);border-color:rgba(0,0,0,.22);color:rgba(0,0,0,.58)}
+  #highlight-toggle.active{background:rgba(0,0,0,.06);border-color:rgba(0,0,0,.3);color:rgba(0,0,0,.7)}
+  .hl-icon{width:12px;height:12px;flex-shrink:0;position:relative}
+  .hl-icon::before,.hl-icon::after{content:'';position:absolute;left:0;right:0;height:2.5px;background:currentColor;border-radius:1px}
+  .hl-icon::before{top:2px}
+  .hl-icon::after{bottom:2px}
+  mark.kw{background:transparent;color:inherit;border-bottom:2px solid var(--g-border,currentColor);padding:0;border-radius:0;font-weight:600}
 
-  /* TABLE */
-  table { width:100%; border-collapse:collapse; flex:1; table-layout:fixed; }
-  thead th {
-    font-weight:500; text-transform:uppercase; letter-spacing:.1em;
-    padding:8px 12px; text-align:left; font-size:.8rem;
-    border-bottom:2px solid rgba(0,0,0,.1); white-space:nowrap;
-  }
-  thead th:first-child  { width:92px; }
-  thead th:nth-child(2) { width:45%; }
-  thead th:nth-child(3) { width:55%; }
+  /* PANEL GROUPS */
+  .panel-group{border-radius:8px;overflow:hidden;margin-bottom:12px;border:1.5px solid var(--g-border);box-shadow:0 3px 18px var(--g-shadow);animation:grp-in .32s cubic-bezier(.34,1.2,.64,1) both}
+  .panel-group:last-child{margin-bottom:0}
+  @keyframes grp-in{from{opacity:0;transform:translateX(14px)}to{opacity:1;transform:translateX(0)}}
+  .same-dim-badge{font-size:.38rem;letter-spacing:.12em;text-transform:uppercase;padding:2px 7px;border-radius:10px;background:var(--g-border);color:#fff;opacity:.85;font-weight:600;flex-shrink:0}
+  .pg-head{padding:9px 14px 8px;background:var(--g-bg);display:flex;align-items:center;gap:8px}
+  .pg-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;background:var(--g-border)}
+  .pg-name{font-size:.48rem;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--g-heading);flex:1}
+  .pg-count{font-size:.42rem;letter-spacing:.08em;color:var(--g-label);font-weight:400}
+  .pe{background:var(--g-bg);border-top:1px solid var(--g-rule);padding:10px 14px;animation:pe-in .28s cubic-bezier(.34,1.1,.64,1) both;animation-delay:var(--ed,0ms);cursor:pointer;transition:background .15s}
+  .pe:hover{background:color-mix(in srgb,var(--g-bg) 85%,var(--g-border) 15%)}
+  .pe.expanded{background:color-mix(in srgb,var(--g-bg) 80%,var(--g-border) 20%)}
+  @keyframes pe-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+  .pe-cat{font-size:.42rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--g-label);margin-bottom:2px}
+  .pe-sub{font-size:.38rem;letter-spacing:.08em;text-transform:uppercase;color:var(--g-label);opacity:.65;margin-bottom:5px}
+  .pe-field{font-size:.6rem;line-height:1.5;color:var(--g-text);word-break:break-word;margin-top:3px}
+  .pe-field.srch{color:var(--g-label);font-style:italic}
+  .pe-id{display:inline-block;font-size:.5rem;font-weight:600;letter-spacing:.06em;opacity:.4;margin-right:4px}
+  .pe-flabel{font-size:.38rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;opacity:.55;margin-right:4px;color:var(--g-label)}
+  .pe-goto{display:none;margin-top:10px;width:100%;padding:6px 0;border-radius:6px;border:1.5px solid var(--g-border);background:transparent;color:var(--g-border);font-family:'Inter',sans-serif;font-size:.42rem;font-weight:600;letter-spacing:.14em;text-transform:uppercase;cursor:pointer;transition:background .15s,color .15s}
+  .pe-goto:hover{background:var(--g-border);color:#fff}
+  .pe.expanded .pe-goto{display:block}
 
-  tbody tr { border-bottom:2px solid rgba(0,0,0,.06); }
-  tbody tr:last-child { border-bottom:none; }
-  tbody td { padding:0; vertical-align:top; }
-  tbody td:first-child {
-    font-weight:500; font-size:.74rem; letter-spacing:.14em;
-    text-transform:uppercase; white-space:nowrap; padding:10px; vertical-align:middle;
-  }
+  /* SEED CARD */
+  #seed-card{border-radius:8px;overflow:hidden;margin-bottom:14px;border:2px solid var(--sc-border,rgba(0,0,0,.18));box-shadow:0 3px 18px var(--sc-shadow,rgba(0,0,0,.08));background:var(--sc-bg,#fff);animation:grp-in .28s cubic-bezier(.34,1.2,.64,1) both}
+  #sc-head{padding:8px 14px 7px;background:var(--sc-border);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  #sc-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;background:rgba(255,255,255,.7)}
+  #sc-label{font-size:.42rem;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.9);flex:1}
+  #sc-cat{font-size:.4rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.65);font-weight:500}
+  .sc-badge{font-size:.36rem;letter-spacing:.14em;text-transform:uppercase;padding:2px 7px;border-radius:10px;background:rgba(255,255,255,.22);color:rgba(255,255,255,.95);font-weight:700;flex-shrink:0;border:1px solid rgba(255,255,255,.3)}
+  #sc-body{padding:10px 14px;background:var(--sc-bg)}
+  .sc-field{font-size:.6rem;line-height:1.5;color:var(--sc-text);word-break:break-word;margin-top:4px}
+  .sc-field.srch{color:var(--sc-label);font-style:italic}
 
-  /* Citation cell */
-  .citation-cell { padding:8px 12px; overflow-y:auto; max-height:148px; }
-  .citation-entry { display:flex; gap:8px; padding:4px 0; border-bottom:1px solid rgba(0,0,0,.07); font-size:.68rem; line-height:1.48; }
-  .citation-entry:last-child { border-bottom:none; }
-  .cid  { flex-shrink:0; font-weight:600; font-size:.6rem; letter-spacing:.04em; opacity:.38; padding-top:1px; min-width:20px; }
-  .ctext { flex:1; }
-  .no-data { padding:10px 12px; font-style:italic; opacity:.28; font-size:.7rem; }
+  /* PLANE — box-shadow removed */
+  .plane{position:absolute;transform-style:preserve-3d;border-radius:8px;transition:transform .7s cubic-bezier(.4,0,.2,1),opacity .5s ease,width .52s cubic-bezier(.4,0,.2,1),height .52s cubic-bezier(.4,0,.2,1),left .52s cubic-bezier(.4,0,.2,1);overflow:hidden;font-size:16px;background:var(--p-bg);border:2px solid var(--p-border);color:var(--p-text)}
+  .plane::after{content:'';position:absolute;inset:0;background:linear-gradient(160deg,rgba(255,255,255,.07) 0%,transparent 50%);pointer-events:none;border-radius:8px;z-index:10}
+  .resize-handle{position:absolute;bottom:0;right:0;z-index:200;width:28px;height:28px;cursor:nwse-resize;display:flex;align-items:flex-end;justify-content:flex-end;padding:0 6px 6px 0;opacity:0;transition:opacity .2s;user-select:none;color:var(--p-label)}
+  .plane:hover .resize-handle{opacity:1}
+  .plane-inner{position:absolute;inset:0;display:flex;flex-direction:column;padding:30px 38px 20px}
+  .plane-title{font-weight:600;font-size:1.08rem;letter-spacing:.2em;margin-bottom:12px;flex-shrink:0;text-transform:uppercase;color:var(--p-heading);user-select:none}
 
-  /* Subdimension cell — read-only display, same style as citation-cell */
-  .subdimension-cell { padding:8px 12px; overflow-y:auto; max-height:148px; }
-  .subdimension-entry { display:flex; gap:8px; padding:4px 0; border-bottom:1px solid rgba(0,0,0,.07); font-size:.68rem; line-height:1.48; }
-  .subdimension-entry:last-child { border-bottom:none; }
-  .stext { flex:1; }
+  .table-wrap{--w-cat:80px;--w-sub:110px}
+  .table-wrap{flex:1;overflow-y:auto;overflow-x:hidden;min-height:0;scrollbar-width:thin;scrollbar-color:var(--p-label) transparent;display:flex;flex-direction:column;padding-right:14px}
+  .table-wrap::-webkit-scrollbar{width:5px}
+  .table-wrap::-webkit-scrollbar-thumb{background:var(--p-label);border-radius:3px}
 
-  /* PLANE THEMES */
-  .plane-1 { background:#e8f0ec; border:2px solid #81b29a; box-shadow:0 12px 80px rgba(129,178,154,.28); }
-  .plane-1 .plane-title,.plane-1 thead th             { color:#3a6b52; }
-  .plane-1 thead th                                   { border-bottom-color:rgba(58,107,82,.18); }
-  .plane-1 thead th:first-child,.plane-1 tbody td:first-child { color:rgba(58,107,82,.4); }
-  .plane-1 .citation-cell,.plane-1 .subdimension-cell { color:#2d5040; }
-  .plane-1 .citation-entry,.plane-1 .subdimension-entry { border-bottom-color:rgba(58,107,82,.1); }
+  .hdr-row{display:flex;border-bottom:2px solid var(--p-rule);position:sticky;top:0;z-index:5;background:var(--p-bg);flex-shrink:0}
+  .hdr-gutter{flex-shrink:0;width:var(--w-cat)}
+  .hdr-sub-gutter{flex-shrink:0;width:var(--w-sub)}
+  .hdr-cells{flex:1;display:flex;min-width:0}
+  .hdr-cell{flex-shrink:1;flex-basis:0;min-width:0;padding:6px 10px 5px;display:flex;flex-direction:column;align-items:flex-start;gap:2px;border-left:1px solid var(--p-rule);cursor:pointer;user-select:none;position:relative}
+  .hdr-cell:first-child{border-left:none}
+  .hdr-cell-name{font-weight:500;text-transform:uppercase;letter-spacing:.1em;font-size:.75rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--p-heading);width:100%;padding:3px 6px;border-radius:12px;border:1.5px solid transparent;transition:border-color .25s,background .25s,color .25s}
+  .hdr-cell.srch-on .hdr-cell-name{border-color:var(--p-border);background:rgba(0,0,0,.04);color:var(--p-border)}
+  .srch-pill{font-size:.36rem;font-style:italic;letter-spacing:.1em;color:var(--p-border);font-weight:500;white-space:nowrap;padding:0 6px;opacity:0;pointer-events:none;transition:none}
+  .hdr-cell.srch-on .srch-pill{animation:pill-flash 1.8s ease forwards}
+  @keyframes pill-flash{0%{opacity:0;transform:translateY(3px)}15%{opacity:1;transform:translateY(0)}70%{opacity:1}100%{opacity:0;transform:translateY(0)}}
 
-  .plane-2 { background:#d6d7e0; border:2px solid #3d405b; box-shadow:0 12px 80px rgba(61,64,91,.3); }
-  .plane-2 .plane-title,.plane-2 thead th             { color:#1e2035; }
-  .plane-2 thead th                                   { border-bottom-color:rgba(30,32,53,.18); }
-  .plane-2 thead th:first-child,.plane-2 tbody td:first-child { color:rgba(30,32,53,.38); }
-  .plane-2 .citation-cell,.plane-2 .subdimension-cell { color:#252740; }
-  .plane-2 .citation-entry,.plane-2 .subdimension-entry { border-bottom-color:rgba(30,32,53,.1); }
+  .cat-group{display:flex;border-bottom:2px solid var(--p-rule)}
+  .cat-group:last-child{border-bottom:none}
+  .cat-label{flex-shrink:0;width:var(--w-cat);padding:10px 8px 10px 0;display:flex;align-items:flex-start;font-weight:600;font-size:.74rem;letter-spacing:.14em;text-transform:uppercase;color:var(--p-label);user-select:none;cursor:default}
+  .cat-right{flex:1;display:flex;flex-direction:column;min-width:0;border-left:1px solid var(--p-rule)}
 
-  .plane-3 { background:#f7ebe6; border:2px solid #e07a5f; box-shadow:0 12px 80px rgba(224,122,95,.25); }
-  .plane-3 .plane-title,.plane-3 thead th             { color:#8a3520; }
-  .plane-3 thead th                                   { border-bottom-color:rgba(138,53,32,.18); }
-  .plane-3 thead th:first-child,.plane-3 tbody td:first-child { color:rgba(138,53,32,.38); }
-  .plane-3 .citation-cell,.plane-3 .subdimension-cell { color:#6b2a18; }
-  .plane-3 .citation-entry,.plane-3 .subdimension-entry { border-bottom-color:rgba(138,53,32,.1); }
+  .sub-group{display:flex;border-bottom:1px solid var(--p-entry-rule)}
+  .sub-group:last-child{border-bottom:none}
+  .sub-label{flex-shrink:0;width:var(--w-sub);padding:8px 6px 8px 8px;display:flex;align-items:flex-start;font-weight:500;font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;color:var(--p-label);opacity:.7;user-select:none;cursor:default;border-right:1px solid var(--p-entry-rule)}
+  .sub-entries{flex:1;display:flex;flex-direction:column;min-width:0}
 
-  .plane-4 { background:#fdfcf5; border:2px solid #c8c4a0; box-shadow:0 12px 80px rgba(180,174,130,.22); }
-  .plane-4 .plane-title,.plane-4 thead th             { color:#5a5630; }
-  .plane-4 thead th                                   { border-bottom-color:rgba(90,86,48,.14); }
-  .plane-4 thead th:first-child,.plane-4 tbody td:first-child { color:rgba(90,86,48,.38); }
-  .plane-4 .citation-cell,.plane-4 .subdimension-cell { color:#48451e; }
-  .plane-4 .citation-entry,.plane-4 .subdimension-entry { border-bottom-color:rgba(90,86,48,.1); }
+  .entry-row{display:flex;width:100%;border-bottom:1px solid var(--p-entry-rule);cursor:pointer;transition:background .18s,opacity .28s,filter .28s,box-shadow .3s}
+  .entry-row:last-child{border-bottom:none}
+  .entry-row:hover{background:var(--p-hover)}
+  .ecell{flex-shrink:1;flex-basis:0;min-width:0;padding:7px 10px;font-size:.68rem;line-height:1.5;color:var(--p-text);pointer-events:none;word-break:break-word;border-left:1px solid var(--p-entry-rule);transition:background .25s}
+  .ecell:first-child{border-left:none}
+  .entry-row.seed .ecell.srch{background:rgba(0,0,0,.06)}
+  .entry-row.match .ecell.srch{background:rgba(0,0,0,.04)}
+  .ecell-id{display:block;font-size:.52rem;font-weight:600;letter-spacing:.04em;opacity:.32;margin-bottom:1px}
+  .ecell-text{display:block}
+  .no-data{padding:10px 12px;font-style:italic;opacity:.28;font-size:.7rem}
+
+  .entry-row.muted{opacity:.12!important;filter:saturate(.2);background:transparent!important;box-shadow:none!important;animation:none!important;cursor:default}
+  .entry-row.seed {opacity:1!important;filter:none!important;background:transparent!important;box-shadow:none!important;cursor:pointer!important}
+  .entry-row.match{opacity:1!important;filter:none!important;background:transparent!important;box-shadow:none!important;cursor:pointer!important}
+  .entry-row.seed .ecell.srch{background:var(--p-cluster-seed)!important;box-shadow:0 0 0 2px var(--p-border),0 0 20px var(--p-shadow);animation:spulse 2s ease-in-out infinite}
+  .entry-row.match .ecell.srch{background:var(--p-cluster-match)!important;box-shadow:0 0 0 1px var(--p-border-faint),0 0 12px var(--p-shadow-faint);animation:mglow 2.6s ease-in-out infinite;animation-delay:var(--gd,0s)}
+  .entry-row.seed .ecell.srch+.ecell.srch{border-left:none;box-shadow:0 0 0 2px var(--p-border),0 0 20px var(--p-shadow);clip-path:inset(-20px -20px -20px 0)}
+  .entry-row.seed .ecell.srch:has(+.ecell.srch){clip-path:inset(-20px 0 -20px -20px)}
+  .entry-row.match .ecell.srch+.ecell.srch{border-left:none;box-shadow:0 0 0 1px var(--p-border-faint),0 0 12px var(--p-shadow-faint);clip-path:inset(-20px -20px -20px 0)}
+  .entry-row.match .ecell.srch:has(+.ecell.srch){clip-path:inset(-20px 0 -20px -20px)}
+  @keyframes spulse{0%,100%{box-shadow:0 0 0 2px var(--p-border),0 0 18px var(--p-shadow)}50%{box-shadow:0 0 0 2px var(--p-border),0 0 40px var(--p-shadow)}}
+  @keyframes mglow{0%,100%{box-shadow:0 0 0 1px var(--p-border-faint),0 0 8px var(--p-shadow-faint)}50%{box-shadow:0 0 0 1px var(--p-border-faint),0 0 24px var(--p-shadow-faint)}}
 
   /* BOTTOM BAR */
-  .bottom-bar {
-    position:relative; z-index:300; width:100%; background:#fff;
-    box-shadow:0 -1px 0 rgba(0,0,0,.08);
-    display:flex; flex-direction:column; align-items:center; gap:8px; padding:14px 24px 16px; flex-shrink:0;
-  }
-  .carousel-wrap { display:flex; align-items:center; width:240px; }
-  .carousel-arrow {
-    flex-shrink:0; width:24px; height:24px; display:flex; align-items:center; justify-content:center;
-    background:none; border:none; cursor:pointer; color:rgba(0,0,0,.3);
-    transition:color .18s; border-radius:50%; padding:0;
-  }
-  .carousel-arrow:hover { color:rgba(0,0,0,.65); }
-  .dot-window { flex:1; display:flex; align-items:center; justify-content:center; gap:14px; height:28px; }
-  .dot {
-    width:12px; height:12px; border-radius:50%; cursor:pointer; flex-shrink:0;
-    transition:opacity .3s ease, transform .3s cubic-bezier(.34,1.56,.64,1), outline .2s ease;
-    outline:2px solid transparent; outline-offset:3px;
-  }
-  .dot:hover { opacity:.7!important; transform:scale(1.3)!important; }
-  .dot.active { outline-color:rgba(0,0,0,.22); }
-  .dot-label {
-    font-size:.48rem; letter-spacing:.18em; color:rgba(0,0,0,.32);
-    text-transform:uppercase; font-weight:400; text-align:center; min-height:1.1em; max-width:400px; transition:color .22s;
-  }
+  .bottom-bar{position:relative;z-index:300;width:100%;background:#fff;box-shadow:0 -1px 0 rgba(0,0,0,.08);display:flex;flex-direction:column;align-items:center;gap:8px;padding:14px 24px 16px;flex-shrink:0}
+  .carousel-wrap{display:flex;align-items:center;width:240px}
+  .carr-arrow{flex-shrink:0;width:24px;height:24px;display:flex;align-items:center;justify-content:center;background:none;border:none;cursor:pointer;color:rgba(0,0,0,.3);transition:color .18s;border-radius:50%;padding:0}
+  .carr-arrow:hover{color:rgba(0,0,0,.65)}
+  .dot-window{flex:1;display:flex;align-items:center;justify-content:center;gap:14px;height:28px}
+  .dot{width:12px;height:12px;border-radius:50%;cursor:pointer;flex-shrink:0;transition:opacity .3s,transform .3s cubic-bezier(.34,1.56,.64,1),outline .2s;outline:2px solid transparent;outline-offset:3px}
+  .dot:hover{opacity:.7!important;transform:scale(1.3)!important}
+  .dot.active{outline-color:rgba(0,0,0,.22)}
+  .dot-label{font-size:.48rem;letter-spacing:.18em;color:rgba(0,0,0,.32);text-transform:uppercase;font-weight:400;text-align:center;min-height:1.1em;max-width:400px;transition:color .22s}
 </style>
 </head>
 <body>
@@ -172,34 +174,47 @@
   <span id="status">Fetching spreadsheet…</span>
   <header>
     <h1>Dimensional Framework</h1>
-    <p>Click dot or arrows to switch dimension</p>
+    <p>Click any entry to reveal related citations across all dimensions</p>
   </header>
-  <button id="view-toggle" aria-pressed="false">
-    <span class="toggle-icon"><span></span><span></span></span>
-    3D View
-  </button>
+  <div class="top-bar-right">
+    <button id="panel-open-btn" class="tbtn" aria-pressed="false">
+      <span class="panel-icon"><span></span><span></span><span></span></span>Related
+    </button>
+    <button id="view-toggle" class="tbtn" aria-pressed="false">
+      <span class="toggle-icon"><span></span><span></span></span>3D View
+    </button>
+  </div>
 </div>
 
-<div id="stage">
-  <div id="scene-inner">
-    <div class="scene">
-      <div class="stack" id="stack"></div>
+<div id="stage-wrap">
+  <div id="stage">
+    <div id="scene-inner">
+      <div class="scene"><div class="stack" id="stack"></div></div>
+    </div>
+  </div>
+  <div id="cluster-panel">
+    <div id="panel-inner">
+      <div id="panel-head">
+        <div id="panel-head-text">
+          <div id="panel-title">Related Entries</div>
+          <div id="panel-subtitle"></div>
+          <button id="highlight-toggle"><span class="hl-icon"></span>Highlight keywords</button>
+        </div>
+        <button id="panel-close">✕</button>
+      </div>
+      <div id="panel-body"></div>
     </div>
   </div>
 </div>
 
 <div class="bottom-bar">
   <div class="carousel-wrap">
-    <button class="carousel-arrow" id="arr-left" aria-label="Previous">
-      <svg width="8" height="14" viewBox="0 0 8 14" fill="none">
-        <path d="M7 1L1 7L7 13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
+    <button class="carr-arrow" id="arr-left" aria-label="Previous">
+      <svg width="8" height="14" viewBox="0 0 8 14" fill="none"><path d="M7 1L1 7L7 13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
     </button>
     <div class="dot-window" id="dot-window"></div>
-    <button class="carousel-arrow" id="arr-right" aria-label="Next">
-      <svg width="8" height="14" viewBox="0 0 8 14" fill="none">
-        <path d="M1 1L7 7L1 13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
+    <button class="carr-arrow" id="arr-right" aria-label="Next">
+      <svg width="8" height="14" viewBox="0 0 8 14" fill="none"><path d="M1 1L7 7L1 13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
     </button>
   </div>
   <div class="dot-label" id="hint-label"></div>
@@ -208,394 +223,642 @@
 <script>
 'use strict';
 
-// ─────────────────────────────────────────────────────────────────────────────
-// CONFIGURATION — edit these if your tab names or column headers change
-// ─────────────────────────────────────────────────────────────────────────────
-
-const XLSX_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRKom5SD7yrnPoGV4pzsf4f20uv0nkrZXEDRA6_-g_ZTogUVBNPzeDAr4Przl7WA9Y07ev5XNuZbhTz/pub?output=xlsx'
-
-const PLANES = [
-  { tab:'VALUES',         cls:'plane-1', color:'#81b29a', title:'The Dimension of Visions & Values' },
-  { tab:'ORGANIZATIONAL', cls:'plane-2', color:'#3d405b', title:'The Organisational Dimension'      },
-  { tab:'RELATIONAL',     cls:'plane-3', color:'#e07a5f', title:'The Relational Dimension'           },
-  { tab:'PHYSICAL',       cls:'plane-4', color:'#c8c4a0', title:'The Physical Dimension'             },
+// ── Colour engine ─────────────────────────────────────────────────
+function shift(hex,{h=0,s=0,l=0,a=1}={}){
+  const r=parseInt(hex.slice(1,3),16)/255,g=parseInt(hex.slice(3,5),16)/255,b=parseInt(hex.slice(5,7),16)/255;
+  const mx=Math.max(r,g,b),mn=Math.min(r,g,b);
+  let hh=0,ss=0,ll=(mx+mn)/2;
+  if(mx!==mn){const d=mx-mn;ss=ll>.5?d/(2-mx-mn):d/(mx+mn);switch(mx){case r:hh=((g-b)/d+(g<b?6:0))/6;break;case g:hh=((b-r)/d+2)/6;break;case b:hh=((r-g)/d+4)/6;break;}}
+  hh=((hh*360+h)%360+360)%360;ss=Math.max(0,Math.min(100,ss*100+s));ll=Math.max(0,Math.min(100,ll*100+l));
+  return a<1?`hsla(${hh.toFixed(1)},${ss.toFixed(1)}%,${ll.toFixed(1)}%,${a})`:`hsl(${hh.toFixed(1)},${ss.toFixed(1)}%,${ll.toFixed(1)}%)`;
+}
+function mkPlane(border){
+  return{border,
+    get bg(){return shift(this.border,{l:40})},
+    get dot(){return this.border},
+    get text(){return shift(this.border,{l:-20,s:-20})},
+    get heading(){return shift(this.border,{l:-20,s:-20})},
+    get label(){return shift(this.border,{l:-20,s:-20})},
+    get rule(){return shift(this.border,{l:15})},
+    get entryRule(){return shift(this.border,{l:20})},
+    get hover(){return shift(this.border,{l:28,a:.55})},
+    get shadow(){return shift(this.border,{a:.28})},
+    get shadowFaint(){return shift(this.border,{l:10,a:.18})},
+    get borderFaint(){return shift(this.border,{l:10,a:.5})},
+    get clusterSeed(){return shift(this.border,{l:30,a:.65})},
+    get clusterMatch(){return shift(this.border,{l:33,a:.40})},
+  };
+}
+const PLANE_COLORS=[
+  mkPlane('#81b29a'),
+  {...mkPlane('#5a3f86'),get bg(){return shift(this.border,{l:60})}},
+  mkPlane('#535fc1'),
+  mkPlane('#bb463c'),
 ];
 
-const ROWS = [
-  { label:'WHAT?', keys:['WHAT','MORPHOLOGY'] },
-  { label:'WHO?',  keys:['WHO','AGENCY']       },
-  { label:'WHY?',  keys:['WHY','TELEOLOGY']    },
-  { label:'HOW?',  keys:['HOW','PRAXIS']       },
+// ── Config ────────────────────────────────────────────────────────
+const XLSX_URL='https://docs.google.com/spreadsheets/d/e/2PACX-1vRKom5SD7yrnPoGV4pzsf4f20uv0nkrZXEDRA6_-g_ZTogUVBNPzeDAr4Przl7WA9Y07ev5XNuZbhTz/pub?output=xlsx';
+
+const PLANES=[
+  {tab:'VALUES',         title:'The Dimension of Visions & Values'},
+  {tab:'ORGANIZATIONAL', title:'The Organisational Dimension'},
+  {tab:'RELATIONAL',     title:'The Relational Dimension'},
+  {tab:'PHYSICAL',       title:'The Physical Dimension'},
 ];
 
-const COL_ID_KEYS           = ['ID','NO.','NO ','NUM','#'];
-const COL_CITATION_KEYS     = ['CITATION','REFERENCE','SOURCE','FULL CIT','APA'];
-const COL_SUBDIMENSION_KEYS = ['SUBDIMENSION', ,'SUB-DIMENSION','SUB DIMENSION','SUBDIM','DIMENSION'];
-const COL_CATEGORY_KEYS     = ['CATEGORY','ROW','TYPE','DIMENSION ROW','One of the options'];
+const STOP_WORDS=new Set(['a','an','the','and','or','of','in','on','at','to','for','by','with','from','is','are','was','were','be','been','have','has','had','do','does','did','will','would','could','should','may','might','not','no','but','so','than','that','their','them','then','there','these','they','this','those','through','what','when','where','which','who','how','all','any','each','some','such','its','our','as','if','into','about','after','before','during','including','pp','vol','ed','eds','de','van','von','et','al','doi','housing','cohousing','living','urban','design','community','space','social','people','study','case','research','analysis','journal','review','international','new','city','based']);
+const MIN_KW=5,MIN_SHARED=2;
 
-// ─────────────────────────────────────────────────────────────────────────────
-// CONSTANTS
-// ─────────────────────────────────────────────────────────────────────────────
+// ── Layout state ──────────────────────────────────────────────────
+let SCENE_W=1360,SCENE_H=960,PLANE_W=99999,PLANE_H=99999,PLANE_L=40,PLANE_T=100;
+const PAD_X=300,PAD_Y=100,GAP=144,N=PLANES.length,VISIBLE=3;
+const VIEW_FLAT={rotX:0,rotY:0},VIEW_3D={rotX:-20,rotY:15};
+let is3D=false,order=[0,1,2,3],animating=false;
 
-const GAP = 144, N = PLANES.length, VISIBLE = 3;
-const VIEW_FLAT   = { rotX:0,   rotY:0  };
-const VIEW_ANGLED = { rotX:-20, rotY:15 };
-let is3D = false, order = [0,1,2,3], animating = false;
+// ── DOM ───────────────────────────────────────────────────────────
+const stageEl   =document.getElementById('stage');
+const sceneInner=document.getElementById('scene-inner');
+const stackEl   =document.getElementById('stack');
+const hintLabel =document.getElementById('hint-label');
+const toggleBtn =document.getElementById('view-toggle');
+const panelOpenBtn=document.getElementById('panel-open-btn');
+const dotWindow =document.getElementById('dot-window');
+const arrLeft   =document.getElementById('arr-left');
+const arrRight  =document.getElementById('arr-right');
+const statusEl  =document.getElementById('status');
+const clusterPanel=document.getElementById('cluster-panel');
+const panelBody =document.getElementById('panel-body');
+const panelSub  =document.getElementById('panel-subtitle');
+const panelClose=document.getElementById('panel-close');
+const hlToggle  =document.getElementById('highlight-toggle');
 
-// ─────────────────────────────────────────────────────────────────────────────
-// DOM REFS
-// ─────────────────────────────────────────────────────────────────────────────
+const setStatus=(m,err=false)=>{statusEl.textContent=m;statusEl.classList.toggle('err',err);statusEl.style.opacity='1'};
+const escH=t=>String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const normStr=s=>String(s??'').toUpperCase().trim();
 
-const stackEl   = document.getElementById('stack');
-const hintLabel = document.getElementById('hint-label');
-const toggleBtn = document.getElementById('view-toggle');
-const dotWindow = document.getElementById('dot-window');
-const arrLeft   = document.getElementById('arr-left');
-const arrRight  = document.getElementById('arr-right');
-const statusEl  = document.getElementById('status');
-
-function setStatus(msg, isErr=false) {
-  statusEl.textContent = msg;
-  statusEl.classList.toggle('err', isErr);
-  statusEl.style.opacity = '1';
+function applyColors(el,c){
+  const v={'--p-bg':c.bg,'--p-border':c.border,'--p-shadow':c.shadow,'--p-shadow-faint':c.shadowFaint,'--p-border-faint':c.borderFaint,'--p-heading':c.heading,'--p-text':c.text,'--p-label':c.label,'--p-rule':c.rule,'--p-entry-rule':c.entryRule,'--p-hover':c.hover,'--p-cluster-seed':c.clusterSeed,'--p-cluster-match':c.clusterMatch};
+  Object.entries(v).forEach(([k,val])=>el.style.setProperty(k,val));
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// BUILD PLANE HTML SHELLS
-// ─────────────────────────────────────────────────────────────────────────────
+// ── FitScene ──────────────────────────────────────────────────────
+let fitDone=false;
+function fitScene(){
+  const sw=stageEl.clientWidth,sh=stageEl.clientHeight;
+  SCENE_W=sw;SCENE_H=sh;
+  sceneInner.style.cssText=`width:${sw}px;height:${sh}px;transform:translate(-50%,-50%)`;
+  const sc=sceneInner.querySelector('.scene');
+  if(sc)sc.style.cssText=`width:${sw}px;height:${sh}px`;
+  stackEl.style.width=sw+'px';stackEl.style.height=sh+'px';
+  const maxW=Math.max(200,sw-PAD_X*2),maxH=Math.max(120,sh-PAD_Y*2);
+  const nW=Math.min(PLANE_W,maxW),nH=Math.min(PLANE_H,maxH);
+  const ch=nW!==PLANE_W||nH!==PLANE_H;
+  PLANE_W=nW;PLANE_H=nH;PLANE_L=Math.round((sw-nW)/2);PLANE_T=PAD_Y;
+  document.querySelectorAll('.plane').forEach(pl=>{
+    if(!fitDone)pl.style.transition='none';
+    pl.style.left=PLANE_L+'px';pl.style.top=PLANE_T+'px';
+    if(ch){pl.style.width=nW+'px';pl.style.height=nH+'px';}
+    if(!fitDone)requestAnimationFrame(()=>{pl.style.transition='transform .7s cubic-bezier(.4,0,.2,1),opacity .5s ease,width .52s cubic-bezier(.4,0,.2,1),height .52s cubic-bezier(.4,0,.2,1),left .52s cubic-bezier(.4,0,.2,1)';});
+  });
+  fitDone=true;applyPositions(false);
+}
+window.addEventListener('resize',fitScene);
 
-const planeEls = PLANES.map((p, pi) => {
-  const el = document.createElement('div');
-  el.className = `plane ${p.cls}`;
-  el.dataset.planeIdx = pi;
-
-  el.innerHTML = `
+// ── Build plane shells ─────────────────────────────────────────────
+const planeEls=PLANES.map((p,pi)=>{
+  const c=PLANE_COLORS[pi],el=document.createElement('div');
+  el.className='plane';el.dataset.planeIdx=pi;applyColors(el,c);
+  el.innerHTML=`
+    <div class="resize-handle"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M11 1L1 11M11 5L5 11M11 9L9 11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" opacity="0.5"/></svg></div>
     <div class="plane-inner">
       <div class="plane-title">${p.title}</div>
-      <table>
-        <thead><tr>
-          <th></th>
-          <th>Citation</th>
-          <th>Subdimension</th>
-        </tr></thead>
-        <tbody>
-          ${ROWS.map((r, ri) => `
-            <tr>
-              <td>${r.label}</td>
-              <td class="citation-cell" id="cc-${pi}-${ri}">
-                <span class="no-data">Loading…</span>
-              </td>
-              <td class="subdimension-cell" id="sc-${pi}-${ri}">
-                <span class="no-data">Loading…</span>
-              </td>
-            </tr>`).join('')}
-        </tbody>
-      </table>
+      <div class="table-wrap" id="tw-${pi}">
+        <div class="hdr-row" id="hr-${pi}"><div class="hdr-gutter"></div><div class="hdr-sub-gutter"></div><div class="hdr-cells" id="hc-${pi}"></div></div>
+        <div id="body-${pi}"></div>
+      </div>
     </div>`;
-
   stackEl.appendChild(el);
   return el;
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// XLSX PARSING HELPERS
-// ─────────────────────────────────────────────────────────────────────────────
+// ── Utilities ─────────────────────────────────────────────────────
+function extractKW(text){
+  return[...new Set(String(text).toLowerCase().replace(/[^a-z\s]/g,' ').split(/\s+/).filter(w=>w.length>=MIN_KW&&!STOP_WORDS.has(w)))];
+}
+function highlightKW(text,kwSet){
+  if(!kwSet||!kwSet.size)return escH(text);
+  const pat=new RegExp(`\\b(${[...kwSet].map(k=>k.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('|')})\\b`,'gi');
+  return escH(text).replace(pat,m=>`<mark class="kw">${m}</mark>`);
+}
+function emptyMsg(t='Select an entry to see related citations'){
+  return`<div style="padding:24px 4px;font-size:.6rem;color:rgba(0,0,0,.3);text-align:center;letter-spacing:.1em;text-transform:uppercase;">${t}</div>`;
+}
 
-const norm = s => String(s ?? '').toUpperCase().trim();
+// ── PARSE TAB ─────────────────────────────────────────────────────
+function parseTab(ws){
+  const aoa=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+  if(aoa.length<2)return{cats:[],cols:[]};
 
-function findColIdx(headers, ...keyGroups) {
-  const h = headers.map(norm);
-  for (const keys of keyGroups) {
-    for (let i = 0; i < h.length; i++) {
-      if (keys.some(k => h[i].includes(k))) return i;
-    }
+  const row0=aoa[0];
+  const includedCols=new Set();
+  row0.forEach((cell,ci)=>{
+    if(String(cell??'').toUpperCase().includes('COLUMN'))includedCols.add(ci);
+  });
+
+  let hdrRowIdx=-1;
+  for(let ri=0;ri<aoa.length;ri++){
+    if(String(aoa[ri][0]??'').trim()==='HEADER ROW'){hdrRowIdx=ri;break;}
   }
-  return -1;
-}
+  if(hdrRowIdx<0||hdrRowIdx>=aoa.length-1)return{cats:[],cols:[]};
+  const hdrRow=aoa[hdrRowIdx];
 
-function matchRowLabel(cellVal) {
-  const v = norm(cellVal);
-  return ROWS.findIndex(r => r.keys.some(k => v.includes(k)));
-}
-
-function parseTab(ws, tabName) {
-  // Returns { WHAT:[], WHO:[], WHY:[], HOW:[] }
-  // Each array entry: { id, cit, sub }  ← sub is the new subdimension field
-  const result = { WHAT:[], WHO:[], WHY:[], HOW:[] };
-  const rowKeys = ['WHAT','WHO','WHY','HOW'];
-
-  const aoa = XLSX.utils.sheet_to_json(ws, { header:1, defval:'' });
-  if (!aoa.length) { console.warn(`[${tabName}] Sheet is empty`); return result; }
-
-  console.group(`[${tabName}] Raw sheet (first 8 rows):`);
-  aoa.slice(0, 8).forEach((r, i) => console.log(`Row ${i}:`, r));
-  console.groupEnd();
-
-  // Header row is always row index 2 (the 3rd row)
-  let hdrIdx = 2;
-
-  if (hdrIdx >= 0) {
-    const headers = aoa[hdrIdx];
-    const iId  = findColIdx(headers, COL_ID_KEYS);
-    const iCit = findColIdx(headers, COL_CITATION_KEYS);
-    const iSub = findColIdx(headers, COL_SUBDIMENSION_KEYS);
-    const iCat = findColIdx(headers, COL_CATEGORY_KEYS);
-
-    console.log(`[${tabName}] Header row ${hdrIdx} → id:${iId} citation:${iCit} subdimension:${iSub} category:${iCat}`);
-    console.log(`[${tabName}] Headers:`, headers);
-
-    if (iSub < 0) console.warn(`[${tabName}] No subdimension column found. Headers:`, headers.map(norm));
-    if (iCit < 0) console.warn(`[${tabName}] No citation column found. Headers:`, headers.map(norm));
-
-    for (let i = hdrIdx + 1; i < aoa.length; i++) {
-      const row = aoa[i];
-      if (!row || row.every(c => !norm(c))) continue;
-
-      // Need at least citation OR subdimension to be worth including
-      const cit = iCit >= 0 ? String(row[iCit] ?? '').trim() : '';
-      const sub = iSub >= 0 ? String(row[iSub] ?? '').trim() : '';
-      if (!cit && !sub) continue;
-
-      const id  = norm(iId >= 0 ? row[iId] : String(i - hdrIdx));
-      const cat = norm(iCat >= 0 ? row[iCat] : '');
-      const ri  = matchRowLabel(cat);
-
-      const entry = { id: id || String(i - hdrIdx), cit, sub };
-
-      if (ri >= 0) {
-        result[rowKeys[ri]].push(entry);
-      } else {
-        // Fallback: try first column as category
-        const firstColRi = matchRowLabel(row[0]);
-        if (firstColRi >= 0) {
-          result[rowKeys[firstColRi]].push(entry);
-        }
-      }
-    }
-
-  } else {
-    // Strategy 2: no header — col A = category, col B = citation, col C = subdimension
-    console.warn(`[${tabName}] No header row found. Trying fallback layout.`);
-    for (let i = 0; i < aoa.length; i++) {
-      const row = aoa[i];
-      if (!row || row.every(c => !norm(c))) continue;
-      const ri = matchRowLabel(row[0]);
-      if (ri >= 0) {
-        const cit = String(row[1] ?? '').trim();
-        const sub = String(row[2] ?? '').trim();
-        if (cit || sub) result[rowKeys[ri]].push({ id: String(i + 1), cit, sub });
-      }
-    }
+  const groupColIdx=1;
+  const subGroupColIdx=2;
+  const cols=[];
+  for(let ci=3;ci<hdrRow.length;ci++){
+    if(!includedCols.has(ci))continue;
+    const label=String(hdrRow[ci]??'').trim()||`Col ${ci}`;
+    cols.push({ci,label,searchable:false});
   }
 
-  console.log(`[${tabName}] Parsed:`, Object.fromEntries(Object.entries(result).map(([k,v])=>[k,v.length])));
-  return result;
+  const catOrder=[];
+  const catMap={};
+
+  for(let ri=hdrRowIdx+1;ri<aoa.length;ri++){
+    const row=aoa[ri];
+    if(!row||row.every(c=>String(c??'').trim()===''))continue;
+    const catVal=String(row[groupColIdx]??'').trim();
+    if(!catVal)continue;
+    const subVal=String(row[subGroupColIdx]??'').trim();
+
+    if(!catMap[catVal]){catMap[catVal]={subOrder:[],subMap:{}};catOrder.push(catVal);}
+    const cm=catMap[catVal];
+    if(!cm.subMap[subVal]){cm.subMap[subVal]=[];cm.subOrder.push(subVal);}
+
+    const values={};
+    cols.forEach(col=>{values[col.ci]=String(row[col.ci]??'').trim();});
+    cm.subMap[subVal].push({id:String(ri-hdrRowIdx),values});
+  }
+
+  const cats=catOrder.map(val=>{
+    const cm=catMap[val];
+    return{val,subs:cm.subOrder.map(sv=>({val:sv,entries:cm.subMap[sv]}))};
+  });
+  return{cats,cols};
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// FILL PLANE CELLS
-// ─────────────────────────────────────────────────────────────────────────────
+// ── FILL PLANE ────────────────────────────────────────────────────
+const COL_GROW_DEFAULT=1;
+function fillPlane(pi,parsed){
+  const{cats,cols}=parsed;
+  planeEls[pi]._cols=cols;
 
-function fillPlane(pi, data) {
-  const rowKeys = ['WHAT','WHO','WHY','HOW'];
-  ROWS.forEach((_, ri) => {
-    const citCell = document.getElementById(`cc-${pi}-${ri}`);
-    const subCell = document.getElementById(`sc-${pi}-${ri}`);
-    const entries = data[rowKeys[ri]] || [];
+  cols.forEach(col=>{col._grow=COL_GROW_DEFAULT;});
 
-    // ── Citation column ──
-    if (citCell) {
-      const citEntries = entries.filter(e => e.cit);
-      if (!citEntries.length) {
-        citCell.innerHTML = '<span class="no-data">—</span>';
-      } else {
-        citCell.innerHTML = citEntries.map(e =>
-          `<div class="citation-entry">
-            <span class="cid">${e.id}</span>
-            <span class="ctext">${e.cit}</span>
-          </div>`
-        ).join('');
-      }
-    }
+  const hc=document.getElementById(`hc-${pi}`);
+  hc.innerHTML='';
+  cols.forEach(col=>{
+    const cell=document.createElement('div');
+    cell.className='hdr-cell'+(col.searchable?' srch-on':'');
+    cell.style.flexGrow=col._grow;
+    cell.style.flexBasis='0';
 
-    // ── Subdimension column ──
-    if (subCell) {
-      const subEntries = entries.filter(e => e.sub);
-      if (!subEntries.length) {
-        subCell.innerHTML = '<span class="no-data">—</span>';
-      } else {
-        subCell.innerHTML = subEntries.map(e =>
-          `<div class="subdimension-entry">
-            <span class="cid">${e.id}</span>
-            <span class="stext">${e.sub}</span>
-          </div>`
-        ).join('');
-      }
-    }
+    const name=document.createElement('span');
+    name.className='hdr-cell-name';
+    name.textContent=col.label;
+
+    const pill=document.createElement('span');
+    pill.className='srch-pill';
+    pill.textContent='Included in match';
+
+    cell.appendChild(name);
+    cell.appendChild(pill);
+
+    cell.addEventListener('click',()=>{
+      col.searchable=!col.searchable;
+      const colLabel=col.label;
+
+      PLANES.forEach((_,otherPi)=>{
+        const otherCols=planeEls[otherPi]._cols||[];
+        otherCols.forEach(otherCol=>{
+          if(otherCol.label!==colLabel)return;
+          otherCol.searchable=col.searchable;
+
+          const otherHc=document.getElementById(`hc-${otherPi}`);
+          const allHdrCells=[...(otherHc?.querySelectorAll('.hdr-cell')||[])];
+          const matchHdr=allHdrCells.find(h=>h.querySelector('.hdr-cell-name')?.textContent===colLabel);
+          if(matchHdr){
+            matchHdr.classList.remove('srch-on');
+            if(col.searchable){
+              void matchHdr.offsetWidth;
+              matchHdr.classList.add('srch-on');
+            }
+          }
+
+          document.querySelectorAll(`.entry-row[data-plane-idx="${otherPi}"] .ecell[data-ci="${otherCol.ci}"]`).forEach(ec=>{
+            ec.classList.toggle('srch',col.searchable);
+          });
+        });
+        recomputeKW(otherPi);
+      });
+
+      if(activeSeed)activateCluster(activeSeed,activeSeedCell,true);
+    });
+    hc.appendChild(cell);
+  });
+
+  const body=document.getElementById(`body-${pi}`);
+  body.innerHTML='';
+  if(!cats.length){body.innerHTML='<div class="no-data">No data found</div>';return;}
+
+  cats.forEach(({val,subs})=>{
+    const catGrp=document.createElement('div');
+    catGrp.className='cat-group';
+
+    const catLbl=document.createElement('div');
+    catLbl.className='cat-label';
+    catLbl.textContent=val;
+
+    const catRight=document.createElement('div');
+    catRight.className='cat-right';
+
+    subs.forEach(({val:subVal,entries})=>{
+      const subGrp=document.createElement('div');
+      subGrp.className='sub-group';
+
+      const subLbl=document.createElement('div');
+      subLbl.className='sub-label';
+      subLbl.textContent=subVal;
+
+      const subEntries=document.createElement('div');
+      subEntries.className='sub-entries';
+
+      entries.forEach(e=>{
+        const row=document.createElement('div');
+        row.className='entry-row';
+        row.dataset.planeIdx=pi;
+        row.dataset.catVal=val;
+        row.dataset.subVal=subVal;
+        row.dataset.entryId=e.id;
+
+        const kwSrc=cols.filter(c=>c.searchable).map(c=>e.values[c.ci]||'').join(' ');
+        row.dataset.keywords=extractKW(kwSrc).join(' ');
+
+        cols.forEach(col=>{
+          const cell=document.createElement('div');
+          cell.className='ecell'+(col.searchable?' srch':'');
+          cell.style.flexGrow=col._grow;
+          cell.style.flexBasis='0';
+          cell.dataset.ci=col.ci;
+
+          const idSpan=document.createElement('span');
+          idSpan.className='ecell-id';
+          idSpan.textContent=e.id;
+
+          const txt=document.createElement('span');
+          txt.className='ecell-text';
+          txt.textContent=e.values[col.ci]||'';
+
+          cell.appendChild(idSpan);
+          cell.appendChild(txt);
+          row.appendChild(cell);
+        });
+
+        row.addEventListener('click',ev=>{ev.stopPropagation();const cc=ev.target.closest('.ecell');activateCluster(row,cc||null);});
+        subEntries.appendChild(row);
+      });
+
+      subGrp.appendChild(subLbl);
+      subGrp.appendChild(subEntries);
+      catRight.appendChild(subGrp);
+    });
+
+    catGrp.appendChild(catLbl);
+    catGrp.appendChild(catRight);
+    body.appendChild(catGrp);
   });
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// MAIN LOAD
-// ─────────────────────────────────────────────────────────────────────────────
-
-async function loadData() {
-  try {
-    setStatus('Fetching spreadsheet…');
-    const res = await fetch(XLSX_URL, { cache: 'no-store' });
-    if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
-
-    setStatus('Parsing…');
-    const buf = await res.arrayBuffer();
-    const wb  = XLSX.read(buf, { type:'array' });
-
-    console.log('All sheet names:', wb.SheetNames);
-
-    const findTab = target => {
-      const t = norm(target);
-      return wb.SheetNames.find(n => norm(n) === t)
-          || wb.SheetNames.find(n => norm(n).includes(t) || t.includes(norm(n)));
-    };
-
-    let totalEntries = 0;
-
-    for (let pi = 0; pi < PLANES.length; pi++) {
-      const p       = PLANES[pi];
-      const tabName = findTab(p.tab);
-
-      if (!tabName) {
-        console.error(`Tab "${p.tab}" not found. Available:`, wb.SheetNames);
-        ROWS.forEach((_, ri) => {
-          const cc = document.getElementById(`cc-${pi}-${ri}`);
-          const sc = document.getElementById(`sc-${pi}-${ri}`);
-          const msg = `<span class="no-data" style="color:#c0392b">Tab not found: "${p.tab}"</span>`;
-          if (cc) cc.innerHTML = msg;
-          if (sc) sc.innerHTML = msg;
-        });
-        continue;
-      }
-
-      const data = parseTab(wb.Sheets[tabName], tabName);
-      fillPlane(pi, data);
-      totalEntries += Object.values(data).reduce((s, a) => s + a.length, 0);
-    }
-
-    setStatus(`${totalEntries} entr${totalEntries !== 1 ? 'ies' : 'y'} loaded`);
-    setTimeout(() => { statusEl.style.opacity = '0'; }, 3000);
-
-  } catch (err) {
-    console.error('Failed to load spreadsheet:', err);
-    setStatus(`Load failed: ${err.message}`, true);
-    document.querySelectorAll('.no-data').forEach(el => { el.textContent = 'Error loading data'; });
-  }
+function recomputeKW(pi){
+  const cols=planeEls[pi]._cols||[];
+  document.querySelectorAll(`.entry-row[data-plane-idx="${pi}"]`).forEach(row=>{
+    if(row===activeSeed)return; // seed row keywords are owned by activateCluster, never overwritten here
+    const kwSrc=cols.map(col=>{
+      if(!col.searchable)return'';
+      return row.querySelector(`.ecell[data-ci="${col.ci}"] .ecell-text`)?.textContent||'';
+    }).join(' ');
+    row.dataset.keywords=extractKW(kwSrc).join(' ');
+  });
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// CAROUSEL DOTS
-// ─────────────────────────────────────────────────────────────────────────────
+// ── Cluster engine ────────────────────────────────────────────────
+let activeSeed=null,hlOn=true;
 
-const dotEls = PLANES.map((p, i) => {
-  const d = document.createElement('div');
-  d.className = 'dot';
-  d.style.background = p.color;
-  dotWindow.appendChild(d);
-  d.addEventListener('click', e => { e.stopPropagation(); if (!animating) bringToTop(i); });
-  d.addEventListener('mouseenter', () => { hintLabel.textContent = p.title.toUpperCase(); hintLabel.style.color = 'rgba(0,0,0,.55)'; });
-  d.addEventListener('mouseleave', refreshHint);
-  return d;
+hlToggle.addEventListener('click',()=>{
+  hlOn=!hlOn;
+  hlToggle.classList.toggle('active',hlOn);
+  const ic=document.createElement('span');ic.className='hl-icon';
+  hlToggle.innerHTML='';hlToggle.appendChild(ic);
+  hlToggle.appendChild(document.createTextNode(hlOn?' Highlight keywords':' Show keywords'));
+  panelBody.querySelectorAll('mark.kw').forEach(m=>{m.style.borderBottomColor=hlOn?'':'transparent';m.style.fontWeight=hlOn?'':'inherit';});
 });
 
-arrLeft.addEventListener('click',  () => { if (!animating) bringToTop((order[0] + N - 1) % N); });
-arrRight.addEventListener('click', () => { if (!animating) bringToTop((order[0] + 1) % N); });
+// activeSeedCells: Set of column ci values whose text contributes to the seed keywords.
+// Managed ONLY here — recomputeKW never touches the seed row.
+let activeSeedCells=new Set();
 
-function renderCarousel() {
-  dotEls.forEach((d, i) => {
-    const dist   = (i - order[0] + N) % N;
-    const signed = dist > N / 2 ? dist - N : dist;
-    const half   = Math.floor(VISIBLE / 2);
-    if (Math.abs(signed) <= half) {
-      d.style.display   = 'block';
-      d.style.opacity   = signed === 0 ? '1' : String(Math.max(0, 0.35 - Math.abs(signed) * 0.05));
-      d.style.transform = `scale(${signed === 0 ? 1.55 : Math.max(0.1, 1 - Math.abs(signed) * 0.22)})`;
-      d.classList.toggle('active', signed === 0);
+// activateCluster(seedEl, clickedCell, preserveSeed)
+//   seedEl:       the .entry-row element
+//   clickedCell:  the specific .ecell clicked (or null)
+//   preserveSeed: true when called from a column toggle — keep existing seed/cell selection
+function activateCluster(seedEl,clickedCell,preserveSeed){
+  const pi=parseInt(seedEl.dataset.planeIdx);
+  const cols=planeEls[pi]._cols||[];
+
+  if(!preserveSeed){
+    const clickedCi=clickedCell?parseInt(clickedCell.dataset.ci):-1;
+    const clickedCol=cols.find(c=>c.ci===clickedCi);
+    const isSameRow=(activeSeed===seedEl);
+
+    if(isSameRow){
+      // ── Already-selected row clicked again ───────────────────────
+      if(clickedCell && clickedCol){
+        if(clickedCol.searchable){
+          // Toggle this cell in/out
+          if(activeSeedCells.has(clickedCi)){
+            activeSeedCells.delete(clickedCi);
+            if(activeSeedCells.size===0){
+              // Last cell removed — clear everything
+              clearCluster();activeSeed=null;activeSeedCells=new Set();
+              panelSub.textContent='No entry selected · click an entry to find matches';
+              panelBody.innerHTML=emptyMsg();hlToggle.classList.remove('visible','active');
+              return;
+            }
+          } else {
+            activeSeedCells.add(clickedCi);
+          }
+        } else {
+          // Non-searchable cell clicked → clear
+          clearCluster();activeSeed=null;activeSeedCells=new Set();
+          panelSub.textContent='No entry selected · click an entry to find matches';
+          panelBody.innerHTML=emptyMsg();hlToggle.classList.remove('visible','active');
+          return;
+        }
+      } else {
+        // Row background clicked → clear
+        clearCluster();activeSeed=null;activeSeedCells=new Set();
+        panelSub.textContent='No entry selected · click an entry to find matches';
+        panelBody.innerHTML=emptyMsg();hlToggle.classList.remove('visible','active');
+        return;
+      }
     } else {
-      d.style.display = 'none';
+      // ── New row selected ─────────────────────────────────────────
+      clearCluster();
+      activeSeed=seedEl;
+      hlOn=true;
+      activeSeedCells=new Set();
+
+      if(clickedCell && clickedCol){
+        if(clickedCol.searchable){
+          activeSeedCells.add(clickedCi); // only this one cell
+        }
+        // if not searchable: activeSeedCells stays empty → no keywords → no matches
+      } else {
+        // No specific cell (e.g. goto btn) — fall back to all searchable cols
+        cols.filter(c=>c.searchable).forEach(c=>activeSeedCells.add(c.ci));
+      }
     }
+  }
+  // preserveSeed=true: activeSeedCells is unchanged, just re-run matching below
+
+  // ── Recompute seed keywords from selected cells only ─────────────
+  const kwSrc=cols.filter(c=>activeSeedCells.has(c.ci))
+    .map(c=>seedEl.querySelector(`.ecell[data-ci="${c.ci}"] .ecell-text`)?.textContent||'').join(' ');
+  seedEl.dataset.keywords=extractKW(kwSrc).join(' ');
+
+  // ── Update .srch highlight on seed row cells ──────────────────────
+  seedEl.querySelectorAll('.ecell').forEach(ec=>{
+    ec.classList.toggle('srch',activeSeedCells.has(parseInt(ec.dataset.ci)));
+  });
+
+  const seedPi=parseInt(seedEl.dataset.planeIdx);
+  const seedKws=new Set(seedEl.dataset.keywords.split(' ').filter(Boolean));
+
+  if(!seedKws.size){
+    panelSub.textContent='No keywords — try enabling more columns or click a searchable cell';
+    panelBody.innerHTML=emptyMsg('No keywords to match');
+    hlToggle.classList.remove('visible','active');
+    clusterPanel.classList.add('open');syncPanelBtn();
+    document.querySelectorAll('.entry-row').forEach(r=>r.classList.add('muted'));
+    seedEl.classList.remove('muted');seedEl.classList.add('seed');
+    return;
+  }
+
+  document.querySelectorAll('.entry-row').forEach(r=>r.classList.add('muted'));
+  seedEl.classList.remove('muted');seedEl.classList.add('seed');
+
+  const byPlane=new Map();
+  let total=0;const matchedKws=new Set();let delay=0;
+
+  document.querySelectorAll('.entry-row').forEach(row=>{
+    if(row===seedEl)return;
+    const rKws=new Set(row.dataset.keywords.split(' ').filter(Boolean));
+    const shared=[];seedKws.forEach(k=>{if(rKws.has(k))shared.push(k);});
+    if(shared.length<MIN_SHARED)return;
+    row.classList.remove('muted');row.classList.add('match');
+    row.style.setProperty('--gd',`${Math.min(delay,1.2)}s`);delay+=0.1;
+    shared.forEach(k=>matchedKws.add(k));total++;
+    const rPi=parseInt(row.dataset.planeIdx);
+    if(!byPlane.has(rPi))byPlane.set(rPi,[]);
+    const rCols=planeEls[rPi]._cols||[];
+    const fv={};rCols.forEach(col=>{fv[col.ci]=row.querySelector(`.ecell[data-ci="${col.ci}"] .ecell-text`)?.textContent||'';});
+    byPlane.get(rPi).push({id:row.dataset.entryId,cat:row.dataset.catVal,sub:row.dataset.subVal,fv,cols:rCols,sharedKws:new Set(shared)});
+  });
+
+  buildPanel(seedEl,byPlane,matchedKws,total,seedPi);
+}
+
+function buildPanel(seedEl,byPlane,matchedKws,total,seedPi){
+  panelSub.textContent=total?`${total} match${total===1?'':'es'} · shared: ${[...matchedKws].slice(0,4).join(', ')}`:'No related entries found';
+  panelBody.innerHTML='';
+
+  const sc=PLANE_COLORS[seedPi];
+  const card=document.createElement('div');card.id='seed-card';
+  [['--sc-bg',sc.bg],['--sc-border',sc.border],['--sc-shadow',sc.shadow],['--sc-text',sc.text],['--sc-label',sc.label]].forEach(([k,v])=>card.style.setProperty(k,v));
+  const seedCols=planeEls[seedPi]._cols||[];
+  let sFields='';
+  seedCols.forEach((col)=>{
+    const val=seedEl.querySelector(`.ecell[data-ci="${col.ci}"] .ecell-text`)?.textContent||'';if(!val)return;
+    const html=col.searchable?highlightKW(val,matchedKws):escH(val);
+    sFields+=`<div class="sc-field${col.searchable?' srch':''}"><span class="pe-flabel" style="color:var(--sc-label)">${escH(col.label)}</span><span class="pe-id">${seedEl.dataset.entryId}</span>${html}</div>`;
+  });
+  card.innerHTML=`<div id="sc-head"><div id="sc-dot"></div><div id="sc-label">${escH(PLANES[seedPi].title)}</div><span class="sc-badge">Selected</span><div id="sc-cat">${escH(seedEl.dataset.catVal||'')}${seedEl.dataset.subVal?' · '+escH(seedEl.dataset.subVal):''}</div></div><div id="sc-body">${sFields||'<span style="opacity:.35;font-size:.6rem">—</span>'}</div>`;
+  panelBody.appendChild(card);
+
+  if(!byPlane.size){
+    panelBody.insertAdjacentHTML('beforeend',emptyMsg('No matches found'));
+    hlToggle.classList.remove('visible','active');
+  } else {
+    hlToggle.classList.add('visible','active');
+    const ic=document.createElement('span');ic.className='hl-icon';
+    hlToggle.innerHTML='';hlToggle.appendChild(ic);hlToggle.appendChild(document.createTextNode(' Highlight keywords'));
+    let gd=0;
+    [...byPlane.keys()].sort((a,b)=>{if(a===seedPi)return-1;if(b===seedPi)return 1;return a-b;}).forEach(pi=>{
+      const entries=byPlane.get(pi);const c=PLANE_COLORS[pi];const isSame=pi===seedPi;
+      const grp=document.createElement('div');grp.className='panel-group'+(isSame?' same-dim':'');grp.style.animationDelay=`${gd}ms`;
+      [['--g-bg',c.bg],['--g-border',c.border],['--g-shadow',c.shadow],['--g-heading',c.heading],['--g-text',c.text],['--g-label',c.label],['--g-rule',c.rule]].forEach(([k,v])=>grp.style.setProperty(k,v));
+      gd+=80;
+      grp.innerHTML=`<div class="pg-head"><div class="pg-dot"></div><div class="pg-name">${escH(PLANES[pi].title)}</div>${isSame?'<span class="same-dim-badge">Same Dim.</span>':''}<div class="pg-count">${entries.length}</div></div>`;
+      let ed=gd;
+      entries.forEach(e=>{
+        const div=document.createElement('div');
+        div.className='pe';
+        div.style.setProperty('--ed',`${ed}ms`);
+        ed+=50;
+
+        let html=`<div class="pe-cat">${escH(e.cat)}</div>`;
+        if(e.sub)html+=`<div class="pe-sub">↳ ${escH(e.sub)}</div>`;
+
+        e.cols.forEach(col=>{
+          const val=e.fv[col.ci]||'';if(!val)return;
+          const vH=col.searchable?highlightKW(val,e.sharedKws):escH(val);
+          html+=`<div class="pe-field${col.searchable?' srch':''}"><span class="pe-flabel">${escH(col.label)}</span><span class="pe-id">${escH(e.id)}</span>${vH}</div>`;
+        });
+
+        div.innerHTML=html;
+
+        const gotoBtn=document.createElement('button');
+        gotoBtn.className='pe-goto';
+        gotoBtn.textContent='Go to cell';
+        div.appendChild(gotoBtn);
+
+        div.addEventListener('click',ev=>{
+          if(ev.target===gotoBtn)return;
+          const isExpanded=div.classList.contains('expanded');
+          grp.querySelectorAll('.pe.expanded').forEach(p=>p.classList.remove('expanded'));
+          if(!isExpanded)div.classList.add('expanded');
+        });
+
+        gotoBtn.addEventListener('click',ev=>{
+          ev.stopPropagation();
+          const targetRow=document.querySelector(`.entry-row[data-plane-idx="${pi}"][data-entry-id="${e.id}"]`);
+          if(!targetRow)return;
+          if(order[0]!==pi)bringToTop(pi);
+          setTimeout(()=>activateCluster(targetRow,null),order[0]===pi?0:700);
+        });
+
+        grp.appendChild(div);
+      });
+      panelBody.appendChild(grp);
+    });
+  }
+  const wasOpen=clusterPanel.classList.contains('open');
+  clusterPanel.classList.add('open');syncPanelBtn();
+  if(!wasOpen)fitScene();
+}
+
+function clearCluster(){document.querySelectorAll('.muted,.seed,.match').forEach(el=>{el.classList.remove('muted','seed','match');el.style.removeProperty('--gd');});}
+function closePanelCompletely(){clearCluster();activeSeed=null;activeSeedCells=new Set();hlToggle.classList.remove('visible','active');clusterPanel.classList.remove('open');panelBody.innerHTML='';syncPanelBtn();setTimeout(fitScene,540);}
+function syncPanelBtn(){const o=clusterPanel.classList.contains('open');panelOpenBtn.classList.toggle('active',o);panelOpenBtn.setAttribute('aria-pressed',o);}
+
+panelClose.addEventListener('click',closePanelCompletely);
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closePanelCompletely();});
+panelOpenBtn.addEventListener('click',()=>{
+  if(clusterPanel.classList.contains('open')){closePanelCompletely();return;}
+  panelSub.textContent='No entry selected · click an entry to find matches';
+  panelBody.innerHTML=emptyMsg();clusterPanel.classList.add('open');syncPanelBtn();fitScene();
+});
+stackEl.addEventListener('click',e=>{
+  if(!e.target.closest('.entry-row')&&!e.target.closest('.resize-handle')){
+    if(activeSeed){clearCluster();activeSeed=null;activeSeedCells=new Set();panelSub.textContent='No entry selected · click an entry to find matches';panelBody.innerHTML=emptyMsg();hlToggle.classList.remove('visible','active');}
+  }
+});
+
+// ── Load data ─────────────────────────────────────────────────────
+async function loadData(){
+  try{
+    setStatus('Fetching spreadsheet…');
+    const res=await fetch(XLSX_URL,{cache:'no-store'});
+    if(!res.ok)throw new Error(`HTTP ${res.status}`);
+    setStatus('Parsing…');
+    const wb=XLSX.read(await res.arrayBuffer(),{type:'array'});
+    const findTab=t=>{const tn=normStr(t);return wb.SheetNames.find(n=>normStr(n)===tn)||wb.SheetNames.find(n=>normStr(n).includes(tn)||tn.includes(normStr(n)));};
+    let total=0;
+    for(let pi=0;pi<PLANES.length;pi++){
+      const tn=findTab(PLANES[pi].tab);
+      if(!tn){document.getElementById(`body-${pi}`).innerHTML=`<div class="no-data" style="color:#c0392b">Tab "${PLANES[pi].tab}" not found</div>`;continue;}
+      const parsed=parseTab(wb.Sheets[tn]);
+      fillPlane(pi,parsed);
+      total+=parsed.cats.reduce((s,c)=>s+c.subs.reduce((ss,sb)=>ss+sb.entries.length,0),0);
+    }
+    setStatus(`${total} entr${total!==1?'ies':'y'} loaded`);
+    setTimeout(()=>{statusEl.style.opacity='0';},3000);
+  }catch(err){console.error(err);setStatus(`Load failed: ${err.message}`,true);}
+}
+
+// ── Carousel ──────────────────────────────────────────────────────
+const dotEls=PLANES.map((p,i)=>{
+  const d=document.createElement('div');d.className='dot';d.style.background=PLANE_COLORS[i].dot;
+  dotWindow.appendChild(d);
+  d.addEventListener('click',e=>{e.stopPropagation();if(!animating)bringToTop(i);});
+  d.addEventListener('mouseenter',()=>{hintLabel.textContent=p.title.toUpperCase();hintLabel.style.color='rgba(0,0,0,.55)';});
+  d.addEventListener('mouseleave',refreshHint);
+  return d;
+});
+arrLeft.addEventListener('click',()=>{if(!animating)bringToTop((order[0]+N-1)%N);});
+arrRight.addEventListener('click',()=>{if(!animating)bringToTop((order[0]+1)%N);});
+function renderCarousel(){
+  dotEls.forEach((d,i)=>{
+    const dist=(i-order[0]+N)%N,signed=dist>N/2?dist-N:dist,half=Math.floor(VISIBLE/2);
+    if(Math.abs(signed)<=half){d.style.display='block';d.style.opacity=signed===0?'1':String(Math.max(0,.35-Math.abs(signed)*.05));d.style.transform=`scale(${signed===0?1.55:Math.max(.1,1-Math.abs(signed)*.22)})`;d.classList.toggle('active',signed===0);}
+    else d.style.display='none';
   });
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// STACK / CAROUSEL ANIMATION
-// ─────────────────────────────────────────────────────────────────────────────
-
-function getZ(sp) { return (N - 1 - sp) * GAP; }
-
-function refreshHint() {
-  hintLabel.textContent = PLANES[order[0]].title.toUpperCase();
-  hintLabel.style.color = 'rgba(0,0,0,.3)';
+// ── Stack ─────────────────────────────────────────────────────────
+const getZ=sp=>(N-1-sp)*GAP;
+function refreshHint(){hintLabel.textContent=PLANES[order[0]].title.toUpperCase();hintLabel.style.color='rgba(0,0,0,.3)';}
+function syncUI(){planeEls.forEach((el,i)=>{el.dataset.top=order[0]===i?'true':'false';});renderCarousel();refreshHint();}
+function applyPositions(animated=true){
+  order.forEach((pi,sp)=>{
+    const el=planeEls[pi];
+    el.style.transition=animated?'transform .65s cubic-bezier(.4,0,.2,1),opacity .5s ease':'none';
+    el.style.transform=`translateZ(${getZ(sp)}px)`;el.style.zIndex=N-sp;el.style.opacity=sp===0?'1':(0.82-sp*.08).toFixed(2);
+  });syncUI();
 }
-
-function syncUI() {
-  planeEls.forEach((el, i) => { el.dataset.top = order[0] === i ? 'true' : 'false'; });
-  renderCarousel();
-  refreshHint();
+function cycleOnce(done){
+  animating=true;const ti=order[0],el=planeEls[ti];
+  el.style.transition='transform .4s cubic-bezier(.4,0,.2,1),opacity .3s ease';el.style.transform=`translateZ(${getZ(0)+400}px)`;el.style.opacity='0';
+  setTimeout(()=>{order.push(order.shift());el.style.transition='none';el.style.transform=`translateZ(${getZ(N-1)-100}px)`;el.style.opacity='0';setTimeout(()=>{applyPositions(true);animating=false;if(done)done();},40);},380);
 }
+function bringToTop(t){if(order[0]===t||animating)return;function step(){if(order[0]!==t)cycleOnce(step);}step();}
 
-function applyPositions(animated = true) {
-  order.forEach((pi, sp) => {
-    const el = planeEls[pi];
-    el.style.transition = animated ? 'transform .65s cubic-bezier(.4,0,.2,1), opacity .5s ease' : 'none';
-    el.style.transform  = `translateZ(${getZ(sp)}px)`;
-    el.style.zIndex     = N - sp;
-    el.style.opacity    = sp === 0 ? '1' : (0.82 - sp * 0.08).toFixed(2);
-  });
-  syncUI();
-}
+// ── View toggle ───────────────────────────────────────────────────
+function applyView(){const v=is3D?VIEW_3D:VIEW_FLAT;stackEl.style.transform=`rotateX(${v.rotX}deg) rotateY(${v.rotY}deg)`;toggleBtn.classList.toggle('active',is3D);toggleBtn.setAttribute('aria-pressed',is3D);}
+toggleBtn.addEventListener('click',()=>{is3D=!is3D;applyView();});
 
-function cycleOnce(done) {
-  animating = true;
-  if (document.activeElement?.classList.contains('cell')) document.activeElement.blur();
-  const ti = order[0], el = planeEls[ti];
-  el.style.transition = 'transform .4s cubic-bezier(.4,0,.2,1), opacity .3s ease';
-  el.style.transform  = `translateZ(${getZ(0) + 400}px)`;
-  el.style.opacity    = '0';
-  setTimeout(() => {
-    order.push(order.shift());
-    el.style.transition = 'none';
-    el.style.transform  = `translateZ(${getZ(N - 1) - 100}px)`;
-    el.style.opacity    = '0';
-    setTimeout(() => { applyPositions(true); animating = false; if (done) done(); }, 40);
-  }, 380);
-}
+// ── Resize handle ─────────────────────────────────────────────────
+let rsz=false,rsX,rsY,rsW,rsH;
+document.addEventListener('mousedown',e=>{
+  const h=e.target.closest('.resize-handle');if(!h)return;e.preventDefault();e.stopPropagation();
+  const pl=h.closest('.plane');rsz=true;rsX=e.clientX;rsY=e.clientY;rsW=pl.offsetWidth;rsH=pl.offsetHeight;
+  document.body.style.cursor='nwse-resize';document.body.style.userSelect='none';
+  document.querySelectorAll('.plane').forEach(p=>p.style.transition='opacity .5s ease');
+});
+document.addEventListener('mousemove',e=>{
+  if(!rsz)return;
+  const maxW=Math.max(200,SCENE_W-PAD_X*2),maxH=Math.max(120,SCENE_H-PAD_Y*2);
+  let w=Math.max(320,Math.min(maxW,rsW+e.clientX-rsX)),h=Math.max(200,Math.min(maxH,rsH+e.clientY-rsY));
+  PLANE_W=w;PLANE_H=h;PLANE_L=Math.round((SCENE_W-w)/2);
+  document.querySelectorAll('.plane').forEach(pl=>{pl.style.width=w+'px';pl.style.height=h+'px';pl.style.left=PLANE_L+'px';});
+});
+document.addEventListener('mouseup',()=>{
+  if(!rsz)return;rsz=false;document.body.style.cursor='';document.body.style.userSelect='';
+  document.querySelectorAll('.plane').forEach(p=>{p.style.transition='transform .7s cubic-bezier(.4,0,.2,1),opacity .5s ease';});
+});
 
-function bringToTop(t) {
-  if (order[0] === t || animating) return;
-  function step() { if (order[0] !== t) cycleOnce(step); }
-  step();
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// VIEW TOGGLE
-// ─────────────────────────────────────────────────────────────────────────────
-
-function applyView() {
-  const v = is3D ? VIEW_ANGLED : VIEW_FLAT;
-  stackEl.style.transform = `rotateX(${v.rotX}deg) rotateY(${v.rotY}deg)`;
-  toggleBtn.classList.toggle('active', is3D);
-  toggleBtn.setAttribute('aria-pressed', is3D);
-}
-
-toggleBtn.addEventListener('click', () => { is3D = !is3D; applyView(); });
-
-// ─────────────────────────────────────────────────────────────────────────────
-// INIT
-// ─────────────────────────────────────────────────────────────────────────────
-
-applyPositions(false);
-applyView();
-renderCarousel();
-refreshHint();
-loadData();
+// ── Init ──────────────────────────────────────────────────────────
+applyPositions(false);applyView();renderCarousel();refreshHint();fitScene();loadData();
 </script>
 </body>
 </html>
