@@ -10,7 +10,6 @@
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
   html,body{width:100%;height:100%;background:#fff;display:flex;flex-direction:column;align-items:center;overflow:hidden;font-family:'Inter',sans-serif}
 
-  /* TOP BAR */
   .top-bar{position:relative;z-index:300;width:100%;background:#fff;box-shadow:0 1px 0 rgba(0,0,0,.08);display:flex;align-items:center;justify-content:center;padding:14px 24px;flex-shrink:0}
   header{text-align:center;flex:1}
   header h1{font-weight:300;font-size:.72rem;letter-spacing:.42em;color:rgba(0,0,0,.38);text-transform:uppercase}
@@ -34,14 +33,12 @@
   .panel-icon span:nth-child(3){width:100%}
   #panel-open-btn.active .panel-icon span:nth-child(2){width:100%}
 
-  /* STAGE */
   #stage-wrap{flex:1;width:100%;display:flex;overflow:hidden;min-height:0}
   #stage{flex:1;min-width:0;overflow:hidden;min-height:0;display:flex;align-items:center;justify-content:center;position:relative}
   #scene-inner{position:absolute;top:50%;left:50%;transform-origin:center center}
   .scene{perspective:2800px;perspective-origin:50% 42%}
   .stack{width:100%;height:100%;position:relative;transform-style:preserve-3d;transition:transform .7s cubic-bezier(.4,0,.2,1)}
 
-  /* SIDE PANEL */
   #cluster-panel{width:0;flex-shrink:0;overflow:hidden;background:#f7f7f8;border-left:1px solid rgba(0,0,0,.08);display:flex;flex-direction:column;transition:width .52s cubic-bezier(.4,0,.2,1);z-index:200}
   #cluster-panel.open{width:380px}
   #panel-inner{width:380px;height:100%;display:flex;flex-direction:column;overflow:hidden}
@@ -64,7 +61,6 @@
   .hl-icon::after{bottom:2px}
   mark.kw{background:transparent;color:inherit;border-bottom:2px solid var(--g-border,currentColor);padding:0;border-radius:0;font-weight:600}
 
-  /* PANEL GROUPS */
   .panel-group{border-radius:8px;overflow:hidden;margin-bottom:12px;border:1.5px solid var(--g-border);box-shadow:0 3px 18px var(--g-shadow);animation:grp-in .32s cubic-bezier(.34,1.2,.64,1) both}
   .panel-group:last-child{margin-bottom:0}
   @keyframes grp-in{from{opacity:0;transform:translateX(14px)}to{opacity:1;transform:translateX(0)}}
@@ -77,17 +73,16 @@
   .pe:hover{background:color-mix(in srgb,var(--g-bg) 85%,var(--g-border) 15%)}
   .pe.expanded{background:color-mix(in srgb,var(--g-bg) 80%,var(--g-border) 20%)}
   @keyframes pe-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
-  .pe-cat{font-size:.42rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--g-label);margin-bottom:2px}
-  .pe-sub{font-size:.38rem;letter-spacing:.08em;text-transform:uppercase;color:var(--g-label);opacity:.65;margin-bottom:5px}
+  /* Category · subcategory line per entry in sidebar */
+  .pe-location{font-size:.4rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--g-label);margin-bottom:4px}
+  .pe-location-sub{opacity:.6}
   .pe-field{font-size:.6rem;line-height:1.5;color:var(--g-text);word-break:break-word;margin-top:3px}
   .pe-field.srch{color:var(--g-label);font-style:italic}
-  .pe-id{display:inline-block;font-size:.5rem;font-weight:600;letter-spacing:.06em;opacity:.4;margin-right:4px}
   .pe-flabel{font-size:.38rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;opacity:.55;margin-right:4px;color:var(--g-label)}
   .pe-goto{display:none;margin-top:10px;width:100%;padding:6px 0;border-radius:6px;border:1.5px solid var(--g-border);background:transparent;color:var(--g-border);font-family:'Inter',sans-serif;font-size:.42rem;font-weight:600;letter-spacing:.14em;text-transform:uppercase;cursor:pointer;transition:background .15s,color .15s}
   .pe-goto:hover{background:var(--g-border);color:#fff}
   .pe.expanded .pe-goto{display:block}
 
-  /* SEED CARD */
   #seed-card{border-radius:8px;overflow:hidden;margin-bottom:14px;border:2px solid var(--sc-border,rgba(0,0,0,.18));box-shadow:0 3px 18px var(--sc-shadow,rgba(0,0,0,.08));background:var(--sc-bg,#fff);animation:grp-in .28s cubic-bezier(.34,1.2,.64,1) both}
   #sc-head{padding:8px 14px 7px;background:var(--sc-border);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
   #sc-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;background:rgba(255,255,255,.7)}
@@ -97,8 +92,8 @@
   #sc-body{padding:10px 14px;background:var(--sc-bg)}
   .sc-field{font-size:.6rem;line-height:1.5;color:var(--sc-text);word-break:break-word;margin-top:4px}
   .sc-field.srch{color:var(--sc-label);font-style:italic}
+  .sc-flabel{font-size:.38rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;opacity:.55;margin-right:4px;color:var(--sc-label)}
 
-  /* PLANE — box-shadow removed */
   .plane{position:absolute;transform-style:preserve-3d;border-radius:8px;transition:transform .7s cubic-bezier(.4,0,.2,1),opacity .5s ease,width .52s cubic-bezier(.4,0,.2,1),height .52s cubic-bezier(.4,0,.2,1),left .52s cubic-bezier(.4,0,.2,1);overflow:hidden;font-size:16px;background:var(--p-bg);border:2px solid var(--p-border);color:var(--p-text)}
   .plane::after{content:'';position:absolute;inset:0;background:linear-gradient(160deg,rgba(255,255,255,.07) 0%,transparent 50%);pointer-events:none;border-radius:8px;z-index:10}
   .resize-handle{position:absolute;bottom:0;right:0;z-index:200;width:28px;height:28px;cursor:nwse-resize;display:flex;align-items:flex-end;justify-content:flex-end;padding:0 6px 6px 0;opacity:0;transition:opacity .2s;user-select:none;color:var(--p-label)}
@@ -106,6 +101,7 @@
   .plane-inner{position:absolute;inset:0;display:flex;flex-direction:column;padding:30px 38px 20px}
   .plane-title{font-weight:600;font-size:1.08rem;letter-spacing:.2em;margin-bottom:12px;flex-shrink:0;text-transform:uppercase;color:var(--p-heading);user-select:none}
 
+  /* TABLE — change --w-cat and --w-sub to resize gutter columns */
   .table-wrap{--w-cat:80px;--w-sub:110px}
   .table-wrap{flex:1;overflow-y:auto;overflow-x:hidden;min-height:0;scrollbar-width:thin;scrollbar-color:var(--p-label) transparent;display:flex;flex-direction:column;padding-right:14px}
   .table-wrap::-webkit-scrollbar{width:5px}
@@ -121,42 +117,42 @@
   .hdr-cell.srch-on .hdr-cell-name{border-color:var(--p-border);background:rgba(0,0,0,.04);color:var(--p-border)}
   .srch-pill{font-size:.36rem;font-style:italic;letter-spacing:.1em;color:var(--p-border);font-weight:500;white-space:nowrap;padding:0 6px;opacity:0;pointer-events:none;transition:none}
   .hdr-cell.srch-on .srch-pill{animation:pill-flash 1.8s ease forwards}
-  @keyframes pill-flash{0%{opacity:0;transform:translateY(3px)}15%{opacity:1;transform:translateY(0)}70%{opacity:1}100%{opacity:0;transform:translateY(0)}}
+  @keyframes pill-flash{0%{opacity:0;transform:translateY(3px)}15%{opacity:1;transform:translateY(0)}70%{opacity:1}100%{opacity:0}}
 
   .cat-group{display:flex;border-bottom:2px solid var(--p-rule)}
   .cat-group:last-child{border-bottom:none}
   .cat-label{flex-shrink:0;width:var(--w-cat);padding:10px 8px 10px 0;display:flex;align-items:flex-start;font-weight:600;font-size:.74rem;letter-spacing:.14em;text-transform:uppercase;color:var(--p-label);user-select:none;cursor:default}
   .cat-right{flex:1;display:flex;flex-direction:column;min-width:0;border-left:1px solid var(--p-rule)}
-
   .sub-group{display:flex;border-bottom:1px solid var(--p-entry-rule)}
   .sub-group:last-child{border-bottom:none}
   .sub-label{flex-shrink:0;width:var(--w-sub);padding:8px 6px 8px 8px;display:flex;align-items:flex-start;font-weight:500;font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;color:var(--p-label);opacity:.7;user-select:none;cursor:default;border-right:1px solid var(--p-entry-rule)}
   .sub-entries{flex:1;display:flex;flex-direction:column;min-width:0}
 
-  .entry-row{display:flex;width:100%;border-bottom:1px solid var(--p-entry-rule);cursor:pointer;transition:background .18s,opacity .28s,filter .28s,box-shadow .3s}
+  .entry-row{display:flex;width:100%;border-bottom:1px solid var(--p-entry-rule)}
   .entry-row:last-child{border-bottom:none}
-  .entry-row:hover{background:var(--p-hover)}
-  .ecell{flex-shrink:1;flex-basis:0;min-width:0;padding:7px 10px;font-size:.68rem;line-height:1.5;color:var(--p-text);pointer-events:none;word-break:break-word;border-left:1px solid var(--p-entry-rule);transition:background .25s}
-  .ecell:first-child{border-left:none}
-  .entry-row.seed .ecell.srch{background:rgba(0,0,0,.06)}
-  .entry-row.match .ecell.srch{background:rgba(0,0,0,.04)}
-  .ecell-id{display:block;font-size:.52rem;font-weight:600;letter-spacing:.04em;opacity:.32;margin-bottom:1px}
-  .ecell-text{display:block}
-  .no-data{padding:10px 12px;font-style:italic;opacity:.28;font-size:.7rem}
 
-  .entry-row.muted{opacity:.12!important;filter:saturate(.2);background:transparent!important;box-shadow:none!important;animation:none!important;cursor:default}
-  .entry-row.seed {opacity:1!important;filter:none!important;background:transparent!important;box-shadow:none!important;cursor:pointer!important}
-  .entry-row.match{opacity:1!important;filter:none!important;background:transparent!important;box-shadow:none!important;cursor:pointer!important}
-  .entry-row.seed .ecell.srch{background:var(--p-cluster-seed)!important;box-shadow:0 0 0 2px var(--p-border),0 0 20px var(--p-shadow);animation:spulse 2s ease-in-out infinite}
-  .entry-row.match .ecell.srch{background:var(--p-cluster-match)!important;box-shadow:0 0 0 1px var(--p-border-faint),0 0 12px var(--p-shadow-faint);animation:mglow 2.6s ease-in-out infinite;animation-delay:var(--gd,0s)}
-  .entry-row.seed .ecell.srch+.ecell.srch{border-left:none;box-shadow:0 0 0 2px var(--p-border),0 0 20px var(--p-shadow);clip-path:inset(-20px -20px -20px 0)}
-  .entry-row.seed .ecell.srch:has(+.ecell.srch){clip-path:inset(-20px 0 -20px -20px)}
-  .entry-row.match .ecell.srch+.ecell.srch{border-left:none;box-shadow:0 0 0 1px var(--p-border-faint),0 0 12px var(--p-shadow-faint);clip-path:inset(-20px -20px -20px 0)}
-  .entry-row.match .ecell.srch:has(+.ecell.srch){clip-path:inset(-20px 0 -20px -20px)}
+  /* COL_GROW_DEFAULT is set in JS — all columns share one value, always aligned */
+  .ecell{flex-shrink:1;flex-basis:0;min-width:0;padding:7px 10px;font-size:.68rem;line-height:1.5;color:var(--p-text);word-break:break-word;border-left:1px solid var(--p-entry-rule);transition:background .22s,box-shadow .22s;cursor:pointer;position:relative}
+  .ecell:first-child{border-left:none}
+  .ecell:hover{background:var(--p-hover)}
+  .ecell.not-searchable{cursor:default}
+  .ecell-text{display:block;pointer-events:none}
+
+  .entry-row.muted{opacity:.1;filter:saturate(.15);pointer-events:none}
+
+  /* Seed cells — individually highlighted */
+  .ecell.seed-cell{background:var(--p-cluster-seed)!important;box-shadow:0 0 0 2px var(--p-border),0 0 20px var(--p-shadow);animation:spulse 2s ease-in-out infinite;z-index:1}
+  .ecell.match-cell{background:var(--p-cluster-match)!important;box-shadow:0 0 0 1px var(--p-border-faint),0 0 12px var(--p-shadow-faint);animation:mglow 2.6s ease-in-out infinite;animation-delay:var(--gd,0s);z-index:1}
+  /* Merge borders between adjacent highlighted cells */
+  .ecell.seed-cell+.ecell.seed-cell{border-left:none;clip-path:inset(-20px -20px -20px 0)}
+  .ecell.seed-cell:has(+.ecell.seed-cell){clip-path:inset(-20px 0 -20px -20px)}
+  .ecell.match-cell+.ecell.match-cell{border-left:none;clip-path:inset(-20px -20px -20px 0)}
+  .ecell.match-cell:has(+.ecell.match-cell){clip-path:inset(-20px 0 -20px -20px)}
   @keyframes spulse{0%,100%{box-shadow:0 0 0 2px var(--p-border),0 0 18px var(--p-shadow)}50%{box-shadow:0 0 0 2px var(--p-border),0 0 40px var(--p-shadow)}}
   @keyframes mglow{0%,100%{box-shadow:0 0 0 1px var(--p-border-faint),0 0 8px var(--p-shadow-faint)}50%{box-shadow:0 0 0 1px var(--p-border-faint),0 0 24px var(--p-shadow-faint)}}
 
-  /* BOTTOM BAR */
+  .no-data{padding:10px 12px;font-style:italic;opacity:.28;font-size:.7rem}
+
   .bottom-bar{position:relative;z-index:300;width:100%;background:#fff;box-shadow:0 -1px 0 rgba(0,0,0,.08);display:flex;flex-direction:column;align-items:center;gap:8px;padding:14px 24px 16px;flex-shrink:0}
   .carousel-wrap{display:flex;align-items:center;width:240px}
   .carr-arrow{flex-shrink:0;width:24px;height:24px;display:flex;align-items:center;justify-content:center;background:none;border:none;cursor:pointer;color:rgba(0,0,0,.3);transition:color .18s;border-radius:50%;padding:0}
@@ -169,12 +165,11 @@
 </style>
 </head>
 <body>
-
 <div class="top-bar">
   <span id="status">Fetching spreadsheet…</span>
   <header>
     <h1>Dimensional Framework</h1>
-    <p>Click any entry to reveal related citations across all dimensions</p>
+    <p>Click any cell to add it to the match · click empty space to clear</p>
   </header>
   <div class="top-bar-right">
     <button id="panel-open-btn" class="tbtn" aria-pressed="false">
@@ -223,7 +218,6 @@
 <script>
 'use strict';
 
-// ── Colour engine ─────────────────────────────────────────────────
 function shift(hex,{h=0,s=0,l=0,a=1}={}){
   const r=parseInt(hex.slice(1,3),16)/255,g=parseInt(hex.slice(3,5),16)/255,b=parseInt(hex.slice(5,7),16)/255;
   const mx=Math.max(r,g,b),mn=Math.min(r,g,b);
@@ -234,63 +228,44 @@ function shift(hex,{h=0,s=0,l=0,a=1}={}){
 }
 function mkPlane(border){
   return{border,
-    get bg(){return shift(this.border,{l:40})},
-    get dot(){return this.border},
-    get text(){return shift(this.border,{l:-20,s:-20})},
-    get heading(){return shift(this.border,{l:-20,s:-20})},
-    get label(){return shift(this.border,{l:-20,s:-20})},
-    get rule(){return shift(this.border,{l:15})},
-    get entryRule(){return shift(this.border,{l:20})},
-    get hover(){return shift(this.border,{l:28,a:.55})},
-    get shadow(){return shift(this.border,{a:.28})},
-    get shadowFaint(){return shift(this.border,{l:10,a:.18})},
+    get bg(){return shift(this.border,{l:40})},get dot(){return this.border},
+    get text(){return shift(this.border,{l:-20,s:-20})},get heading(){return shift(this.border,{l:-20,s:-20})},
+    get label(){return shift(this.border,{l:-20,s:-20})},get rule(){return shift(this.border,{l:15})},
+    get entryRule(){return shift(this.border,{l:20})},get hover(){return shift(this.border,{l:28,a:.55})},
+    get shadow(){return shift(this.border,{a:.28})},get shadowFaint(){return shift(this.border,{l:10,a:.18})},
     get borderFaint(){return shift(this.border,{l:10,a:.5})},
-    get clusterSeed(){return shift(this.border,{l:30,a:.65})},
-    get clusterMatch(){return shift(this.border,{l:33,a:.40})},
+    get clusterSeed(){return shift(this.border,{l:30,a:.65})},get clusterMatch(){return shift(this.border,{l:33,a:.40})},
   };
 }
-const PLANE_COLORS=[
-  mkPlane('#81b29a'),
-  {...mkPlane('#5a3f86'),get bg(){return shift(this.border,{l:60})}},
-  mkPlane('#535fc1'),
-  mkPlane('#bb463c'),
-];
+const PLANE_COLORS=[mkPlane('#81b29a'),{...mkPlane('#5a3f86'),get bg(){return shift(this.border,{l:60})}},mkPlane('#535fc1'),mkPlane('#bb463c')];
 
-// ── Config ────────────────────────────────────────────────────────
 const XLSX_URL='https://docs.google.com/spreadsheets/d/e/2PACX-1vRKom5SD7yrnPoGV4pzsf4f20uv0nkrZXEDRA6_-g_ZTogUVBNPzeDAr4Przl7WA9Y07ev5XNuZbhTz/pub?output=xlsx';
-
 const PLANES=[
-  {tab:'VALUES',         title:'The Dimension of Visions & Values'},
-  {tab:'ORGANIZATIONAL', title:'The Organisational Dimension'},
-  {tab:'RELATIONAL',     title:'The Relational Dimension'},
-  {tab:'PHYSICAL',       title:'The Physical Dimension'},
+  {tab:'VALUES',title:'The Dimension of Visions & Values'},
+  {tab:'ORGANIZATIONAL',title:'The Organisational Dimension'},
+  {tab:'RELATIONAL',title:'The Relational Dimension'},
+  {tab:'PHYSICAL',title:'The Physical Dimension'},
 ];
-
 const STOP_WORDS=new Set(['a','an','the','and','or','of','in','on','at','to','for','by','with','from','is','are','was','were','be','been','have','has','had','do','does','did','will','would','could','should','may','might','not','no','but','so','than','that','their','them','then','there','these','they','this','those','through','what','when','where','which','who','how','all','any','each','some','such','its','our','as','if','into','about','after','before','during','including','pp','vol','ed','eds','de','van','von','et','al','doi','housing','cohousing','living','urban','design','community','space','social','people','study','case','research','analysis','journal','review','international','new','city','based']);
 const MIN_KW=5,MIN_SHARED=2;
 
-// ── Layout state ──────────────────────────────────────────────────
+// ── COL_GROW_DEFAULT ─────────────────────────────────────────────────────────
+// Change this single value to adjust all column widths equally.
+// Headers always match cells because both read from col._grow which is set from this.
+const COL_GROW_DEFAULT=1;
+
 let SCENE_W=1360,SCENE_H=960,PLANE_W=99999,PLANE_H=99999,PLANE_L=40,PLANE_T=100;
-const PAD_X=SCENE_W/5,PAD_Y=100,GAP=144,N=PLANES.length,VISIBLE=3;
+const PAD_X=300,PAD_Y=100,GAP=144,N=PLANES.length,VISIBLE=3;
 const VIEW_FLAT={rotX:0,rotY:0},VIEW_3D={rotX:-20,rotY:15};
 let is3D=false,order=[0,1,2,3],animating=false;
 
-// ── DOM ───────────────────────────────────────────────────────────
-const stageEl   =document.getElementById('stage');
-const sceneInner=document.getElementById('scene-inner');
-const stackEl   =document.getElementById('stack');
-const hintLabel =document.getElementById('hint-label');
-const toggleBtn =document.getElementById('view-toggle');
-const panelOpenBtn=document.getElementById('panel-open-btn');
-const dotWindow =document.getElementById('dot-window');
-const arrLeft   =document.getElementById('arr-left');
-const arrRight  =document.getElementById('arr-right');
-const statusEl  =document.getElementById('status');
-const clusterPanel=document.getElementById('cluster-panel');
-const panelBody =document.getElementById('panel-body');
-const panelSub  =document.getElementById('panel-subtitle');
-const panelClose=document.getElementById('panel-close');
-const hlToggle  =document.getElementById('highlight-toggle');
+const stageEl=document.getElementById('stage'),sceneInner=document.getElementById('scene-inner');
+const stackEl=document.getElementById('stack'),hintLabel=document.getElementById('hint-label');
+const toggleBtn=document.getElementById('view-toggle'),panelOpenBtn=document.getElementById('panel-open-btn');
+const dotWindow=document.getElementById('dot-window'),arrLeft=document.getElementById('arr-left'),arrRight=document.getElementById('arr-right');
+const statusEl=document.getElementById('status'),clusterPanel=document.getElementById('cluster-panel');
+const panelBody=document.getElementById('panel-body'),panelSub=document.getElementById('panel-subtitle');
+const panelClose=document.getElementById('panel-close'),hlToggle=document.getElementById('highlight-toggle');
 
 const setStatus=(m,err=false)=>{statusEl.textContent=m;statusEl.classList.toggle('err',err);statusEl.style.opacity='1'};
 const escH=t=>String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
@@ -301,14 +276,12 @@ function applyColors(el,c){
   Object.entries(v).forEach(([k,val])=>el.style.setProperty(k,val));
 }
 
-// ── FitScene ──────────────────────────────────────────────────────
 let fitDone=false;
 function fitScene(){
   const sw=stageEl.clientWidth,sh=stageEl.clientHeight;
   SCENE_W=sw;SCENE_H=sh;
   sceneInner.style.cssText=`width:${sw}px;height:${sh}px;transform:translate(-50%,-50%)`;
-  const sc=sceneInner.querySelector('.scene');
-  if(sc)sc.style.cssText=`width:${sw}px;height:${sh}px`;
+  const sc=sceneInner.querySelector('.scene');if(sc)sc.style.cssText=`width:${sw}px;height:${sh}px`;
   stackEl.style.width=sw+'px';stackEl.style.height=sh+'px';
   const maxW=Math.max(200,sw-PAD_X*2),maxH=Math.max(120,sh-PAD_Y*2);
   const nW=Math.min(PLANE_W,maxW),nH=Math.min(PLANE_H,maxH);
@@ -318,382 +291,258 @@ function fitScene(){
     if(!fitDone)pl.style.transition='none';
     pl.style.left=PLANE_L+'px';pl.style.top=PLANE_T+'px';
     if(ch){pl.style.width=nW+'px';pl.style.height=nH+'px';}
-    if(!fitDone)requestAnimationFrame(()=>{pl.style.transition='transform .7s cubic-bezier(.4,0,.2,1),opacity .5s ease,width .52s cubic-bezier(.4,0,.2,1),height .52s cubic-bezier(.4,0,.2,1),left .52s cubic-bezier(.4,0,.2,1)';});
+    if(!fitDone)requestAnimationFrame(()=>{pl.style.transition='transform .7s cubic-bezier(.4,0,.2,1),opacity .5s ease,width .52s,height .52s,left .52s';});
   });
   fitDone=true;applyPositions(false);
 }
 window.addEventListener('resize',fitScene);
 
-// ── Build plane shells ─────────────────────────────────────────────
 const planeEls=PLANES.map((p,pi)=>{
   const c=PLANE_COLORS[pi],el=document.createElement('div');
   el.className='plane';el.dataset.planeIdx=pi;applyColors(el,c);
-  el.innerHTML=`
-    <div class="resize-handle"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M11 1L1 11M11 5L5 11M11 9L9 11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" opacity="0.5"/></svg></div>
-    <div class="plane-inner">
-      <div class="plane-title">${p.title}</div>
+  el.innerHTML=`<div class="resize-handle"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M11 1L1 11M11 5L5 11M11 9L9 11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" opacity="0.5"/></svg></div>
+    <div class="plane-inner"><div class="plane-title">${p.title}</div>
       <div class="table-wrap" id="tw-${pi}">
         <div class="hdr-row" id="hr-${pi}"><div class="hdr-gutter"></div><div class="hdr-sub-gutter"></div><div class="hdr-cells" id="hc-${pi}"></div></div>
-        <div id="body-${pi}"></div>
-      </div>
-    </div>`;
-  stackEl.appendChild(el);
-  return el;
+        <div id="body-${pi}"></div></div></div>`;
+  stackEl.appendChild(el);return el;
 });
 
-// ── Utilities ─────────────────────────────────────────────────────
-function extractKW(text){
-  return[...new Set(String(text).toLowerCase().replace(/[^a-z\s]/g,' ').split(/\s+/).filter(w=>w.length>=MIN_KW&&!STOP_WORDS.has(w)))];
-}
+function extractKW(text){return[...new Set(String(text).toLowerCase().replace(/[^a-z\s]/g,' ').split(/\s+/).filter(w=>w.length>=MIN_KW&&!STOP_WORDS.has(w)))];}
 function highlightKW(text,kwSet){
   if(!kwSet||!kwSet.size)return escH(text);
   const pat=new RegExp(`\\b(${[...kwSet].map(k=>k.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('|')})\\b`,'gi');
   return escH(text).replace(pat,m=>`<mark class="kw">${m}</mark>`);
 }
-function emptyMsg(t='Select an entry to see related citations'){
-  return`<div style="padding:24px 4px;font-size:.6rem;color:rgba(0,0,0,.3);text-align:center;letter-spacing:.1em;text-transform:uppercase;">${t}</div>`;
-}
+function emptyMsg(t='Click a cell to find related entries'){return`<div style="padding:24px 4px;font-size:.6rem;color:rgba(0,0,0,.3);text-align:center;letter-spacing:.1em;text-transform:uppercase;">${t}</div>`;}
 
-// ── PARSE TAB ─────────────────────────────────────────────────────
 function parseTab(ws){
   const aoa=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
   if(aoa.length<2)return{cats:[],cols:[]};
-
   const row0=aoa[0];
   const includedCols=new Set();
-  row0.forEach((cell,ci)=>{
-    if(String(cell??'').toUpperCase().includes('COLUMN'))includedCols.add(ci);
-  });
-
+  row0.forEach((cell,ci)=>{if(String(cell??'').toUpperCase().includes('COLUMN'))includedCols.add(ci);});
   let hdrRowIdx=-1;
-  for(let ri=0;ri<aoa.length;ri++){
-    if(String(aoa[ri][0]??'').trim()==='HEADER ROW'){hdrRowIdx=ri;break;}
-  }
+  for(let ri=0;ri<aoa.length;ri++){if(String(aoa[ri][0]??'').trim()==='HEADER ROW'){hdrRowIdx=ri;break;}}
   if(hdrRowIdx<0||hdrRowIdx>=aoa.length-1)return{cats:[],cols:[]};
   const hdrRow=aoa[hdrRowIdx];
-
-  const groupColIdx=1;
-  const subGroupColIdx=2;
   const cols=[];
   for(let ci=3;ci<hdrRow.length;ci++){
     if(!includedCols.has(ci))continue;
-    const label=String(hdrRow[ci]??'').trim()||`Col ${ci}`;
-    cols.push({ci,label,searchable:false});
+    cols.push({ci,label:String(hdrRow[ci]??'').trim()||`Col ${ci}`,searchable:false});
   }
-
-  const catOrder=[];
-  const catMap={};
-
+  const catOrder=[],catMap={};
   for(let ri=hdrRowIdx+1;ri<aoa.length;ri++){
     const row=aoa[ri];
     if(!row||row.every(c=>String(c??'').trim()===''))continue;
-    const catVal=String(row[groupColIdx]??'').trim();
-    if(!catVal)continue;
-    const subVal=String(row[subGroupColIdx]??'').trim();
-
+    const catVal=String(row[1]??'').trim();if(!catVal)continue;
+    const subVal=String(row[2]??'').trim();
     if(!catMap[catVal]){catMap[catVal]={subOrder:[],subMap:{}};catOrder.push(catVal);}
     const cm=catMap[catVal];
     if(!cm.subMap[subVal]){cm.subMap[subVal]=[];cm.subOrder.push(subVal);}
-
-    const values={};
-    cols.forEach(col=>{values[col.ci]=String(row[col.ci]??'').trim();});
+    const values={};cols.forEach(col=>{values[col.ci]=String(row[col.ci]??'').trim();});
     cm.subMap[subVal].push({id:String(ri-hdrRowIdx),values});
   }
-
-  const cats=catOrder.map(val=>{
-    const cm=catMap[val];
-    return{val,subs:cm.subOrder.map(sv=>({val:sv,entries:cm.subMap[sv]}))};
-  });
-  return{cats,cols};
+  return{cats:catOrder.map(val=>({val,subs:catMap[val].subOrder.map(sv=>({val:sv,entries:catMap[val].subMap[sv]}))})),cols};
 }
 
-// ── FILL PLANE ────────────────────────────────────────────────────
-const COL_GROW_DEFAULT=1;
 function fillPlane(pi,parsed){
   const{cats,cols}=parsed;
   planeEls[pi]._cols=cols;
-
   cols.forEach(col=>{col._grow=COL_GROW_DEFAULT;});
 
-  const hc=document.getElementById(`hc-${pi}`);
-  hc.innerHTML='';
+  // Headers
+  const hc=document.getElementById(`hc-${pi}`);hc.innerHTML='';
   cols.forEach(col=>{
     const cell=document.createElement('div');
     cell.className='hdr-cell'+(col.searchable?' srch-on':'');
-    cell.style.flexGrow=col._grow;
-    cell.style.flexBasis='0';
-
-    const name=document.createElement('span');
-    name.className='hdr-cell-name';
-    name.textContent=col.label;
-
-    const pill=document.createElement('span');
-    pill.className='srch-pill';
-    pill.textContent='Included in match';
-
-    cell.appendChild(name);
-    cell.appendChild(pill);
-
+    cell.style.flexGrow=col._grow;cell.style.flexBasis='0';
+    const name=document.createElement('span');name.className='hdr-cell-name';name.textContent=col.label;
+    const pill=document.createElement('span');pill.className='srch-pill';pill.textContent='Included in match';
+    cell.appendChild(name);cell.appendChild(pill);
     cell.addEventListener('click',()=>{
       col.searchable=!col.searchable;
       const colLabel=col.label;
-
-      PLANES.forEach((_,otherPi)=>{
-        const otherCols=planeEls[otherPi]._cols||[];
-        otherCols.forEach(otherCol=>{
-          if(otherCol.label!==colLabel)return;
-          otherCol.searchable=col.searchable;
-
-          const otherHc=document.getElementById(`hc-${otherPi}`);
-          const allHdrCells=[...(otherHc?.querySelectorAll('.hdr-cell')||[])];
-          const matchHdr=allHdrCells.find(h=>h.querySelector('.hdr-cell-name')?.textContent===colLabel);
-          if(matchHdr){
-            matchHdr.classList.remove('srch-on');
-            if(col.searchable){
-              void matchHdr.offsetWidth;
-              matchHdr.classList.add('srch-on');
-            }
-          }
-
-          document.querySelectorAll(`.entry-row[data-plane-idx="${otherPi}"] .ecell[data-ci="${otherCol.ci}"]`).forEach(ec=>{
-            ec.classList.toggle('srch',col.searchable);
-          });
+      PLANES.forEach((_,opi)=>{
+        (planeEls[opi]._cols||[]).forEach(oc=>{
+          if(oc.label!==colLabel)return;
+          oc.searchable=col.searchable;
+          const oh=document.getElementById(`hc-${opi}`);
+          const mh=[...(oh?.querySelectorAll('.hdr-cell')||[])].find(h=>h.querySelector('.hdr-cell-name')?.textContent===colLabel);
+          if(mh){mh.classList.remove('srch-on');if(col.searchable){void mh.offsetWidth;mh.classList.add('srch-on');}}
         });
-        recomputeKW(otherPi);
+        recomputeRowKW(opi);
       });
-
-      if(activeSeed)activateCluster(activeSeed,activeSeedCell,true);
+      if(activeSeedCells.size>0)runCluster();
     });
     hc.appendChild(cell);
   });
 
-  const body=document.getElementById(`body-${pi}`);
-  body.innerHTML='';
+  // Body
+  const body=document.getElementById(`body-${pi}`);body.innerHTML='';
   if(!cats.length){body.innerHTML='<div class="no-data">No data found</div>';return;}
-
   cats.forEach(({val,subs})=>{
-    const catGrp=document.createElement('div');
-    catGrp.className='cat-group';
-
-    const catLbl=document.createElement('div');
-    catLbl.className='cat-label';
-    catLbl.textContent=val;
-
-    const catRight=document.createElement('div');
-    catRight.className='cat-right';
-
-    subs.forEach(({val:subVal,entries})=>{
-      const subGrp=document.createElement('div');
-      subGrp.className='sub-group';
-
-      const subLbl=document.createElement('div');
-      subLbl.className='sub-label';
-      subLbl.textContent=subVal;
-
-      const subEntries=document.createElement('div');
-      subEntries.className='sub-entries';
-
+    const cg=document.createElement('div');cg.className='cat-group';
+    const cl=document.createElement('div');cl.className='cat-label';cl.textContent=val;
+    const cr=document.createElement('div');cr.className='cat-right';
+    subs.forEach(({val:sv,entries})=>{
+      const sg=document.createElement('div');sg.className='sub-group';
+      const sl=document.createElement('div');sl.className='sub-label';sl.textContent=sv;
+      const se=document.createElement('div');se.className='sub-entries';
       entries.forEach(e=>{
         const row=document.createElement('div');
         row.className='entry-row';
-        row.dataset.planeIdx=pi;
-        row.dataset.catVal=val;
-        row.dataset.subVal=subVal;
-        row.dataset.entryId=e.id;
-
-        const kwSrc=cols.filter(c=>c.searchable).map(c=>e.values[c.ci]||'').join(' ');
-        row.dataset.keywords=extractKW(kwSrc).join(' ');
-
+        row.dataset.planeIdx=pi;row.dataset.catVal=val;row.dataset.subVal=sv;row.dataset.entryId=e.id;
+        // keywords computed from searchable cols
+        row.dataset.keywords=extractKW(cols.filter(c=>c.searchable).map(c=>e.values[c.ci]||'').join(' ')).join(' ');
         cols.forEach(col=>{
-          const cell=document.createElement('div');
-          cell.className='ecell'+(col.searchable?' srch':'');
-          cell.style.flexGrow=col._grow;
-          cell.style.flexBasis='0';
-          cell.dataset.ci=col.ci;
-
-          const idSpan=document.createElement('span');
-          idSpan.className='ecell-id';
-          idSpan.textContent=e.id;
-
-          const txt=document.createElement('span');
-          txt.className='ecell-text';
-          txt.textContent=e.values[col.ci]||'';
-
-          cell.appendChild(idSpan);
-          cell.appendChild(txt);
-          row.appendChild(cell);
+          const ec=document.createElement('div');
+          ec.className='ecell'+(col.searchable?'':' not-searchable');
+          ec.style.flexGrow=col._grow;ec.style.flexBasis='0';
+          ec.dataset.ci=col.ci;ec.dataset.planeIdx=pi;ec.dataset.entryId=e.id;
+          const txt=document.createElement('span');txt.className='ecell-text';txt.textContent=e.values[col.ci]||'';
+          ec.appendChild(txt);
+          // Each cell individually clickable; non-searchable cells do nothing
+          ec.addEventListener('click',ev=>{
+            ev.stopPropagation();
+            if(!col.searchable)return;
+            toggleCell(ec);
+          });
+          row.appendChild(ec);
         });
-
-        row.addEventListener('click',ev=>{ev.stopPropagation();const cc=ev.target.closest('.ecell');activateCluster(row,cc||null);});
-        subEntries.appendChild(row);
+        se.appendChild(row);
       });
-
-      subGrp.appendChild(subLbl);
-      subGrp.appendChild(subEntries);
-      catRight.appendChild(subGrp);
+      sg.appendChild(sl);sg.appendChild(se);cr.appendChild(sg);
     });
-
-    catGrp.appendChild(catLbl);
-    catGrp.appendChild(catRight);
-    body.appendChild(catGrp);
+    cg.appendChild(cl);cg.appendChild(cr);body.appendChild(cg);
   });
 }
 
-function recomputeKW(pi){
+function recomputeRowKW(pi){
   const cols=planeEls[pi]._cols||[];
   document.querySelectorAll(`.entry-row[data-plane-idx="${pi}"]`).forEach(row=>{
-    if(row===activeSeed)return; // seed row keywords are owned by activateCluster, never overwritten here
-    const kwSrc=cols.map(col=>{
-      if(!col.searchable)return'';
-      return row.querySelector(`.ecell[data-ci="${col.ci}"] .ecell-text`)?.textContent||'';
-    }).join(' ');
-    row.dataset.keywords=extractKW(kwSrc).join(' ');
+    row.dataset.keywords=extractKW(cols.filter(c=>c.searchable).map(c=>row.querySelector(`.ecell[data-ci="${c.ci}"] .ecell-text`)?.textContent||'').join(' ')).join(' ');
   });
 }
 
-// ── Cluster engine ────────────────────────────────────────────────
-let activeSeed=null,hlOn=true;
-
-hlToggle.addEventListener('click',()=>{
-  hlOn=!hlOn;
-  hlToggle.classList.toggle('active',hlOn);
-  const ic=document.createElement('span');ic.className='hl-icon';
-  hlToggle.innerHTML='';hlToggle.appendChild(ic);
-  hlToggle.appendChild(document.createTextNode(hlOn?' Highlight keywords':' Show keywords'));
-  panelBody.querySelectorAll('mark.kw').forEach(m=>{m.style.borderBottomColor=hlOn?'':'transparent';m.style.fontWeight=hlOn?'':'inherit';});
-});
-
-// activeSeedCells: Set of column ci values whose text contributes to the seed keywords.
-// Managed ONLY here — recomputeKW never touches the seed row.
+// ── Selection: each cell is an independent entity ─────────────────────────────
+// activeSeedCells: Set of .ecell DOM elements currently selected as seed
 let activeSeedCells=new Set();
+let hlOn=true;
 
-// activateCluster(seedEl, clickedCell, preserveSeed)
-//   seedEl:       the .entry-row element
-//   clickedCell:  the specific .ecell clicked (or null)
-//   preserveSeed: true when called from a column toggle — keep existing seed/cell selection
-function activateCluster(seedEl,clickedCell,preserveSeed){
-  const pi=parseInt(seedEl.dataset.planeIdx);
-  const cols=planeEls[pi]._cols||[];
-
-  if(!preserveSeed){
-    const clickedCi=clickedCell?parseInt(clickedCell.dataset.ci):-1;
-    const clickedCol=cols.find(c=>c.ci===clickedCi);
-    const isSameRow=(activeSeed===seedEl);
-
-    if(isSameRow){
-      // ── Already-selected row clicked again ───────────────────────
-      if(clickedCell && clickedCol){
-        if(clickedCol.searchable){
-          // Toggle this cell in/out
-          if(activeSeedCells.has(clickedCi)){
-            activeSeedCells.delete(clickedCi);
-            if(activeSeedCells.size===0){
-              // Last cell removed — clear everything
-              clearCluster();activeSeed=null;activeSeedCells=new Set();
-              panelSub.textContent='No entry selected · click an entry to find matches';
-              panelBody.innerHTML=emptyMsg();hlToggle.classList.remove('visible','active');
-              return;
-            }
-          } else {
-            activeSeedCells.add(clickedCi);
-          }
-        } else {
-          // Non-searchable cell clicked → clear
-          clearCluster();activeSeed=null;activeSeedCells=new Set();
-          panelSub.textContent='No entry selected · click an entry to find matches';
-          panelBody.innerHTML=emptyMsg();hlToggle.classList.remove('visible','active');
-          return;
-        }
-      } else {
-        // Row background clicked → clear
-        clearCluster();activeSeed=null;activeSeedCells=new Set();
-        panelSub.textContent='No entry selected · click an entry to find matches';
-        panelBody.innerHTML=emptyMsg();hlToggle.classList.remove('visible','active');
-        return;
-      }
-    } else {
-      // ── New row selected ─────────────────────────────────────────
-      clearCluster();
-      activeSeed=seedEl;
-      hlOn=true;
-      activeSeedCells=new Set();
-
-      if(clickedCell && clickedCol){
-        if(clickedCol.searchable){
-          activeSeedCells.add(clickedCi); // only this one cell
-        }
-        // if not searchable: activeSeedCells stays empty → no keywords → no matches
-      } else {
-        // No specific cell (e.g. goto btn) — fall back to all searchable cols
-        cols.filter(c=>c.searchable).forEach(c=>activeSeedCells.add(c.ci));
-      }
+function toggleCell(ecell){
+  if(activeSeedCells.has(ecell)){
+    // Deselect this cell only
+    activeSeedCells.delete(ecell);
+    ecell.classList.remove('seed-cell');
+    if(activeSeedCells.size===0){
+      // All gone — clear everything but do NOT deselect other cells
+      clearMatchState();
+      showPanelEmpty();
+      return;
     }
+  } else {
+    // Add this cell — never deselects anything else
+    activeSeedCells.add(ecell);
+    ecell.classList.add('seed-cell');
   }
-  // preserveSeed=true: activeSeedCells is unchanged, just re-run matching below
+  runCluster();
+}
 
-  // ── Recompute seed keywords from selected cells only ─────────────
-  const kwSrc=cols.filter(c=>activeSeedCells.has(c.ci))
-    .map(c=>seedEl.querySelector(`.ecell[data-ci="${c.ci}"] .ecell-text`)?.textContent||'').join(' ');
-  seedEl.dataset.keywords=extractKW(kwSrc).join(' ');
+function clearMatchState(){
+  // Only remove muted + match highlights — never touches seed-cell
+  document.querySelectorAll('.entry-row.muted').forEach(r=>r.classList.remove('muted'));
+  document.querySelectorAll('.ecell.match-cell').forEach(ec=>ec.classList.remove('match-cell'));
+}
 
-  // ── Update .srch highlight on seed row cells ──────────────────────
-  seedEl.querySelectorAll('.ecell').forEach(ec=>{
-    ec.classList.toggle('srch',activeSeedCells.has(parseInt(ec.dataset.ci)));
+function clearAll(){
+  // Full reset including seed cells
+  activeSeedCells.forEach(ec=>ec.classList.remove('seed-cell'));
+  activeSeedCells.clear();
+  clearMatchState();
+}
+
+function showPanelEmpty(msg){
+  panelSub.textContent=msg||'Click a cell to find related entries';
+  panelBody.innerHTML=emptyMsg(msg);
+  hlToggle.classList.remove('visible','active');
+}
+
+function runCluster(){
+  if(activeSeedCells.size===0){clearAll();showPanelEmpty();return;}
+
+  // Collect all keywords from selected cells
+  const allKws=new Set();
+  activeSeedCells.forEach(ec=>{
+    extractKW(ec.querySelector('.ecell-text')?.textContent||'').forEach(k=>allKws.add(k));
   });
 
-  const seedPi=parseInt(seedEl.dataset.planeIdx);
-  const seedKws=new Set(seedEl.dataset.keywords.split(' ').filter(Boolean));
+  // Which rows contain at least one seed cell?
+  const seedRows=new Set();
+  activeSeedCells.forEach(ec=>{const r=ec.closest('.entry-row');if(r)seedRows.add(r);});
 
-  if(!seedKws.size){
-    panelSub.textContent='No keywords — try enabling more columns or click a searchable cell';
-    panelBody.innerHTML=emptyMsg('No keywords to match');
-    hlToggle.classList.remove('visible','active');
-    clusterPanel.classList.add('open');syncPanelBtn();
-    document.querySelectorAll('.entry-row').forEach(r=>r.classList.add('muted'));
-    seedEl.classList.remove('muted');seedEl.classList.add('seed');
-    return;
-  }
+  // Apply muted state — seed rows are never muted
+  document.querySelectorAll('.entry-row').forEach(r=>r.classList.toggle('muted',!seedRows.has(r)));
 
-  document.querySelectorAll('.entry-row').forEach(r=>r.classList.add('muted'));
-  seedEl.classList.remove('muted');seedEl.classList.add('seed');
+  // Clear old match highlights
+  document.querySelectorAll('.ecell.match-cell').forEach(ec=>ec.classList.remove('match-cell'));
 
   const byPlane=new Map();
   let total=0;const matchedKws=new Set();let delay=0;
 
-  document.querySelectorAll('.entry-row').forEach(row=>{
-    if(row===seedEl)return;
-    const rKws=new Set(row.dataset.keywords.split(' ').filter(Boolean));
-    const shared=[];seedKws.forEach(k=>{if(rKws.has(k))shared.push(k);});
-    if(shared.length<MIN_SHARED)return;
-    row.classList.remove('muted');row.classList.add('match');
-    row.style.setProperty('--gd',`${Math.min(delay,1.2)}s`);delay+=0.1;
-    shared.forEach(k=>matchedKws.add(k));total++;
-    const rPi=parseInt(row.dataset.planeIdx);
-    if(!byPlane.has(rPi))byPlane.set(rPi,[]);
-    const rCols=planeEls[rPi]._cols||[];
-    const fv={};rCols.forEach(col=>{fv[col.ci]=row.querySelector(`.ecell[data-ci="${col.ci}"] .ecell-text`)?.textContent||'';});
-    byPlane.get(rPi).push({id:row.dataset.entryId,cat:row.dataset.catVal,sub:row.dataset.subVal,fv,cols:rCols,sharedKws:new Set(shared)});
-  });
+  if(allKws.size>=1){
+    document.querySelectorAll('.entry-row').forEach(row=>{
+      if(seedRows.has(row))return;
+      const rKws=new Set(row.dataset.keywords.split(' ').filter(Boolean));
+      const shared=[];allKws.forEach(k=>{if(rKws.has(k))shared.push(k);});
+      if(shared.length<MIN_SHARED)return;
+      row.classList.remove('muted');
+      shared.forEach(k=>matchedKws.add(k));total++;
+      const rpi=parseInt(row.dataset.planeIdx);
+      const rCols=planeEls[rpi]._cols||[];
+      // Highlight only searchable cells in matched row
+      rCols.forEach(col=>{
+        if(!col.searchable)return;
+        const ec=row.querySelector(`.ecell[data-ci="${col.ci}"]`);
+        if(ec){ec.classList.add('match-cell');ec.style.setProperty('--gd',`${Math.min(delay,1.2)}s`);}
+      });
+      delay+=0.08;
+      if(!byPlane.has(rpi))byPlane.set(rpi,[]);
+      const fv={};rCols.forEach(col=>{fv[col.ci]=row.querySelector(`.ecell[data-ci="${col.ci}"] .ecell-text`)?.textContent||'';});
+      byPlane.get(rpi).push({id:row.dataset.entryId,cat:row.dataset.catVal,sub:row.dataset.subVal,fv,cols:rCols,sharedKws:new Set(shared)});
+    });
+  }
 
-  buildPanel(seedEl,byPlane,matchedKws,total,seedPi);
+  buildPanel(byPlane,matchedKws,total,allKws);
 }
 
-function buildPanel(seedEl,byPlane,matchedKws,total,seedPi){
+function buildPanel(byPlane,matchedKws,total,allKws){
   panelSub.textContent=total?`${total} match${total===1?'':'es'} · shared: ${[...matchedKws].slice(0,4).join(', ')}`:'No related entries found';
   panelBody.innerHTML='';
 
-  const sc=PLANE_COLORS[seedPi];
-  const card=document.createElement('div');card.id='seed-card';
-  [['--sc-bg',sc.bg],['--sc-border',sc.border],['--sc-shadow',sc.shadow],['--sc-text',sc.text],['--sc-label',sc.label]].forEach(([k,v])=>card.style.setProperty(k,v));
-  const seedCols=planeEls[seedPi]._cols||[];
-  let sFields='';
-  seedCols.forEach((col)=>{
-    const val=seedEl.querySelector(`.ecell[data-ci="${col.ci}"] .ecell-text`)?.textContent||'';if(!val)return;
-    const html=col.searchable?highlightKW(val,matchedKws):escH(val);
-    sFields+=`<div class="sc-field${col.searchable?' srch':''}"><span class="pe-flabel" style="color:var(--sc-label)">${escH(col.label)}</span><span class="pe-id">${seedEl.dataset.entryId}</span>${html}</div>`;
+  // Seed card — group by plane, show cat · sub
+  const seedsByPlane=new Map();
+  activeSeedCells.forEach(ec=>{
+    const pi=parseInt(ec.dataset.planeIdx);
+    if(!seedsByPlane.has(pi))seedsByPlane.set(pi,[]);
+    seedsByPlane.get(pi).push(ec);
   });
-  card.innerHTML=`<div id="sc-head"><div id="sc-dot"></div><div id="sc-label">${escH(PLANES[seedPi].title)}</div><span class="sc-badge">Selected</span><div id="sc-cat">${escH(seedEl.dataset.catVal||'')}${seedEl.dataset.subVal?' · '+escH(seedEl.dataset.subVal):''}</div></div><div id="sc-body">${sFields||'<span style="opacity:.35;font-size:.6rem">—</span>'}</div>`;
-  panelBody.appendChild(card);
+  seedsByPlane.forEach((cells,pi)=>{
+    const sc=PLANE_COLORS[pi];
+    const card=document.createElement('div');card.id='seed-card';
+    [['--sc-bg',sc.bg],['--sc-border',sc.border],['--sc-shadow',sc.shadow],['--sc-text',sc.text],['--sc-label',sc.label]].forEach(([k,v])=>card.style.setProperty(k,v));
+    const row=cells[0].closest('.entry-row');
+    const cat=row?.dataset.catVal||'',sub=row?.dataset.subVal||'';
+    const seedCols=planeEls[pi]._cols||[];
+    let sFields='';
+    seedCols.forEach(col=>{
+      const val=row?.querySelector(`.ecell[data-ci="${col.ci}"] .ecell-text`)?.textContent||'';if(!val)return;
+      const isSel=cells.some(ec=>parseInt(ec.dataset.ci)===col.ci);
+      sFields+=`<div class="sc-field${isSel?' srch':''}"><span class="sc-flabel">${escH(col.label)}</span>${isSel?highlightKW(val,allKws):escH(val)}</div>`;
+    });
+    card.innerHTML=`<div id="sc-head"><div id="sc-dot"></div><div id="sc-label">${escH(PLANES[pi].title)}</div><span class="sc-badge">Selected</span><div id="sc-cat">${escH(cat)}${sub?' · '+escH(sub):''}</div></div><div id="sc-body">${sFields||'<span style="opacity:.35;font-size:.6rem">—</span>'}</div>`;
+    panelBody.appendChild(card);
+  });
 
   if(!byPlane.size){
     panelBody.insertAdjacentHTML('beforeend',emptyMsg('No matches found'));
@@ -703,50 +552,41 @@ function buildPanel(seedEl,byPlane,matchedKws,total,seedPi){
     const ic=document.createElement('span');ic.className='hl-icon';
     hlToggle.innerHTML='';hlToggle.appendChild(ic);hlToggle.appendChild(document.createTextNode(' Highlight keywords'));
     let gd=0;
-    [...byPlane.keys()].sort((a,b)=>{if(a===seedPi)return-1;if(b===seedPi)return 1;return a-b;}).forEach(pi=>{
-      const entries=byPlane.get(pi);const c=PLANE_COLORS[pi];const isSame=pi===seedPi;
-      const grp=document.createElement('div');grp.className='panel-group'+(isSame?' same-dim':'');grp.style.animationDelay=`${gd}ms`;
+    [...byPlane.keys()].sort((a,b)=>a-b).forEach(pi=>{
+      const entries=byPlane.get(pi);const c=PLANE_COLORS[pi];
+      const grp=document.createElement('div');grp.className='panel-group';grp.style.animationDelay=`${gd}ms`;
       [['--g-bg',c.bg],['--g-border',c.border],['--g-shadow',c.shadow],['--g-heading',c.heading],['--g-text',c.text],['--g-label',c.label],['--g-rule',c.rule]].forEach(([k,v])=>grp.style.setProperty(k,v));
       gd+=80;
-      grp.innerHTML=`<div class="pg-head"><div class="pg-dot"></div><div class="pg-name">${escH(PLANES[pi].title)}</div>${isSame?'<span class="same-dim-badge">Same Dim.</span>':''}<div class="pg-count">${entries.length}</div></div>`;
+      grp.innerHTML=`<div class="pg-head"><div class="pg-dot"></div><div class="pg-name">${escH(PLANES[pi].title)}</div><div class="pg-count">${entries.length}</div></div>`;
       let ed=gd;
       entries.forEach(e=>{
-        const div=document.createElement('div');
-        div.className='pe';
-        div.style.setProperty('--ed',`${ed}ms`);
-        ed+=50;
-
-        let html=`<div class="pe-cat">${escH(e.cat)}</div>`;
-        if(e.sub)html+=`<div class="pe-sub">↳ ${escH(e.sub)}</div>`;
-
+        const div=document.createElement('div');div.className='pe';div.style.setProperty('--ed',`${ed}ms`);ed+=50;
+        // Category · subcategory per entry (same style as seed card header)
+        let html=`<div class="pe-location">${escH(e.cat)}${e.sub?` <span class="pe-location-sub">· ${escH(e.sub)}</span>`:''}</div>`;
         e.cols.forEach(col=>{
           const val=e.fv[col.ci]||'';if(!val)return;
-          const vH=col.searchable?highlightKW(val,e.sharedKws):escH(val);
-          html+=`<div class="pe-field${col.searchable?' srch':''}"><span class="pe-flabel">${escH(col.label)}</span><span class="pe-id">${escH(e.id)}</span>${vH}</div>`;
+          html+=`<div class="pe-field${col.searchable?' srch':''}"><span class="pe-flabel">${escH(col.label)}</span>${col.searchable?highlightKW(val,e.sharedKws):escH(val)}</div>`;
         });
-
         div.innerHTML=html;
-
-        const gotoBtn=document.createElement('button');
-        gotoBtn.className='pe-goto';
-        gotoBtn.textContent='Go to cell';
-        div.appendChild(gotoBtn);
-
+        const gotoBtn=document.createElement('button');gotoBtn.className='pe-goto';gotoBtn.textContent='Go to cell';div.appendChild(gotoBtn);
         div.addEventListener('click',ev=>{
           if(ev.target===gotoBtn)return;
-          const isExpanded=div.classList.contains('expanded');
+          const isExp=div.classList.contains('expanded');
           grp.querySelectorAll('.pe.expanded').forEach(p=>p.classList.remove('expanded'));
-          if(!isExpanded)div.classList.add('expanded');
+          if(!isExp)div.classList.add('expanded');
         });
-
         gotoBtn.addEventListener('click',ev=>{
           ev.stopPropagation();
           const targetRow=document.querySelector(`.entry-row[data-plane-idx="${pi}"][data-entry-id="${e.id}"]`);
           if(!targetRow)return;
           if(order[0]!==pi)bringToTop(pi);
-          setTimeout(()=>activateCluster(targetRow,null),order[0]===pi?0:700);
+          setTimeout(()=>{
+            const cols=planeEls[pi]._cols||[];
+            const firstS=cols.find(c=>c.searchable);if(!firstS)return;
+            const ec=targetRow.querySelector(`.ecell[data-ci="${firstS.ci}"]`);
+            if(ec)toggleCell(ec);
+          },order[0]===pi?0:700);
         });
-
         grp.appendChild(div);
       });
       panelBody.appendChild(grp);
@@ -757,24 +597,35 @@ function buildPanel(seedEl,byPlane,matchedKws,total,seedPi){
   if(!wasOpen)fitScene();
 }
 
-function clearCluster(){document.querySelectorAll('.muted,.seed,.match').forEach(el=>{el.classList.remove('muted','seed','match');el.style.removeProperty('--gd');});}
-function closePanelCompletely(){clearCluster();activeSeed=null;activeSeedCells=new Set();hlToggle.classList.remove('visible','active');clusterPanel.classList.remove('open');panelBody.innerHTML='';syncPanelBtn();setTimeout(fitScene,540);}
+hlToggle.addEventListener('click',()=>{
+  hlOn=!hlOn;hlToggle.classList.toggle('active',hlOn);
+  const ic=document.createElement('span');ic.className='hl-icon';
+  hlToggle.innerHTML='';hlToggle.appendChild(ic);
+  hlToggle.appendChild(document.createTextNode(hlOn?' Highlight keywords':' Show keywords'));
+  panelBody.querySelectorAll('mark.kw').forEach(m=>{m.style.borderBottomColor=hlOn?'':'transparent';m.style.fontWeight=hlOn?'':'inherit';});
+});
+
+function closePanelCompletely(){
+  clearAll();hlToggle.classList.remove('visible','active');
+  clusterPanel.classList.remove('open');panelBody.innerHTML='';syncPanelBtn();setTimeout(fitScene,540);
+}
 function syncPanelBtn(){const o=clusterPanel.classList.contains('open');panelOpenBtn.classList.toggle('active',o);panelOpenBtn.setAttribute('aria-pressed',o);}
 
 panelClose.addEventListener('click',closePanelCompletely);
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closePanelCompletely();});
 panelOpenBtn.addEventListener('click',()=>{
   if(clusterPanel.classList.contains('open')){closePanelCompletely();return;}
-  panelSub.textContent='No entry selected · click an entry to find matches';
-  panelBody.innerHTML=emptyMsg();clusterPanel.classList.add('open');syncPanelBtn();fitScene();
+  showPanelEmpty();clusterPanel.classList.add('open');syncPanelBtn();fitScene();
 });
+
+// Deselect ALL only when clicking truly empty space
 stackEl.addEventListener('click',e=>{
-  if(!e.target.closest('.entry-row')&&!e.target.closest('.resize-handle')){
-    if(activeSeed){clearCluster();activeSeed=null;activeSeedCells=new Set();panelSub.textContent='No entry selected · click an entry to find matches';panelBody.innerHTML=emptyMsg();hlToggle.classList.remove('visible','active');}
+  const isInteractive=e.target.closest('.ecell,.resize-handle,.hdr-cell');
+  if(!isInteractive&&activeSeedCells.size>0){
+    clearAll();showPanelEmpty();
   }
 });
 
-// ── Load data ─────────────────────────────────────────────────────
 async function loadData(){
   try{
     setStatus('Fetching spreadsheet…');
@@ -796,7 +647,6 @@ async function loadData(){
   }catch(err){console.error(err);setStatus(`Load failed: ${err.message}`,true);}
 }
 
-// ── Carousel ──────────────────────────────────────────────────────
 const dotEls=PLANES.map((p,i)=>{
   const d=document.createElement('div');d.className='dot';d.style.background=PLANE_COLORS[i].dot;
   dotWindow.appendChild(d);
@@ -814,8 +664,6 @@ function renderCarousel(){
     else d.style.display='none';
   });
 }
-
-// ── Stack ─────────────────────────────────────────────────────────
 const getZ=sp=>(N-1-sp)*GAP;
 function refreshHint(){hintLabel.textContent=PLANES[order[0]].title.toUpperCase();hintLabel.style.color='rgba(0,0,0,.3)';}
 function syncUI(){planeEls.forEach((el,i)=>{el.dataset.top=order[0]===i?'true':'false';});renderCarousel();refreshHint();}
@@ -832,12 +680,9 @@ function cycleOnce(done){
   setTimeout(()=>{order.push(order.shift());el.style.transition='none';el.style.transform=`translateZ(${getZ(N-1)-100}px)`;el.style.opacity='0';setTimeout(()=>{applyPositions(true);animating=false;if(done)done();},40);},380);
 }
 function bringToTop(t){if(order[0]===t||animating)return;function step(){if(order[0]!==t)cycleOnce(step);}step();}
-
-// ── View toggle ───────────────────────────────────────────────────
 function applyView(){const v=is3D?VIEW_3D:VIEW_FLAT;stackEl.style.transform=`rotateX(${v.rotX}deg) rotateY(${v.rotY}deg)`;toggleBtn.classList.toggle('active',is3D);toggleBtn.setAttribute('aria-pressed',is3D);}
 toggleBtn.addEventListener('click',()=>{is3D=!is3D;applyView();});
 
-// ── Resize handle ─────────────────────────────────────────────────
 let rsz=false,rsX,rsY,rsW,rsH;
 document.addEventListener('mousedown',e=>{
   const h=e.target.closest('.resize-handle');if(!h)return;e.preventDefault();e.stopPropagation();
@@ -857,7 +702,6 @@ document.addEventListener('mouseup',()=>{
   document.querySelectorAll('.plane').forEach(p=>{p.style.transition='transform .7s cubic-bezier(.4,0,.2,1),opacity .5s ease';});
 });
 
-// ── Init ──────────────────────────────────────────────────────────
 applyPositions(false);applyView();renderCarousel();refreshHint();fitScene();loadData();
 </script>
 </body>
