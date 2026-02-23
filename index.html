@@ -35,7 +35,7 @@
 
   #stage-wrap{flex:1;width:100%;display:flex;overflow:hidden;min-height:0}
   #stage{flex:1;min-width:0;overflow:hidden;min-height:0;display:flex;align-items:center;justify-content:center;position:relative}
-  #scene-inner{position:absolute;top:50%;left:50%;transform-origin:center center}
+  #scene-inner{position:absolute;top:50%;left:50%;transform-origin:center center;transition:transform .6s cubic-bezier(.4,0,.2,1)}
   .scene{perspective:2800px;perspective-origin:50% 42%}
   .stack{width:100%;height:100%;position:relative;transform-style:preserve-3d;transition:transform .7s cubic-bezier(.4,0,.2,1)}
 
@@ -114,11 +114,19 @@
   .hdr-cells{flex:1;display:flex;min-width:0}
   .hdr-cell{flex-shrink:1;flex-basis:0;min-width:0;padding:6px 10px 5px;display:flex;flex-direction:column;align-items:flex-start;gap:2px;border-left:1px solid var(--p-rule);cursor:pointer;user-select:none;position:relative}
   .hdr-cell:first-child{border-left:none}
-  .hdr-cell-name{font-weight:500;text-transform:uppercase;letter-spacing:.1em;font-size:.75rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--p-heading);width:100%;padding:3px 6px;border-radius:12px;border:1.5px solid transparent;transition:border-color .25s,background .25s,color .25s}
+  .hdr-cell-name{font-weight:500;text-transform:uppercase;letter-spacing:.1em;font-size:.75rem;white-space:normal;word-break:break-word;overflow-wrap:break-word;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;color:var(--p-heading);width:100%;padding:3px 6px;border-radius:12px;border:1.5px solid transparent;transition:border-color .25s,background .25s,color .25s;line-height:1.25}
   .hdr-cell.srch-on .hdr-cell-name{border-color:var(--p-border);background:rgba(0,0,0,.04);color:var(--p-border)}
   .srch-pill{font-size:.36rem;font-style:italic;letter-spacing:.1em;color:var(--p-border);font-weight:500;white-space:nowrap;padding:0 6px;opacity:0;pointer-events:none;transition:none}
   .hdr-cell.srch-on .srch-pill{animation:pill-flash 1.8s ease forwards}
   @keyframes pill-flash{0%{opacity:0;transform:translateY(3px)}15%{opacity:1;transform:translateY(0)}70%{opacity:1}100%{opacity:0}}
+
+  /* In 3D mode back planes show a pointer to hint they're clickable — applied via JS */
+  .plane.plane-3d-back{cursor:pointer!important}
+  .plane.plane-3d-back *{pointer-events:none!important}
+
+  /* Header tooltip */
+  .hdr-tooltip{position:fixed;z-index:9999;pointer-events:none;opacity:0;transition:opacity .18s;max-width:220px;background:rgba(20,20,30,.88);color:#fff;font-size:.48rem;letter-spacing:.08em;line-height:1.5;padding:7px 11px;border-radius:7px;box-shadow:0 4px 18px rgba(0,0,0,.22);word-break:break-word}
+  .hdr-tooltip.visible{opacity:1}
 
   .cat-group{display:flex;border-bottom:2px solid var(--p-rule)}
   .cat-group:last-child{border-bottom:none}
@@ -262,12 +270,15 @@ const PLANES=[
   {tab:'PHYSICAL',title:'The Physical Dimension'},
 ];
 const STOP_WORDS=new Set(['a','an','the','and','or','of','in','on','at','to','for','by','with','from','is','are','was','were','be','been','have','has','had','do','does','did','will','would','could','should','may','might','not','no','but','so','than','that','their','them','then','there','these','they','this','those','through','what','when','where','which','who','how','all','any','each','some','such','its','our','as','if','into','about','after','before','during','including','pp','vol','ed','eds','de','van','von','et','al','doi','housing','cohousing','living','urban','design','community','space','social','people','study','case','research','analysis','journal','review','international','new','city','based']);
-const MIN_KW=5,MIN_SHARED=1;
+const MIN_KW=5,MIN_SHARED=2;
 const COL_GROW_DEFAULT=1;
 
 let SCENE_W=1360,SCENE_H=960,PLANE_W=99999,PLANE_H=99999,PLANE_L=40,PLANE_T=100;
-const PAD_X=300,PAD_Y=100,GAP=144,N=PLANES.length,VISIBLE=3;
-const VIEW_FLAT={rotX:0,rotY:0},VIEW_3D={rotX:-20,rotY:15};
+// ☄️ GAP — distance in px between stacked planes in 3D mode. Increase for more dramatic depth, decrease to tighten the deck.
+const PAD_X=SCENE_W/5,PAD_Y=SCENE_H/15,GAP=20,N=PLANES.length,VISIBLE=3;
+// ☄️ 3D VIEW ANGLES — rotX tilts the stack toward/away from viewer, rotY rotates left/right.
+// Increase rotX magnitude for a steeper overhead tilt, decrease for a flatter view.
+const VIEW_FLAT={rotX:0,rotY:0},VIEW_3D={rotX:10,rotY:0};
 let is3D=false,order=[0,1,2,3],animating=false;
 
 const stageEl=document.getElementById('stage'),sceneInner=document.getElementById('scene-inner');
@@ -291,7 +302,14 @@ let fitDone=false;
 function fitScene(){
   const sw=stageEl.clientWidth,sh=stageEl.clientHeight;
   SCENE_W=sw;SCENE_H=sh;
-  sceneInner.style.cssText=`width:${sw}px;height:${sh}px;transform:translate(-50%,-50%)`;
+  // Preserve any scale+offset set by applyView
+  const scale = is3D ? compute3DScale() : 1;
+  const v=is3D?VIEW_3D:VIEW_FLAT;
+  const verticalOffset = is3D
+    ? -Math.sin(Math.abs(v.rotX) * Math.PI / 180) * (PLANE_H / 2) * 0.5 * scale
+    : 0;
+  sceneInner.style.width=sw+'px';sceneInner.style.height=sh+'px';
+  sceneInner.style.transform=`translate(calc(-50% + 0px), calc(-50% + ${verticalOffset}px)) scale(${scale})`;
   const sc=sceneInner.querySelector('.scene');if(sc)sc.style.cssText=`width:${sw}px;height:${sh}px`;
   stackEl.style.width=sw+'px';stackEl.style.height=sh+'px';
   const maxW=Math.max(200,sw-PAD_X*2),maxH=Math.max(120,sh-PAD_Y*2);
@@ -352,12 +370,30 @@ function parseTab(ws){
   const cols=[];
   for(let ci=3;ci<hdrRow.length;ci++){
     if(!includedCols.has(ci))continue;
-    cols.push({ci,label:String(hdrRow[ci]??'').trim()||`Col ${ci}`,searchable:false});
+    cols.push({ci,label:String(hdrRow[ci]??'').trim()||`Col ${ci}`,searchable:false,description:''});
   }
+
+  // Find HEADER INFO row: scan all rows (including last) for exact match in column 0
+  const colDescriptions={};
+  for(let ri=aoa.length-1;ri>=0;ri--){
+    const row=aoa[ri];
+    if(!row)continue;
+    if(String(row[0]??'').trim()==='HEADER INFO'){
+      cols.forEach(col=>{
+        const desc=String(row[col.ci]??'').trim();
+        if(desc)colDescriptions[col.ci]=desc;
+      });
+      break;
+    }
+  }
+  cols.forEach(col=>{if(colDescriptions[col.ci])col.description=colDescriptions[col.ci];});
+
   const catOrder=[],catMap={};
   for(let ri=hdrRowIdx+1;ri<aoa.length;ri++){
     const row=aoa[ri];
     if(!row||row.every(c=>String(c??'').trim()===''))continue;
+    // Skip HEADER INFO rows in data
+    if(String(row[0]??'').trim()==='HEADER INFO')continue;
     const catVal=String(row[1]??'').trim();if(!catVal)continue;
     const subVal=String(row[2]??'').trim();
     if(!catMap[catVal]){catMap[catVal]={subOrder:[],subMap:{}};catOrder.push(catVal);}
@@ -375,6 +411,24 @@ function parseTab(ws){
   return{cats:catOrder.map(val=>({val,subs:catMap[val].subOrder.map(sv=>({val:sv,entries:catMap[val].subMap[sv]}))})),cols};
 }
 
+// Shared tooltip singleton for header descriptions
+const hdrTooltipEl=(()=>{const t=document.createElement('div');t.className='hdr-tooltip';document.body.appendChild(t);return t;})();
+let hdrTipTimer=null;
+function showHdrTip(text,x,y){
+  clearTimeout(hdrTipTimer);
+  hdrTipTimer=setTimeout(()=>{
+    hdrTooltipEl.textContent=text;
+    // position: prefer below, clamp to viewport
+    const tw=220,pad=10;
+    let lx=x-tw/2,ly=y+14;
+    lx=Math.max(pad,Math.min(window.innerWidth-tw-pad,lx));
+    if(ly+80>window.innerHeight)ly=y-80;
+    hdrTooltipEl.style.left=lx+'px';hdrTooltipEl.style.top=ly+'px';
+    hdrTooltipEl.classList.add('visible');
+  },1500);
+}
+function hideHdrTip(){clearTimeout(hdrTipTimer);hdrTooltipEl.classList.remove('visible');}
+
 function fillPlane(pi,parsed){
   const{cats,cols}=parsed;
   planeEls[pi]._cols=cols;
@@ -389,6 +443,24 @@ function fillPlane(pi,parsed){
     const name=document.createElement('span');name.className='hdr-cell-name';name.textContent=col.label;
     const pill=document.createElement('span');pill.className='srch-pill';pill.textContent='Included in match';
     cell.appendChild(name);cell.appendChild(pill);
+    // Tooltip on hover (1.5s delay)
+    if(col.description){
+      cell.addEventListener('mouseenter',e=>showHdrTip(col.description,e.clientX,e.clientY));
+      cell.addEventListener('mousemove',e=>{
+        // reset timer on move so it only fires after 1.5s of stillness
+        clearTimeout(hdrTipTimer);
+        hdrTipTimer=setTimeout(()=>{
+          hdrTooltipEl.textContent=col.description;
+          const tw=220,pad=10;
+          let lx=e.clientX-tw/2,ly=e.clientY+14;
+          lx=Math.max(pad,Math.min(window.innerWidth-tw-pad,lx));
+          if(ly+80>window.innerHeight)ly=e.clientY-80;
+          hdrTooltipEl.style.left=lx+'px';hdrTooltipEl.style.top=ly+'px';
+          hdrTooltipEl.classList.add('visible');
+        },1500);
+      });
+      cell.addEventListener('mouseleave',hideHdrTip);
+    }
     cell.addEventListener('click',()=>{
       col.searchable=!col.searchable;
       const colLabel=col.label;
@@ -759,6 +831,23 @@ panelOpenBtn.addEventListener('click',()=>{
 });
 
 stackEl.addEventListener('click',e=>{
+  // In 3D mode: clicking ANY plane switches to flat
+  if(is3D && !animating){
+    const clickedPlane=e.target.closest('.plane');
+    if(clickedPlane){
+      const pi=parseInt(clickedPlane.dataset.planeIdx);
+      if(order[0]!==pi){
+        // Back plane — animate it to front then flatten
+        bringToTop(pi, true);
+      } else {
+        // Front plane — already selected, just flatten in place (no shuffle needed)
+        is3D=false;
+        applyView(true);
+      }
+      return;
+    }
+  }
+  // Normal: clicking empty space clears selection
   const isInteractive=e.target.closest('.ecell,.resize-handle,.hdr-cell');
   if(!isInteractive&&activeSeedCells.size>0){
     clearAll();showPanelEmpty();
@@ -789,37 +878,205 @@ async function loadData(){
 const dotEls=PLANES.map((p,i)=>{
   const d=document.createElement('div');d.className='dot';d.style.background=PLANE_COLORS[i].dot;
   dotWindow.appendChild(d);
-  d.addEventListener('click',e=>{e.stopPropagation();if(!animating)bringToTop(i);});
+  d.addEventListener('click',e=>{e.stopPropagation();if(!animating)bringToTop(i, false);});
   d.addEventListener('mouseenter',()=>{hintLabel.textContent=p.title.toUpperCase();hintLabel.style.color='rgba(0,0,0,.55)';});
   d.addEventListener('mouseleave',refreshHint);
   return d;
 });
-arrLeft.addEventListener('click',()=>{if(!animating)bringToTop((order[0]+N-1)%N);});
-arrRight.addEventListener('click',()=>{if(!animating)bringToTop((order[0]+1)%N);});
+arrLeft.addEventListener('click',()=>{if(!animating)bringToTop((order[0]+N-1)%N, false);});
+arrRight.addEventListener('click',()=>{if(!animating)bringToTop((order[0]+1)%N, false);});
 function renderCarousel(){
+  // Always show all dots; active = larger + full opacity, others = smaller + dimmed
   dotEls.forEach((d,i)=>{
-    const dist=(i-order[0]+N)%N,signed=dist>N/2?dist-N:dist,half=Math.floor(VISIBLE/2);
-    if(Math.abs(signed)<=half){d.style.display='block';d.style.opacity=signed===0?'1':String(Math.max(0,.35-Math.abs(signed)*.05));d.style.transform=`scale(${signed===0?1.55:Math.max(.1,1-Math.abs(signed)*.22)})`;d.classList.toggle('active',signed===0);}
-    else d.style.display='none';
+    const isActive=order[0]===i;
+    d.style.display='block';
+    d.style.opacity=isActive?'1':'0.28';
+    d.style.transform=`scale(${isActive?1.55:1})`;
+    d.classList.toggle('active',isActive);
   });
 }
 const getZ=sp=>(N-1-sp)*GAP;
 function refreshHint(){hintLabel.textContent=PLANES[order[0]].title.toUpperCase();hintLabel.style.color='rgba(0,0,0,.3)';}
-function syncUI(){planeEls.forEach((el,i)=>{el.dataset.top=order[0]===i?'true':'false';});renderCarousel();refreshHint();}
+function syncUI(){
+  planeEls.forEach((el,i)=>{
+    const isFront=order[0]===i;
+    el.dataset.top=isFront?'true':'false';
+    // In 3D mode back planes get a pointer cursor so user knows they're clickable
+    el.classList.toggle('plane-3d-back', is3D && !isFront);
+  });
+  renderCarousel();refreshHint();
+}
+
+// ☄️ ANIMATION SPEED — tweak these values to adjust the card-shuffle feel
+const ANIM={
+  flat:{
+    rise:  160,   // ms — how long the card takes to lift up from the stack
+    land:  220,   // ms — how long the card eases into the front position
+    easeRise: 'cubic-bezier(.4,0,.2,1)',
+    easeLand: 'cubic-bezier(.22,1,.36,1)',
+  },
+  threed:{
+    rise:  260,   // ms — slower in 3D so the tilt+rise motion reads clearly
+    land:  400,   // ms
+    easeRise: 'cubic-bezier(.4,0,.2,1)',
+    easeLand: 'cubic-bezier(.22,1,.36,1)',
+  },
+};
+
+// ☄️ 3D RISE TILT — angle (degrees) the card rotates around X during its rise arc.
+// Positive = top tilts away (text faces up/toward viewer). Try 30–60 for more drama.
+const RISE_TILT_DEG = 45;
+
+// ☄️ RISE HEIGHT — how far forward (toward viewer) the card pops during the shuffle arc, in px.
+// Larger = more dramatic zoom out from stack. Try 100–300 for flat, 300–600 for 3D.
+const RISE_HEIGHT_FLAT   = 260;   // ← adjust this for 2D mode pop
+const RISE_HEIGHT_3D     = 420;   // ← adjust this for 3D mode pop
+
+// In 3D mode every plane in the stack is visible at a decreasing opacity.
+// In flat mode only the front plane is shown.
+// ☄️ Tweak the steps array to adjust how visible each layer behind is in 3D.
+function stackOpacity(sp){
+  if(!is3D) return sp===0 ? '1' : '0';
+  const steps=['1','1','1','1']; // front → furthest back
+  return steps[sp] ?? '0.08';
+}
+
+// ☄️ STAIRCASE OFFSET — in 3D mode each plane behind the front is shifted upward by this
+// many px per stack position, so their tops peek out above the plane in front.
+// Increase for more of each card showing, decrease to tighten the stack.
+const STAIRCASE_Y = -60; // px per stack step (negative = upward)
+
+// Transform string for a plane at stack position sp (resting state)
+// In 3D mode adds a staircase Y offset so back planes peek above the front.
+function stackTransform(sp){
+  const y = (is3D && sp > 0) ? STAIRCASE_Y * sp : 0;
+  return `translateZ(${getZ(sp)}px) translateY(${y}px) rotateX(0deg)`;
+}
+
 function applyPositions(animated=true){
+  const spd=is3D?ANIM.threed:ANIM.flat;
   order.forEach((pi,sp)=>{
     const el=planeEls[pi];
-    el.style.transition=animated?'transform .65s cubic-bezier(.4,0,.2,1),opacity .5s ease':'none';
-    el.style.transform=`translateZ(${getZ(sp)}px)`;el.style.zIndex=N-sp;el.style.opacity=sp===0?'1':(0.82-sp*.08).toFixed(2);
-  });syncUI();
+    const isFront=sp===0;
+    el.style.transition=animated?`transform ${spd.land}ms ${spd.easeLand}, opacity ${spd.land}ms ease`:'none';
+    el.style.transform=stackTransform(sp);
+    el.style.zIndex=N-sp;
+    el.style.opacity=stackOpacity(sp);
+    // In 3D mode back planes must remain clickable (the plane element itself is the click target).
+    // We only block pointer-events in flat mode where back planes are invisible.
+    el.style.pointerEvents = (!is3D && !isFront) ? 'none' : '';
+  });
+  syncUI();
 }
-function cycleOnce(done){
-  animating=true;const ti=order[0],el=planeEls[ti];
-  el.style.transition='transform .4s cubic-bezier(.4,0,.2,1),opacity .3s ease';el.style.transform=`translateZ(${getZ(0)+400}px)`;el.style.opacity='0';
-  setTimeout(()=>{order.push(order.shift());el.style.transition='none';el.style.transform=`translateZ(${getZ(N-1)-100}px)`;el.style.opacity='0';setTimeout(()=>{applyPositions(true);animating=false;if(done)done();},40);},380);
+
+// Card-shuffle: in flat mode a simple rise+land; in 3D the card also tilts 45° as it rises.
+// switchToFlat=true means the animation will exit 3D mode on landing (only from plane-click in 3D).
+function bringToTop(target, switchToFlat=false){
+  if(order[0]===target||animating)return;
+  animating=true;
+
+  const spd=is3D?ANIM.threed:ANIM.flat;
+  const targetEl=planeEls[target];
+
+  // Phase 1 — snap all planes to current resting positions with no transition
+  order.forEach((pi,sp)=>{
+    const el=planeEls[pi];
+    el.style.transition='none';
+    el.style.transform=stackTransform(sp);
+    el.style.zIndex=N-sp;
+    el.style.opacity=stackOpacity(sp);
+    // During animation lock all pointer events
+    el.style.pointerEvents='none';
+  });
+
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    // Fade out current front
+    planeEls[order[0]].style.transition=`opacity ${spd.rise}ms ease`;
+    planeEls[order[0]].style.opacity='0';
+
+    // Rise — in 3D: shoot up AND tilt so the card "rotates face-up" during flight
+    const riseZ = getZ(0) + (is3D ? RISE_HEIGHT_3D : RISE_HEIGHT_FLAT);
+    const riseTilt = is3D ? `rotateX(${RISE_TILT_DEG}deg)` : 'rotateX(0deg)';
+    targetEl.style.transition=`transform ${spd.rise}ms ${spd.easeRise}, opacity ${spd.rise}ms ease`;
+    targetEl.style.transform=`translateZ(${riseZ}px) ${riseTilt}`;
+    targetEl.style.opacity='0.82';
+    targetEl.style.zIndex=N+1;
+
+    setTimeout(()=>{
+      // Update order
+      const idx=order.indexOf(target);
+      order.splice(idx,1);
+      order.unshift(target);
+
+      // Only switch to flat when explicitly requested (i.e. user clicked a plane in 3D)
+      if(switchToFlat && is3D){
+        is3D=false;
+        // Use applyView so the zoom-out reversal (scale back to 1) fires correctly
+        applyView(true);
+      }
+
+      // Land — all planes ease to new resting positions, tilt resolves to 0
+      order.forEach((pi,sp)=>{
+        const el=planeEls[pi];
+        const isFront=sp===0;
+        el.style.transition=`transform ${spd.land}ms ${spd.easeLand}, opacity ${spd.land}ms ease`;
+        el.style.transform=stackTransform(sp);
+        el.style.zIndex=N-sp;
+        el.style.opacity=stackOpacity(sp);
+        el.style.pointerEvents=(!is3D && !isFront)?'none':'';
+      });
+      syncUI();
+
+      setTimeout(()=>{
+        stackEl.style.transition='';
+        animating=false;
+      },spd.land);
+    },spd.rise);
+  }));
 }
-function bringToTop(t){if(order[0]===t||animating)return;function step(){if(order[0]!==t)cycleOnce(step);}step();}
-function applyView(){const v=is3D?VIEW_3D:VIEW_FLAT;stackEl.style.transform=`rotateX(${v.rotX}deg) rotateY(${v.rotY}deg)`;toggleBtn.classList.toggle('active',is3D);toggleBtn.setAttribute('aria-pressed',is3D);}
+// ☄️ 3D ZOOM — padding (px) kept around the stacked planes when entering 3D mode.
+// Increase for more breathing room, decrease to fill more of the scene.
+const ZOOM_3D_PAD = 80;
+
+function compute3DScale(){
+  // The stack tilts rotateX(-20deg) rotateY(15deg). We need to fit:
+  //   width:  PLANE_W projected with rotY=15° → PLANE_W * cos(15°) + depth * sin(15°)
+  //   height: PLANE_H projected with rotX=20° → PLANE_H * cos(20°) + depth * sin(20°)
+  // where depth = GAP * (N-1) (total stack depth)
+  const depth = GAP * (N - 1);
+  const rotX = Math.abs(VIEW_3D.rotX) * Math.PI / 180;
+  const rotY = Math.abs(VIEW_3D.rotY) * Math.PI / 180;
+  const projW = PLANE_W * Math.cos(rotY) + depth * Math.sin(rotY);
+  const projH = PLANE_H * Math.cos(rotX) + depth * Math.sin(rotX);
+  const availW = SCENE_W - ZOOM_3D_PAD * 2;
+  const availH = SCENE_H - ZOOM_3D_PAD * 2;
+  const scaleW = availW / projW;
+  const scaleH = availH / projH;
+  return Math.min(1, scaleW, scaleH); // never scale UP in flat mode
+}
+
+function applyView(animated=true){
+  const v=is3D?VIEW_3D:VIEW_FLAT;
+  stackEl.style.transform=`rotateX(${v.rotX}deg) rotateY(${v.rotY}deg)`;
+  toggleBtn.classList.toggle('active',is3D);
+  toggleBtn.setAttribute('aria-pressed',is3D);
+
+  // Zoom out the whole scene in 3D so the stacked planes fit within the padding
+  const scale = is3D ? compute3DScale() : 1;
+
+  // When rotateX tilts the stack, the bottom edge swings toward the viewer and
+  // clips below the bottom bar. Shift the scene upward to re-centre the tilted stack.
+  // ☄️ 3D VERTICAL OFFSET — tweak the multiplier (default 0.5) if the stack sits
+  // too high or too low in 3D mode. 0 = no shift, 1 = full half-plane-height shift.
+  const verticalOffset = is3D
+    ? -Math.sin(Math.abs(v.rotX) * Math.PI / 180) * (PLANE_H / 2) * -3 * scale
+    : 0;
+
+  sceneInner.style.transform=`translate(calc(-50% + 0px), calc(-50% + ${verticalOffset}px)) scale(${scale})`;
+
+  // Re-apply stack opacities so 3D shows the full deck, flat hides back planes
+  applyPositions(animated);
+}
 toggleBtn.addEventListener('click',()=>{is3D=!is3D;applyView();});
 
 let rsz=false,rsX,rsY,rsW,rsH;
