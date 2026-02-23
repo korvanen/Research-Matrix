@@ -575,7 +575,7 @@ function buildPanel(byPlane,matchedKws,total,allKws){
   });
   if(allSelectedEmpty){
     panelSub.textContent = ''; // no subtitle
-    panelBody.innerHTML = emptyMsg('The cell is empty'); // same style as "No matches found"
+    panelBody.innerHTML = emptyMsg('The cell is empty'+ "<br>" +'select a different cell'); // same style as "No matches found"
     hlToggle.classList.remove('visible','active');
     const wasOpen=clusterPanel.classList.contains('open');
     clusterPanel.classList.add('open');syncPanelBtn();
