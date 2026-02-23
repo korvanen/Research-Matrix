@@ -269,8 +269,8 @@ const PLANES=[
   {tab:'RELATIONAL',title:'The Relational Dimension'},
   {tab:'PHYSICAL',title:'The Physical Dimension'},
 ];
-const STOP_WORDS=new Set(['a','an','the','and','or','of','in','on','at','to','for','by','with','from','is','are','was','were','be','been','have','has','had','do','does','did','will','would','could','should','may','might','not','no','but','so','than','that','their','them','then','there','these','they','this','those','through','what','when','where','which','who','how','all','any','each','some','such','its','our','as','if','into','about','after','before','during','including','pp','vol','ed','eds','de','van','von','et','al','doi','housing','cohousing','living','urban','design','community','space','social','people','study','case','research','analysis','journal','review','international','new','city','based']);
-const MIN_KW=5,MIN_SHARED=2;
+const STOP_WORDS=new Set(['building','built','environment','architecture','architectural','planning','residential','apartment','apartments','area','part','time','work','use','paper', 'article','literature','practice','approach','model','system','process','development','project','method','result','data','using','used','also','within','between','among','example','context']);
+const MIN_KW=4,MIN_SHARED=3;
 const COL_GROW_DEFAULT=1;
 
 let SCENE_W=1360,SCENE_H=960,PLANE_W=99999,PLANE_H=99999,PLANE_L=40,PLANE_T=100;
@@ -348,8 +348,21 @@ function extractTag(raw){
 }
 
 function extractKW(text){
-  return[...new Set(String(text).toLowerCase().replace(/[^a-z\s]/g,' ').split(/\s+/).filter(w=>w.length>=MIN_KW&&!STOP_WORDS.has(w)))];
+  return[...new Set(
+    String(text).toLowerCase().replace(/[^a-z\s]/g,' ').split(/\s+/)
+      .filter(w=>w.length>=MIN_KW&&!STOP_WORDS.has(w))
+      .map(word=>{
+        // Basic English depluralization: "resources"→"resource", but keep "class","ross" etc.
+        let clean = word.endsWith('s') && !word.endsWith('ss') ? word.slice(0,-1) : word;
+        // Also collapse common -ing/-ed/-er endings to bare stem for better cross-match
+        // (leave these lines commented out unless you want more aggressive stemming)
+        // clean = clean.endsWith('ing') && clean.length>6 ? clean.slice(0,-3) : clean;
+        // clean = clean.endsWith('ed')  && clean.length>5 ? clean.slice(0,-2) : clean;
+        return clean;
+      })
+  )];
 }
+  
 function highlightKW(text,kwSet){
   if(!kwSet||!kwSet.size)return escH(text);
   const pat=new RegExp(`\\b(${[...kwSet].map(k=>k.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('|')})\\b`,'gi');
@@ -1036,7 +1049,7 @@ function bringToTop(target, switchToFlat=false){
 }
 // ☄️ 3D ZOOM — padding (px) kept around the stacked planes when entering 3D mode.
 // Increase for more breathing room, decrease to fill more of the scene.
-const ZOOM_3D_PAD = 80;
+const ZOOM_3D_PAD = 100;
 
 function compute3DScale(){
   // The stack tilts rotateX(-20deg) rotateY(15deg). We need to fit:
