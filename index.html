@@ -1,1 +1,67 @@
-<script src="https://gist.github.com/korvanen/4d3ccd6221577afdfa1e0219e464be5f.js"></script>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Dimensional Framework</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="top-bar">
+  <span id="status">Fetching spreadsheet…</span>
+  <header>
+    <h1>Dimensional Framework</h1>
+    <p>Click any cell to add it to the match · click empty space to clear</p>
+  </header>
+  <div class="top-bar-right">
+    <button id="panel-open-btn" class="tbtn" aria-pressed="false">
+      <span class="panel-icon"><span></span><span></span><span></span></span>Related
+    </button>
+    <button id="view-toggle" class="tbtn" aria-pressed="false">
+      <span class="toggle-icon"><span></span><span></span></span>Stair View
+    </button>
+  </div>
+</div>
+<div id="stage-wrap">
+  <div id="stage">
+    <div id="scene-inner">
+      <div class="scene"><div class="stack" id="stack"></div></div>
+    </div>
+  </div>
+  <div id="cluster-panel">
+    <div class="resize-grip" id="panel-grip"></div>
+    <div id="panel-inner">
+      <div id="panel-head">
+        <div id="panel-head-text">
+          <div id="panel-title">Related Entries</div>
+          <div id="panel-subtitle"></div>
+          <div id="panel-toolbar">
+            <button id="highlight-toggle"><span class="hl-icon"></span>Highlight keywords</button>
+            <button id="mindmap-toggle">Mindmap</button>
+          </div>
+        </div>
+        <button id="panel-close">✕</button>
+      </div>
+      <div id="panel-body"></div>
+      <div id="mindmap-wrap">
+        <svg id="mindmap-svg"></svg>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="bottom-bar">
+  <div class="carousel-wrap">
+    <button class="carr-arrow" id="arr-left" aria-label="Previous">
+      <svg width="8" height="14" viewBox="0 0 8 14" fill="none"><path d="M7 1L1 7L7 13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <div class="dot-window" id="dot-window"></div>
+    <button class="carr-arrow" id="arr-right" aria-label="Next">
+      <svg width="8" height="14" viewBox="0 0 8 14" fill="none"><path d="M1 1L7 7L1 13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+  </div>
+  <div class="dot-label" id="hint-label"></div>
+</div>
+<script src="script.js"></script>
+</body>
+</html>
