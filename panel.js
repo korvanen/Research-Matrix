@@ -11,7 +11,10 @@ const PANEL_MIN_SHARED      = 2;
 const PANEL_MM_PAD          = 10;
 const PANEL_MM_ITERS        = 20;
 const PANEL_CARD_W          = 160;
-const PANEL_TILE_MIN_W      = 180; // grid column min-width (px)
+const PANEL_TILE_MIN_R      = 0.14; // grid column min-width as fraction of screen width
+const PANEL_TILE_MAX_R      = 0.22; // grid column max-width as fraction of screen width
+const PANEL_TILE_MIN_W      = () => Math.round(window.innerWidth * PANEL_TILE_MIN_R);
+const PANEL_TILE_MAX_W      = () => Math.round(window.innerWidth * PANEL_TILE_MAX_R);
 const PANEL_GOTO_DELAY      = 900; // ms hover before "Go to" appears
 
 const PANEL_STOP_WORDS = new Set([
@@ -240,6 +243,16 @@ function initPanel(sidebarBox) {
   const ppViewWrap = document.getElementById('pp-view-wrap');
   const ppBody     = document.getElementById('pp-body');
   const ppMmWrap   = document.getElementById('pp-mm-wrap');
+
+  // ── Tile column sizing — recompute CSS vars from screen ratio on every resize ──
+  function updateTileColVars() {
+    var min = PANEL_TILE_MIN_W() + 'px';
+    var max = PANEL_TILE_MAX_W() + 'px';
+    ppBody.style.setProperty('--pp-col-min', min);
+    ppBody.style.setProperty('--pp-col-max', max);
+  }
+  updateTileColVars();
+  window.addEventListener('resize', updateTileColVars);
 
   // ── State ─────────────────────────────────────────────────────────────────
   var hlOn        = true;
@@ -815,12 +828,13 @@ function initPanel(sidebarBox) {
 
 #pp-body-wrap { flex: 1; min-height: 0; position: relative; overflow: hidden; }
 
-/* CSS Grid — auto-fill columns of min ${PANEL_TILE_MIN_W}px → true 2D stacking */
+/* CSS Grid — columns sized by screen-width ratio (PANEL_TILE_MIN_R / PANEL_TILE_MAX_R) */
 #pp-body {
   position: absolute; inset: 0; overflow-y: auto;
   padding: 8px 10px 16px; box-sizing: border-box;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(${PANEL_TILE_MIN_W}px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(var(--pp-col-min), var(--pp-col-max)));
+  justify-content: start;
   align-content: start;
   gap: 6px;
 }
