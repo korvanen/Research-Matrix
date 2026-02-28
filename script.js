@@ -39,7 +39,7 @@ const LANDSCAPE = {
   sidebarBoxMargin:          0.012,
   sidebarMin:                0.00,  
   sidebarMax:                1.00, 
-  sidebarDefault:            0.40,  // If const SIDEBAR_DEFAULT =  R().sidebarDefault); else it is handled by the .dataColMin
+  sidebarDefault:            0.40,
   sidebarSnapClose:          0.30,  // Below this width → auto-close with animation
   sidebarOverlapThreshold:   0.50,  // Tab bar collapses to single tab + arrows
   sidebarFullscreenThreshold:0.80,  // Sidebar covers entire bottom bar
@@ -148,50 +148,41 @@ function makeTheme(base) {
   const themeColor_3 = modifyColor(base, { lightness:  0.9,  saturation: -0.55 });
   
   return {
-    // backgrounds of the main window
     '--bg-topbar':            modifyColor(base, { lightness:  0.7,  saturation: -0.55 }),
     '--bg-bottombar':         modifyColor(base, { lightness:  0.7,  saturation: -0.55 }),
     '--bg-header':            themeColor_1,
     '--bg-cat':               themeColor_1,
     '--bg-corner':            themeColor_1,
     '--bg-data':              modifyColor(base, { lightness:  0.9,  saturation: -0.60 }),
-    // text colors
     '--color-data':           modifyColor(base, { lightness: -0.30, saturation: -0.20, alpha: 0.80 }),
     '--color-cat':            modifyColor(base, { lightness: -0.25, saturation: -0.10, alpha: 0.55 }),
     '--color-header':         modifyColor(base, { lightness: -0.25, saturation: -0.10, alpha: 0.55 }),
     '--color-topbar-global':  modifyColor(base, { lightness: -0.20, saturation: -0.10, alpha: 0.40 }),
     '--color-topbar-sheet':   modifyColor(base, { lightness: -0.35, saturation:  0.00 }),
-    // borders of the main window
     '--border-main':          themeColor_2,
     '--border-group':         modifyColor(base, { lightness:  0.18, saturation: -0.25 }),
     '--border-strong':        themeColor_3,
     '--border-corner':        modifyColor(base, { lightness:  0.18, saturation: -0.25 }),
     '--border-sticky':        modifyColor(base, { lightness:  0.18, saturation: -0.25 }),
-    // highlight and select colors
     '--highlight-cell':       modifyColor(base, { lightness:  0.2,  saturation:  0.00, alpha: 0.50 }),
     '--highlight-group':      modifyColor(base, { lightness:  0.32, saturation: -0.10, alpha: 0.35 }),
     '--selected-cell':        modifyColor(base, { lightness:  0.10, saturation:  0.05, alpha: 0.70 }),
     '--selected-group':       modifyColor(base, { lightness:  0.18, saturation:  0.00, alpha: 0.50 }),
-    // tab colors
     '--tab-bg':               modifyColor(base, { lightness:  0.7,  saturation: -0.3  }),
     '--tab-border':           modifyColor(base, { lightness: -0.22, saturation: -0.35 }),
     '--tab-active-bg':        modifyColor(base, { lightness:  0.1,  saturation:  0    }),
     '--tab-color':            modifyColor(base, { lightness: -0.40, saturation: -0.10, alpha: 0.45 }),
     '--tab-active-color':     modifyColor(base, { lightness:  0.8,  saturation:  0.5  }),
-    // scroll bar colors
     '--drag-handle':          modifyColor(base, { lightness: -0.05, alpha: 0.35 }),
     '--scrollbar-track':      modifyColor(base, { lightness:  0.36, saturation: -0.50, alpha: 0    }),
     '--scrollbar-thumb':      modifyColor(base, { lightness:  0.18, saturation: -0.20 }),
     '--scrollbar-thumb-hover':modifyColor(base, { lightness:  0.08, saturation: -0.10 }),
-    // sidebar colors
     '--bg-sidebar':             modifyColor(base, { lightness:  0.9,  saturation: -0.55 }),
     '--sidebar-box-bg':         modifyColor(base, { lightness: -0.03, alpha: 0.06 }),
     '--sidebar-box-border':    themeColor_2,
     '--border-sidebar':        themeColor_3,
-    // navigation colors
     '--tab-arrow-bg':           modifyColor(base, { lightness:  0.55, saturation: -0.20 }),
     '--tab-arrow-color':        modifyColor(base, { lightness: -0.30, saturation:  0.10 }),
-    // misc colors
     '--bg-content-surround':    themeColor_3,
     '--border-content-surround':themeColor_2,
   };
@@ -414,21 +405,43 @@ function updateLayout(numDataCols) {
     td.style.width = td.style.minWidth = colW + 'px';
   });
 
-  void dataScroll.offsetHeight;
+  // FIX: double rAF ensures the browser has fully reflowed column widths
+  // before we measure row heights. Single rAF was too early.
+  void dataScroll.offsetHeight; // force sync reflow of column styles
   requestAnimationFrame(() => {
-    void dataScroll.offsetHeight;
-    syncRowHeights();
+    requestAnimationFrame(() => {
+      syncRowHeights();
+    });
   });
 }
 
 // ── Sync row heights ──
+// Ensures cat-body rows match data-body row heights (needed because cat cells
+// can span multiple rows, so heights must be set explicitly).
+// FIX: reset heights first, then measure, then apply — prevents stale values
+// accumulating across repeated calls during sidebar drag.
+let _syncTimer = null;
 function syncRowHeights() {
+  // Debounce rapid calls during drag to at most one per animation frame
+  if (_syncTimer) return;
+  _syncTimer = requestAnimationFrame(() => {
+    _syncTimer = null;
+    _doSyncRowHeights();
+  });
+}
+
+function _doSyncRowHeights() {
   const dataRows = Array.from(dataBody.querySelectorAll('tr'));
   const catRows  = Array.from(catBody.querySelectorAll('tr'));
 
+  // Step 1: clear all explicit heights so getBoundingClientRect reflects natural size
   dataRows.forEach(tr => tr.style.height = '');
   catRows.forEach(tr  => tr.style.height = '');
 
+  // Step 2: force a reflow so the browser recalculates heights with cleared values
+  void dataBody.offsetHeight;
+
+  // Step 3: measure and apply
   dataRows.forEach((dataRow, i) => {
     const catRow = catRows[i];
     if (!catRow) return;
@@ -440,10 +453,23 @@ function syncRowHeights() {
     catRow.style.height  = h + 'px';
   });
 
+  // Step 4: update scrollbar compensation
   const scrollbarH = dataScroll.offsetHeight - dataScroll.clientHeight;
   const scrollbarW = dataScroll.offsetWidth  - dataScroll.clientWidth;
   catScroll.style.paddingBottom   = scrollbarH + 'px';
   headerScroll.style.paddingRight = scrollbarW + 'px';
+}
+
+// ── ResizeObserver on dataScroll — catches sidebar drag resizes ──────────────
+// This is the key fix for the "rows go out of sync on sidebar drag" bug.
+// Previously syncRowHeights only fired at the end of a drag gesture.
+// Now it fires whenever dataScroll changes size (which happens on every drag frame).
+if (window.ResizeObserver) {
+  let _resizeSyncTimer = null;
+  new ResizeObserver(() => {
+    clearTimeout(_resizeSyncTimer);
+    _resizeSyncTimer = setTimeout(_doSyncRowHeights, 16);
+  }).observe(dataScroll);
 }
 
 // ── Highlight & Selection ──
@@ -542,7 +568,6 @@ function applyTheme(themeName) {
 }
 
 // ── Tab bar mode management ──
-// Modes: 'full' | 'compact' | 'hidden'
 let tabBarMode = 'full';
 
 function getTabBarMode() {
@@ -551,14 +576,13 @@ function getTabBarMode() {
   return 'full';
 }
 
-// Check if tabs actually overflow (used after a full render attempt)
 function tabsOverflow() {
   const tabs = tabBar.querySelectorAll('.tab:not(.tab-compact-label)');
   if (!tabs.length) return false;
   let totalW = 0;
   tabs.forEach(t => totalW += t.offsetWidth);
   const gap = 8 * (tabs.length - 1);
-  return (totalW + gap) > tabBar.clientWidth + 2; // +2 for rounding
+  return (totalW + gap) > tabBar.clientWidth + 2;
 }
 
 function buildTabBar() {
@@ -577,7 +601,6 @@ function buildTabBar() {
   bottombar.classList.remove('tabs-hidden');
 
   if (mode === 'full') {
-    // Try rendering full first, then check overflow
     tabBar.style.width    = '';
     tabBar.style.maxWidth = '';
     tabBar.style.padding  = '';
@@ -601,8 +624,6 @@ function buildTabBar() {
       tabBar.appendChild(el);
     });
 
-    // FIX 1: After render, if tabs still overflow even with flex shrink, switch to compact
-    // We use requestAnimationFrame to let the browser lay out first
     requestAnimationFrame(() => {
       if (tabsOverflow()) {
         mode = 'compact';
@@ -635,18 +656,14 @@ function buildTabBarCompact() {
   const label   = (tabData && tabData.title) ? tabData.title : TABS[activeTab].name;
   const vars    = THEMES[TAB_THEMES[activeTab] || 'default'] || THEMES.default;
 
-  // FIX 2: Build arrow with explicit inline colors so it's always visible
   function makeTabArrow(dir) {
     const btn = document.createElement('button');
     btn.className = `tab-arrow tab-arrow-${dir}`;
     btn.setAttribute('aria-label', dir === 'prev' ? 'Previous tab' : 'Next tab');
-    // FIX 2: use explicit stroke attribute, not just currentColor inheritance
     const pts = dir === 'prev' ? '7,2 2,8 7,14' : '3,2 8,8 3,14';
     btn.innerHTML = `<svg viewBox="0 0 10 16" fill="none"><polyline points="${pts}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-    // FIX 2: Inline background and color so they're always visible regardless of CSS var resolution timing
     btn.style.background = vars['--tab-arrow-bg'] || '#c8c8c8';
     btn.style.color      = vars['--tab-arrow-color'] || '#333333';
-    // FIX 2: Ensure opacity is 1 (not relying on CSS class .visible)
     btn.style.opacity = '1';
     return btn;
   }
@@ -833,8 +850,6 @@ function animateSidebarTo(targetW) {
 
   updateHandleArrows(targetW);
 
-  // In portrait (two-position), immediately switch to fixed positioning before
-  // the animation starts so the grid reflows once rather than every frame.
   if (SIDEBAR_TWO_POSITION()) {
     sidebar.classList.add('is-overlapping');
     document.documentElement.style.setProperty('--sidebar-reserved-width', '0px');
@@ -878,7 +893,6 @@ function animateSidebarTo(targetW) {
       animateSidebarTo._rafId = requestAnimationFrame(rafLoop);
     } else {
       sidebar.style.width = targetW + 'px';
-      // In portrait closing, remove overlapping now that animation is done
       if (SIDEBAR_TWO_POSITION() && targetW <= SIDEBAR_MIN()) {
         sidebar.classList.remove('is-overlapping', 'is-fullscreen');
         document.documentElement.style.setProperty('--sidebar-reserved-width', '0px');
@@ -886,7 +900,6 @@ function animateSidebarTo(targetW) {
       applySidebarWidth(targetW);
       updateSidebarOverlap();
       updateLayout();
-      syncRowHeights();
       updateHandleArrows(targetW);
       positionDragHandle();
     }
@@ -919,7 +932,6 @@ function applySidebarWidth(w) {
   applyBarSizes_noOverlap();
 }
 
-// applyBarSizes without the updateSidebarOverlap call (used during animation)
 function applyBarSizes_noOverlap() {
   document.documentElement.style.setProperty('--sidebar-box-margin',  SIDEBAR_BOX_MARGIN() + 'px');
   document.documentElement.style.setProperty('--drag-handle-width',   DRAG_HANDLE_WIDTH() + 'px');
@@ -998,6 +1010,7 @@ function startDrag(e) {
 
 dragHandle.addEventListener('mousedown', startDrag);
 dragHandleFixed.addEventListener('mousedown', startDrag);
+
 document.addEventListener('mousemove', e => {
   if (!dragging) return;
   const newW = Math.min(SIDEBAR_MAX(), Math.max(SIDEBAR_MIN(), startSidebarWidth + (startX - e.clientX)));
@@ -1005,9 +1018,9 @@ document.addEventListener('mousemove', e => {
   updateSidebarOverlap();
   updateLayout();
   positionDragHandle();
-  void dataScroll.offsetHeight;
-  syncRowHeights();
+  // Note: syncRowHeights is triggered automatically via ResizeObserver on dataScroll
 });
+
 document.addEventListener('mouseup', () => {
   if (!dragging) return;
   dragging = false;
@@ -1026,6 +1039,7 @@ document.addEventListener('mouseup', () => {
     positionDragHandle();
   }
 });
+
 window.addEventListener('resize', () => {
   applyBarSizes();
   if (SIDEBAR_TWO_POSITION()) {
