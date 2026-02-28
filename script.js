@@ -801,6 +801,8 @@ function setupHover() {
   });
 
   document.addEventListener('click', e => {
+    // Don't clear selection when clicking sidebar toggle arrows
+    if (e.target.closest('.handle-arrow')) return;
     if (!e.target.closest('#sidebar')) {
       clearSelection();
     }
