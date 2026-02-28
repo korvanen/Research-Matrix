@@ -60,9 +60,18 @@ function initPanel(sidebarBox) {
   const ppBody     = document.getElementById('pp-body');
   const ppMmWrap   = document.getElementById('pp-mm-wrap');
 
-  // Inject PANEL_TILE_CARD_W as a CSS variable so the stylesheet is driven by the constant.
-  // Change PANEL_TILE_CARD_W at the top of this file and everything updates automatically.
+  // Inject PANEL_TILE_CARD_W as a CSS variable.
   document.documentElement.style.setProperty('--pp-tile-card-w', PANEL_TILE_CARD_W + 'px');
+
+  // The grid needs an explicit pixel width on #pp-body to count columns correctly —
+  // CSS alone can't resolve it through the overflow:hidden flex ancestor.
+  function updateBodyWidth() {
+    ppBody.style.width = sidebarBox.clientWidth + 'px';
+  }
+  updateBodyWidth();
+  if (window.ResizeObserver) {
+    new ResizeObserver(updateBodyWidth).observe(sidebarBox);
+  }
 
   // ── State ─────────────────────────────────────────────────────────────────
   var hlOn        = true;
@@ -657,9 +666,9 @@ function initPanel(sidebarBox) {
 
 #pp-body-wrap { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; position: relative; }
 
-/* CSS Grid — fixed-width columns driven by --pp-tile-card-w (set from PANEL_TILE_CARD_W in JS).
-   Cards never stretch; they tile left-to-right and wrap when there's no room for another column.
-   NOTE: must NOT be position:absolute — auto-fill needs a definite non-scrollable width to count columns. */
+/* CSS Grid — columns are PANEL_TILE_CARD_W px wide (set as --pp-tile-card-w via JS).
+   #pp-body gets an explicit pixel width from JS (sidebarBox.clientWidth) so auto-fill
+   can correctly count how many columns fit. */
 #pp-body {
   padding: 10px 12px 18px; box-sizing: border-box;
   display: grid;
