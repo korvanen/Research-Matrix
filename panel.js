@@ -63,14 +63,16 @@ function initPanel(sidebarBox) {
   // Inject PANEL_TILE_CARD_W as a CSS variable.
   document.documentElement.style.setProperty('--pp-tile-card-w', PANEL_TILE_CARD_W + 'px');
 
-  // The grid needs an explicit pixel width on #pp-body to count columns correctly —
-  // CSS alone can't resolve it through the overflow:hidden flex ancestor.
+  // Set explicit pixel width on #pp-body from pp-body-wrap's clientWidth (excludes scrollbar).
+  // This is the only reliable way to give auto-fill a definite width through the
+  // overflow:hidden / absolute-positioned ancestor chain.
+  const ppBodyWrap = document.getElementById('pp-body-wrap');
   function updateBodyWidth() {
-    ppBody.style.width = sidebarBox.clientWidth + 'px';
+    ppBody.style.width = ppBodyWrap.clientWidth + 'px';
   }
   updateBodyWidth();
   if (window.ResizeObserver) {
-    new ResizeObserver(updateBodyWidth).observe(sidebarBox);
+    new ResizeObserver(updateBodyWidth).observe(ppBodyWrap);
   }
 
   // ── State ─────────────────────────────────────────────────────────────────
