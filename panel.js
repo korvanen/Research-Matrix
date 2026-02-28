@@ -16,10 +16,9 @@ const PANEL_MM_PAD          = 10;  // mindmap collision padding (px)
 const PANEL_MM_ITERS        = 20;  // mindmap collision resolution iterations
 const PANEL_CARD_W          = 160; // mindmap card width (px)
 
-// Tile card sizing — fixed px values that respond to sidebar width (not window width).
-// These are used by updateTileColVars() which measures the actual sidebar container.
-const PANEL_CARD_MIN_W      = 140; // px — minimum column width (aim: ~2 cols fit in narrow sidebar)
-const PANEL_CARD_MAX_W      = 220; // px — maximum column width
+// Tile card fixed width — cards always render at this width and wrap to the
+// next row when there isn't horizontal room for another column. No stretching.
+const PANEL_TILE_CARD_W     = 160; // px — fixed width for every tile card
 
 const PANEL_GOTO_DELAY      = 900; // ms hover before "Go to" button appears
 
@@ -61,22 +60,9 @@ function initPanel(sidebarBox) {
   const ppBody     = document.getElementById('pp-body');
   const ppMmWrap   = document.getElementById('pp-mm-wrap');
 
-  // ── Tile column sizing ────────────────────────────────────────────────────
-  // KEY FIX: measure sidebarBox.clientWidth (the actual container), not window.innerWidth.
-  // This means columns reflow immediately as the sidebar is dragged.
-  function updateTileColVars() {
-    var containerW = sidebarBox.clientWidth || 200;
-    var minW = Math.max(PANEL_CARD_MIN_W, Math.floor(containerW / 3));
-    var maxW = Math.max(minW + 20, Math.min(PANEL_CARD_MAX_W, Math.floor(containerW / 2)));
-    ppBody.style.setProperty('--pp-col-min', minW + 'px');
-    ppBody.style.setProperty('--pp-col-max', maxW + 'px');
-  }
-  updateTileColVars();
-  window.addEventListener('resize', updateTileColVars);
-  // ResizeObserver on the sidebar box catches drag resizes between window resize events
-  if (window.ResizeObserver) {
-    new ResizeObserver(updateTileColVars).observe(sidebarBox);
-  }
+  // Cards are fixed-width (PANEL_TILE_CARD_W). The CSS grid uses auto-fill so
+  // the browser naturally fits as many columns as the sidebar width allows.
+  // No JS measurement needed — CSS handles the tiling automatically.
 
   // ── State ─────────────────────────────────────────────────────────────────
   var hlOn        = true;
@@ -259,8 +245,7 @@ function initPanel(sidebarBox) {
 
     if (viewMode === 'mindmap') { viewMode = 'tiles'; viewPill.setValue('tiles', false); }
 
-    // Re-measure now that we're about to render
-    updateTileColVars();
+    // Cards are fixed-width — no column var update needed here
 
     var vars = panelThemeVars(srcTabIdx);
 
@@ -650,13 +635,15 @@ function initPanel(sidebarBox) {
 
 #pp-body-wrap { flex: 1; min-height: 0; position: relative; overflow: hidden; }
 
-/* CSS Grid — auto-fill columns based on --pp-col-min, which is set from the
-   actual sidebar container width (not window width). Columns reflow on sidebar drag. */
+/* CSS Grid — auto-fill fixed-width columns. Cards never stretch; they tile
+   left-to-right and wrap when there's no room for another column.
+   The sidebar width determines how many columns fit naturally. */
 #pp-body {
   position: absolute; inset: 0; overflow-y: auto;
   padding: 10px 12px 18px; box-sizing: border-box;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(var(--pp-col-min, 140px), 1fr));
+  grid-template-columns: repeat(auto-fill, 160px);
+  justify-content: start;
   align-content: start;
   gap: 10px;
 }
@@ -696,9 +683,9 @@ function initPanel(sidebarBox) {
   overflow: hidden; box-sizing: border-box;
 }
 
-/* Match card — fills its grid cell, max-width caps it from growing too wide */
+/* Match card — fixed width set by grid column. Never stretches. */
 .pp-match-card {
-  max-width: var(--pp-col-max, 220px);
+  width: 160px;
   border: 1.5px solid var(--ppc-border, #aaa);
   border-radius: 8px; background: var(--ppc-bg, #f8f8f8);
   overflow: visible; box-sizing: border-box;
