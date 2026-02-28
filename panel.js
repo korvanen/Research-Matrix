@@ -249,7 +249,7 @@ function initPanel(sidebarBox) {
 
     var vars = panelThemeVars(srcTabIdx);
 
-    // Seed card (full-width, spans all columns via CSS)
+    // Seed card — fixed-width, same as match cards
     var seedCard = document.createElement('div');
     seedCard.className = 'pp-seed-card';
     seedCard.style.setProperty('--ppc-border', vars['--tab-active-bg'] || '#888');
@@ -423,28 +423,50 @@ function initPanel(sidebarBox) {
 
     function makeDraggable(el, key) {
       var isDragging = false, ox = 0, oy = 0, sl = 0, st = 0;
-      el.addEventListener('mousedown', function(e) {
-        if (e.button !== 0) return;
-        isDragging = true; ox = e.clientX; oy = e.clientY;
+
+      function dragStart(clientX, clientY) {
+        isDragging = true; ox = clientX; oy = clientY;
         sl = parseFloat(el.style.left) || 0;
         st = parseFloat(el.style.top)  || 0;
         el.style.zIndex = 99; el.style.transition = 'none';
-        e.preventDefault(); e.stopPropagation();
-      });
-      document.addEventListener('mousemove', function(e) {
+      }
+      function dragMove(clientX, clientY) {
         if (!isDragging) return;
         var r = rects.get(key) || { w: PANEL_CARD_W, h: 80 };
-        var pos = clampToCanvas(sl + (e.clientX - ox), st + (e.clientY - oy), r.w, r.h);
+        var pos = clampToCanvas(sl + (clientX - ox), st + (clientY - oy), r.w, r.h);
         el.style.left = pos[0] + 'px'; el.style.top = pos[1] + 'px';
         rects.set(key, { x: pos[0], y: pos[1], w: r.w, h: r.h });
         pushApart(key);
         redrawArrows();
-      });
-      document.addEventListener('mouseup', function() {
+      }
+      function dragEnd() {
         if (!isDragging) return;
         isDragging = false; el.style.zIndex = '';
         redrawArrows();
+      }
+
+      // Mouse
+      el.addEventListener('mousedown', function(e) {
+        if (e.button !== 0) return;
+        dragStart(e.clientX, e.clientY);
+        e.preventDefault(); e.stopPropagation();
       });
+      document.addEventListener('mousemove', function(e) { dragMove(e.clientX, e.clientY); });
+      document.addEventListener('mouseup', dragEnd);
+
+      // Touch
+      el.addEventListener('touchstart', function(e) {
+        if (e.touches.length !== 1) return;
+        dragStart(e.touches[0].clientX, e.touches[0].clientY);
+        e.preventDefault(); // prevent scroll while dragging card
+      }, { passive: false });
+      el.addEventListener('touchmove', function(e) {
+        if (e.touches.length !== 1) return;
+        dragMove(e.touches[0].clientX, e.touches[0].clientY);
+        e.preventDefault();
+      }, { passive: false });
+      el.addEventListener('touchend', dragEnd);
+      el.addEventListener('touchcancel', dragEnd);
     }
 
     function makeCard(text, header, tabIdx, key, isSeed, cats, kwsHL, matchObj) {
@@ -633,12 +655,12 @@ function initPanel(sidebarBox) {
 #pp-hl-wrap, #pp-view-wrap { flex: 1; min-width: 0; display: flex; }
 #pp-hl-wrap .pp-pill, #pp-view-wrap .pp-pill { width: 100%; }
 
-#pp-body-wrap { flex: 1; min-height: 0; position: relative; overflow: hidden; }
+#pp-body-wrap { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; position: relative; }
 
 /* CSS Grid — fixed-width columns driven by --pp-tile-card-w (set from PANEL_TILE_CARD_W in JS).
-   Cards never stretch; they tile left-to-right and wrap when there's no room for another column. */
+   Cards never stretch; they tile left-to-right and wrap when there's no room for another column.
+   NOTE: must NOT be position:absolute — auto-fill needs a definite non-scrollable width to count columns. */
 #pp-body {
-  position: absolute; inset: 0; overflow-y: auto;
   padding: 10px 12px 18px; box-sizing: border-box;
   display: grid;
   grid-template-columns: repeat(auto-fill, var(--pp-tile-card-w, 160px));
@@ -674,9 +696,9 @@ function initPanel(sidebarBox) {
   color: rgba(0,0,0,.25); line-height: 1.5;
 }
 
-/* Seed card — always full-width, spans all columns */
+/* Seed card — same fixed width as match cards, just styled differently */
 .pp-seed-card {
-  grid-column: 1 / -1;
+  width: var(--pp-tile-card-w, 160px);
   border: 2px solid var(--ppc-border, #aaa);
   border-radius: 8px; background: var(--ppc-bg, #f8f8f8);
   overflow: hidden; box-sizing: border-box;
