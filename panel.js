@@ -1,30 +1,27 @@
 // ════════════════════════════════════════════════════════════════════════════
 // panel.js — Results panel for sidebar-box
-// Depends on: script.js globals (TABS, activeTab, processSheetData, THEMES,
-//             TAB_THEMES, makeTheme, modifyColor, clearSelection, applySelection,
-//             getHighlightTargets, showTab, buildTabBar)
+//
+// REQUIRES (load before this file):
+//   panel-utils.js   — panelEscH, panelExtractKW, panelHighlight, panelThemeVars,
+//                      buildRowIndex, findMatches, buildPill, panelGoTo, attachGoTo
+//   script.js        — TABS, activeTab, processSheetData, THEMES, TAB_THEMES,
+//                      clearSelection, applySelection, getHighlightTargets,
+//                      showTab, buildTabBar
 // ════════════════════════════════════════════════════════════════════════════
 
 // ── SETTINGS ─────────────────────────────────────────────────────────────────
-const PANEL_KW_MIN_WORD_LEN = 4;
-const PANEL_MIN_SHARED      = 2;
-const PANEL_MM_PAD          = 10;
-const PANEL_MM_ITERS        = 20;
-const PANEL_CARD_W          = 160;
-const PANEL_TILE_MIN_R      = 0.1; // grid column min-width as fraction of screen width
-const PANEL_TILE_MAX_R      = 0.15; // grid column max-width as fraction of screen width
-const PANEL_TILE_MIN_W      = () => Math.round(window.innerWidth * PANEL_TILE_MIN_R);
-const PANEL_TILE_MAX_W      = () => Math.round(window.innerWidth * PANEL_TILE_MAX_R);
-const PANEL_GOTO_DELAY      = 900; // ms hover before "Go to" appears
+const PANEL_KW_MIN_WORD_LEN = 4;   // minimum characters for a word to be a keyword
+const PANEL_MIN_SHARED      = 2;   // minimum shared keywords to count as a match
+const PANEL_MM_PAD          = 10;  // mindmap collision padding (px)
+const PANEL_MM_ITERS        = 20;  // mindmap collision resolution iterations
+const PANEL_CARD_W          = 160; // mindmap card width (px)
 
-const PANEL_STOP_WORDS = new Set([
-  'that','this','with','from','have','they','will','been','were','their',
-  'when','also','into','more','than','then','some','what','there','which',
-  'about','these','other','would','could','should','through','where','those',
-  'building','built','environment','architecture','architectural','planning',
-  'residential','area','part','time','work','using','used','only','within',
-  'between','among','example','context','claim','housing','where','rarely',
-]);
+// Tile card sizing — fixed px values that respond to sidebar width (not window width).
+// These are used by updateTileColVars() which measures the actual sidebar container.
+const PANEL_CARD_MIN_W      = 140; // px — minimum column width (aim: ~2 cols fit in narrow sidebar)
+const PANEL_CARD_MAX_W      = 220; // px — maximum column width
+
+const PANEL_GOTO_DELAY      = 900; // ms hover before "Go to" button appears
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
@@ -35,186 +32,6 @@ document.addEventListener('DOMContentLoaded', () => {
     initPanel(box);
   }, 50);
 });
-
-// ── HELPERS ───────────────────────────────────────────────────────────────────
-function panelEscH(t) {
-  return String(t == null ? '' : t)
-    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-}
-
-function panelExtractKW(text) {
-  return [...new Set(
-    String(text).toLowerCase()
-      .replace(/[^a-z\s]/g, ' ')
-      .split(/\s+/)
-      .filter(w => w.length >= PANEL_KW_MIN_WORD_LEN && !PANEL_STOP_WORDS.has(w))
-      .map(w => w.endsWith('s') && !w.endsWith('ss') ? w.slice(0, -1) : w)
-  )];
-}
-
-function panelHighlight(text, kwSet) {
-  if (!kwSet || !kwSet.size) return panelEscH(text);
-  const pat = new RegExp(
-    '\\b(' + [...kwSet].map(k => k.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('|') + ')\\b', 'gi'
-  );
-  return panelEscH(text).replace(pat, m => '<mark class="pkw">' + m + '</mark>');
-}
-
-function panelThemeVars(tabIdx) {
-  const name = (typeof TAB_THEMES !== 'undefined' && TAB_THEMES[tabIdx]) || 'default';
-  return (typeof THEMES !== 'undefined' && (THEMES[name] || THEMES.default)) || {};
-}
-
-// ── SEARCH ENGINE ─────────────────────────────────────────────────────────────
-function buildRowIndex() {
-  if (typeof TABS === 'undefined' || !TABS.length) return [];
-  const rows = [];
-  TABS.forEach((tab, tabIdx) => {
-    const data = typeof processSheetData === 'function' ? processSheetData(tab.grid) : null;
-    if (!data) return;
-    data.rows.forEach((row, rowIdx) => {
-      rows.push({
-        tabIdx, rowIdx, row,
-        headers: data.headers,
-        title: data.title || tab.name,
-        kws: new Set(panelExtractKW(row.cells.join(' ')))
-      });
-    });
-  });
-  return rows;
-}
-
-function findMatches(seedKws, seedTabIdx, seedRowIdx) {
-  const matches = [];
-  buildRowIndex().forEach(entry => {
-    if (entry.tabIdx === seedTabIdx && entry.rowIdx === seedRowIdx) return;
-    const shared = new Set([...seedKws].filter(k => entry.kws.has(k)));
-    if (shared.size < PANEL_MIN_SHARED) return;
-    matches.push({ ...entry, shared });
-  });
-  matches.sort((a, b) => b.shared.size - a.shared.size);
-  return matches;
-}
-
-// ── PILL TOGGLE ───────────────────────────────────────────────────────────────
-function buildPill(options, onSwitch) {
-  const wrap = document.createElement('div');
-  wrap.className = 'pp-pill';
-  const ind = document.createElement('div');
-  ind.className = 'pp-ind';
-  wrap.appendChild(ind);
-  const btns = {};
-  options.forEach(function(opt) {
-    const b = document.createElement('button');
-    b.className = 'pp-btn';
-    b.textContent = opt.label;
-    b.addEventListener('click', function() { setValue(opt.value); onSwitch(opt.value); });
-    wrap.appendChild(b);
-    btns[opt.value] = b;
-  });
-  let current = options[0].value;
-  function setValue(v, animate) {
-    animate = animate !== false;
-    current = v;
-    Object.keys(btns).forEach(bv => btns[bv].classList.toggle('active', bv === v));
-    const ab = btns[v];
-    if (!ab) return;
-    if (!animate) ind.style.transition = 'none';
-    ind.style.left  = ab.offsetLeft + 'px';
-    ind.style.width = ab.offsetWidth + 'px';
-    if (!animate) requestAnimationFrame(() => { ind.style.transition = ''; });
-  }
-  setValue(options[0].value, false);
-  if (window.ResizeObserver) new ResizeObserver(() => setValue(current, false)).observe(wrap);
-  return { el: wrap, setValue };
-}
-
-// ── GOTO: navigate to a match row in the grid ─────────────────────────────────
-// Switches tab if needed, clears selection, then selects the first data cell of that row.
-function panelGoTo(match) {
-  var tabIdx = match.tabIdx;
-  var rowIdx = match.rowIdx;
-
-  // Switch tab if needed
-  if (typeof activeTab !== 'undefined' && activeTab !== tabIdx) {
-    activeTab = tabIdx;
-    if (typeof buildTabBar === 'function') buildTabBar();
-    if (typeof showTab === 'function') showTab(tabIdx);
-  }
-
-  // After potential tab switch, select the row
-  requestAnimationFrame(function() {
-    if (typeof clearSelection === 'function') clearSelection();
-
-    var dataRows = Array.from(document.querySelectorAll('#data-body tr'));
-    var tr = dataRows[rowIdx];
-    if (!tr) return;
-
-    var firstTd = tr.querySelector('td');
-    if (!firstTd) return;
-
-    // Use script.js's existing getHighlightTargets + applySelection if available,
-    // otherwise fall back to direct class manipulation
-    if (typeof getHighlightTargets === 'function' && typeof applySelection === 'function') {
-      var targets = getHighlightTargets(firstTd);
-      if (targets) {
-        applySelection(targets);
-        // Scroll the row into view
-        firstTd.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      }
-    } else {
-      firstTd.classList.add('selected-cell');
-      firstTd.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    }
-  });
-}
-
-// ── GOTO HOVER BUTTON ─────────────────────────────────────────────────────────
-// Attaches hover-to-reveal "Go to" logic to a card element.
-// match = the match object {tabIdx, rowIdx, ...}
-// accentColor = border/badge color string
-function attachGoTo(card, match, accentColor) {
-  var hoverTimer = null;
-  var btn = null;
-
-  function showBtn() {
-    if (btn) return;
-    btn = document.createElement('button');
-    btn.className = 'pp-goto-btn';
-    btn.textContent = 'Go to ↗';
-    btn.style.borderColor = accentColor || 'rgba(0,0,0,.2)';
-    btn.style.color = accentColor || 'rgba(0,0,0,.6)';
-    btn.addEventListener('click', function(e) {
-      e.stopPropagation();
-      panelGoTo(match);
-    });
-    // Keep btn alive while hovering the button itself
-    btn.addEventListener('mouseenter', function() { clearTimeout(hoverTimer); });
-    btn.addEventListener('mouseleave', function() { hideBtn(); });
-    card.appendChild(btn);
-    // Animate in
-    requestAnimationFrame(function() { btn && btn.classList.add('pp-goto-visible'); });
-  }
-
-  function hideBtn() {
-    if (!btn) return;
-    var b = btn;
-    btn = null;
-    b.classList.remove('pp-goto-visible');
-    setTimeout(function() { if (b.parentNode) b.parentNode.removeChild(b); }, 180);
-  }
-
-  card.addEventListener('mouseenter', function() {
-    clearTimeout(hoverTimer);
-    hoverTimer = setTimeout(showBtn, PANEL_GOTO_DELAY);
-  });
-  card.addEventListener('mouseleave', function(e) {
-    clearTimeout(hoverTimer);
-    // Don't hide if we moved onto the button
-    if (btn && btn.contains(e.relatedTarget)) return;
-    hideBtn();
-  });
-}
 
 // ── MAIN ──────────────────────────────────────────────────────────────────────
 function initPanel(sidebarBox) {
@@ -244,15 +61,22 @@ function initPanel(sidebarBox) {
   const ppBody     = document.getElementById('pp-body');
   const ppMmWrap   = document.getElementById('pp-mm-wrap');
 
-  // ── Tile column sizing — recompute CSS vars from screen ratio on every resize ──
+  // ── Tile column sizing ────────────────────────────────────────────────────
+  // KEY FIX: measure sidebarBox.clientWidth (the actual container), not window.innerWidth.
+  // This means columns reflow immediately as the sidebar is dragged.
   function updateTileColVars() {
-    var min = PANEL_TILE_MIN_W() + 'px';
-    var max = PANEL_TILE_MAX_W() + 'px';
-    ppBody.style.setProperty('--pp-col-min', min);
-    ppBody.style.setProperty('--pp-col-max', max);
+    var containerW = sidebarBox.clientWidth || 200;
+    var minW = Math.max(PANEL_CARD_MIN_W, Math.floor(containerW / 3));
+    var maxW = Math.max(minW + 20, Math.min(PANEL_CARD_MAX_W, Math.floor(containerW / 2)));
+    ppBody.style.setProperty('--pp-col-min', minW + 'px');
+    ppBody.style.setProperty('--pp-col-max', maxW + 'px');
   }
   updateTileColVars();
   window.addEventListener('resize', updateTileColVars);
+  // ResizeObserver on the sidebar box catches drag resizes between window resize events
+  if (window.ResizeObserver) {
+    new ResizeObserver(updateTileColVars).observe(sidebarBox);
+  }
 
   // ── State ─────────────────────────────────────────────────────────────────
   var hlOn        = true;
@@ -265,7 +89,7 @@ function initPanel(sidebarBox) {
   var _mmActive   = null;
   var _hasContent = false;
 
-  // ── Keyword highlight ──────────────────────────────────────────────────────
+  // ── Keyword highlight toggle ───────────────────────────────────────────────
   function applyHlState() {
     [ppBody, ppMmWrap].forEach(function(c) {
       c.querySelectorAll('mark.pkw').forEach(function(m) {
@@ -298,6 +122,7 @@ function initPanel(sidebarBox) {
   );
   ppViewWrap.appendChild(viewPill.el);
 
+  // ── Empty state ────────────────────────────────────────────────────────────
   function showEmpty(msg) {
     msg = msg || 'Click a cell to find matches';
     ppSubtitle.textContent  = msg;
@@ -313,14 +138,7 @@ function initPanel(sidebarBox) {
   }
   showEmpty();
 
-  // ── Build seed from selection ──────────────────────────────────────────────
-  // Three selection types from script.js:
-  //   • Single cell / row click  → td.selected-cell (focal) + td.selected-group (context)
-  //   • Column header click      → th.selected-cell in header-row + td.selected-group in every row
-  //   • Category td click        → td.selected-cell on the cat cell + td.selected-group on data rows
-  //
-  // Strategy: find every data-body td that is EITHER selected-cell OR selected-group,
-  // but exclude rows where the only match is the category/header cell (not a data cell).
+  // ── Build seed from current grid selection ─────────────────────────────────
   function buildSeedFromSelection() {
     var curTabIdx = typeof activeTab !== 'undefined' ? activeTab : 0;
     var tab  = typeof TABS !== 'undefined' ? TABS[curTabIdx] : null;
@@ -328,16 +146,11 @@ function initPanel(sidebarBox) {
     if (!data) return false;
 
     var allDataRows = Array.from(document.querySelectorAll('#data-body tr'));
-
-    // Collect every data td that carries any selection class
-    // Map: rowIndex → Set of column indices that are selected
-    var selectedCols = new Map(); // ri → Set<ci>
+    var selectedCols = new Map(); // rowIndex → Set of colIndices
 
     allDataRows.forEach(function(dtr, ri) {
-      var tds = Array.from(dtr.querySelectorAll('td'));
-      tds.forEach(function(td, ci) {
-        if (td.classList.contains('selected-cell') ||
-            td.classList.contains('selected-group')) {
+      Array.from(dtr.querySelectorAll('td')).forEach(function(td, ci) {
+        if (td.classList.contains('selected-cell') || td.classList.contains('selected-group')) {
           if (!selectedCols.has(ri)) selectedCols.set(ri, new Set());
           selectedCols.get(ri).add(ci);
         }
@@ -347,7 +160,7 @@ function initPanel(sidebarBox) {
     if (!selectedCols.size) return false;
 
     var allText = [];
-    var cellMap = new Map(); // header → Set of texts
+    var cellMap = new Map(); // header → Set of cell texts
 
     selectedCols.forEach(function(cols, ri) {
       var row = data.rows[ri];
@@ -378,7 +191,7 @@ function initPanel(sidebarBox) {
     return true;
   }
 
-  // ── Refresh panel ──────────────────────────────────────────────────────────
+  // ── Refresh panel on selection change ─────────────────────────────────────
   function refreshFromSelection() {
     var curTabIdx = typeof activeTab !== 'undefined' ? activeTab : 0;
     var tab  = typeof TABS !== 'undefined' ? TABS[curTabIdx] : null;
@@ -400,7 +213,7 @@ function initPanel(sidebarBox) {
     }
   }
 
-  // ── MutationObserver ───────────────────────────────────────────────────────
+  // ── MutationObserver — watches for selection class changes in data-body ────
   var _refreshTimer = null;
 
   function attachObserver() {
@@ -409,11 +222,9 @@ function initPanel(sidebarBox) {
     new MutationObserver(function(mutations) {
       var relevant = mutations.some(function(m) {
         if (m.type !== 'attributes' || m.attributeName !== 'class' || m.target.tagName !== 'TD') return false;
-        // Only react to selection changes, not hover highlights
-        var cur  = m.target.classList;
         var prev = m.oldValue || '';
         var wasSelected = /\bselected-/.test(prev);
-        var isSelected  = cur.contains('selected-cell') || cur.contains('selected-group');
+        var isSelected  = m.target.classList.contains('selected-cell') || m.target.classList.contains('selected-group');
         return wasSelected !== isSelected;
       });
       if (!relevant) return;
@@ -426,7 +237,7 @@ function initPanel(sidebarBox) {
   }
   attachObserver();
 
-  // Cat-body: slight delay so script.js finishes its DOM update first
+  // Cat-body click: slight delay so script.js finishes its DOM update first
   var catBodyEl2 = document.getElementById('cat-body');
   if (catBodyEl2) catBodyEl2.addEventListener('click', function(e) {
     if (!e.target.closest('td')) return;
@@ -434,9 +245,11 @@ function initPanel(sidebarBox) {
     _refreshTimer = setTimeout(refreshFromSelection, 80);
   });
 
-  // ── TILES ──────────────────────────────────────────────────────────────────
-  // Layout: CSS Grid with auto-fill columns (true 2D stacking).
-  // Tab-group dividers span all columns (grid-column: 1 / -1).
+  // ── TILES VIEW ────────────────────────────────────────────────────────────
+  // Layout: CSS Grid with auto-fill columns. Column count adapts to sidebar width
+  // because --pp-col-min is set from sidebarBox.clientWidth by updateTileColVars().
+  // The seed card spans all columns (grid-column: 1 / -1).
+  // Tab-group dividers also span all columns.
   function renderTiles(matches, kws, srcTabIdx, srcData) {
     ppBody.innerHTML       = '';
     ppBody.style.display   = 'block';
@@ -446,9 +259,12 @@ function initPanel(sidebarBox) {
 
     if (viewMode === 'mindmap') { viewMode = 'tiles'; viewPill.setValue('tiles', false); }
 
+    // Re-measure now that we're about to render
+    updateTileColVars();
+
     var vars = panelThemeVars(srcTabIdx);
 
-    // ── Seed card ──
+    // Seed card (full-width, spans all columns via CSS)
     var seedCard = document.createElement('div');
     seedCard.className = 'pp-seed-card';
     seedCard.style.setProperty('--ppc-border', vars['--tab-active-bg'] || '#888');
@@ -488,7 +304,7 @@ function initPanel(sidebarBox) {
     hlOn = true;
     hlPill.setValue('show', false);
 
-    // Group by tab
+    // Group matches by tab, then render a divider + cards for each tab
     var byTab = new Map();
     matches.forEach(function(m) {
       if (!byTab.has(m.tabIdx)) byTab.set(m.tabIdx, []);
@@ -548,7 +364,6 @@ function initPanel(sidebarBox) {
         card.appendChild(sharedPill);
         ppBody.appendChild(card);
 
-        // Attach "Go to" hover button
         attachGoTo(card, m, accentColor);
       });
     });
@@ -556,7 +371,7 @@ function initPanel(sidebarBox) {
     applyHlState();
   }
 
-  // ── MINDMAP ────────────────────────────────────────────────────────────────
+  // ── MINDMAP VIEW ──────────────────────────────────────────────────────────
   function mmW() { return ppMmWrap.clientWidth  || 300; }
   function mmH() { return ppMmWrap.clientHeight || 400; }
 
@@ -622,17 +437,17 @@ function initPanel(sidebarBox) {
     }
 
     function makeDraggable(el, key) {
-      var dragging = false, ox = 0, oy = 0, sl = 0, st = 0;
+      var isDragging = false, ox = 0, oy = 0, sl = 0, st = 0;
       el.addEventListener('mousedown', function(e) {
         if (e.button !== 0) return;
-        dragging = true; ox = e.clientX; oy = e.clientY;
+        isDragging = true; ox = e.clientX; oy = e.clientY;
         sl = parseFloat(el.style.left) || 0;
         st = parseFloat(el.style.top)  || 0;
         el.style.zIndex = 99; el.style.transition = 'none';
         e.preventDefault(); e.stopPropagation();
       });
       document.addEventListener('mousemove', function(e) {
-        if (!dragging) return;
+        if (!isDragging) return;
         var r = rects.get(key) || { w: PANEL_CARD_W, h: 80 };
         var pos = clampToCanvas(sl + (e.clientX - ox), st + (e.clientY - oy), r.w, r.h);
         el.style.left = pos[0] + 'px'; el.style.top = pos[1] + 'px';
@@ -641,8 +456,8 @@ function initPanel(sidebarBox) {
         redrawArrows();
       });
       document.addEventListener('mouseup', function() {
-        if (!dragging) return;
-        dragging = false; el.style.zIndex = '';
+        if (!isDragging) return;
+        isDragging = false; el.style.zIndex = '';
         redrawArrows();
       });
     }
@@ -677,7 +492,6 @@ function initPanel(sidebarBox) {
             '<div class="pp-mm-field"><span class="pp-flabel">' + panelEscH(header) + '</span>' +
             panelHighlight(text, kwsHL) + '</div>' +
           '</div>';
-        // Attach "Go to" hover button for match cards
         if (matchObj) attachGoTo(card, matchObj, accentColor);
       }
 
@@ -687,7 +501,6 @@ function initPanel(sidebarBox) {
       return card;
     }
 
-    // Build ALL cards synchronously so offsetHeight works in a single rAF
     var seedKey = 'seed';
     makeCard('', '', seedTabIdx, seedKey, true, [], seedKws, null);
 
@@ -713,7 +526,6 @@ function initPanel(sidebarBox) {
       arrowDefs.push({ fromKey: seedKey, toKey: key, color: tv['--tab-active-bg'] || '#aaa' });
     });
 
-    // Single rAF: all cards in DOM, offsetHeight now valid
     requestAnimationFrame(function() {
       var W = mmW(), H = mmH(), cx = W / 2, cy = H / 2;
 
@@ -838,13 +650,13 @@ function initPanel(sidebarBox) {
 
 #pp-body-wrap { flex: 1; min-height: 0; position: relative; overflow: hidden; }
 
-/* CSS Grid — auto-fill as many min-width columns as fit; 1fr lets them share space
-   evenly, while max-width on the card element prevents them growing past the cap */
+/* CSS Grid — auto-fill columns based on --pp-col-min, which is set from the
+   actual sidebar container width (not window width). Columns reflow on sidebar drag. */
 #pp-body {
   position: absolute; inset: 0; overflow-y: auto;
   padding: 10px 12px 18px; box-sizing: border-box;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(var(--pp-col-min), 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(var(--pp-col-min, 140px), 1fr));
   align-content: start;
   gap: 10px;
 }
@@ -876,17 +688,17 @@ function initPanel(sidebarBox) {
   color: rgba(0,0,0,.25); line-height: 1.5;
 }
 
-/* Seed card */
+/* Seed card — always full-width, spans all columns */
 .pp-seed-card {
-  max-width: var(--pp-col-max);
+  grid-column: 1 / -1;
   border: 2px solid var(--ppc-border, #aaa);
   border-radius: 8px; background: var(--ppc-bg, #f8f8f8);
   overflow: hidden; box-sizing: border-box;
 }
 
-/* Match card — fills its grid cell but never wider than max */
+/* Match card — fills its grid cell, max-width caps it from growing too wide */
 .pp-match-card {
-  max-width: var(--pp-col-max);
+  max-width: var(--pp-col-max, 220px);
   border: 1.5px solid var(--ppc-border, #aaa);
   border-radius: 8px; background: var(--ppc-bg, #f8f8f8);
   overflow: visible; box-sizing: border-box;
@@ -898,7 +710,7 @@ function initPanel(sidebarBox) {
   to   { opacity: 1; transform: translateY(0); }
 }
 
-/* Divider — spans all grid columns, horizontal line with label */
+/* Divider — spans all grid columns */
 .pp-divider {
   grid-column: 1 / -1;
   display: flex; align-items: center; gap: 6px;
@@ -946,12 +758,8 @@ function initPanel(sidebarBox) {
   transition: opacity .35s ease, transform .35s ease;
   box-shadow: 0 1px 6px rgba(0,0,0,.08);
 }
-.pp-goto-btn.pp-goto-visible {
-  opacity: 1; transform: translateY(0);
-}
-.pp-goto-btn:hover {
-  filter: brightness(0.92);
-}
+.pp-goto-btn.pp-goto-visible { opacity: 1; transform: translateY(0); }
+.pp-goto-btn:hover { filter: brightness(0.92); }
 
 /* Keyword highlight */
 mark.pkw {
@@ -965,8 +773,7 @@ mark.pkw {
   position: absolute; border: 1.5px solid var(--ppc-border, #aaa);
   border-radius: 8px; background: var(--ppc-bg, #fff);
   box-shadow: 0 2px 10px rgba(0,0,0,.12);
-  cursor: grab; user-select: none; z-index: 1;
-  overflow: visible;
+  cursor: grab; user-select: none; z-index: 1; overflow: visible;
 }
 .pp-mm-card:active { cursor: grabbing; }
 .pp-mm-card-head {
