@@ -8,13 +8,13 @@
 // ════════════════════════════════════════════════════════════════════════════
 
 // ── SETTINGS ────────────────────────────────────────────────────────────────
-const PANEL_KW_MIN_WORD_LEN = 4;   // ignore words shorter than this
-const PANEL_MIN_SHARED      = 2;   // minimum shared keywords to count as a match
-const PANEL_MM_PAD          = 10;  // mindmap card collision padding px
-const PANEL_MM_ITERS        = 20;  // collision resolution iterations
-const PANEL_CARD_W          = 160; // mindmap card width px
-const PANEL_TILE_MIN_W      = 180; // tiles: minimum card width px
-const PANEL_TILE_MAX_W      = 340; // tiles: maximum card width px
+const PANEL_KW_MIN_WORD_LEN = 4;
+const PANEL_MIN_SHARED      = 2;
+const PANEL_MM_PAD          = 10;
+const PANEL_MM_ITERS        = 20;
+const PANEL_CARD_W          = 160;
+const PANEL_TILE_MIN_W      = 180;
+const PANEL_TILE_MAX_W      = 340;
 
 const PANEL_STOP_WORDS = new Set([
   'that','this','with','from','have','they','will','been','were','their',
@@ -164,11 +164,11 @@ function initPanel(sidebarBox) {
   var seedKws     = new Set();
   var seedTabIdx  = -1;
   var seedRowIdx  = -1;
-  var seedCells   = [];
+  var seedCells   = [];   // [{header, text}] — may span multiple selected rows
   var lastMatches = [];
-  var _mmActive   = null;  // live mindmap state for resize reflow
+  var _mmActive   = null;
 
-  // ── Keyword highlight toggle — applies to BOTH tiles and mindmap ─────────
+  // ── Keyword highlight toggle ─────────────────────────────────────────────
   function applyHlState() {
     [ppBody, ppMmWrap].forEach(function(container) {
       container.querySelectorAll('mark.pkw').forEach(function(m) {
@@ -178,7 +178,7 @@ function initPanel(sidebarBox) {
     });
   }
 
-  // ── Pills — always side-by-side in one row ───────────────────────────────
+  // ── Pills ────────────────────────────────────────────────────────────────
   var hlPill = buildPill(
     [{ label: 'Show KW', value: 'show' }, { label: 'Hide KW', value: 'hide' }],
     function(v) { hlOn = v === 'show'; applyHlState(); }
@@ -216,6 +216,7 @@ function initPanel(sidebarBox) {
   showEmpty();
 
   // ── Cell click ────────────────────────────────────────────────────────────
+  // FIX 3: collect all highlighted/selected rows to build a richer seed
   function onCellClick(e) {
     var td = e.target.closest('td, th');
     if (!td) return;
@@ -224,20 +225,65 @@ function initPanel(sidebarBox) {
     var data = tab && typeof processSheetData === 'function' ? processSheetData(tab.grid) : null;
     if (!data) return;
     var tr    = td.closest('tr');
-    var tbody = tr && tr.closest('tbody');
-    if (!tbody) return;
-    var rowIdx = Array.from(tbody.querySelectorAll('tr')).indexOf(tr);
-    var row    = data.rows[rowIdx];
-    if (!row) return;
-    var kws = new Set(panelExtractKW(row.cells.join(' ')));
-    if (!kws.size) { showEmpty('This cell has no searchable text'); return; }
+    if (!tr) return;
+
+    var allDataRows = Array.from(document.querySelectorAll('#data-body tr'));
+    var selectedRowIndices = new Set();
+
+    // Resolve the clicked row index (works for both data-body and cat-body clicks)
+    var clickedIdx = allDataRows.indexOf(tr);
+    if (clickedIdx === -1) {
+      var catRows = Array.from(document.querySelectorAll('#cat-body tr'));
+      clickedIdx = catRows.indexOf(tr);
+    }
+    if (clickedIdx >= 0) selectedRowIndices.add(clickedIdx);
+
+    // Add rows that are already selected/highlighted in the data table
+    allDataRows.forEach(function(dtr, ri) {
+      if (dtr.querySelector('td.selected-cell,td.selected-group,td.highlight-cell,td.highlight-group')) {
+        selectedRowIndices.add(ri);
+      }
+    });
+
+    // If a category span was clicked, include all rows it covers
+    var catTd = e.target.closest('#cat-body td');
+    if (catTd) {
+      var catRows2 = Array.from(document.querySelectorAll('#cat-body tr'));
+      var catStart = catRows2.indexOf(catTd.closest('tr'));
+      var span     = parseInt(catTd.rowSpan) || 1;
+      for (var s = catStart; s < catStart + span && s < data.rows.length; s++) {
+        selectedRowIndices.add(s);
+      }
+    }
+
+    // Build seedCells by merging content from all selected rows, keyed by header
+    var allText = [];
+    var cellMap = new Map(); // header -> Set of unique non-empty texts
+    selectedRowIndices.forEach(function(ri) {
+      var row = data.rows[ri];
+      if (!row) return;
+      data.headers.forEach(function(h, ci) {
+        var txt = (row.cells[ci] || '').trim();
+        if (!txt) return;
+        if (!cellMap.has(h)) cellMap.set(h, new Set());
+        cellMap.get(h).add(txt);
+        allText.push(txt);
+      });
+    });
+
+    seedCells = [];
+    cellMap.forEach(function(texts, header) {
+      seedCells.push({ header: header, text: [...texts].join(' / ') });
+    });
+
+    var kws = new Set(panelExtractKW(allText.join(' ')));
+    if (!kws.size) { showEmpty('No searchable text in selection'); return; }
+
     seedKws    = kws;
     seedTabIdx = curTabIdx;
-    seedRowIdx = rowIdx;
-    seedCells  = data.headers
-      .map(function(h, i) { return { header: h, text: row.cells[i] || '' }; })
-      .filter(function(c) { return c.text.trim(); });
-    lastMatches = findMatches(kws, curTabIdx, rowIdx);
+    seedRowIdx = [...selectedRowIndices][0]; // primary row for dedup
+
+    lastMatches = findMatches(kws, curTabIdx, seedRowIdx);
     renderTiles(lastMatches, kws, curTabIdx, data);
   }
 
@@ -247,6 +293,7 @@ function initPanel(sidebarBox) {
   if (catBodyEl)  catBodyEl.addEventListener('click', onCellClick);
 
   // ── TILES ─────────────────────────────────────────────────────────────────
+  // FIX 1: seed card flows inline (same flex as match cards, no forced 100% width)
   function renderTiles(matches, kws, srcTabIdx, srcData) {
     ppBody.innerHTML       = '';
     ppBody.style.display   = 'block';
@@ -258,7 +305,7 @@ function initPanel(sidebarBox) {
 
     var vars = panelThemeVars(srcTabIdx);
 
-    // Seed card — always full width
+    // Seed card — same flex sizing as match cards, thicker border to distinguish
     var seedCard = document.createElement('div');
     seedCard.className = 'pp-seed-card';
     seedCard.style.setProperty('--ppc-border', vars['--tab-active-bg'] || '#888');
@@ -307,7 +354,6 @@ function initPanel(sidebarBox) {
       var tv = panelThemeVars(tabIdx);
       var tabName = tabMatches[0].title || (typeof TABS !== 'undefined' ? TABS[tabIdx].name : 'Tab ' + tabIdx);
 
-      // Divider — flex-basis:100% forces it to its own row
       var divider = document.createElement('div');
       divider.className = 'pp-divider';
       divider.style.borderColor = tv['--tab-active-bg'] || '#aaa';
@@ -357,7 +403,6 @@ function initPanel(sidebarBox) {
   }
 
   // ── MINDMAP ───────────────────────────────────────────────────────────────
-  // Live canvas size — always read from DOM, never snapshotted in closure
   function mmW() { return ppMmWrap.clientWidth  || 300; }
   function mmH() { return ppMmWrap.clientHeight || 400; }
 
@@ -368,9 +413,15 @@ function initPanel(sidebarBox) {
     ];
   }
 
+  // FIX 2: all cards created synchronously before any measurement rAF,
+  // so offsetHeight is valid in a single rAF (container is guaranteed visible)
   function renderMindmap(matches) {
-    ppMmWrap.innerHTML = '';
+    // Ensure container is visible BEFORE we append cards (needed for offsetHeight)
+    ppMmWrap.style.display = 'block';
+    ppBody.style.display   = 'none';
+    ppMmWrap.innerHTML     = '';
     _mmActive = null;
+
     if (!matches || !matches.length) {
       ppMmWrap.innerHTML = '<div class="pp-empty">No matches to map</div>';
       return;
@@ -436,7 +487,6 @@ function initPanel(sidebarBox) {
       document.addEventListener('mousemove', function(e) {
         if (!dragging) return;
         var r = rects.get(key) || { w: PANEL_CARD_W, h: 80 };
-        // clampToCanvas uses live mmW()/mmH() so drag respects current sidebar width
         var pos = clampToCanvas(sl + (e.clientX - ox), st + (e.clientY - oy), r.w, r.h);
         el.style.left = pos[0] + 'px'; el.style.top = pos[1] + 'px';
         rects.set(key, { x: pos[0], y: pos[1], w: r.w, h: r.h });
@@ -485,86 +535,93 @@ function initPanel(sidebarBox) {
       return card;
     }
 
+    // ── Build ALL cards first (sync), then measure + position in ONE rAF ──
     var seedKey = 'seed';
     makeCard('', '', seedTabIdx, seedKey, true, [], seedKws);
 
+    matches.forEach(function(m) {
+      // Pick the column with the most shared keyword matches
+      var indices = Array.from({ length: m.row.cells.length }, function(_, i) { return i; })
+        .filter(function(ci) { return (m.row.cells[ci] || '').trim(); });
+      if (!indices.length) return;
+
+      indices.sort(function(a, b) {
+        var ka = panelExtractKW(m.row.cells[a]).filter(function(k) { return m.shared.has(k); }).length;
+        var kb = panelExtractKW(m.row.cells[b]).filter(function(k) { return m.shared.has(k); }).length;
+        return kb - ka;
+      });
+
+      var bestColIdx = indices[0];
+      var text   = m.row.cells[bestColIdx] || '';
+      var header = m.headers[bestColIdx]   || '';
+      var key    = 'm-' + m.tabIdx + '-' + m.rowIdx;
+      var cats   = m.row.cats ? m.row.cats.filter(function(c) { return c.trim(); }) : [];
+      var tv     = panelThemeVars(m.tabIdx);
+
+      makeCard(text, header, m.tabIdx, key, false, cats, m.shared);
+      arrowDefs.push({ fromKey: seedKey, toKey: key, color: tv['--tab-active-bg'] || '#aaa' });
+    });
+
+    // Single rAF — all cards are in the DOM so offsetHeight is now reliable
     requestAnimationFrame(function() {
-      var W = mmW(), H = mmH(), cx = W/2, cy = H/2;
+      var W = mmW(), H = mmH(), cx = W / 2, cy = H / 2;
+
+      // Place seed at centre
       var sCard = cardEls.get(seedKey);
-      var sH    = sCard ? sCard.offsetHeight : 80;
-      var sPos  = clampToCanvas(cx - PANEL_CARD_W/2, cy - sH/2, PANEL_CARD_W, sH);
-      sCard.style.left = sPos[0] + 'px'; sCard.style.top = sPos[1] + 'px';
+      var sH    = sCard ? (sCard.offsetHeight || 80) : 80;
+      var sPos  = clampToCanvas(cx - PANEL_CARD_W / 2, cy - sH / 2, PANEL_CARD_W, sH);
+      if (sCard) { sCard.style.left = sPos[0] + 'px'; sCard.style.top = sPos[1] + 'px'; }
       rects.set(seedKey, { x: sPos[0], y: sPos[1], w: PANEL_CARD_W, h: sH });
 
       var ringR  = Math.min(W, H) * 0.33;
       var nCards = matches.length;
 
       matches.forEach(function(m, i) {
-        var angle = (2 * Math.PI * i / nCards) - Math.PI / 2;
-        var tv    = panelThemeVars(m.tabIdx);
-
-        // Pick the column with the most shared keyword matches
-        var bestColIdx = [].slice.call(m.row.cells.keys ? m.row.cells.keys() : Object.keys(m.row.cells))
-          .filter(function(ci) { return (m.row.cells[ci] || '').trim(); })
-          .sort(function(a, b) {
-            var ka = panelExtractKW(m.row.cells[a]).filter(function(k) { return m.shared.has(k); }).length;
-            var kb = panelExtractKW(m.row.cells[b]).filter(function(k) { return m.shared.has(k); }).length;
-            return kb - ka;
-          })[0];
-        if (bestColIdx === undefined) return;
-
-        var text   = m.row.cells[bestColIdx] || '';
-        var header = m.headers[bestColIdx]   || '';
         var key    = 'm-' + m.tabIdx + '-' + m.rowIdx;
-        var cats   = m.row.cats ? m.row.cats.filter(function(c) { return c.trim(); }) : [];
+        var cardEl = cardEls.get(key);
+        if (!cardEl) return;
 
-        makeCard(text, header, m.tabIdx, key, false, cats, m.shared);
-        arrowDefs.push({ fromKey: seedKey, toKey: key, color: tv['--tab-active-bg'] || '#aaa' });
+        var angle = (2 * Math.PI * i / nCards) - Math.PI / 2;
+        var cH    = cardEl.offsetHeight || 80;
+        var x     = cx + ringR * Math.cos(angle) - PANEL_CARD_W / 2;
+        var y     = cy + ringR * Math.sin(angle) - cH / 2;
 
-        requestAnimationFrame(function() {
-          var cardEl = cardEls.get(key);
-          if (!cardEl) return;
-          var cH = cardEl.offsetHeight || 80;
-          var x  = cx + ringR * Math.cos(angle) - PANEL_CARD_W / 2;
-          var y  = cy + ringR * Math.sin(angle) - cH / 2;
-
-          for (var iter = 0; iter < PANEL_MM_ITERS; iter++) {
-            var moved = false;
-            for (var _r of rects) {
-              var other = _r[1];
-              if (!(x < other.x + other.w + PANEL_MM_PAD && x + PANEL_CARD_W + PANEL_MM_PAD > other.x &&
-                    y < other.y + other.h + PANEL_MM_PAD && y + cH + PANEL_MM_PAD > other.y)) continue;
-              var dR = other.x + other.w + PANEL_MM_PAD - x, dL = x + PANEL_CARD_W + PANEL_MM_PAD - other.x;
-              var dD = other.y + other.h + PANEL_MM_PAD - y, dU = y + cH + PANEL_MM_PAD - other.y;
-              var mh2 = Math.min(dR, dL), mv2 = Math.min(dD, dU);
-              if (mh2 <= mv2) x += dR < dL ? dR : -dL;
-              else            y += dD < dU ? dD : -dU;
-              var c2 = clampToCanvas(x, y, PANEL_CARD_W, cH);
-              x = c2[0]; y = c2[1];
-              moved = true;
-            }
-            if (!moved) break;
+        // Collision push against already-placed cards
+        for (var iter = 0; iter < PANEL_MM_ITERS; iter++) {
+          var moved = false;
+          for (var _r of rects) {
+            var other = _r[1];
+            if (!(x < other.x + other.w + PANEL_MM_PAD &&
+                  x + PANEL_CARD_W + PANEL_MM_PAD > other.x &&
+                  y < other.y + other.h + PANEL_MM_PAD &&
+                  y + cH + PANEL_MM_PAD > other.y)) continue;
+            var dR = other.x + other.w + PANEL_MM_PAD - x, dL = x + PANEL_CARD_W + PANEL_MM_PAD - other.x;
+            var dD = other.y + other.h + PANEL_MM_PAD - y, dU = y + cH + PANEL_MM_PAD - other.y;
+            var mh2 = Math.min(dR, dL), mv2 = Math.min(dD, dU);
+            if (mh2 <= mv2) x += dR < dL ? dR : -dL;
+            else            y += dD < dU ? dD : -dU;
+            var c2 = clampToCanvas(x, y, PANEL_CARD_W, cH);
+            x = c2[0]; y = c2[1];
+            moved = true;
           }
-          var final = clampToCanvas(x, y, PANEL_CARD_W, cH);
-          cardEl.style.left = final[0] + 'px'; cardEl.style.top = final[1] + 'px';
-          rects.set(key, { x: final[0], y: final[1], w: PANEL_CARD_W, h: cH });
-          redrawArrows();
-        });
+          if (!moved) break;
+        }
+
+        var final = clampToCanvas(x, y, PANEL_CARD_W, cH);
+        cardEl.style.left = final[0] + 'px';
+        cardEl.style.top  = final[1] + 'px';
+        rects.set(key, { x: final[0], y: final[1], w: PANEL_CARD_W, h: cH });
       });
 
-      // Store live state for resize reflow + hl toggle
+      redrawArrows();
+
       _mmActive = { rects: rects, cardEls: cardEls, arrowDefs: arrowDefs, redrawArrows: redrawArrows };
-      // Capture canvas size so ResizeObserver can scale proportionally
       _mmLastW = mmW(); _mmLastH = mmH();
-      // Apply hl after two more rAFs — the child rAFs (match cards) are nested
-      // one level deeper, so we need two frames to guarantee all marks exist
-      requestAnimationFrame(function() {
-        requestAnimationFrame(function() { applyHlState(); });
-      });
+      requestAnimationFrame(function() { applyHlState(); });
     });
   }
 
-  // Re-scale mindmap cards proportionally when the sidebar canvas resizes
+  // Re-scale mindmap proportionally on sidebar resize
   var _mmLastW = 0, _mmLastH = 0, _mmResizeTimer = null;
   if (window.ResizeObserver) {
     new ResizeObserver(function() {
@@ -621,41 +678,31 @@ function initPanel(sidebarBox) {
     style.textContent = [
       '#sidebar-box { box-sizing: border-box; }',
 
-      // Head
       '#pp-head {',
       '  flex-shrink: 0;',
       '  padding: 10px 12px 8px;',
       '  border-bottom: 1px solid var(--sidebar-box-border, rgba(0,0,0,.1));',
-      '  display: flex;',
-      '  flex-direction: column;',
-      '  gap: 6px;',
+      '  display: flex; flex-direction: column; gap: 6px;',
       '}',
       '#pp-subtitle {',
       '  font-size: 11px; font-weight: 500; color: rgba(0,0,0,.45);',
       '  letter-spacing: .04em; line-height: 1.3; min-height: 14px;',
       '  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;',
       '}',
-
-      // Toolrow — always one row, pills side by side
       '#pp-toolrow {',
-      '  display: flex;',
-      '  flex-direction: row;',
-      '  gap: 5px;',
-      '  align-items: stretch;',
+      '  display: flex; flex-direction: row; gap: 5px; align-items: stretch;',
       '}',
       '#pp-hl-wrap, #pp-view-wrap {',
       '  flex: 1; min-width: 0; display: flex;',
       '}',
       '#pp-hl-wrap .pp-pill, #pp-view-wrap .pp-pill { width: 100%; }',
 
-      // Body
       '#pp-body-wrap {',
       '  flex: 1; min-height: 0; position: relative; overflow: hidden;',
       '}',
       '#pp-body {',
       '  position: absolute; inset: 0; overflow-y: auto;',
       '  padding: 8px 10px 16px; box-sizing: border-box;',
-      // Horizontal wrapping flow for tile cards
       '  display: flex; flex-direction: row; flex-wrap: wrap;',
       '  align-content: flex-start; gap: 6px;',
       '}',
@@ -663,7 +710,6 @@ function initPanel(sidebarBox) {
       '  position: absolute; inset: 0; display: none; overflow: hidden;',
       '}',
 
-      // Pill toggle
       '.pp-pill {',
       '  position: relative; display: inline-flex; align-items: center;',
       '  background: rgba(0,0,0,.07); border-radius: 20px;',
@@ -685,7 +731,6 @@ function initPanel(sidebarBox) {
       '}',
       '.pp-btn.active { color: rgba(0,0,0,.75); }',
 
-      // Empty state
       '.pp-empty {',
       '  width: 100%; flex-basis: 100%;',
       '  padding: 24px 8px; text-align: center;',
@@ -693,7 +738,6 @@ function initPanel(sidebarBox) {
       '  color: rgba(0,0,0,.25); line-height: 1.5;',
       '}',
 
-      // Divider — flex-basis 100% keeps it on its own row
       '.pp-divider {',
       '  width: 100%; flex-basis: 100%;',
       '  display: flex; align-items: center; gap: 6px;',
@@ -706,17 +750,16 @@ function initPanel(sidebarBox) {
       '  border-radius: 20px; white-space: nowrap; flex-shrink: 0;',
       '}',
 
-      // Seed card — always full width
+      // FIX 1: seed card uses same flex as match cards; thicker border = visual distinction
       '.pp-seed-card {',
-      '  flex-basis: 100%; width: 100%; box-sizing: border-box;',
-      '  border: 1.5px solid var(--ppc-border, #aaa);',
+      '  flex: 1 1 ' + PANEL_TILE_MIN_W + 'px;',
+      '  min-width: ' + PANEL_TILE_MIN_W + 'px;',
+      '  max-width: ' + PANEL_TILE_MAX_W + 'px;',
+      '  border: 2px solid var(--ppc-border, #aaa);',
       '  border-radius: 8px; background: var(--ppc-bg, #f8f8f8);',
-      '  overflow: hidden; flex-shrink: 0;',
+      '  overflow: hidden; box-sizing: border-box;',
       '}',
 
-      // Match cards — responsive columns
-      // flex-grow:1 lets cards fill a row together, max-width caps them so a
-      // lone card on a wide sidebar never balloons beyond PANEL_TILE_MAX_W
       '.pp-match-card {',
       '  flex: 1 1 ' + PANEL_TILE_MIN_W + 'px;',
       '  min-width: ' + PANEL_TILE_MIN_W + 'px;',
@@ -731,7 +774,6 @@ function initPanel(sidebarBox) {
       '  to   { opacity: 1; transform: translateY(0); }',
       '}',
 
-      // Card internals
       '.pp-card-head {',
       '  padding: 5px 8px 4px; display: flex; align-items: center;',
       '  gap: 6px; flex-wrap: wrap;',
@@ -766,14 +808,12 @@ function initPanel(sidebarBox) {
       '  display: inline-block; align-self: flex-start;',
       '}',
 
-      // Keyword highlight
       'mark.pkw {',
       '  background: transparent; border-bottom: 2px solid currentColor;',
       '  font-weight: 700; padding: 0; color: inherit;',
       '  transition: border-bottom-color .15s, font-weight .15s;',
       '}',
 
-      // Mindmap cards
       '.pp-mm-card {',
       '  position: absolute;',
       '  border: 1.5px solid var(--ppc-border, #aaa);',
