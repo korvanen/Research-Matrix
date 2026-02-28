@@ -11,8 +11,8 @@ const PANEL_MIN_SHARED      = 2;
 const PANEL_MM_PAD          = 10;
 const PANEL_MM_ITERS        = 20;
 const PANEL_CARD_W          = 160;
-const PANEL_TILE_MIN_R      = 0.14; // grid column min-width as fraction of screen width
-const PANEL_TILE_MAX_R      = 0.22; // grid column max-width as fraction of screen width
+const PANEL_TILE_MIN_R      = 0.1; // grid column min-width as fraction of screen width
+const PANEL_TILE_MAX_R      = 0.15; // grid column max-width as fraction of screen width
 const PANEL_TILE_MIN_W      = () => Math.round(window.innerWidth * PANEL_TILE_MIN_R);
 const PANEL_TILE_MAX_W      = () => Math.round(window.innerWidth * PANEL_TILE_MAX_R);
 const PANEL_GOTO_DELAY      = 900; // ms hover before "Go to" appears
