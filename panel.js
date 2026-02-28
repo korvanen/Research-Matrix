@@ -11,8 +11,8 @@ const PANEL_MIN_SHARED      = 2;
 const PANEL_MM_PAD          = 10;
 const PANEL_MM_ITERS        = 20;
 const PANEL_CARD_W          = 160;
-const PANEL_TILE_MIN_R      = 0.05; // grid column min-width as fraction of screen width
-const PANEL_TILE_MAX_R      = 0.1; // grid column max-width as fraction of screen width
+const PANEL_TILE_MIN_R      = 0.14; // grid column min-width as fraction of screen width
+const PANEL_TILE_MAX_R      = 0.22; // grid column max-width as fraction of screen width
 const PANEL_TILE_MIN_W      = () => Math.round(window.innerWidth * PANEL_TILE_MIN_R);
 const PANEL_TILE_MAX_W      = () => Math.round(window.innerWidth * PANEL_TILE_MAX_R);
 const PANEL_GOTO_DELAY      = 900; // ms hover before "Go to" appears
@@ -314,9 +314,13 @@ function initPanel(sidebarBox) {
   showEmpty();
 
   // ── Build seed from selection ──────────────────────────────────────────────
-  // FIX: only rows with a `selected-cell` td are included.
-  // `selected-group` cells appear when you click a column header or category —
-  // those are context cells, not the selection target itself.
+  // Three selection types from script.js:
+  //   • Single cell / row click  → td.selected-cell (focal) + td.selected-group (context)
+  //   • Column header click      → th.selected-cell in header-row + td.selected-group in every row
+  //   • Category td click        → td.selected-cell on the cat cell + td.selected-group on data rows
+  //
+  // Strategy: find every data-body td that is EITHER selected-cell OR selected-group,
+  // but exclude rows where the only match is the category/header cell (not a data cell).
   function buildSeedFromSelection() {
     var curTabIdx = typeof activeTab !== 'undefined' ? activeTab : 0;
     var tab  = typeof TABS !== 'undefined' ? TABS[curTabIdx] : null;
@@ -324,34 +328,31 @@ function initPanel(sidebarBox) {
     if (!data) return false;
 
     var allDataRows = Array.from(document.querySelectorAll('#data-body tr'));
-    var selectedRowIndices = new Set();
 
-    // Only rows that contain a td.selected-cell (the direct target of the click)
+    // Collect every data td that carries any selection class
+    // Map: rowIndex → Set of column indices that are selected
+    var selectedCols = new Map(); // ri → Set<ci>
+
     allDataRows.forEach(function(dtr, ri) {
-      if (dtr.querySelector('td.selected-cell')) {
-        selectedRowIndices.add(ri);
-      }
+      var tds = Array.from(dtr.querySelectorAll('td'));
+      tds.forEach(function(td, ci) {
+        if (td.classList.contains('selected-cell') ||
+            td.classList.contains('selected-group')) {
+          if (!selectedCols.has(ri)) selectedCols.set(ri, new Set());
+          selectedCols.get(ri).add(ci);
+        }
+      });
     });
 
-    if (!selectedRowIndices.size) return false;
+    if (!selectedCols.size) return false;
 
-    // Collect only the highlighted (selected-cell) columns from each row,
-    // not the entire row — this respects single-cell and column selections.
-    var allText  = [];
-    var cellMap  = new Map(); // header → Set of texts
+    var allText = [];
+    var cellMap = new Map(); // header → Set of texts
 
-    selectedRowIndices.forEach(function(ri) {
-      var row    = data.rows[ri];
-      var dtr    = allDataRows[ri];
-      if (!row || !dtr) return;
-      var tds    = Array.from(dtr.querySelectorAll('td'));
-
-      tds.forEach(function(td, ci) {
-        // Only include cells that are actually highlighted/selected
-        if (!td.classList.contains('selected-cell') &&
-            !td.classList.contains('selected-group') &&
-            !td.classList.contains('highlight-cell') &&
-            !td.classList.contains('highlight-group')) return;
+    selectedCols.forEach(function(cols, ri) {
+      var row = data.rows[ri];
+      if (!row) return;
+      cols.forEach(function(ci) {
         var txt = (row.cells[ci] || '').trim();
         if (!txt) return;
         var h = data.headers[ci] || '';
@@ -373,7 +374,7 @@ function initPanel(sidebarBox) {
 
     seedKws    = kws;
     seedTabIdx = curTabIdx;
-    seedRowIdx = [...selectedRowIndices][0];
+    seedRowIdx = [...selectedCols.keys()][0];
     return true;
   }
 
