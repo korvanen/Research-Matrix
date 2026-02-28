@@ -2,12 +2,9 @@
 // panel.js — Results panel for sidebar-box
 // Depends on: script.js globals (TABS, activeTab, processSheetData, THEMES,
 //             TAB_THEMES, makeTheme, modifyColor)
-// Link in HTML *after* script.js:
-//   <script src="script.js"></script>
-//   <script src="panel.js"></script>
 // ════════════════════════════════════════════════════════════════════════════
 
-// ── SETTINGS ────────────────────────────────────────────────────────────────
+// ── SETTINGS ─────────────────────────────────────────────────────────────────
 const PANEL_KW_MIN_WORD_LEN = 4;
 const PANEL_MIN_SHARED      = 2;
 const PANEL_MM_PAD          = 10;
@@ -25,7 +22,7 @@ const PANEL_STOP_WORDS = new Set([
   'between','among','example','context','claim','housing','where','rarely',
 ]);
 
-// ── INIT ─────────────────────────────────────────────────────────────────────
+// ── INIT ──────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   const wait = setInterval(() => {
     const box = document.getElementById('sidebar-box');
@@ -164,11 +161,12 @@ function initPanel(sidebarBox) {
   var seedKws     = new Set();
   var seedTabIdx  = -1;
   var seedRowIdx  = -1;
-  var seedCells   = [];   // [{header, text}] — may span multiple selected rows
+  var seedCells   = [];
   var lastMatches = [];
   var _mmActive   = null;
+  var _hasContent = false;
 
-  // ── Keyword highlight toggle ─────────────────────────────────────────────
+  // ── Keyword highlight toggle ──────────────────────────────────────────────
   function applyHlState() {
     [ppBody, ppMmWrap].forEach(function(container) {
       container.querySelectorAll('mark.pkw').forEach(function(m) {
@@ -178,7 +176,7 @@ function initPanel(sidebarBox) {
     });
   }
 
-  // ── Pills ────────────────────────────────────────────────────────────────
+  // ── Pills ─────────────────────────────────────────────────────────────────
   var hlPill = buildPill(
     [{ label: 'Show KW', value: 'show' }, { label: 'Hide KW', value: 'hide' }],
     function(v) { hlOn = v === 'show'; applyHlState(); }
@@ -209,56 +207,34 @@ function initPanel(sidebarBox) {
     ppMmWrap.style.display  = 'none';
     ppMmWrap.innerHTML      = '';
     ppToolrow.style.display = 'none';
-    _mmActive = null;
-    viewMode  = 'tiles';
+    _mmActive   = null;
+    _hasContent = false;
+    viewMode    = 'tiles';
     viewPill.setValue('tiles', false);
   }
   showEmpty();
 
-  // ── Cell click ────────────────────────────────────────────────────────────
-  // FIX 3: collect all highlighted/selected rows to build a richer seed
-  function onCellClick(e) {
-    var td = e.target.closest('td, th');
-    if (!td) return;
+  // ── Build seed from current DOM selection state ───────────────────────────
+  // Returns true if a valid non-empty selection was found
+  function buildSeedFromSelection() {
     var curTabIdx = typeof activeTab !== 'undefined' ? activeTab : 0;
     var tab  = typeof TABS !== 'undefined' ? TABS[curTabIdx] : null;
     var data = tab && typeof processSheetData === 'function' ? processSheetData(tab.grid) : null;
-    if (!data) return;
-    var tr    = td.closest('tr');
-    if (!tr) return;
+    if (!data) return false;
 
     var allDataRows = Array.from(document.querySelectorAll('#data-body tr'));
     var selectedRowIndices = new Set();
 
-    // Resolve the clicked row index (works for both data-body and cat-body clicks)
-    var clickedIdx = allDataRows.indexOf(tr);
-    if (clickedIdx === -1) {
-      var catRows = Array.from(document.querySelectorAll('#cat-body tr'));
-      clickedIdx = catRows.indexOf(tr);
-    }
-    if (clickedIdx >= 0) selectedRowIndices.add(clickedIdx);
-
-    // Add rows that are already selected/highlighted in the data table
     allDataRows.forEach(function(dtr, ri) {
-      if (dtr.querySelector('td.selected-cell,td.selected-group,td.highlight-cell,td.highlight-group')) {
+      if (dtr.querySelector('td.selected-cell, td.selected-group')) {
         selectedRowIndices.add(ri);
       }
     });
 
-    // If a category span was clicked, include all rows it covers
-    var catTd = e.target.closest('#cat-body td');
-    if (catTd) {
-      var catRows2 = Array.from(document.querySelectorAll('#cat-body tr'));
-      var catStart = catRows2.indexOf(catTd.closest('tr'));
-      var span     = parseInt(catTd.rowSpan) || 1;
-      for (var s = catStart; s < catStart + span && s < data.rows.length; s++) {
-        selectedRowIndices.add(s);
-      }
-    }
+    if (!selectedRowIndices.size) return false;
 
-    // Build seedCells by merging content from all selected rows, keyed by header
     var allText = [];
-    var cellMap = new Map(); // header -> Set of unique non-empty texts
+    var cellMap = new Map();
     selectedRowIndices.forEach(function(ri) {
       var row = data.rows[ri];
       if (!row) return;
@@ -271,45 +247,100 @@ function initPanel(sidebarBox) {
       });
     });
 
+    if (!allText.length) return false;
+
     seedCells = [];
     cellMap.forEach(function(texts, header) {
       seedCells.push({ header: header, text: [...texts].join(' / ') });
     });
 
     var kws = new Set(panelExtractKW(allText.join(' ')));
-    if (!kws.size) { showEmpty('No searchable text in selection'); return; }
+    if (!kws.size) return false;
 
     seedKws    = kws;
     seedTabIdx = curTabIdx;
-    seedRowIdx = [...selectedRowIndices][0]; // primary row for dedup
-
-    lastMatches = findMatches(kws, curTabIdx, seedRowIdx);
-    renderTiles(lastMatches, kws, curTabIdx, data);
+    seedRowIdx = [...selectedRowIndices][0];
+    return true;
   }
 
-  var dataBodyEl = document.getElementById('data-body');
-  var catBodyEl  = document.getElementById('cat-body');
-  if (dataBodyEl) dataBodyEl.addEventListener('click', onCellClick);
-  if (catBodyEl)  catBodyEl.addEventListener('click', onCellClick);
+  // ── Refresh panel from current selection ─────────────────────────────────
+  function refreshFromSelection() {
+    var curTabIdx = typeof activeTab !== 'undefined' ? activeTab : 0;
+    var tab  = typeof TABS !== 'undefined' ? TABS[curTabIdx] : null;
+    var data = tab && typeof processSheetData === 'function' ? processSheetData(tab.grid) : null;
+
+    var ok = buildSeedFromSelection();
+    if (!ok) {
+      if (_hasContent) showEmpty('Click a cell to find matches');
+      return;
+    }
+
+    lastMatches = findMatches(seedKws, curTabIdx, seedRowIdx);
+    _hasContent = true;
+
+    if (viewMode === 'mindmap') {
+      renderMindmap(lastMatches);
+    } else {
+      renderTiles(lastMatches, seedKws, curTabIdx, data);
+    }
+  }
+
+  // ── MutationObserver: react to any class change on data-body <td>s ───────
+  // This fires whenever script.js applies or clears selection/highlight classes.
+  var _refreshTimer = null;
+
+  function attachObserver() {
+    var dataBodyEl = document.getElementById('data-body');
+    if (!dataBodyEl) { setTimeout(attachObserver, 100); return; }
+    var obs = new MutationObserver(function(mutations) {
+      var relevant = mutations.some(function(m) {
+        return m.type === 'attributes' &&
+               m.attributeName === 'class' &&
+               m.target.tagName === 'TD';
+      });
+      if (!relevant) return;
+      clearTimeout(_refreshTimer);
+      _refreshTimer = setTimeout(refreshFromSelection, 60);
+    });
+    obs.observe(dataBodyEl, { subtree: true, attributes: true, attributeFilter: ['class'] });
+  }
+  attachObserver();
+
+  // ── Cat-body click: slight extra delay so script.js finishes selecting ────
+  // The MutationObserver already handles data-body; we only need this for the
+  // case where a category span is clicked and its rowspan rows need to be picked up.
+  function onCatClick(e) {
+    if (!e.target.closest('td')) return;
+    clearTimeout(_refreshTimer);
+    _refreshTimer = setTimeout(refreshFromSelection, 80);
+  }
+  var catBodyEl2 = document.getElementById('cat-body');
+  if (catBodyEl2) catBodyEl2.addEventListener('click', onCatClick);
 
   // ── TILES ─────────────────────────────────────────────────────────────────
-  // FIX 1: seed card flows inline (same flex as match cards, no forced 100% width)
+  // All cards (seed + matches) are in one flat wrapping flex flow.
+  // Tab-group labels are narrow inline vertical pills — they do NOT have
+  // flex-basis:100% so they never force a row break.
   function renderTiles(matches, kws, srcTabIdx, srcData) {
     ppBody.innerHTML       = '';
     ppBody.style.display   = 'block';
     ppMmWrap.style.display = 'none';
     ppMmWrap.innerHTML     = '';
     _mmActive = null;
-    viewMode  = 'tiles';
-    viewPill.setValue('tiles', false);
+
+    if (viewMode === 'mindmap') {
+      viewMode = 'tiles';
+      viewPill.setValue('tiles', false);
+    }
 
     var vars = panelThemeVars(srcTabIdx);
 
-    // Seed card — same flex sizing as match cards, thicker border to distinguish
+    // ── Seed card ──
     var seedCard = document.createElement('div');
     seedCard.className = 'pp-seed-card';
     seedCard.style.setProperty('--ppc-border', vars['--tab-active-bg'] || '#888');
     seedCard.style.setProperty('--ppc-bg',     vars['--bg-data']       || '#f8f8f8');
+
     var seedHead = document.createElement('div');
     seedHead.className = 'pp-card-head';
     var tabLabel = srcData.title || (typeof TABS !== 'undefined' ? TABS[srcTabIdx].name : '');
@@ -317,14 +348,17 @@ function initPanel(sidebarBox) {
       '<span class="pp-card-badge" style="background:' + (vars['--tab-active-bg']||'#888') +
       ';color:' + (vars['--tab-active-color']||'#fff') + '">Selected</span>' +
       '<span class="pp-card-dim">' + panelEscH(tabLabel) + '</span>';
+
     var seedBody = document.createElement('div');
     seedBody.className = 'pp-card-body';
     seedCells.forEach(function(c) {
       var f = document.createElement('div');
       f.className = 'pp-field';
-      f.innerHTML = '<span class="pp-flabel">' + panelEscH(c.header) + '</span>' + panelHighlight(c.text, kws);
+      f.innerHTML = '<span class="pp-flabel">' + panelEscH(c.header) + '</span>' +
+        panelHighlight(c.text, kws);
       seedBody.appendChild(f);
     });
+
     seedCard.appendChild(seedHead);
     seedCard.appendChild(seedBody);
     ppBody.appendChild(seedCard);
@@ -336,7 +370,7 @@ function initPanel(sidebarBox) {
       return;
     }
 
-    ppSubtitle.textContent  = matches.length + ' match' + (matches.length === 1 ? '' : 'es') +
+    ppSubtitle.textContent = matches.length + ' match' + (matches.length === 1 ? '' : 'es') +
       ' · ' + [...kws].slice(0, 4).join(', ');
     ppToolrow.style.display = 'flex';
     hlOn = true;
@@ -349,29 +383,38 @@ function initPanel(sidebarBox) {
       byTab.get(m.tabIdx).push(m);
     });
 
+    // ── Flat card flow with inline tab labels ──
     [...byTab.keys()].sort().forEach(function(tabIdx) {
-      var tabMatches = byTab.get(tabIdx);
-      var tv = panelThemeVars(tabIdx);
-      var tabName = tabMatches[0].title || (typeof TABS !== 'undefined' ? TABS[tabIdx].name : 'Tab ' + tabIdx);
+      var tabMatches  = byTab.get(tabIdx);
+      var tv          = panelThemeVars(tabIdx);
+      var tabName     = tabMatches[0].title || (typeof TABS !== 'undefined' ? TABS[tabIdx].name : 'Tab ' + tabIdx);
+      var accentColor = tv['--tab-active-bg'] || '#888';
+      var bgColor     = tv['--bg-data']       || '#f8f8f8';
 
-      var divider = document.createElement('div');
-      divider.className = 'pp-divider';
-      divider.style.borderColor = tv['--tab-active-bg'] || '#aaa';
-      divider.innerHTML = '<span style="color:' + (tv['--tab-active-bg']||'#888') +
-        ';background:' + (tv['--bg-data']||'#fff') + '">' + panelEscH(tabName) + '</span>';
-      ppBody.appendChild(divider);
+      // Narrow vertical pill — flex: 0 0 auto, does NOT break the row
+      var label = document.createElement('div');
+      label.className = 'pp-tab-label';
+      label.title = tabName;
+      label.innerHTML =
+        '<span style="background:' + accentColor +
+        ';color:' + (tv['--tab-active-color']||'#fff') + '">' +
+        panelEscH(tabName) + '</span>';
+      ppBody.appendChild(label);
 
       tabMatches.forEach(function(m, mi) {
         var card = document.createElement('div');
         card.className = 'pp-match-card';
-        card.style.setProperty('--ppc-border', tv['--tab-active-bg'] || '#888');
-        card.style.setProperty('--ppc-bg',     tv['--bg-data']       || '#f8f8f8');
+        card.style.setProperty('--ppc-border', accentColor);
+        card.style.setProperty('--ppc-bg',     bgColor);
         card.style.animationDelay = (mi * 40) + 'ms';
 
         var head = document.createElement('div');
         head.className = 'pp-card-head';
         var cats = m.row.cats ? m.row.cats.filter(function(c) { return c.trim(); }) : [];
-        if (cats.length) head.innerHTML = '<span class="pp-card-dim">' + cats.map(panelEscH).join(' · ') + '</span>';
+        if (cats.length) {
+          head.innerHTML = '<span class="pp-card-dim">' +
+            cats.map(panelEscH).join(' · ') + '</span>';
+        }
 
         var body = document.createElement('div');
         body.className = 'pp-card-body';
@@ -413,10 +456,7 @@ function initPanel(sidebarBox) {
     ];
   }
 
-  // FIX 2: all cards created synchronously before any measurement rAF,
-  // so offsetHeight is valid in a single rAF (container is guaranteed visible)
   function renderMindmap(matches) {
-    // Ensure container is visible BEFORE we append cards (needed for offsetHeight)
     ppMmWrap.style.display = 'block';
     ppBody.style.display   = 'none';
     ppMmWrap.innerHTML     = '';
@@ -515,8 +555,8 @@ function initPanel(sidebarBox) {
           '</div>' +
           '<div class="pp-mm-card-body">' +
             seedCells.map(function(c) {
-              return '<div class="pp-mm-field"><span class="pp-flabel">' + panelEscH(c.header) + '</span>' +
-                panelHighlight(c.text, kwsHL) + '</div>';
+              return '<div class="pp-mm-field"><span class="pp-flabel">' +
+                panelEscH(c.header) + '</span>' + panelHighlight(c.text, kwsHL) + '</div>';
             }).join('') +
           '</div>';
       } else {
@@ -535,12 +575,11 @@ function initPanel(sidebarBox) {
       return card;
     }
 
-    // ── Build ALL cards first (sync), then measure + position in ONE rAF ──
+    // Build ALL cards sync so offsetHeight is readable in one rAF
     var seedKey = 'seed';
     makeCard('', '', seedTabIdx, seedKey, true, [], seedKws);
 
     matches.forEach(function(m) {
-      // Pick the column with the most shared keyword matches
       var indices = Array.from({ length: m.row.cells.length }, function(_, i) { return i; })
         .filter(function(ci) { return (m.row.cells[ci] || '').trim(); });
       if (!indices.length) return;
@@ -562,11 +601,10 @@ function initPanel(sidebarBox) {
       arrowDefs.push({ fromKey: seedKey, toKey: key, color: tv['--tab-active-bg'] || '#aaa' });
     });
 
-    // Single rAF — all cards are in the DOM so offsetHeight is now reliable
+    // Single rAF — measure and position all cards
     requestAnimationFrame(function() {
       var W = mmW(), H = mmH(), cx = W / 2, cy = H / 2;
 
-      // Place seed at centre
       var sCard = cardEls.get(seedKey);
       var sH    = sCard ? (sCard.offsetHeight || 80) : 80;
       var sPos  = clampToCanvas(cx - PANEL_CARD_W / 2, cy - sH / 2, PANEL_CARD_W, sH);
@@ -586,7 +624,6 @@ function initPanel(sidebarBox) {
         var x     = cx + ringR * Math.cos(angle) - PANEL_CARD_W / 2;
         var y     = cy + ringR * Math.sin(angle) - cH / 2;
 
-        // Collision push against already-placed cards
         for (var iter = 0; iter < PANEL_MM_ITERS; iter++) {
           var moved = false;
           for (var _r of rects) {
@@ -614,14 +651,13 @@ function initPanel(sidebarBox) {
       });
 
       redrawArrows();
-
-      _mmActive = { rects: rects, cardEls: cardEls, arrowDefs: arrowDefs, redrawArrows: redrawArrows };
+      _mmActive = { rects, cardEls, arrowDefs, redrawArrows };
       _mmLastW = mmW(); _mmLastH = mmH();
       requestAnimationFrame(function() { applyHlState(); });
     });
   }
 
-  // Re-scale mindmap proportionally on sidebar resize
+  // Proportional resize for mindmap
   var _mmLastW = 0, _mmLastH = 0, _mmResizeTimer = null;
   if (window.ResizeObserver) {
     new ResizeObserver(function() {
@@ -632,8 +668,7 @@ function initPanel(sidebarBox) {
         if (!_mmLastW || !_mmLastH || (newW === _mmLastW && newH === _mmLastH)) {
           _mmLastW = newW; _mmLastH = newH; return;
         }
-        var scaleX = newW / _mmLastW;
-        var scaleY = newH / _mmLastH;
+        var scaleX = newW / _mmLastW, scaleY = newH / _mmLastH;
         _mmLastW = newW; _mmLastH = newH;
         _mmActive.rects.forEach(function(r, key) {
           var pos = clampToCanvas(r.x * scaleX, r.y * scaleY, r.w, r.h);
@@ -647,8 +682,8 @@ function initPanel(sidebarBox) {
   }
 
   function drawMmArrow(svg, x1, y1, x2, y2, color) {
-    var ns  = 'http://www.w3.org/2000/svg';
-    var mid = 'arr' + color.replace(/[^a-z0-9]/gi, '_');
+    var ns   = 'http://www.w3.org/2000/svg';
+    var mid  = 'arr' + color.replace(/[^a-z0-9]/gi, '_');
     var defs = svg.querySelector('defs');
     if (!defs) { defs = document.createElementNS(ns, 'defs'); svg.insertBefore(defs, svg.firstChild); }
     if (!defs.querySelector('#' + mid)) {
@@ -679,8 +714,7 @@ function initPanel(sidebarBox) {
       '#sidebar-box { box-sizing: border-box; }',
 
       '#pp-head {',
-      '  flex-shrink: 0;',
-      '  padding: 10px 12px 8px;',
+      '  flex-shrink: 0; padding: 10px 12px 8px;',
       '  border-bottom: 1px solid var(--sidebar-box-border, rgba(0,0,0,.1));',
       '  display: flex; flex-direction: column; gap: 6px;',
       '}',
@@ -689,134 +723,119 @@ function initPanel(sidebarBox) {
       '  letter-spacing: .04em; line-height: 1.3; min-height: 14px;',
       '  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;',
       '}',
-      '#pp-toolrow {',
-      '  display: flex; flex-direction: row; gap: 5px; align-items: stretch;',
-      '}',
-      '#pp-hl-wrap, #pp-view-wrap {',
-      '  flex: 1; min-width: 0; display: flex;',
-      '}',
+      '#pp-toolrow { display: flex; flex-direction: row; gap: 5px; align-items: stretch; }',
+      '#pp-hl-wrap, #pp-view-wrap { flex: 1; min-width: 0; display: flex; }',
       '#pp-hl-wrap .pp-pill, #pp-view-wrap .pp-pill { width: 100%; }',
 
-      '#pp-body-wrap {',
-      '  flex: 1; min-height: 0; position: relative; overflow: hidden;',
-      '}',
+      '#pp-body-wrap { flex: 1; min-height: 0; position: relative; overflow: hidden; }',
+
+      // Pure wrapping flex — no element inside has flex-basis:100% except .pp-empty
       '#pp-body {',
       '  position: absolute; inset: 0; overflow-y: auto;',
       '  padding: 8px 10px 16px; box-sizing: border-box;',
       '  display: flex; flex-direction: row; flex-wrap: wrap;',
-      '  align-content: flex-start; gap: 6px;',
+      '  align-content: flex-start; align-items: flex-start; gap: 6px;',
       '}',
-      '#pp-mm-wrap {',
-      '  position: absolute; inset: 0; display: none; overflow: hidden;',
-      '}',
+      '#pp-mm-wrap { position: absolute; inset: 0; display: none; overflow: hidden; }',
 
+      // Pill
       '.pp-pill {',
       '  position: relative; display: inline-flex; align-items: center;',
-      '  background: rgba(0,0,0,.07); border-radius: 20px;',
-      '  padding: 2px; box-sizing: border-box;',
+      '  background: rgba(0,0,0,.07); border-radius: 20px; padding: 2px; box-sizing: border-box;',
       '}',
       '.pp-ind {',
-      '  position: absolute; top: 2px; bottom: 2px;',
-      '  background: white; border-radius: 16px;',
-      '  box-shadow: 0 1px 4px rgba(0,0,0,.15);',
-      '  transition: left .18s ease, width .18s ease;',
+      '  position: absolute; top: 2px; bottom: 2px; background: white; border-radius: 16px;',
+      '  box-shadow: 0 1px 4px rgba(0,0,0,.15); transition: left .18s ease, width .18s ease;',
       '  pointer-events: none;',
       '}',
       '.pp-btn {',
-      '  flex: 1; position: relative; z-index: 1; border: none;',
-      '  background: transparent; border-radius: 16px; padding: 4px 5px;',
-      '  font-size: 9px; font-weight: 600; letter-spacing: .07em;',
-      '  text-transform: uppercase; color: rgba(0,0,0,.35);',
+      '  flex: 1; position: relative; z-index: 1; border: none; background: transparent;',
+      '  border-radius: 16px; padding: 4px 5px; font-size: 9px; font-weight: 600;',
+      '  letter-spacing: .07em; text-transform: uppercase; color: rgba(0,0,0,.35);',
       '  cursor: pointer; transition: color .15s; white-space: nowrap;',
       '}',
       '.pp-btn.active { color: rgba(0,0,0,.75); }',
 
+      // Empty — only element allowed to span full width
       '.pp-empty {',
-      '  width: 100%; flex-basis: 100%;',
-      '  padding: 24px 8px; text-align: center;',
+      '  width: 100%; flex-basis: 100%; padding: 24px 8px; text-align: center;',
       '  font-size: 11px; letter-spacing: .08em; text-transform: uppercase;',
       '  color: rgba(0,0,0,.25); line-height: 1.5;',
       '}',
 
-      '.pp-divider {',
-      '  width: 100%; flex-basis: 100%;',
-      '  display: flex; align-items: center; gap: 6px;',
-      '  margin: 4px 0 2px; border-top: 1.5px solid; padding-top: 6px;',
-      '  font-size: 0;',
-      '}',
-      '.pp-divider span {',
-      '  font-size: 9px; font-weight: 700; letter-spacing: .14em;',
-      '  text-transform: uppercase; padding: 2px 6px;',
-      '  border-radius: 20px; white-space: nowrap; flex-shrink: 0;',
-      '}',
-
-      // FIX 1: seed card uses same flex as match cards; thicker border = visual distinction
+      // Seed card — same flex as match cards, 2px border to distinguish
       '.pp-seed-card {',
       '  flex: 1 1 ' + PANEL_TILE_MIN_W + 'px;',
-      '  min-width: ' + PANEL_TILE_MIN_W + 'px;',
-      '  max-width: ' + PANEL_TILE_MAX_W + 'px;',
+      '  min-width: ' + PANEL_TILE_MIN_W + 'px; max-width: ' + PANEL_TILE_MAX_W + 'px;',
       '  border: 2px solid var(--ppc-border, #aaa);',
       '  border-radius: 8px; background: var(--ppc-bg, #f8f8f8);',
       '  overflow: hidden; box-sizing: border-box;',
       '}',
 
+      // Match card
       '.pp-match-card {',
       '  flex: 1 1 ' + PANEL_TILE_MIN_W + 'px;',
-      '  min-width: ' + PANEL_TILE_MIN_W + 'px;',
-      '  max-width: ' + PANEL_TILE_MAX_W + 'px;',
+      '  min-width: ' + PANEL_TILE_MIN_W + 'px; max-width: ' + PANEL_TILE_MAX_W + 'px;',
       '  border: 1.5px solid var(--ppc-border, #aaa);',
       '  border-radius: 8px; background: var(--ppc-bg, #f8f8f8);',
-      '  overflow: hidden; box-sizing: border-box;',
-      '  animation: pp-fade-in .25s ease both;',
+      '  overflow: hidden; box-sizing: border-box; animation: pp-fade-in .25s ease both;',
       '}',
       '@keyframes pp-fade-in {',
       '  from { opacity: 0; transform: translateY(4px); }',
       '  to   { opacity: 1; transform: translateY(0); }',
       '}',
 
+      // Tab label — narrow vertical pill, flex: 0 0 auto so it NEVER forces a row break
+      '.pp-tab-label {',
+      '  flex: 0 0 auto; align-self: stretch;',
+      '  display: flex; align-items: stretch;',
+      '}',
+      '.pp-tab-label span {',
+      '  display: flex; align-items: center; justify-content: center;',
+      '  writing-mode: vertical-rl; text-orientation: mixed;',
+      '  transform: rotate(180deg);',
+      '  font-size: 8px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase;',
+      '  padding: 6px 3px; border-radius: 6px; white-space: nowrap; opacity: 0.9;',
+      '  min-height: 32px;',
+      '}',
+
+      // Card internals
       '.pp-card-head {',
-      '  padding: 5px 8px 4px; display: flex; align-items: center;',
-      '  gap: 6px; flex-wrap: wrap;',
+      '  padding: 5px 8px 4px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap;',
       '  border-bottom: 1px solid rgba(0,0,0,.07);',
       '}',
       '.pp-card-badge {',
-      '  font-size: 9px; font-weight: 700; letter-spacing: .12em;',
-      '  text-transform: uppercase; border-radius: 20px;',
-      '  padding: 2px 7px; flex-shrink: 0;',
+      '  font-size: 9px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase;',
+      '  border-radius: 20px; padding: 2px 7px; flex-shrink: 0;',
       '}',
       '.pp-card-dim {',
-      '  font-size: 10px; font-weight: 600; letter-spacing: .06em;',
-      '  text-transform: uppercase; color: rgba(0,0,0,.4);',
-      '  flex: 1; min-width: 0; overflow: hidden;',
-      '  text-overflow: ellipsis; white-space: nowrap;',
+      '  font-size: 10px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase;',
+      '  color: rgba(0,0,0,.4); flex: 1; min-width: 0;',
+      '  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;',
       '}',
-      '.pp-card-body {',
-      '  padding: 6px 8px 8px; display: flex; flex-direction: column; gap: 5px;',
-      '}',
+      '.pp-card-body { padding: 6px 8px 8px; display: flex; flex-direction: column; gap: 5px; }',
       '.pp-field { font-size: 11px; line-height: 1.4; color: rgba(0,0,0,.65); }',
       '.pp-field-matched { color: rgba(0,0,0,.85); }',
       '.pp-flabel {',
-      '  display: block; font-size: 9px; font-weight: 700;',
-      '  letter-spacing: .1em; text-transform: uppercase;',
-      '  color: rgba(0,0,0,.3); margin-bottom: 1px;',
+      '  display: block; font-size: 9px; font-weight: 700; letter-spacing: .1em;',
+      '  text-transform: uppercase; color: rgba(0,0,0,.3); margin-bottom: 1px;',
       '}',
       '.pp-shared-pill {',
-      '  margin: 0 8px 7px; padding: 2px 7px;',
-      '  background: rgba(0,0,0,.06); border-radius: 20px;',
-      '  font-size: 9px; font-weight: 600; letter-spacing: .06em;',
-      '  color: rgba(0,0,0,.4); text-transform: uppercase;',
-      '  display: inline-block; align-self: flex-start;',
+      '  margin: 0 8px 7px; padding: 2px 7px; background: rgba(0,0,0,.06); border-radius: 20px;',
+      '  font-size: 9px; font-weight: 600; letter-spacing: .06em; color: rgba(0,0,0,.4);',
+      '  text-transform: uppercase; display: inline-block; align-self: flex-start;',
       '}',
 
+      // Keyword highlight
       'mark.pkw {',
       '  background: transparent; border-bottom: 2px solid currentColor;',
       '  font-weight: 700; padding: 0; color: inherit;',
       '  transition: border-bottom-color .15s, font-weight .15s;',
       '}',
 
+      // Mindmap cards
       '.pp-mm-card {',
-      '  position: absolute;',
-      '  border: 1.5px solid var(--ppc-border, #aaa);',
+      '  position: absolute; border: 1.5px solid var(--ppc-border, #aaa);',
       '  border-radius: 8px; background: var(--ppc-bg, #fff);',
       '  box-shadow: 0 2px 10px rgba(0,0,0,.12);',
       '  cursor: grab; user-select: none; z-index: 1; overflow: hidden;',
@@ -827,9 +846,7 @@ function initPanel(sidebarBox) {
       '  display: flex; align-items: center; justify-content: center;',
       '}',
       '.pp-mm-seed .pp-mm-card-head { min-height: 22px; }',
-      '.pp-mm-card-body {',
-      '  padding: 5px 8px 7px; display: flex; flex-direction: column; gap: 3px;',
-      '}',
+      '.pp-mm-card-body { padding: 5px 8px 7px; display: flex; flex-direction: column; gap: 3px; }',
       '.pp-mm-field {',
       '  font-size: 10px; line-height: 1.35; color: rgba(0,0,0,.7);',
       '  overflow: hidden; display: -webkit-box;',
