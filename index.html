@@ -1,67 +1,76 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>Dimensional Framework</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dimensional Framework</title>
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-<div class="top-bar">
-  <span id="status">Fetching spreadsheet…</span>
-  <header>
-    <h1>Dimensional Framework</h1>
-    <p>Click any cell to add it to the match · click empty space to clear</p>
-  </header>
-  <div class="top-bar-right">
-    <button id="panel-open-btn" class="tbtn" aria-pressed="false">
-      <span class="panel-icon"><span></span><span></span><span></span></span>Related
-    </button>
-    <button id="view-toggle" class="tbtn" aria-pressed="false">
-      <span class="toggle-icon"><span></span><span></span></span>Stair View
-    </button>
-  </div>
-</div>
-<div id="stage-wrap">
-  <div id="stage">
-    <div id="scene-inner">
-      <div class="scene"><div class="stack" id="stack"></div></div>
+  <div class="app-grid">
+    <div class="topbar" id="topbar">
+      <div class="topbar-global" id="topbar-global"></div>
+      <div class="topbar-sheet" id="topbar-sheet"></div>
     </div>
-  </div>
-  <div id="cluster-panel">
-    <div class="resize-grip" id="panel-grip"></div>
-    <div id="panel-inner">
-      <div id="panel-head">
-        <div id="panel-head-text">
-          <div id="panel-title">Related Entries</div>
-          <div id="panel-subtitle"></div>
-          <div id="panel-toolbar">
-            <button id="highlight-toggle"><span class="hl-icon"></span>Highlight keywords</button>
-            <button id="mindmap-toggle">Mindmap</button>
-          </div>
+    <div class="main">
+      <div class="loading-overlay" id="loading-overlay">Loading...</div>
+      <div class="grid-area" id="grid-area">
+        <div class="corner" id="corner"></div>
+        <div class="header-scroll" id="header-scroll">
+          <table class="sheet header-table" id="header-table">
+            <thead><tr id="header-row"></tr></thead>
+          </table>
         </div>
-        <button id="panel-close">✕</button>
+        <div class="cat-scroll" id="cat-scroll">
+          <table class="sheet cat-table" id="cat-table">
+            <tbody id="cat-body"></tbody>
+          </table>
+        </div>
+        <div class="data-scroll" id="data-scroll">
+          <table class="sheet data-table" id="data-table">
+            <tbody id="data-body"></tbody>
+          </table>
+        </div>
       </div>
-      <div id="panel-body"></div>
-      <div id="mindmap-wrap">
-        <svg id="mindmap-svg"></svg>
+    </div>
+    <div class="bottombar">
+      <div class="tab-bar" id="tab-bar"></div>
+    </div>
+    <div class="sidebar" id="sidebar">
+      <div class="drag-handle" id="drag-handle">
+        <div class="handle-arrows">
+          <button class="handle-arrow" id="handle-arrow-open" aria-label="Open sidebar">
+            <svg viewBox="0 0 10 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <polyline points="7,2 2,8 7,14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+          <button class="handle-arrow" id="handle-arrow-close" aria-label="Close sidebar">
+            <svg viewBox="0 0 10 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <polyline points="3,2 8,8 3,14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+      <div class="sidebar-box" id="sidebar-box"></div>
+    </div>
+    <!-- Fixed drag handle overlay -->
+    <div class="drag-handle drag-handle-fixed" id="drag-handle-fixed">
+      <div class="handle-arrows">
+        <button class="handle-arrow" id="handle-arrow-open-fixed" aria-label="Open sidebar">
+          <svg viewBox="0 0 10 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <polyline points="7,2 2,8 7,14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+        <button class="handle-arrow" id="handle-arrow-close-fixed" aria-label="Close sidebar">
+          <svg viewBox="0 0 10 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <polyline points="3,2 8,8 3,14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
       </div>
     </div>
   </div>
-</div>
-<div class="bottom-bar">
-  <div class="carousel-wrap">
-    <button class="carr-arrow" id="arr-left" aria-label="Previous">
-      <svg width="8" height="14" viewBox="0 0 8 14" fill="none"><path d="M7 1L1 7L7 13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-    </button>
-    <div class="dot-window" id="dot-window"></div>
-    <button class="carr-arrow" id="arr-right" aria-label="Next">
-      <svg width="8" height="14" viewBox="0 0 8 14" fill="none"><path d="M1 1L7 7L1 13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-    </button>
-  </div>
-  <div class="dot-label" id="hint-label"></div>
-</div>
-<script src="script.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="script.js"></script>
+  <script src="panel.js"></script>   <!-- ← add this -->
 </body>
 </html>
