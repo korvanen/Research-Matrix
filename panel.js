@@ -408,12 +408,21 @@ function initPanel(sidebarBox) {
     if (!dataBodyEl) { setTimeout(attachObserver, 100); return; }
     new MutationObserver(function(mutations) {
       var relevant = mutations.some(function(m) {
-        return m.type === 'attributes' && m.attributeName === 'class' && m.target.tagName === 'TD';
+        if (m.type !== 'attributes' || m.attributeName !== 'class' || m.target.tagName !== 'TD') return false;
+        // Only react to selection changes, not hover highlights
+        var cur  = m.target.classList;
+        var prev = m.oldValue || '';
+        var wasSelected = /\bselected-/.test(prev);
+        var isSelected  = cur.contains('selected-cell') || cur.contains('selected-group');
+        return wasSelected !== isSelected;
       });
       if (!relevant) return;
       clearTimeout(_refreshTimer);
       _refreshTimer = setTimeout(refreshFromSelection, 60);
-    }).observe(dataBodyEl, { subtree: true, attributes: true, attributeFilter: ['class'] });
+    }).observe(dataBodyEl, {
+      subtree: true, attributes: true,
+      attributeFilter: ['class'], attributeOldValue: true
+    });
   }
   attachObserver();
 
@@ -829,15 +838,15 @@ function initPanel(sidebarBox) {
 
 #pp-body-wrap { flex: 1; min-height: 0; position: relative; overflow: hidden; }
 
-/* CSS Grid — columns sized by screen-width ratio (PANEL_TILE_MIN_R / PANEL_TILE_MAX_R) */
+/* CSS Grid — auto-fill as many min-width columns as fit; 1fr lets them share space
+   evenly, while max-width on the card element prevents them growing past the cap */
 #pp-body {
   position: absolute; inset: 0; overflow-y: auto;
-  padding: 8px 10px 16px; box-sizing: border-box;
+  padding: 10px 12px 18px; box-sizing: border-box;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(var(--pp-col-min), var(--pp-col-max)));
-  justify-content: start;
+  grid-template-columns: repeat(auto-fill, minmax(var(--pp-col-min), 1fr));
   align-content: start;
-  gap: 6px;
+  gap: 10px;
 }
 #pp-mm-wrap { position: absolute; inset: 0; display: none; overflow: hidden; }
 
@@ -933,8 +942,8 @@ function initPanel(sidebarBox) {
   padding: 5px 8px; border-radius: 6px; border: 1.5px solid;
   background: white; font-size: 10px; font-weight: 600; letter-spacing: .06em;
   text-transform: uppercase; cursor: pointer; text-align: center;
-  opacity: 0; transform: translateY(4px);
-  transition: opacity .15s ease, transform .15s ease;
+  opacity: 0; transform: translateY(6px);
+  transition: opacity .35s ease, transform .35s ease;
   box-shadow: 0 1px 6px rgba(0,0,0,.08);
 }
 .pp-goto-btn.pp-goto-visible {
