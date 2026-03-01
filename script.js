@@ -1,7 +1,7 @@
 // ════════════════════════════════════════════════════════════════
 // ── GLOBAL CONFIG ──
 // ════════════════════════════════════════════════════════════════
-console.log('script.js - v2'); // version 
+console.log('script.js - v3'); // version 
 
 const APP_TITLE       = 'Dimensional Framework';
 
@@ -42,7 +42,7 @@ const LANDSCAPE = {
   arrowSize:                 28,    // px
   arrowGap:                  10,
   arrowOffset:               12,
-  tabBarPadding:             16,    // px
+  tabBarPadding:             60,    // px
 };
 
 const R = () => isPortrait() ? PORTRAIT : LANDSCAPE;
