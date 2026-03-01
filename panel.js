@@ -20,7 +20,7 @@ const PANEL_CARD_MAX_W      = 240;
 const PANEL_GOTO_DELAY      = 400;
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
-console.log('[panel.js_v_H]');
+console.log('[panel.js_v_I]');
 document.addEventListener('DOMContentLoaded', () => {
   const wait = setInterval(() => {
     const box = document.getElementById('sidebar-box');
@@ -121,6 +121,8 @@ function initPanel(sidebarBox) {
   var seedKws      = new Set();
   var seedTabIdx   = -1;
   var seedRowIdx   = -1;
+  // seedCells: array of { cats: string[], header: string, text: string }
+  // one entry per selected cell (not grouped by column)
   var seedCells    = [];
   var lastMatches  = [];
   var _mmActive    = null;
@@ -195,7 +197,7 @@ function initPanel(sidebarBox) {
     if (!data) return false;
 
     var allDataRows = Array.from(document.querySelectorAll('#data-body tr'));
-    var selectedCols = new Map();
+    var selectedCols = new Map(); // rowIndex -> Set<colIndex>
 
     allDataRows.forEach(function(dtr, ri) {
       Array.from(dtr.querySelectorAll('td')).forEach(function(td, ci) {
@@ -209,34 +211,36 @@ function initPanel(sidebarBox) {
     if (!selectedCols.size) return false;
 
     var allText = [];
-    var cellMap = new Map();
+    // Build per-cell entries preserving row order, then col order within row
+    var newSeedCells = [];
 
-    selectedCols.forEach(function(cols, ri) {
+    // Sort row indices
+    var sortedRows = [...selectedCols.keys()].sort(function(a, b) { return a - b; });
+
+    sortedRows.forEach(function(ri) {
       var row = data.rows[ri];
       if (!row) return;
-      cols.forEach(function(ci) {
+      var cats = row.cats ? row.cats.filter(function(c) { return c.trim(); }) : [];
+      var sortedCols = [...selectedCols.get(ri)].sort(function(a, b) { return a - b; });
+      sortedCols.forEach(function(ci) {
         var txt = (row.cells[ci] || '').trim();
         if (!txt) return;
         var h = data.headers[ci] || '';
-        if (!cellMap.has(h)) cellMap.set(h, new Set());
-        cellMap.get(h).add(txt);
+        newSeedCells.push({ cats: cats, header: h, text: txt });
         allText.push(txt);
       });
     });
 
     if (!allText.length) return false;
 
-    seedCells = [];
-    cellMap.forEach(function(texts, header) {
-      seedCells.push({ header: header, text: [...texts].join(' / ') });
-    });
+    seedCells = newSeedCells;
 
     var kws = new Set(panelExtractKW(allText.join(' ')));
     if (!kws.size) return false;
 
     seedKws    = kws;
     seedTabIdx = curTabIdx;
-    seedRowIdx = [...selectedCols.keys()][0];
+    seedRowIdx = sortedRows[0];
     return true;
   }
 
@@ -313,7 +317,7 @@ function initPanel(sidebarBox) {
     var tabLabel    = (srcData && srcData.title) ? srcData.title
                       : (typeof TABS !== 'undefined' ? TABS[srcTabIdx].name : '');
 
-    // Build the seed card — same structure as a match card, "Selected" badge in header.
+    // Build the seed card — shows each selected cell with its cats, column, and text
     function buildSeedCard() {
       var card = document.createElement('div');
       card.className = 'pp-match-card pp-seed-card';
@@ -322,22 +326,34 @@ function initPanel(sidebarBox) {
 
       var head = document.createElement('div');
       head.className = 'pp-card-head';
-      // Get cats for the seed row
-      var seedRow = srcData && srcData.rows[seedRowIdx];
-      var seedCatsArr = seedRow ? seedRow.cats.filter(function(c){ return c.trim(); }) : [];
       head.innerHTML =
-        '<span class="pp-card-badge" style="background:' + accentSrc + ';color:' + labelSrc + '">Selected</span>' +
-        (seedCatsArr.length ? '<span class="pp-card-dim">' + seedCatsArr.map(panelEscH).join(' · ') + '</span>' : '');
+        '<span class="pp-card-badge" style="background:' + accentSrc + ';color:' + labelSrc + '">Selected</span>';
 
       var body = document.createElement('div');
       body.className = 'pp-card-body';
-      seedCells.forEach(function(c) {
+
+      seedCells.forEach(function(c, idx) {
+        // Section divider between cells (not before first)
+        if (idx > 0) {
+          var sep = document.createElement('div');
+          sep.className = 'pp-seed-sep';
+          body.appendChild(sep);
+        }
+        // Categories line
+        if (c.cats && c.cats.length) {
+          var catEl = document.createElement('div');
+          catEl.className = 'pp-seed-cats';
+          catEl.textContent = c.cats.join(' · ');
+          body.appendChild(catEl);
+        }
+        // Column + text field
         var f = document.createElement('div');
         f.className = 'pp-field pp-field-matched';
         f.innerHTML = '<span class="pp-flabel">' + panelEscH(c.header) + '</span>' +
           panelHighlight(c.text, kws);
         body.appendChild(f);
       });
+
       card.appendChild(head);
       card.appendChild(body);
       return card;
@@ -346,7 +362,6 @@ function initPanel(sidebarBox) {
     if (!matches.length) {
       ppSubtitle.textContent  = 'No matches found';
       ppToolrow.style.display = 'none';
-      // Seed card still shown even with no matches, inside its tab group
       var divNone = document.createElement('div');
       divNone.className = 'pp-divider';
       divNone.style.borderColor = accentSrc;
@@ -375,10 +390,8 @@ function initPanel(sidebarBox) {
       if (!byTab.has(m.tabIdx)) byTab.set(m.tabIdx, []);
       byTab.get(m.tabIdx).push(m);
     });
-    // Ensure the seed's tab appears even if it has no matches
     if (!byTab.has(srcTabIdx)) byTab.set(srcTabIdx, []);
 
-    // Sort tabs: seed tab always first, others in index order
     var sortedTabKeys = [srcTabIdx].concat(
       [...byTab.keys()].filter(function(t){ return t !== srcTabIdx; }).sort()
     );
@@ -400,7 +413,6 @@ function initPanel(sidebarBox) {
         panelEscH(tabNameStr) + '</span>';
       frag.appendChild(divider);
 
-      // Seed card first, inside its own tab group
       if (tabIdx === srcTabIdx) frag.appendChild(buildSeedCard());
 
       tabMatches.forEach(function(m) {
@@ -484,7 +496,6 @@ function initPanel(sidebarBox) {
     svg.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:0';
     ppMmWrap.appendChild(svg);
 
-    // Top SVG layer — connection point circles sit above cards
     var svgTop = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svgTop.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:9999';
     ppMmWrap.appendChild(svgTop);
@@ -492,15 +503,13 @@ function initPanel(sidebarBox) {
     var cardEls    = new Map();
     var rects      = new Map();
     var arrowDefs  = [];
-    var cardColors      = new Map(); // key -> { border, bg }
-    var collapsedHeights = new Map(); // key -> px height in collapsed state
-    var _mmTouchExpanded = null;      // card element currently expanded by touch
+    var cardColors      = new Map();
+    var collapsedHeights = new Map();
+    var _mmTouchExpanded = null;
+    // z-index management: base z per card (elevated after drag), expand z on top of all
+    var _topZ      = 10;   // increments on each drag-end; last-dragged card gets this value
+    var cardBaseZ  = new Map(); // key -> base z (default 1, raised after drag)
 
-    // Returns the card's live border-box rect relative to ppMmWrap.
-    // Uses getBoundingClientRect() so it tracks CSS transitions and drag in real-time.
-    // The card element's own bbox expands/contracts as children change size (e.g. the
-    // goto button's margin-bottom animates from -38px hidden → 8px visible), so we
-    // never need to special-case individual children — the card stroke IS the boundary.
     function getCardRect(key) {
       var el = cardEls.get(key);
       var r  = rects.get(key);
@@ -511,22 +520,20 @@ function initPanel(sidebarBox) {
       return { x: cr.left - wrap.left, y: cr.top - wrap.top, w: r.w, h: cr.height };
     }
 
-    // 10 connection points glued to the card's stroke: 3 top, 3 bottom, 2 left, 2 right.
-    // Reads live DOM every call so they move with any size change automatically.
     function getConnectionPoints(key) {
       var vr = getCardRect(key);
       if (!vr) return [];
       var x = vr.x, y = vr.y, W = vr.w, H = vr.h;
       return [
-        { x: x + W * 0.25, y: y         },  // top
+        { x: x + W * 0.25, y: y         },
         { x: x + W * 0.5,  y: y         },
         { x: x + W * 0.75, y: y         },
-        { x: x + W * 0.25, y: y + H     },  // bottom
+        { x: x + W * 0.25, y: y + H     },
         { x: x + W * 0.5,  y: y + H     },
         { x: x + W * 0.75, y: y + H     },
-        { x: x,            y: y + H / 3 },  // left
+        { x: x,            y: y + H / 3 },
         { x: x,            y: y + H * 2/3 },
-        { x: x + W,        y: y + H / 3 },  // right
+        { x: x + W,        y: y + H / 3 },
         { x: x + W,        y: y + H * 2/3 },
       ];
     }
@@ -542,17 +549,14 @@ function initPanel(sidebarBox) {
       return best;
     }
 
-    // Returns the outward unit vector for a connection point based on which
-    // edge of its card it sits on. Used to make bezier control points exit
-    // the card perpendicularly, giving clean elbow-style curves.
     function getEdgeTangent(pt, key) {
       var vr = getCardRect(key);
       if (!vr) return { dx: 0, dy: 1 };
       var tol = 3;
-      if (Math.abs(pt.y - vr.y)           < tol) return { dx: 0, dy: -1 }; // top
-      if (Math.abs(pt.y - (vr.y + vr.h))  < tol) return { dx: 0, dy:  1 }; // bottom
-      if (Math.abs(pt.x - vr.x)           < tol) return { dx: -1, dy: 0 }; // left
-      if (Math.abs(pt.x - (vr.x + vr.w))  < tol) return { dx:  1, dy: 0 }; // right
+      if (Math.abs(pt.y - vr.y)           < tol) return { dx: 0, dy: -1 };
+      if (Math.abs(pt.y - (vr.y + vr.h))  < tol) return { dx: 0, dy:  1 };
+      if (Math.abs(pt.x - vr.x)           < tol) return { dx: -1, dy: 0 };
+      if (Math.abs(pt.x - (vr.x + vr.w))  < tol) return { dx:  1, dy: 0 };
       return { dx: 0, dy: 1 };
     }
 
@@ -594,8 +598,6 @@ function initPanel(sidebarBox) {
         var pair = closestPointPair(ptsA, ptsB);
         if (!pair) return;
 
-        // Cubic bezier in bottom SVG layer — control points exit each card
-        // perpendicularly (tangent to the edge the connection point is on).
         var ax = pair.a.x, ay = pair.a.y, bx = pair.b.x, by = pair.b.y;
         var dist = Math.hypot(bx - ax, by - ay);
         var offset = Math.min(dist * 0.45, 90);
@@ -615,7 +617,6 @@ function initPanel(sidebarBox) {
         curve.setAttribute('stroke-opacity', '0.45');
         svg.appendChild(curve);
 
-        // Connection point circles in top SVG layer (above cards)
         [[pair.a, def.fromKey], [pair.b, def.toKey]].forEach(function(item) {
           var pt = item[0], k = item[1];
           var colors = cardColors.get(k) || { border: def.color, bg: '#fff' };
@@ -631,10 +632,8 @@ function initPanel(sidebarBox) {
       });
     }
 
-    // Expand/collapse a mindmap card: reveals full text and goto button as one motion.
-    // Uses explicit height animation so the duration matches the goto button exactly.
-    var MM_EXPAND_MS    = 260; // ← animation speed in ms
-    var MM_HOVER_DELAY  = 200; // ← ms before hover expand triggers (0 = instant)
+    var MM_EXPAND_MS    = 260;
+    var MM_HOVER_DELAY  = 200;
 
     function _btnReset(btn) {
       if (!btn) return;
@@ -643,11 +642,8 @@ function initPanel(sidebarBox) {
       btn.style.opacity       = '';
       btn.style.transform     = '';
       btn.style.pointerEvents = '';
+      btn.classList.remove('pp-goto-visible');
     }
-
-    // _mmExpandState per card: 'expanded' | 'collapsed' | undefined
-    // Used by cleanup timers instead of checking the class (which is removed
-    // synchronously while the collapse animation is still running).
 
     function mmSetExpanded(cardEl, expanded, key) {
       var btn = cardEl.querySelector('.pp-goto-btn');
@@ -655,28 +651,29 @@ function initPanel(sidebarBox) {
 
       if (expanded) {
         cardEl._mmExpandState = 'expanded';
+        // Bring to front while expanded — above all cards including last-dragged
+        cardEl.style.zIndex = (_topZ + 1) + '';
 
         if (!collapsedHeights.has(key)) {
           collapsedHeights.set(key, cardEl.offsetHeight);
         }
         var collH = collapsedHeights.get(key);
 
-        // Prep: pin height, unclamp text, snap btn into layout space but invisible.
         cardEl.style.transition = 'none';
         cardEl.style.height     = collH + 'px';
         cardEl.classList.add('pp-mm-expanded');
         if (btn) {
+          btn.classList.remove('pp-goto-visible');
           btn.style.transition    = 'none';
-          btn.style.marginBottom  = '8px';  // in-flow for scrollHeight measurement
+          btn.style.marginBottom  = '8px';
           btn.style.opacity       = '0';
           btn.style.transform     = 'translateY(4px)';
           btn.style.pointerEvents = 'none';
         }
-        void cardEl.offsetHeight; // flush — scrollHeight now includes full content + btn
+        void cardEl.offsetHeight;
 
         var fullH = cardEl.scrollHeight;
 
-        // Animate card height and btn fade as a single motion.
         cardEl.style.transition = 'height ' + MM_EXPAND_MS + 'ms ease';
         cardEl.style.height     = fullH + 'px';
         if (btn) {
@@ -687,7 +684,6 @@ function initPanel(sidebarBox) {
           btn.style.pointerEvents = 'auto';
         }
 
-        // After animation: release fixed height so card reflows naturally.
         cardEl._expandTimer = setTimeout(function() {
           if (cardEl._mmExpandState !== 'expanded') return;
           cardEl.style.transition = '';
@@ -695,24 +691,19 @@ function initPanel(sidebarBox) {
         }, MM_EXPAND_MS + 20);
 
       } else {
-        // Mark collapsed immediately — class removal is also synchronous so that
-        // the mouseleave touch-guard check works, but we use _mmExpandState in
-        // timers to avoid the class-already-gone race that caused the stuck-card bug.
         cardEl._mmExpandState = 'collapsed';
         cardEl.classList.remove('pp-mm-expanded');
         cardEl.classList.remove('pp-mm-touch-expanded');
 
-        // Reset btn margin to CSS default (negative) NOW, before snapshotting height.
-        // This ensures card reflows to collH correctly once inline height is cleared.
         if (btn) {
+          btn.classList.remove('pp-goto-visible');
           btn.style.transition    = 'none';
-          btn.style.marginBottom  = '';   // back to calc(-1*(1em+22px))
+          btn.style.marginBottom  = '';
           btn.style.opacity       = '0';
           btn.style.transform     = 'translateY(4px)';
           btn.style.pointerEvents = 'none';
         }
 
-        // Re-read height after btn margin reset (card may have slightly changed).
         void cardEl.offsetHeight;
         var curH  = cardEl.getBoundingClientRect().height;
         var collH = collapsedHeights.get(key) || curH;
@@ -728,6 +719,8 @@ function initPanel(sidebarBox) {
           if (cardEl._mmExpandState !== 'collapsed') return;
           cardEl.style.transition = '';
           cardEl.style.height     = '';
+          // Restore to this card's own base z (1 for untouched, elevated if ever dragged)
+          cardEl.style.zIndex = (cardBaseZ.get(key) || 1) + '';
           _btnReset(btn);
         }, MM_EXPAND_MS + 20);
       }
@@ -739,29 +732,32 @@ function initPanel(sidebarBox) {
       var touchStartX = 0, touchStartY = 0;
 
       function dragStart(clientX, clientY) {
-        isDragging = true; wasDrag = false;
+        isDragging = true; wasDrag = false; el._mmIsDragging = true;
         ox = clientX; oy = clientY;
         sl = parseFloat(el.style.left) || 0;
         st = parseFloat(el.style.top)  || 0;
-        // Collapse card instantly if it's expanded so we drag the compact version.
-        if (el.classList.contains('pp-mm-expanded')) {
+        // Collapse card (with cleanup) if it's expanded when drag starts
+        if (el.classList.contains('pp-mm-expanded') || el._mmExpandState === 'expanded') {
+          var btn = el.querySelector('.pp-goto-btn');
+          // Force-remove goto-visible class and reset btn immediately
+          if (btn) {
+            btn.classList.remove('pp-goto-visible');
+            btn.style.transition    = 'none';
+            btn.style.marginBottom  = '';
+            btn.style.opacity       = '0';
+            btn.style.transform     = 'translateY(4px)';
+            btn.style.pointerEvents = 'none';
+          }
           clearTimeout(el._expandTimer);
+          el._mmExpandState = 'collapsed';
           el.classList.remove('pp-mm-expanded');
           el.classList.remove('pp-mm-touch-expanded');
           el.style.height     = '';
           el.style.transition = '';
-          var btn = el.querySelector('.pp-goto-btn');
-          if (btn) {
-            btn.style.transition    = '';
-            btn.style.marginBottom  = '';
-            btn.style.opacity       = '';
-            btn.style.transform     = '';
-            btn.style.pointerEvents = '';
-          }
-          collapsedHeights.delete(key); // reset so next expand re-measures
+          collapsedHeights.delete(key);
           if (_mmTouchExpanded === el) _mmTouchExpanded = null;
         }
-        el.style.zIndex = 500; el.style.transition = 'none';
+        el.style.zIndex = (_topZ + 2) + ''; el.style.transition = 'none';
       }
       function dragMove(clientX, clientY) {
         if (!isDragging) return;
@@ -775,7 +771,12 @@ function initPanel(sidebarBox) {
       }
       function dragEnd() {
         if (!isDragging) return;
-        isDragging = false; el.style.zIndex = '';
+        isDragging = false; el._mmIsDragging = false;
+        // Assign this card a permanently elevated z so it stays on top of
+        // cards that were never dragged, until another card is dragged later.
+        _topZ++;
+        cardBaseZ.set(key, _topZ);
+        el.style.zIndex = _topZ + '';
         redrawArrows();
       }
 
@@ -787,7 +788,6 @@ function initPanel(sidebarBox) {
       document.addEventListener('mousemove', function(e) { dragMove(e.clientX, e.clientY); });
       document.addEventListener('mouseup', dragEnd);
 
-      // Touch: track start position to distinguish tap from drag
       el.addEventListener('touchstart', function(e) {
         if (e.touches.length !== 1) return;
         touchStartX = e.touches[0].clientX;
@@ -806,10 +806,8 @@ function initPanel(sidebarBox) {
         var dy = (t ? t.clientY : touchStartY) - touchStartY;
         var moved = Math.hypot(dx, dy);
         dragEnd();
-        // Tap (< 8px movement): expand this card, collapse any other that was open
         if (moved < 8) {
           var wantsExpand = !el.classList.contains('pp-mm-touch-expanded');
-          // Collapse the previously touch-expanded card
           if (_mmTouchExpanded && _mmTouchExpanded !== el) {
             var prevKey = _mmTouchExpanded._mmKey;
             _mmTouchExpanded.classList.remove('pp-mm-touch-expanded');
@@ -836,8 +834,6 @@ function initPanel(sidebarBox) {
       card.style.setProperty('--ppc-border', accentColor);
       card.style.setProperty('--ppc-bg',     bgColor);
 
-      // Header: thin color bar collapsed; expands to show tab name on hover.
-      // Both seed and match cards share the same header structure.
       var badgeHtml = isSeed
         ? '<span class="pp-mm-badge">Selected</span>'
         : '';
@@ -847,41 +843,45 @@ function initPanel(sidebarBox) {
           '<span class="pp-mm-head-label">' + panelEscH(tabName || '') + '</span>' +
         '</div>';
 
-      // Body: categories + all cell fields (for seed: seedCells; for match: single best field)
-      var catLine   = cats && cats.length ? cats.map(panelEscH).join(' · ') : '';
-      var fieldsHtml = isSeed
-        ? seedCells.map(function(c) {
-            return '<div class="pp-mm-field"><span class="pp-flabel">' +
-              panelEscH(c.header) + '</span>' + panelHighlight(c.text, kwsHL) + '</div>';
-          }).join('')
-        : '<div class="pp-mm-field"><span class="pp-flabel">' + panelEscH(header) + '</span>' +
+      // Body: for seed — show each cell with its cats, column, text
+      //       for match — single best field as before
+      var bodyHtml = '';
+      if (isSeed) {
+        bodyHtml = seedCells.map(function(c, idx) {
+          var sepHtml = idx > 0 ? '<div class="pp-mm-seed-sep"></div>' : '';
+          var catHtml = (c.cats && c.cats.length)
+            ? '<div class="pp-mm-cat">' + c.cats.map(panelEscH).join(' · ') + '</div>'
+            : '';
+          return sepHtml + catHtml +
+            '<div class="pp-mm-field"><span class="pp-flabel">' + panelEscH(c.header) + '</span>' +
+            panelHighlight(c.text, kwsHL) + '</div>';
+        }).join('');
+      } else {
+        var catLine = cats && cats.length ? cats.map(panelEscH).join(' · ') : '';
+        bodyHtml =
+          (catLine ? '<div class="pp-mm-cat">' + catLine + '</div>' : '') +
+          '<div class="pp-mm-field"><span class="pp-flabel">' + panelEscH(header) + '</span>' +
           panelHighlight(text, kwsHL) + '</div>';
+      }
 
       card.innerHTML =
         headHtml +
-        '<div class="pp-mm-card-body">' +
-          (catLine ? '<div class="pp-mm-cat">' + catLine + '</div>' : '') +
-          fieldsHtml +
-        '</div>';
+        '<div class="pp-mm-card-body">' + bodyHtml + '</div>';
 
       if (!isSeed && matchObj) {
         attachGoTo(card, matchObj, accentColor);
       }
 
       ppMmWrap.appendChild(card);
-      card._mmKey = key; // stored so touch-collapse path can retrieve the key
+      card._mmKey = key;
       makeDraggable(card, key);
       cardEls.set(key, card);
 
-      // Hover expand with configurable delay.
-      // Touch-expanded cards ignore synthetic mouseleave from the browser.
       var _hoverEnterTimer = null;
       card.addEventListener('mouseenter', function() {
-        if (card.style.zIndex === '500') return; // dragging
+        if (card._mmIsDragging) return;
         clearTimeout(_hoverEnterTimer);
         _hoverEnterTimer = setTimeout(function() {
-          // If this was triggered by a real hover (not synthetic post-touch),
-          // take over from touch mode rather than fighting it.
           if (_mmTouchExpanded === card) {
             card.classList.remove('pp-mm-touch-expanded');
             _mmTouchExpanded = null;
@@ -891,14 +891,10 @@ function initPanel(sidebarBox) {
       });
       card.addEventListener('mouseleave', function() {
         clearTimeout(_hoverEnterTimer);
-        // Ignore synthetic mouseleave fired by mobile browser after a tap.
-        // pp-mm-touch-expanded is set in touchend before any synthetic events fire.
         if (card.classList.contains('pp-mm-touch-expanded')) return;
         mmSetExpanded(card, false, key);
       });
 
-      // ResizeObserver: any size change on the card (goto button, future features)
-      // automatically redraws connection points to stay glued to the card's stroke.
       if (window.ResizeObserver) {
         new ResizeObserver(function() { redrawArrows(); }).observe(card);
       }
@@ -930,7 +926,6 @@ function initPanel(sidebarBox) {
       var cats   = m.row.cats ? m.row.cats.filter(function(c) { return c.trim(); }) : [];
       var tv     = panelThemeVars(m.tabIdx);
 
-      var _mTabData = _seedData; // reuse if same tab, else compute
       var _mTabD = (m.tabIdx === seedTabIdx && _seedData) ? _seedData :
         (typeof TABS !== 'undefined' && typeof processSheetData === 'function' ? processSheetData(TABS[m.tabIdx].grid) : null);
       var _mTabName = (_mTabD && _mTabD.title) ? _mTabD.title :
@@ -1051,17 +1046,9 @@ function initPanel(sidebarBox) {
     if (!snap || !_mmActive) return;
     if (snap.matchKey !== _mmMatchKey) return;
 
-    // Cards are already visible at their default (smooshed) positions.
-    // We want them to smoothly slide to the saved positions rather than snap.
-    // Strategy:
-    //   rAF 1 — let the current default layout paint so cards are visibly
-    //            present at their starting positions.
-    //   rAF 2 — add left/top transitions, then update coords to saved values.
-    //            The browser will tween between the two positions automatically.
     requestAnimationFrame(function() {
       if (!_mmActive || snap.matchKey !== _mmMatchKey) return;
 
-      // Measure saved positions clamped to the new canvas size
       var targets = new Map();
       snap.positions.forEach(function(pos, key) {
         var r = _mmActive.rects.get(key);
@@ -1072,14 +1059,11 @@ function initPanel(sidebarBox) {
         });
       });
 
-      // Enable position transitions on every card
       _mmActive.cardEls.forEach(function(el) {
-        // ← Change 0.38s to adjust the slide-back animation speed
         el.style.transition = 'left 0.38s cubic-bezier(0.25,1,0.5,1), ' +
                               'top  0.38s cubic-bezier(0.25,1,0.5,1)';
       });
 
-      // rAF 2 — update positions; browser animates from current → saved
       requestAnimationFrame(function() {
         if (!_mmActive || snap.matchKey !== _mmMatchKey) return;
 
@@ -1092,7 +1076,6 @@ function initPanel(sidebarBox) {
           el.style.top  = t.ny + 'px';
         });
 
-        // Redraw arrows continuously during the slide
         var start  = performance.now();
         var dur    = 480;
         function arrowRaf(now) {
@@ -1101,7 +1084,6 @@ function initPanel(sidebarBox) {
         }
         requestAnimationFrame(arrowRaf);
 
-        // Clean up transitions once the slide is done so dragging is unaffected
         setTimeout(function() {
           if (!_mmActive) return;
           _mmActive.cardEls.forEach(function(el) { el.style.transition = ''; });
@@ -1109,8 +1091,6 @@ function initPanel(sidebarBox) {
       });
     });
   });
-
-  // drawMmArrow removed — lines now use straight segments with connection points
 
   // ── STYLES ────────────────────────────────────────────────────────────────
   if (!document.getElementById('pp-styles')) {
@@ -1241,6 +1221,16 @@ function initPanel(sidebarBox) {
   text-transform: uppercase; display: inline-block; align-self: flex-start;
 }
 
+/* Seed card multi-cell separators and category labels */
+.pp-seed-cats {
+  font-size: 9px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+  color: rgba(0,0,0,.35); margin-bottom: 1px;
+}
+.pp-seed-sep {
+  border-top: 1px solid rgba(0,0,0,.08);
+  margin: 4px 0;
+}
+
 /* "Go to" hover button */
 .pp-goto-btn {
   display: block; width: calc(100% - 16px);
@@ -1262,7 +1252,6 @@ function initPanel(sidebarBox) {
   pointer-events: auto;
 }
 .pp-goto-btn:hover { filter: brightness(0.92); }
-/* Touch-expanded: button visibility is handled via inline styles in mmSetExpanded */
 
 /* Keyword highlight */
 mark.pkw {
@@ -1313,6 +1302,11 @@ mark.pkw {
 .pp-mm-cat {
   font-size: 9px; font-weight: 700; letter-spacing: .08em;
   text-transform: uppercase; color: rgba(0,0,0,.35); margin-bottom: 2px;
+}
+/* Seed card cell separator in mindmap */
+.pp-mm-seed-sep {
+  border-top: 1px solid rgba(255,255,255,.25);
+  margin: 4px 0;
 }
 `;
     document.head.appendChild(style);
