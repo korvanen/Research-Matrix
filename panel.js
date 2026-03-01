@@ -20,7 +20,7 @@ const PANEL_CARD_MAX_W      = 240;
 const PANEL_GOTO_DELAY      = 400;
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
-console.log('[panel.js_v_2]');
+console.log('[panel.js_v_3]');
 document.addEventListener('DOMContentLoaded', () => {
   const wait = setInterval(() => {
     const box = document.getElementById('sidebar-box');
@@ -744,7 +744,7 @@ function initPanel(sidebarBox) {
         if (!_mmActive) return;
         _mmActive.cardEls.forEach(function(el, i) {
           // Stagger each card slightly for a ripple feel
-          var delay = i * 18;
+          var delay = i * 1800;
           el.style.transition = 'opacity 4s ease ' + delay + 'ms, transform 1s cubic-bezier(0.34,1.4,0.64,1) ' + delay + 'ms'; // the line I changed
           el.style.opacity    = '1';
           el.style.transform  = 'scale(1)';
