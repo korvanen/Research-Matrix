@@ -17,10 +17,10 @@ const PANEL_MM_ITERS        = 20;
 const PANEL_CARD_W          = 160;
 const PANEL_CARD_MIN_W      = 140;
 const PANEL_CARD_MAX_W      = 240;
-const PANEL_GOTO_DELAY      = 900;
+const PANEL_GOTO_DELAY      = 400;
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
-console.log('[panel.js_v_1]');
+console.log('[panel.js_v_2]');
 document.addEventListener('DOMContentLoaded', () => {
   const wait = setInterval(() => {
     const box = document.getElementById('sidebar-box');
@@ -745,7 +745,7 @@ function initPanel(sidebarBox) {
         _mmActive.cardEls.forEach(function(el, i) {
           // Stagger each card slightly for a ripple feel
           var delay = i * 18;
-          el.style.transition = 'opacity 0.28s ease ' + delay + 'ms, transform 1s cubic-bezier(0.34,1.4,0.64,1) ' + delay + 'ms'; // the line I changed
+          el.style.transition = 'opacity 4s ease ' + delay + 'ms, transform 1s cubic-bezier(0.34,1.4,0.64,1) ' + delay + 'ms'; // the line I changed
           el.style.opacity    = '1';
           el.style.transform  = 'scale(1)';
         });
