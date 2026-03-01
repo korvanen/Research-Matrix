@@ -18,8 +18,8 @@ const PANEL_CARD_W          = 160; // mindmap card width (px)
 
 // Tile card fixed width — cards always render at this width and wrap to the
 // next row when there isn't horizontal room for another column. No stretching.
-const PANEL_CARD_MIN_W      = 80; // px — card min width; also determines column breakpoints
-const PANEL_CARD_MAX_W      = 100; // px — card max width (cards stretch up to this within a column)
+const PANEL_CARD_MIN_W      = 140; // px — card min width; also determines column breakpoints
+const PANEL_CARD_MAX_W      = 240; // px — card max width (cards stretch up to this within a column)
 
 const PANEL_GOTO_DELAY      = 900; // ms hover before "Go to" button appears
 
@@ -70,14 +70,23 @@ function initPanel(sidebarBox) {
   function updateGrid() {
     var pad  = 24; // 12px left + 12px right from #pp-body padding
     var gap  = 10;
-    var w    = ppBodyWrap.clientWidth - pad;
+    // ppBodyWrap.clientWidth is 0 if the sidebar hasn't laid out yet —
+    // fall back to the sidebar element's own width minus margins
+    var w = ppBodyWrap.clientWidth - pad;
+    if (w <= 0) {
+      var sbMargin = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--sidebar-box-margin')) || 8;
+      w = (sidebarBox.offsetWidth || sidebarBox.parentElement.offsetWidth) - sbMargin * 2 - pad;
+    }
     if (w <= 0) return;
     var cols  = Math.max(1, Math.floor(w / PANEL_CARD_MIN_W));
     var cardW = Math.min(PANEL_CARD_MAX_W, Math.floor((w - gap * (cols - 1)) / cols));
     ppBody.style.gridTemplateColumns = 'repeat(' + cols + ', ' + cardW + 'px)';
   }
 
+  // Call once immediately, then again after layout has settled
   updateGrid();
+  requestAnimationFrame(function() { updateGrid(); });
+
   if (window.ResizeObserver) {
     var _gridRaf = null;
     new ResizeObserver(function() {
@@ -267,8 +276,8 @@ function initPanel(sidebarBox) {
 
     if (viewMode === 'mindmap') { viewMode = 'tiles'; viewPill.setValue('tiles', false); }
 
-    // Cards are fixed-width — width is set by --pp-tile-card-w via CSS variable
     updateGrid();
+    requestAnimationFrame(updateGrid);
 
     var vars = panelThemeVars(srcTabIdx);
 
