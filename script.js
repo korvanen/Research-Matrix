@@ -1,7 +1,7 @@
 // ════════════════════════════════════════════════════════════════
 // ── GLOBAL CONFIG ──
 // ════════════════════════════════════════════════════════════════
-console.log('script.js [v7]');
+console.log('script.js [v8]');
 
 const APP_TITLE       = 'Dimensional Framework';
 
@@ -22,8 +22,8 @@ const PORTRAIT = {
   sidebarTwoPosition:        true,
   arrowSize:                 36,    // px — larger touch targets in portrait
   arrowOffset:               16,
-  tabBarPadding:             24,    // px — gap between arrow buttons and tab label
-  tabBarInset:               20,    // px — gap between arrow buttons and screen/sidebar edges
+  tabBarPadding:             0.1,    // — gap between arrow buttons and tab label
+  tabBarInset:               0.1,    // — gap between arrow buttons and screen/sidebar edges
 };
 
 const LANDSCAPE = {
@@ -41,8 +41,8 @@ const LANDSCAPE = {
   sidebarTwoPosition:        false,
   arrowSize:                 28,    // px
   arrowOffset:               12,
-  tabBarPadding:             16,    // px — gap between arrow buttons and tab label
-  tabBarInset:               12,    // px — gap between arrow buttons and screen/sidebar edges
+  tabBarPadding:             0.1,    //  — gap between arrow buttons and tab label
+  tabBarInset:               0.1,    //  — gap between arrow buttons and screen/sidebar edges
 };
 
 const R = () => isPortrait() ? PORTRAIT : LANDSCAPE;
@@ -62,8 +62,8 @@ const SIDEBAR_SNAP_CLOSE              = () => Math.round(window.innerWidth  * R(
 const SIDEBAR_TWO_POSITION            = () => !!R().sidebarTwoPosition;
 const ARROW_SIZE                      = () => R().arrowSize;
 const ARROW_OFFSET                    = () => R().arrowOffset;
-const TAB_BAR_PADDING                 = () => R().tabBarPadding;
-const TAB_BAR_INSET                   = () => R().tabBarInset;
+const TAB_BAR_PADDING                 = () => Math.round(window.innerHeight * R().tabBarPadding);
+const TAB_BAR_INSET                   = () => Math.round(window.innerHeight * R().tabBarInset);
 
 // ── THEMES ──
 const THEMES = {
