@@ -20,7 +20,7 @@ const PANEL_CARD_MAX_W      = 240;
 const PANEL_GOTO_DELAY      = 400;
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
-console.log('[panel.js_v_3]');
+console.log('[panel.js_v_500]');
 document.addEventListener('DOMContentLoaded', () => {
   const wait = setInterval(() => {
     const box = document.getElementById('sidebar-box');
@@ -449,9 +449,45 @@ function initPanel(sidebarBox) {
     svg.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:0';
     ppMmWrap.appendChild(svg);
 
-    var cardEls   = new Map();
-    var rects     = new Map();
-    var arrowDefs = [];
+    // Top SVG layer — connection point circles sit above cards
+    var svgTop = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svgTop.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:2';
+    ppMmWrap.appendChild(svgTop);
+
+    var cardEls    = new Map();
+    var rects      = new Map();
+    var arrowDefs  = [];
+    var cardColors = new Map(); // key -> { border, bg }
+
+    // 10 connection points per card: 3 top, 3 bottom, 2 left, 2 right
+    function getConnectionPoints(key) {
+      var r = rects.get(key);
+      if (!r) return [];
+      var x = r.x, y = r.y, W = r.w, H = r.h;
+      return [
+        { x: x + W * 0.25, y: y        },  // top
+        { x: x + W * 0.5,  y: y        },
+        { x: x + W * 0.75, y: y        },
+        { x: x + W * 0.25, y: y + H    },  // bottom
+        { x: x + W * 0.5,  y: y + H    },
+        { x: x + W * 0.75, y: y + H    },
+        { x: x,            y: y + H / 3     },  // left
+        { x: x,            y: y + H * 2 / 3 },
+        { x: x + W,        y: y + H / 3     },  // right
+        { x: x + W,        y: y + H * 2 / 3 },
+      ];
+    }
+
+    function closestPointPair(ptsA, ptsB) {
+      var best = null, bestDist = Infinity;
+      ptsA.forEach(function(a) {
+        ptsB.forEach(function(b) {
+          var d = Math.hypot(a.x - b.x, a.y - b.y);
+          if (d < bestDist) { bestDist = d; best = { a: a, b: b }; }
+        });
+      });
+      return best;
+    }
 
     function pushApart(skipKey) {
       for (var pass = 0; pass < PANEL_MM_ITERS; pass++) {
@@ -480,11 +516,39 @@ function initPanel(sidebarBox) {
     }
 
     function redrawArrows() {
-      while (svg.firstChild) svg.removeChild(svg.firstChild);
+      while (svg.firstChild)    svg.removeChild(svg.firstChild);
+      while (svgTop.firstChild) svgTop.removeChild(svgTop.firstChild);
+
+      var ns = 'http://www.w3.org/2000/svg';
       arrowDefs.forEach(function(def) {
-        var a = rects.get(def.fromKey), b = rects.get(def.toKey);
-        if (!a || !b) return;
-        drawMmArrow(svg, a.x + a.w/2, a.y + a.h/2, b.x + b.w/2, b.y + b.h/2, def.color);
+        var ptsA = getConnectionPoints(def.fromKey);
+        var ptsB = getConnectionPoints(def.toKey);
+        if (!ptsA.length || !ptsB.length) return;
+        var pair = closestPointPair(ptsA, ptsB);
+        if (!pair) return;
+
+        // Line in bottom SVG layer (behind cards and circles)
+        var line = document.createElementNS(ns, 'line');
+        line.setAttribute('x1', pair.a.x); line.setAttribute('y1', pair.a.y);
+        line.setAttribute('x2', pair.b.x); line.setAttribute('y2', pair.b.y);
+        line.setAttribute('stroke',         def.color);
+        line.setAttribute('stroke-width',   '1.5');
+        line.setAttribute('stroke-opacity', '0.45');
+        svg.appendChild(line);
+
+        // Connection point circles in top SVG layer (above cards)
+        [[pair.a, def.fromKey], [pair.b, def.toKey]].forEach(function(item) {
+          var pt = item[0], k = item[1];
+          var colors = cardColors.get(k) || { border: def.color, bg: '#fff' };
+          var circle = document.createElementNS(ns, 'circle');
+          circle.setAttribute('cx',           pt.x);
+          circle.setAttribute('cy',           pt.y);
+          circle.setAttribute('r',            '4');
+          circle.setAttribute('fill',         colors.bg);
+          circle.setAttribute('stroke',       colors.border);
+          circle.setAttribute('stroke-width', '1.5');
+          svgTop.appendChild(circle);
+        });
       });
     }
 
@@ -537,6 +601,8 @@ function initPanel(sidebarBox) {
     function makeCard(text, header, tabIdx, key, isSeed, cats, kwsHL, matchObj) {
       var tv = panelThemeVars(tabIdx);
       var accentColor = tv['--tab-active-bg'] || '#888';
+      var bgColor     = tv['--bg-data']       || '#fff';
+      cardColors.set(key, { border: accentColor, bg: bgColor });
       var card = document.createElement('div');
       card.className = 'pp-mm-card' + (isSeed ? ' pp-mm-seed' : '');
       card.style.width = PANEL_CARD_W + 'px';
@@ -733,6 +799,7 @@ function initPanel(sidebarBox) {
 
       // Enable position transitions on every card
       _mmActive.cardEls.forEach(function(el) {
+        // ← Change 0.38s to adjust the slide-back animation speed
         el.style.transition = 'left 0.38s cubic-bezier(0.25,1,0.5,1), ' +
                               'top  0.38s cubic-bezier(0.25,1,0.5,1)';
       });
@@ -768,30 +835,7 @@ function initPanel(sidebarBox) {
     });
   });
 
-  function drawMmArrow(svg, x1, y1, x2, y2, color) {
-    var ns   = 'http://www.w3.org/2000/svg';
-    var mid  = 'arr' + color.replace(/[^a-z0-9]/gi, '_');
-    var defs = svg.querySelector('defs');
-    if (!defs) { defs = document.createElementNS(ns, 'defs'); svg.insertBefore(defs, svg.firstChild); }
-    if (!defs.querySelector('#' + mid)) {
-      var marker = document.createElementNS(ns, 'marker');
-      marker.setAttribute('id', mid);
-      marker.setAttribute('markerWidth', '7'); marker.setAttribute('markerHeight', '7');
-      marker.setAttribute('refX', '6');        marker.setAttribute('refY', '3.5');
-      marker.setAttribute('orient', 'auto');
-      var poly = document.createElementNS(ns, 'polygon');
-      poly.setAttribute('points', '0 0,7 3.5,0 7');
-      poly.setAttribute('fill', color); poly.setAttribute('opacity', '0.5');
-      marker.appendChild(poly); defs.appendChild(marker);
-    }
-    var mx = (x1+x2)/2, my = (y1+y2)/2, dx = x2-x1, dy = y2-y1;
-    var path = document.createElementNS(ns, 'path');
-    path.setAttribute('d', 'M'+x1+','+y1+' Q'+(mx-dy*0.15)+','+(my+dx*0.15)+' '+x2+','+y2);
-    path.setAttribute('fill', 'none'); path.setAttribute('stroke', color);
-    path.setAttribute('stroke-width', '1.5'); path.setAttribute('stroke-opacity', '0.5');
-    path.setAttribute('marker-end', 'url(#' + mid + ')');
-    svg.appendChild(path);
-  }
+  // drawMmArrow removed — lines now use straight segments with connection points
 
   // ── STYLES ────────────────────────────────────────────────────────────────
   if (!document.getElementById('pp-styles')) {
