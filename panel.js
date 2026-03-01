@@ -62,15 +62,15 @@ function initPanel(sidebarBox) {
   const ppMmWrap   = document.getElementById('pp-mm-wrap');
 
   // ── Grid column calculation ───────────────────────────────────────────────
-  // cols  = floor(containerWidth / PANEL_CARD_MIN_W), minimum 1
-  // cardW = containerWidth / cols, clamped to [PANEL_CARD_MIN_W, PANEL_CARD_MAX_W]
-  // This gives the exact behaviour: cards stretch between min and max, and a new
-  // column is added every time the container crosses another multiple of PANEL_CARD_MIN_W.
+  // cols  = floor(availableWidth / PANEL_CARD_MIN_W), minimum 1
+  // cardW = (availableWidth - gaps) / cols, clamped to PANEL_CARD_MAX_W
+  // Columns set as explicit px on gridTemplateColumns — no CSS auto-fill needed.
   const ppBodyWrap = document.getElementById('pp-body-wrap');
 
   function updateGrid() {
+    var pad  = 24; // 12px left + 12px right from #pp-body padding
     var gap  = 10;
-    var w    = ppBodyWrap.clientWidth - 2 * 12; // subtract #pp-body padding (12px each side)
+    var w    = ppBodyWrap.clientWidth - pad;
     if (w <= 0) return;
     var cols  = Math.max(1, Math.floor(w / PANEL_CARD_MIN_W));
     var cardW = Math.min(PANEL_CARD_MAX_W, Math.floor((w - gap * (cols - 1)) / cols));
@@ -79,7 +79,11 @@ function initPanel(sidebarBox) {
 
   updateGrid();
   if (window.ResizeObserver) {
-    new ResizeObserver(updateGrid).observe(ppBodyWrap);
+    var _gridRaf = null;
+    new ResizeObserver(function() {
+      if (_gridRaf) return;
+      _gridRaf = requestAnimationFrame(function() { _gridRaf = null; updateGrid(); });
+    }).observe(ppBodyWrap);
   }
 
   // ── State ─────────────────────────────────────────────────────────────────
