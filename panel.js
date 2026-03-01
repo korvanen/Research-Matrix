@@ -18,7 +18,8 @@ const PANEL_CARD_W          = 160; // mindmap card width (px)
 
 // Tile card fixed width — cards always render at this width and wrap to the
 // next row when there isn't horizontal room for another column. No stretching.
-const PANEL_TILE_CARD_W     = 160; // px — fixed width for every tile card
+const PANEL_CARD_MIN_W      = 140; // px — card min width; also determines column breakpoints
+const PANEL_CARD_MAX_W      = 240; // px — card max width (cards stretch up to this within a column)
 
 const PANEL_GOTO_DELAY      = 900; // ms hover before "Go to" button appears
 
@@ -60,19 +61,25 @@ function initPanel(sidebarBox) {
   const ppBody     = document.getElementById('pp-body');
   const ppMmWrap   = document.getElementById('pp-mm-wrap');
 
-  // Inject PANEL_TILE_CARD_W as a CSS variable.
-  document.documentElement.style.setProperty('--pp-tile-card-w', PANEL_TILE_CARD_W + 'px');
-
-  // Set explicit pixel width on #pp-body from pp-body-wrap's clientWidth (excludes scrollbar).
-  // This is the only reliable way to give auto-fill a definite width through the
-  // overflow:hidden / absolute-positioned ancestor chain.
+  // ── Grid column calculation ───────────────────────────────────────────────
+  // cols  = floor(containerWidth / PANEL_CARD_MIN_W), minimum 1
+  // cardW = containerWidth / cols, clamped to [PANEL_CARD_MIN_W, PANEL_CARD_MAX_W]
+  // This gives the exact behaviour: cards stretch between min and max, and a new
+  // column is added every time the container crosses another multiple of PANEL_CARD_MIN_W.
   const ppBodyWrap = document.getElementById('pp-body-wrap');
-  function updateBodyWidth() {
-    ppBody.style.width = ppBodyWrap.clientWidth + 'px';
+
+  function updateGrid() {
+    var gap  = 10;
+    var w    = ppBodyWrap.clientWidth - 2 * 12; // subtract #pp-body padding (12px each side)
+    if (w <= 0) return;
+    var cols  = Math.max(1, Math.floor(w / PANEL_CARD_MIN_W));
+    var cardW = Math.min(PANEL_CARD_MAX_W, Math.floor((w - gap * (cols - 1)) / cols));
+    ppBody.style.gridTemplateColumns = 'repeat(' + cols + ', ' + cardW + 'px)';
   }
-  updateBodyWidth();
+
+  updateGrid();
   if (window.ResizeObserver) {
-    new ResizeObserver(updateBodyWidth).observe(ppBodyWrap);
+    new ResizeObserver(updateGrid).observe(ppBodyWrap);
   }
 
   // ── State ─────────────────────────────────────────────────────────────────
@@ -257,6 +264,7 @@ function initPanel(sidebarBox) {
     if (viewMode === 'mindmap') { viewMode = 'tiles'; viewPill.setValue('tiles', false); }
 
     // Cards are fixed-width — width is set by --pp-tile-card-w via CSS variable
+    updateGrid();
 
     var vars = panelThemeVars(srcTabIdx);
 
@@ -668,13 +676,11 @@ function initPanel(sidebarBox) {
 
 #pp-body-wrap { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; position: relative; }
 
-/* CSS Grid — columns are PANEL_TILE_CARD_W px wide (set as --pp-tile-card-w via JS).
-   #pp-body gets an explicit pixel width from JS (sidebarBox.clientWidth) so auto-fill
-   can correctly count how many columns fit. */
+/* Grid columns are set entirely by updateGrid() in JS — do not set grid-template-columns here.
+   Cards use width:100% so they fill whatever column width JS has calculated. */
 #pp-body {
   padding: 10px 12px 18px; box-sizing: border-box;
   display: grid;
-  grid-template-columns: repeat(auto-fill, var(--pp-tile-card-w, 160px));
   justify-content: start;
   align-content: start;
   gap: 10px;
@@ -707,17 +713,17 @@ function initPanel(sidebarBox) {
   color: rgba(0,0,0,.25); line-height: 1.5;
 }
 
-/* Seed card — same fixed width as match cards, just styled differently */
+/* Seed card — fills its grid column, same as match cards */
 .pp-seed-card {
-  width: var(--pp-tile-card-w, 160px);
+  width: 100%;
   border: 2px solid var(--ppc-border, #aaa);
   border-radius: 8px; background: var(--ppc-bg, #f8f8f8);
   overflow: hidden; box-sizing: border-box;
 }
 
-/* Match card — width set by CSS variable from PANEL_TILE_CARD_W. Never stretches. */
+/* Match card — fills its grid column width (set by updateGrid in JS) */
 .pp-match-card {
-  width: var(--pp-tile-card-w, 160px);
+  width: 100%;
   border: 1.5px solid var(--ppc-border, #aaa);
   border-radius: 8px; background: var(--ppc-bg, #f8f8f8);
   overflow: visible; box-sizing: border-box;
