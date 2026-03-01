@@ -20,7 +20,7 @@ const PANEL_CARD_MAX_W      = 240;
 const PANEL_GOTO_DELAY      = 900;
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
-console.log('[panel.js_v_11]');
+console.log('[panel.js_v_10]');
 document.addEventListener('DOMContentLoaded', () => {
   const wait = setInterval(() => {
     const box = document.getElementById('sidebar-box');
