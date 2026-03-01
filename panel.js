@@ -666,33 +666,69 @@ function initPanel(sidebarBox) {
       });
 
       redrawArrows();
-      _mmActive   = { rects, cardEls, arrowDefs, redrawArrows };
+      _mmActive   = { rects, cardEls, arrowDefs, redrawArrows, pushApart };
       _mmMatchKey = lastMatches.map(function(m){ return m.tabIdx+':'+m.rowIdx; }).join('|');
       _mmLastW = mmW(); _mmLastH = mmH();
       requestAnimationFrame(function() { applyHlState(); });
     });
   }
 
-  var _mmLastW = 0, _mmLastH = 0, _mmResizeTimer = null;
+  var _mmLastW = 0, _mmLastH = 0, _mmResizeRafId = null;
   if (window.ResizeObserver) {
     new ResizeObserver(function() {
       if (viewMode !== 'mindmap' || !_mmActive) return;
-      clearTimeout(_mmResizeTimer);
-      _mmResizeTimer = setTimeout(function() {
+      // Run at most once per animation frame — sidebar drag fires many events
+      if (_mmResizeRafId) return;
+      _mmResizeRafId = requestAnimationFrame(function() {
+        _mmResizeRafId = null;
         var newW = mmW(), newH = mmH();
-        if (!_mmLastW || !_mmLastH || (newW === _mmLastW && newH === _mmLastH)) {
-          _mmLastW = newW; _mmLastH = newH; return;
-        }
-        var sx = newW / _mmLastW, sy = newH / _mmLastH;
+        if (newW === _mmLastW && newH === _mmLastH) return;
+
+        // Build four wall rects representing the canvas edges.
+        // Walls are only "active" on the side that shrank (i.e. the new boundary
+        // is inside where cards currently are).  Expanding edges are ignored so
+        // card positions never move unless a wall is actually in the way.
+        var walls = [];
+        var T = PANEL_MM_PAD, B = newH - PANEL_MM_PAD;
+        var L = PANEL_MM_PAD, R = newW - PANEL_MM_PAD;
+
+        // Right wall: push cards left when canvas got narrower
+        if (newW < _mmLastW) walls.push({ x: newW, y: 0, w: 1, h: newH });
+        // Bottom wall: push cards up when canvas got shorter
+        if (newH < _mmLastH) walls.push({ x: 0, y: newH, w: newW, h: 1 });
+
         _mmLastW = newW; _mmLastH = newH;
+
+        if (!walls.length) {
+          // Canvas only grew — no pushing needed, just redraw arrows in case SVG resized
+          _mmActive.redrawArrows();
+          return;
+        }
+
+        // For each card, clamp to the new canvas first (instant, one-time snap to boundary),
+        // then run the full card-vs-card pushApart so cards displaced by the wall
+        // ripple outward using the same physics as manual dragging.
+        var dirty = false;
         _mmActive.rects.forEach(function(r, key) {
-          var [nx, ny] = clampToCanvas(r.x * sx, r.y * sy, r.w, r.h);
-          r.x = nx; r.y = ny;
-          var el = _mmActive.cardEls.get(key);
-          if (el) { el.style.left = nx + 'px'; el.style.top = ny + 'px'; }
+          var nx = Math.max(0, Math.min(newW - r.w, r.x));
+          var ny = Math.max(0, Math.min(newH - r.h, r.y));
+          if (nx !== r.x || ny !== r.y) {
+            r.x = nx; r.y = ny;
+            var el = _mmActive.cardEls.get(key);
+            if (el) { el.style.left = nx + 'px'; el.style.top = ny + 'px'; }
+            dirty = true;
+          }
         });
-        _mmActive.redrawArrows();
-      }, 16);
+
+        if (dirty) {
+          // Re-use the existing pushApart closure (captured inside renderMindmap).
+          // We call it with no skip-key so all cards can move.
+          _mmActive.pushApart(null);
+          _mmActive.redrawArrows();
+        } else {
+          _mmActive.redrawArrows();
+        }
+      });
     }).observe(ppMmWrap);
   }
 
