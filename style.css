@@ -43,6 +43,7 @@ body {
   font-family: Inter, system-ui, sans-serif;
   font-size: 14px;
   height: 100vh;
+  height: 100dvh; /* dynamic viewport — tracks Chrome address bar show/hide */
   overflow: hidden;
 }
 
@@ -51,6 +52,7 @@ body {
   display: grid;
   width: 100vw;
   height: 100vh;
+  height: 100dvh; /* dynamic viewport — prevents grid overflow under mobile chrome UI */
   grid-template-columns: auto 1fr var(--sidebar-reserved-width, 0px);
   grid-template-rows: auto 1fr auto;
   grid-template-areas:
@@ -70,6 +72,7 @@ body {
   top: 0;
   right: 0;
   height: 100vh;
+  height: 100dvh;
   z-index: 50;
 }
 .sidebar.is-fullscreen {
@@ -88,6 +91,9 @@ body {
   padding: 0 30px 10px;
   box-shadow: 0 1px 4px rgba(0,0,0,.06);
   z-index: 10;
+  /* dvh: tracks visible area as Chrome address bar animates */
+  height: var(--topbar-dvh, unset);
+  min-height: var(--topbar-dvh, unset);
 }
 .topbar-global {
   font-weight: 300;
@@ -304,6 +310,10 @@ th, td {
   overflow: hidden;
   transition: opacity .18s ease;
   position: relative;
+  /* dvh: tracks the visible viewport so the bar stays in view as
+     Chrome's address bar and bottom UI animate in/out on Android */
+  height: var(--bottombar-dvh, unset);
+  min-height: var(--bottombar-dvh, unset);
 }
 .bottombar.tabs-hidden {}
 
@@ -314,7 +324,6 @@ th, td {
   justify-content: center;
   height: 100%;
   gap: 8px;
-  /* FIX 1: allow the tab bar to shrink and let tabs shrink with it */
   width: 100%;
   min-width: 0;
   overflow: hidden;
@@ -333,7 +342,6 @@ th, td {
   user-select: none;
   transition: background .12s, color .12s, transform .18s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow .18s ease;
   transform: translateY(0px);
-  /* FIX 1: tabs shrink to fit, but never below a readable minimum */
   flex: 1 1 0;
   min-width: 48px;
   max-width: 220px;
@@ -356,7 +364,7 @@ th, td {
   box-shadow: 0 3px 10px rgba(0,0,0,0.12);
 }
 
-/* ── COMPACT TAB BAR (single tab + arrows) ── */
+/* ── COMPACT TAB BAR ── */
 .bottombar.tabs-compact {
   padding: 0;
   justify-content: flex-start;
@@ -372,13 +380,11 @@ th, td {
   padding: 0 var(--tab-bar-padding, 16px);
   box-sizing: border-box;
   overflow: visible;
-  /* don't let the tab bar overflow its container width */
   max-width: 100%;
   min-width: 0;
   flex-shrink: 1;
 }
 
-/* Tab-nav arrows — FIX 2: ensure always visible with explicit colors */
 .tab-arrow {
   flex-shrink: 0;
   display: grid;
@@ -394,7 +400,6 @@ th, td {
   letter-spacing: 0;
   cursor: pointer;
   user-select: none;
-  /* FIX 2: default opacity 1, not relying on any class to show */
   opacity: 1;
   transition: background .12s, opacity .12s;
   padding: 0;
@@ -410,11 +415,9 @@ th, td {
   display: block;
   overflow: visible;
   flex-shrink: 0;
-  /* FIX 2: inherit stroke from parent color */
   pointer-events: none;
 }
 
-/* The active tab in compact mode */
 .tab-compact-label {
   flex: 1;
   min-width: 0;
