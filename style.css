@@ -367,7 +367,10 @@ th, td {
 /* ── COMPACT TAB BAR ── */
 .bottombar.tabs-compact {
   padding: 0;
-  justify-content: flex-start;
+  /* Center the tab bar within the full bottombar; the tab bar itself is
+     sized to exactly the available (non-sidebar) width by JS, so this
+     naturally places it in the correct horizontal region. */
+  justify-content: center;
   align-items: center;
   overflow: visible;
 }
@@ -380,9 +383,9 @@ th, td {
   padding: 0 var(--tab-bar-padding, 16px);
   box-sizing: border-box;
   overflow: visible;
-  max-width: 100%;
+  /* width is set explicitly by JS to the available space — no max-width needed */
   min-width: 0;
-  flex-shrink: 1;
+  flex-shrink: 0;
 }
 
 .tab-arrow {
