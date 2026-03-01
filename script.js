@@ -8,7 +8,7 @@ const ARROW_SIZE      = 28;
 const ARROW_GAP       = 10;
 const ARROW_OFFSET    = 12;
 
-const TAB_BAR_PADDING  = window.innerHeight*0.1;
+const TAB_BAR_PADDING  = window.innerHeight*0.5;
 
 const isPortrait = () => window.innerHeight > window.innerWidth;
 
