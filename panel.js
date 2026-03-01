@@ -24,7 +24,7 @@ const PANEL_CARD_MAX_W      = 240; // px — card max width (cards stretch up to
 const PANEL_GOTO_DELAY      = 900; // ms hover before "Go to" button appears
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
-console.log('[panel.js_v_6]');
+console.log('[panel.js_v_7]');
 document.addEventListener('DOMContentLoaded', () => {
   const wait = setInterval(() => {
     const box = document.getElementById('sidebar-box');
@@ -78,27 +78,21 @@ function initPanel(sidebarBox) {
       w = (sidebarBox.offsetWidth || sidebarBox.parentElement.offsetWidth) - sbMargin * 2 - pad;
     }
     if (w <= 0) return;
-    // Start with 1 column and increase only when the current cardW would exceed PANEL_CARD_MAX_W.
-    // This gives: stretch min→max in 1 col, snap to 2 cols at min, stretch again, etc.
-    // Once all cols fit at max width, extra space stays empty (cols stays at maxCols).
-    var maxCols = Math.max(1, Math.floor((w + gap) / (PANEL_CARD_MAX_W + gap)));
-    var cols = Math.max(1, Math.floor((w + gap) / (PANEL_CARD_MAX_W + gap)));
-    // Now find how many cols at MIN fit — this is the upper bound
-    var colsAtMin = Math.max(1, Math.floor(w / PANEL_CARD_MIN_W));
-    // cols = how many columns such that cardW is between MIN and MAX
-    // Increase cols from 1 until cardW drops to MIN or below
-    cols = 1;
-    while (cols < colsAtMin) {
-      var nextCardW = Math.floor((w - gap * cols) / (cols + 1));
-      if (nextCardW < PANEL_CARD_MIN_W) break;
-      cols++;
-    }
-    // Cap at maxCols so we never exceed MAX width per card
-    if (cols > maxCols) cols = maxCols;
-    var cardW = Math.min(PANEL_CARD_MAX_W, Math.floor((w - gap * (cols - 1)) / cols));
+
+    // How many columns fit such that each card is >= PANEL_CARD_MIN_W?
+    // n cols needs w >= n*MIN + (n-1)*gap  →  n <= (w+gap)/(MIN+gap)
+    var cols = Math.max(1, Math.floor((w + gap) / (PANEL_CARD_MIN_W + gap)));
+
+    // Card width for that column count
+    var cardW = Math.floor((w - gap * (cols - 1)) / cols);
+
+    // Cap card width at MAX — if we're above max, it means there is leftover space, leave it empty
+    cardW = Math.min(PANEL_CARD_MAX_W, cardW);
+
     // No change — skip to avoid triggering ResizeObserver loop
     if (cols === _lastCols && cardW === _lastCardW) return;
     _lastCols = cols; _lastCardW = cardW;
+
     var totalW = cols * cardW + (cols - 1) * gap + pad;
     ppBody.style.display = 'grid';
     ppBody.style.width = totalW + 'px';
