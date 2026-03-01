@@ -20,7 +20,7 @@ const PANEL_CARD_MAX_W      = 240;
 const PANEL_GOTO_DELAY      = 400;
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
-console.log('[panel.js_v_M]');
+console.log('[panel.js_v_N]');
 document.addEventListener('DOMContentLoaded', () => {
   const wait = setInterval(() => {
     const box = document.getElementById('sidebar-box');
@@ -709,14 +709,12 @@ function initPanel(sidebarBox) {
         var cardStyle = getComputedStyle(cardEl);
         contentH += parseFloat(cardStyle.borderTopWidth || 0) +
                     parseFloat(cardStyle.borderBottomWidth || 0);
-        // Add measured button height + its margins when the card has a goto button
+        // Add space for the absolutely-positioned goto button when present.
+        // offsetHeight is reliable even for absolute elements; fallback to 44px
+        // if the element somehow hasn't rendered (first paint edge case).
         if (btn) {
-          var btnStyle  = getComputedStyle(btn);
-          var btnHeight = btn.scrollHeight
-                        + parseFloat(btnStyle.marginTop    || 0)
-                        + parseFloat(btnStyle.marginBottom || 0);
-          // bottom:8px offset is the gap between button bottom and card bottom
-          contentH += btnHeight + 8 /* bottom offset */ + 8 /* top breathing room */;
+          var btnH = btn.offsetHeight || 44;
+          contentH += btnH + 8 /* bottom:8px offset */ + 8 /* gap above button */;
         }
 
         var fullH = contentH;
