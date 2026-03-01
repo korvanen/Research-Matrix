@@ -20,7 +20,7 @@ const PANEL_CARD_MAX_W      = 240;
 const PANEL_GOTO_DELAY      = 400;
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
-console.log('[panel.js_v_I]');
+console.log('[panel.js_v_J]');
 document.addEventListener('DOMContentLoaded', () => {
   const wait = setInterval(() => {
     const box = document.getElementById('sidebar-box');
@@ -736,28 +736,28 @@ function initPanel(sidebarBox) {
         ox = clientX; oy = clientY;
         sl = parseFloat(el.style.left) || 0;
         st = parseFloat(el.style.top)  || 0;
-        // Collapse card (with cleanup) if it's expanded when drag starts
-        if (el.classList.contains('pp-mm-expanded') || el._mmExpandState === 'expanded') {
-          var btn = el.querySelector('.pp-goto-btn');
-          // Force-remove goto-visible class and reset btn immediately
-          if (btn) {
-            btn.classList.remove('pp-goto-visible');
-            btn.style.transition    = 'none';
-            btn.style.marginBottom  = '';
-            btn.style.opacity       = '0';
-            btn.style.transform     = 'translateY(4px)';
-            btn.style.pointerEvents = 'none';
-          }
-          clearTimeout(el._expandTimer);
-          el._mmExpandState = 'collapsed';
-          el.classList.remove('pp-mm-expanded');
-          el.classList.remove('pp-mm-touch-expanded');
-          el.style.height     = '';
-          el.style.transition = '';
-          collapsedHeights.delete(key);
-          if (_mmTouchExpanded === el) _mmTouchExpanded = null;
+        // Always snap card to its natural collapsed size before dragging.
+        // This covers: card expanded, card mid-collapse (inline height frozen at
+        // an intermediate value by transition:none), or already collapsed.
+        // Clearing the inline height lets the card reflow to CSS auto size instantly.
+        var btn = el.querySelector('.pp-goto-btn');
+        if (btn) {
+          btn.classList.remove('pp-goto-visible');
+          btn.style.transition    = 'none';
+          btn.style.marginBottom  = '';
+          btn.style.opacity       = '0';
+          btn.style.transform     = 'translateY(4px)';
+          btn.style.pointerEvents = 'none';
         }
-        el.style.zIndex = (_topZ + 2) + ''; el.style.transition = 'none';
+        clearTimeout(el._expandTimer);
+        el._mmExpandState = 'collapsed';
+        el.classList.remove('pp-mm-expanded');
+        el.classList.remove('pp-mm-touch-expanded');
+        el.style.transition = 'none';
+        el.style.height     = '';   // release any inline height → reflow to natural size
+        collapsedHeights.delete(key); // force re-measure on next expand
+        if (_mmTouchExpanded === el) _mmTouchExpanded = null;
+        el.style.zIndex = (_topZ + 2) + '';
       }
       function dragMove(clientX, clientY) {
         if (!isDragging) return;
@@ -847,15 +847,30 @@ function initPanel(sidebarBox) {
       //       for match — single best field as before
       var bodyHtml = '';
       if (isSeed) {
-        bodyHtml = seedCells.map(function(c, idx) {
-          var sepHtml = idx > 0 ? '<div class="pp-mm-seed-sep"></div>' : '';
-          var catHtml = (c.cats && c.cats.length)
-            ? '<div class="pp-mm-cat">' + c.cats.map(panelEscH).join(' · ') + '</div>'
-            : '';
-          return sepHtml + catHtml +
-            '<div class="pp-mm-field"><span class="pp-flabel">' + panelEscH(c.header) + '</span>' +
-            panelHighlight(c.text, kwsHL) + '</div>';
-        }).join('');
+        // First cell: always visible (same footprint as a match card)
+        var firstCell = seedCells[0];
+        var firstCatHtml = (firstCell && firstCell.cats && firstCell.cats.length)
+          ? '<div class="pp-mm-cat">' + firstCell.cats.map(panelEscH).join(' · ') + '</div>'
+          : '';
+        var firstFieldHtml = firstCell
+          ? '<div class="pp-mm-field"><span class="pp-flabel">' + panelEscH(firstCell.header) + '</span>' +
+            panelHighlight(firstCell.text, kwsHL) + '</div>'
+          : '';
+        // Extra cells: hidden when collapsed, revealed on expand
+        var extraHtml = '';
+        if (seedCells.length > 1) {
+          extraHtml = '<div class="pp-mm-seed-extra">' +
+            seedCells.slice(1).map(function(c) {
+              var catHtml = (c.cats && c.cats.length)
+                ? '<div class="pp-mm-cat">' + c.cats.map(panelEscH).join(' · ') + '</div>'
+                : '';
+              return '<div class="pp-mm-seed-sep"></div>' + catHtml +
+                '<div class="pp-mm-field"><span class="pp-flabel">' + panelEscH(c.header) + '</span>' +
+                panelHighlight(c.text, kwsHL) + '</div>';
+            }).join('') +
+          '</div>';
+        }
+        bodyHtml = firstCatHtml + firstFieldHtml + extraHtml;
       } else {
         var catLine = cats && cats.length ? cats.map(panelEscH).join(' · ') : '';
         bodyHtml =
@@ -1303,6 +1318,14 @@ mark.pkw {
   font-size: 9px; font-weight: 700; letter-spacing: .08em;
   text-transform: uppercase; color: rgba(0,0,0,.35); margin-bottom: 2px;
 }
+/* Seed card extra cells — hidden when collapsed, revealed on expand */
+.pp-mm-seed-extra {
+  display: none;
+}
+.pp-mm-card.pp-mm-expanded .pp-mm-seed-extra {
+  display: block;
+}
+
 /* Seed card cell separator in mindmap */
 .pp-mm-seed-sep {
   border-top: 1px solid rgba(255,255,255,.25);
