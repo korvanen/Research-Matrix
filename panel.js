@@ -691,14 +691,16 @@ function initPanel(sidebarBox) {
           btn.classList.remove('pp-goto-visible');
         }
 
-        // Add expanded class (unclamps field text), then release height to auto
-        // and read offsetHeight — this is the only reliable way to get the true
-        // post-reflow height without scrollHeight's edge-cases with pinned heights
+        // Add expanded class (unclamps field text), then measure the true full height.
+        // overflow:hidden on the card makes offsetHeight return the clipped height,
+        // so we temporarily lift it before reading — then restore immediately after.
         cardEl.classList.add('pp-mm-expanded');
         cardEl.style.transition = 'none';
-        cardEl.style.height     = '';          // release to auto briefly
-        void cardEl.offsetHeight;             // force reflow
-        var contentH = cardEl.offsetHeight;   // true auto height (unclamped text, no btn)
+        cardEl.style.height     = '';             // release to auto
+        cardEl.style.overflow   = 'visible';      // lift clip so full content is measurable
+        void cardEl.offsetHeight;                // force reflow
+        var contentH = cardEl.offsetHeight;      // true full-content height
+        cardEl.style.overflow   = '';             // restore overflow:hidden via CSS
 
         // Reserve space below content for the goto button.
         // Seed cards have no button so need no extra room.
