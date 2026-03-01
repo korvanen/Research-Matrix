@@ -1,7 +1,7 @@
 // ════════════════════════════════════════════════════════════════
 // ── GLOBAL CONFIG ──
 // ════════════════════════════════════════════════════════════════
-console.log('script.js - v1'); // version 
+console.log('script.js - v2'); // version 
 
 const APP_TITLE       = 'Dimensional Framework';
 
@@ -20,10 +20,10 @@ const PORTRAIT = {
   sidebarFullscreenThreshold:1.00,
   sidebarSnapClose:          0.05,
   sidebarTwoPosition:        true,
-  arrowSize:                 36,    // px — larger touch targets in portrait
+  arrowSize:                 50,    // px — larger touch targets in portrait
   arrowGap:                  12,
   arrowOffset:               16,
-  tabBarPadding:             24,    // px — spacing around compact tab label
+  tabBarPadding:             2,    // px — spacing around compact tab label
 };
 
 const LANDSCAPE = {
