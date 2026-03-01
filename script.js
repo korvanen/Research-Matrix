@@ -23,7 +23,7 @@ const PORTRAIT = {
   sidebarBoxMargin:          0.02,
   sidebarOverlapThreshold:   0.00,
   sidebarFullscreenThreshold:1.00,
-  sidebarSnapClose:          0.95,
+  sidebarSnapClose:          0.05,
   sidebarTwoPosition:        true,
 };
 
@@ -726,7 +726,12 @@ function animateSidebarTo(targetW, { restoreMm = false } = {}) {
       updateHandleArrows(targetW);
       positionDragHandle();
       // Restore mindmap positions once the open animation is complete
-      if (restoreMm) restoreMmSnapshot();
+      // Defer two rAFs so the browser fully reflows ppMmWrap to its new
+      // dimensions before we clamp and place cards. One rAF is not enough
+      // on portrait/mobile where the sidebar goes 0 → full-width.
+      if (restoreMm) requestAnimationFrame(function() {
+        requestAnimationFrame(restoreMmSnapshot);
+      });
     }
   }
   animateSidebarTo._rafId = requestAnimationFrame(rafLoop);
