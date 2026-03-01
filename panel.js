@@ -20,7 +20,7 @@ const PANEL_CARD_MAX_W      = 240;
 const PANEL_GOTO_DELAY      = 400;
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
-console.log('[panel.js_v_K]');
+console.log('[panel.js_v_I]');
 document.addEventListener('DOMContentLoaded', () => {
   const wait = setInterval(() => {
     const box = document.getElementById('sidebar-box');
@@ -127,6 +127,7 @@ function initPanel(sidebarBox) {
   var lastMatches  = [];
   var _mmActive    = null;
   var _mmMatchKey  = '';
+  var _mmModeSnapshot = null;  // saved card positions when switching away from mindmap
   var _hasContent  = false;
 
   // ── Keyword highlight toggle ───────────────────────────────────────────────
@@ -156,11 +157,24 @@ function initPanel(sidebarBox) {
         var currentKey = lastMatches.map(function(m){ return m.tabIdx+':'+m.rowIdx; }).join('|');
         if (!_mmActive || _mmMatchKey !== currentKey) {
           renderMindmap(lastMatches);
+          // Restore saved positions if they match the current set of cards
+          if (_mmModeSnapshot && _mmModeSnapshot.matchKey === currentKey) {
+            requestAnimationFrame(function() {
+              requestAnimationFrame(function() {
+                document.dispatchEvent(new CustomEvent('mm-snapshot-restore',
+                  { detail: _mmModeSnapshot, bubbles: false }));
+              });
+            });
+          }
         }
       } else {
+        // Save card positions before leaving mindmap so we can restore on return
+        if (_mmActive) {
+          var positions = new Map();
+          _mmActive.rects.forEach(function(r, key) { positions.set(key, { x: r.x, y: r.y }); });
+          _mmModeSnapshot = { matchKey: _mmMatchKey, positions: positions };
+        }
         ppMmWrap.style.display = 'none';
-        // Always re-render tiles so it reflects the current selection,
-        // even if the selection changed while the user was in mindmap mode.
         if (_hasContent && lastMatches !== undefined) {
           var _td  = typeof TABS !== 'undefined' ? TABS[seedTabIdx] : null;
           var _tdd = _td && typeof processSheetData === 'function' ? processSheetData(_td.grid) : null;
@@ -258,6 +272,7 @@ function initPanel(sidebarBox) {
 
     lastMatches = findMatches(seedKws, curTabIdx, seedRowIdx);
     _hasContent = true;
+    _mmModeSnapshot = null;  // new selection → old positions are stale
 
     if (viewMode === 'mindmap') {
       var newKey = lastMatches.map(function(m){ return m.tabIdx+':'+m.rowIdx; }).join('|');
@@ -646,10 +661,11 @@ function initPanel(sidebarBox) {
       btn.classList.remove('pp-goto-visible');
     }
 
-    // Delay (ms) after card starts expanding before button fades in.
-    // Button appears once the border has mostly reached full height.
+    // How long after the expand animation starts before the button fades in
     var BTN_APPEAR_DELAY = Math.round(MM_EXPAND_MS * 0.60);
     var BTN_APPEAR_DUR   = Math.round(MM_EXPAND_MS * 0.55);
+    // Extra px reserved below content for the absolutely-positioned goto button
+    var MM_BTN_SPACE = 40;
 
     function mmSetExpanded(cardEl, expanded, key) {
       var btn = cardEl.querySelector('.pp-goto-btn');
@@ -658,17 +674,15 @@ function initPanel(sidebarBox) {
 
       if (expanded) {
         cardEl._mmExpandState = 'expanded';
-        // Float above all resting cards while expanded
         cardEl.style.zIndex = (_topZ + 1) + '';
 
-        // Snapshot collapsed height on first expand (btn is absolute, so auto-height
-        // is purely header + body — stable and doesn't include any btn geometry)
+        // Snapshot collapsed height (btn is abs-positioned → never affects auto-height)
         if (!collapsedHeights.has(key)) {
           collapsedHeights.set(key, cardEl.offsetHeight);
         }
         var collH = collapsedHeights.get(key);
 
-        // Ensure btn is hidden and reset before measuring fullH
+        // Reset btn to hidden start state
         if (btn) {
           btn.style.transition    = 'none';
           btn.style.opacity       = '0';
@@ -677,41 +691,45 @@ function initPanel(sidebarBox) {
           btn.classList.remove('pp-goto-visible');
         }
 
-        // Pin at collapsed height, add expanded class (applies padding-bottom
-        // via CSS to reserve space for the abs-positioned button), measure fullH
-        cardEl.style.transition = 'none';
-        cardEl.style.height     = collH + 'px';
+        // Add expanded class (unclamps field text), then release height to auto
+        // and read offsetHeight — this is the only reliable way to get the true
+        // post-reflow height without scrollHeight's edge-cases with pinned heights
         cardEl.classList.add('pp-mm-expanded');
-        void cardEl.offsetHeight;
-        var fullH = cardEl.scrollHeight;
+        cardEl.style.transition = 'none';
+        cardEl.style.height     = '';          // release to auto briefly
+        void cardEl.offsetHeight;             // force reflow
+        var contentH = cardEl.offsetHeight;   // true auto height (unclamped text, no btn)
 
-        // ① Animate card border to full height
+        // Reserve space below content for the goto button.
+        // Seed cards have no button so need no extra room.
+        var btnSpace = btn ? MM_BTN_SPACE : 0;
+        var fullH    = contentH + btnSpace;
+
+        // Pin back to collH, then animate to fullH in one smooth motion.
+        // The inline height is kept at fullH for the entire expanded lifetime —
+        // releasing it would snap the card back to auto=contentH, collapsing the btn space.
+        cardEl.style.height = collH + 'px';
+        void cardEl.offsetHeight;
         cardEl.style.transition = 'height ' + MM_EXPAND_MS + 'ms cubic-bezier(0.22,1,0.36,1)';
         cardEl.style.height     = fullH + 'px';
 
-        // ② Button fades in shortly after — into the space already created
-        cardEl._btnTimer = setTimeout(function() {
-          if (cardEl._mmExpandState !== 'expanded') return;
-          if (btn) {
+        // ② Button fades in after the border has mostly reached full height
+        if (btn) {
+          cardEl._btnTimer = setTimeout(function() {
+            if (cardEl._mmExpandState !== 'expanded') return;
             btn.style.transition    = 'opacity ' + BTN_APPEAR_DUR + 'ms ease, ' +
                                       'transform ' + BTN_APPEAR_DUR + 'ms ease';
             btn.style.opacity       = '1';
             btn.style.transform     = 'translateY(0)';
             btn.style.pointerEvents = 'auto';
-          }
-        }, BTN_APPEAR_DELAY);
-
-        // Release inline height after animation completes
-        cardEl._expandTimer = setTimeout(function() {
-          if (cardEl._mmExpandState !== 'expanded') return;
-          cardEl.style.transition = '';
-          cardEl.style.height     = '';
-        }, MM_EXPAND_MS + 20);
+          }, BTN_APPEAR_DELAY);
+        }
+        // No _expandTimer to release height — inline height stays at fullH while expanded
 
       } else {
         cardEl._mmExpandState = 'collapsed';
 
-        // Hide button immediately — no animation on collapse
+        // Hide button instantly — no animation on collapse
         if (btn) {
           btn.style.transition    = 'none';
           btn.style.opacity       = '0';
@@ -720,28 +738,27 @@ function initPanel(sidebarBox) {
           btn.classList.remove('pp-goto-visible');
         }
 
-        // Measure current rendered height BEFORE touching any classes
+        // Measure current rendered height BEFORE changing any classes
         void cardEl.offsetHeight;
         var curH  = cardEl.getBoundingClientRect().height;
         var collH = collapsedHeights.get(key) || curH;
 
-        // Pin at current height, THEN remove expanded class (padding-bottom → 0).
-        // Pinning first prevents a flash jump to auto-height during class removal.
+        // Pin at current height FIRST, then remove expanded class.
+        // Pinning prevents a flash jump when the class changes auto-height.
         cardEl.style.transition = 'none';
         cardEl.style.height     = curH + 'px';
         void cardEl.offsetHeight;
         cardEl.classList.remove('pp-mm-expanded');
         cardEl.classList.remove('pp-mm-touch-expanded');
 
-        // Animate card border back to collapsed height
+        // Animate back to collapsed height
         cardEl.style.transition = 'height ' + MM_EXPAND_MS + 'ms cubic-bezier(0.22,1,0.36,1)';
         cardEl.style.height     = collH + 'px';
 
         cardEl._expandTimer = setTimeout(function() {
           if (cardEl._mmExpandState !== 'collapsed') return;
           cardEl.style.transition = '';
-          cardEl.style.height     = '';
-          // Restore to this card's resting z (1 for untouched, elevated if ever dragged)
+          cardEl.style.height     = '';   // release → auto = collH ✓
           cardEl.style.zIndex = (cardBaseZ.get(key) || 1) + '';
           _btnReset(btn);
         }, MM_EXPAND_MS + 20);
@@ -1298,7 +1315,7 @@ mark.pkw {
 }
 
 /* ── Mindmap goto button: absolute-positioned so it never affects card auto-height ── */
-/* In the mindmap, the button lives in the padding-bottom space reserved by .pp-mm-expanded */
+/* Button space (MM_BTN_SPACE px) is added to fullH in JS — only for cards that have a button */
 .pp-mm-card .pp-goto-btn {
   position: absolute;
   bottom: 8px;
@@ -1307,10 +1324,6 @@ mark.pkw {
   width: auto;
   /* Override the tile-mode negative margin — absolute elements don't affect flow height */
   margin-bottom: 0 !important;
-}
-/* Expanded card reserves space for the absolutely positioned button */
-.pp-mm-card.pp-mm-expanded {
-  padding-bottom: 44px;
 }
 
 /* Mindmap cards */
