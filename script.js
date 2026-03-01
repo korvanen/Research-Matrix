@@ -23,7 +23,7 @@ const PORTRAIT = {
   sidebarBoxMargin:          0.02,
   sidebarOverlapThreshold:   0.00,
   sidebarFullscreenThreshold:1.00,
-  sidebarSnapClose:          0.05,
+  sidebarSnapClose:          0.95,
   sidebarTwoPosition:        true,
 };
 
