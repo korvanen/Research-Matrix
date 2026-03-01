@@ -1,7 +1,7 @@
 // ════════════════════════════════════════════════════════════════
 // ── GLOBAL CONFIG ──
 // ════════════════════════════════════════════════════════════════
-console.log('script.js [v8]');
+console.log('script.js [v9]');
 
 const APP_TITLE       = 'Dimensional Framework';
 
@@ -22,8 +22,8 @@ const PORTRAIT = {
   sidebarTwoPosition:        true,
   arrowSize:                 36,    // px — larger touch targets in portrait
   arrowOffset:               16,
-  tabBarPadding:             0.1,    // — gap between arrow buttons and tab label
-  tabBarInset:               0.1,    // — gap between arrow buttons and screen/sidebar edges
+  tabBarPadding:             0.03,    // — gap between arrow buttons and tab label
+  tabBarInset:               0.03,    // — gap between arrow buttons and screen/sidebar edges
 };
 
 const LANDSCAPE = {
@@ -41,7 +41,7 @@ const LANDSCAPE = {
   sidebarTwoPosition:        false,
   arrowSize:                 28,    // px
   arrowOffset:               12,
-  tabBarPadding:             0.1,    //  — gap between arrow buttons and tab label
+  tabBarPadding:             0.9,    //  — gap between arrow buttons and tab label
   tabBarInset:               0.1,    //  — gap between arrow buttons and screen/sidebar edges
 };
 
