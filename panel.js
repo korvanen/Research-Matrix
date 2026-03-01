@@ -20,7 +20,7 @@ const PANEL_CARD_MAX_W      = 240;
 const PANEL_GOTO_DELAY      = 900;
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
-console.log('[panel.js_v_11]');
+console.log('[panel.js_v_10]');
 document.addEventListener('DOMContentLoaded', () => {
   const wait = setInterval(() => {
     const box = document.getElementById('sidebar-box');
@@ -126,15 +126,16 @@ function initPanel(sidebarBox) {
   }
 
   // ── State ─────────────────────────────────────────────────────────────────
-  var hlOn        = true;
-  var viewMode    = 'tiles';
-  var seedKws     = new Set();
-  var seedTabIdx  = -1;
-  var seedRowIdx  = -1;
-  var seedCells   = [];
-  var lastMatches = [];
-  var _mmActive   = null;
-  var _hasContent = false;
+  var hlOn         = true;
+  var viewMode     = 'tiles';
+  var seedKws      = new Set();
+  var seedTabIdx   = -1;
+  var seedRowIdx   = -1;
+  var seedCells    = [];
+  var lastMatches  = [];
+  var _mmActive    = null;
+  var _mmMatchKey  = '';   // fingerprint of matches when mindmap was last built
+  var _hasContent  = false;
 
   // ── Keyword highlight toggle ───────────────────────────────────────────────
   function applyHlState() {
@@ -160,7 +161,12 @@ function initPanel(sidebarBox) {
       if (v === 'mindmap') {
         ppBody.style.display   = 'none';
         ppMmWrap.style.display = 'block';
-        renderMindmap(lastMatches);
+        // Only rebuild if the match set has changed since the mindmap was last drawn
+        var currentKey = lastMatches.map(function(m){ return m.tabIdx+':'+m.rowIdx; }).join('|');
+        if (!_mmActive || _mmMatchKey !== currentKey) {
+          renderMindmap(lastMatches);
+        }
+        // else: positions are preserved, just show the existing canvas
       } else {
         ppBody.style.display   = 'grid';
         ppMmWrap.style.display = 'none';
@@ -254,7 +260,10 @@ function initPanel(sidebarBox) {
     _hasContent = true;
 
     if (viewMode === 'mindmap') {
-      renderMindmap(lastMatches);
+      var newKey = lastMatches.map(function(m){ return m.tabIdx+':'+m.rowIdx; }).join('|');
+      if (!_mmActive || _mmMatchKey !== newKey) {
+        renderMindmap(lastMatches);
+      }
     } else {
       renderTiles(lastMatches, seedKws, curTabIdx, data);
     }
@@ -657,7 +666,8 @@ function initPanel(sidebarBox) {
       });
 
       redrawArrows();
-      _mmActive = { rects, cardEls, arrowDefs, redrawArrows };
+      _mmActive   = { rects, cardEls, arrowDefs, redrawArrows };
+      _mmMatchKey = lastMatches.map(function(m){ return m.tabIdx+':'+m.rowIdx; }).join('|');
       _mmLastW = mmW(); _mmLastH = mmH();
       requestAnimationFrame(function() { applyHlState(); });
     });
@@ -849,17 +859,25 @@ function initPanel(sidebarBox) {
 
 /* "Go to" hover button */
 .pp-goto-btn {
-  display: block; width: calc(100% - 16px); margin: 0 8px 8px;
+  display: block; width: calc(100% - 16px);
+  /* collapsed: zero margin so card doesn't grow; negative margin eats the button height */
+  margin: 0 8px 0;
+  margin-bottom: calc(-1 * (1em + 22px)); /* pull up by own height so card doesn't jump */
   padding: 5px 8px; border-radius: 6px; border: 1.5px solid;
   background: white; font-size: 10px; font-weight: 600; letter-spacing: .06em;
   text-transform: uppercase; cursor: pointer; text-align: center;
-  opacity: 0; transform: translateY(6px);
-  transition: opacity .25s ease, transform .25s ease, max-height .25s ease;
+  opacity: 0;
+  transform: translateY(4px);
+  /* Only animate compositor-friendly properties — no max-height, no height */
+  transition: opacity .22s ease, transform .22s ease, margin-bottom .22s ease;
   box-shadow: 0 1px 6px rgba(0,0,0,.08);
-  max-height: 0; overflow: hidden;
+  pointer-events: none;
 }
 .pp-goto-btn.pp-goto-visible {
-  opacity: 1; transform: translateY(0); max-height: 40px;
+  opacity: 1;
+  transform: translateY(0);
+  margin-bottom: 8px;
+  pointer-events: auto;
 }
 .pp-goto-btn:hover { filter: brightness(0.92); }
 
