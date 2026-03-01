@@ -24,7 +24,7 @@ const PANEL_CARD_MAX_W      = 240; // px — card max width (cards stretch up to
 const PANEL_GOTO_DELAY      = 900; // ms hover before "Go to" button appears
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
-console.log('[panel.js_v_4]');
+console.log('[panel.js_v_5]');
 document.addEventListener('DOMContentLoaded', () => {
   const wait = setInterval(() => {
     const box = document.getElementById('sidebar-box');
@@ -87,8 +87,8 @@ function initPanel(sidebarBox) {
     cardW = Math.min(PANEL_CARD_MAX_W, cardW);
     // Key fix: if all cols already fit at max width, lock cols to the minimum needed
     // i.e. don't add another column just because there's more space
-    var minColsAtMax = Math.ceil((w + gap) / (PANEL_CARD_MAX_W + gap));
-    if (cols > minColsAtMax) cols = minColsAtMax;
+    var maxCols = Math.floor((w + gap) / (PANEL_CARD_MAX_W + gap));
+    if (cols > maxCols && maxCols >= 1) cols = maxCols;
     cardW = Math.min(PANEL_CARD_MAX_W, Math.floor((w - gap * (cols - 1)) / cols));
     // No change — skip to avoid triggering ResizeObserver loop
     if (cols === _lastCols && cardW === _lastCardW) return;
@@ -148,7 +148,7 @@ function initPanel(sidebarBox) {
         ppMmWrap.style.display = 'block';
         renderMindmap(lastMatches);
       } else {
-        ppBody.style.display   = 'block';
+        ppBody.style.display   = 'grid';
         ppMmWrap.style.display = 'none';
       }
     }
@@ -160,7 +160,7 @@ function initPanel(sidebarBox) {
     msg = msg || 'Click a cell to find matches';
     ppSubtitle.textContent  = msg;
     ppBody.innerHTML        = '<div class="pp-empty">' + panelEscH(msg) + '</div>';
-    ppBody.style.display    = 'block';
+    ppBody.style.display    = 'grid';
     ppMmWrap.style.display  = 'none';
     ppMmWrap.innerHTML      = '';
     ppToolrow.style.display = 'none';
@@ -285,7 +285,7 @@ function initPanel(sidebarBox) {
   // Tab-group dividers also span all columns.
   function renderTiles(matches, kws, srcTabIdx, srcData) {
     ppBody.innerHTML       = '';
-    ppBody.style.display   = 'block';
+    ppBody.style.display   = 'grid';
     ppMmWrap.style.display = 'none';
     ppMmWrap.innerHTML     = '';
     _mmActive = null;
