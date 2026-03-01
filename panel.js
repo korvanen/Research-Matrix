@@ -20,7 +20,7 @@ const PANEL_CARD_MAX_W      = 240;
 const PANEL_GOTO_DELAY      = 900;
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
-console.log('[panel.js_v_1]');
+console.log('[panel.js_v_10]');
 document.addEventListener('DOMContentLoaded', () => {
   const wait = setInterval(() => {
     const box = document.getElementById('sidebar-box');
@@ -749,20 +749,25 @@ function initPanel(sidebarBox) {
   document.addEventListener('mm-snapshot-restore', function(e) {
     var snap = e.detail;
     if (!snap || !_mmActive) return;
-    // Only apply if the snapshot matches the currently displayed mindmap
     if (snap.matchKey !== _mmMatchKey) return;
-    snap.positions.forEach(function(pos, key) {
-      var r  = _mmActive.rects.get(key);
-      var el = _mmActive.cardEls.get(key);
-      if (!r || !el) return;
-      // Clamp to current canvas size in case it changed
-      var nx = Math.max(0, Math.min(mmW() - r.w, pos.x));
-      var ny = Math.max(0, Math.min(mmH() - r.h, pos.y));
-      r.x = nx; r.y = ny;
-      el.style.left = nx + 'px';
-      el.style.top  = ny + 'px';
+    // Always apply inside a rAF so mmW/mmH are measured after the browser has
+    // committed the new sidebar dimensions — critical on portrait where the
+    // sidebar transitions from 0px to full-width and ppMmWrap needs one frame
+    // to reflow before clientWidth/clientHeight return correct values.
+    requestAnimationFrame(function() {
+      if (!_mmActive || snap.matchKey !== _mmMatchKey) return;
+      snap.positions.forEach(function(pos, key) {
+        var r  = _mmActive.rects.get(key);
+        var el = _mmActive.cardEls.get(key);
+        if (!r || !el) return;
+        var nx = Math.max(0, Math.min(mmW() - r.w, pos.x));
+        var ny = Math.max(0, Math.min(mmH() - r.h, pos.y));
+        r.x = nx; r.y = ny;
+        el.style.left = nx + 'px';
+        el.style.top  = ny + 'px';
+      });
+      _mmActive.redrawArrows();
     });
-    _mmActive.redrawArrows();
   });
 
   function drawMmArrow(svg, x1, y1, x2, y2, color) {
