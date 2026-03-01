@@ -34,9 +34,9 @@
   --scrollbar-thumb-hover: #9898aa;
   --sidebar-intrusion: 0px;
   --handle-arrow-size: 22px;
-  --handle-arrow-gap:  9px;
   --handle-arrow-offset: 0px;
   --tab-bar-padding: 16px;
+  --tab-bar-inset:   12px;
 }
 
 body {
@@ -255,7 +255,6 @@ th, td {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--handle-arrow-gap, 6px);
   pointer-events: none;
   z-index: 21;
   transition: left .15s ease, right .15s ease;
@@ -380,8 +379,8 @@ th, td {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: var(--tab-bar-padding, 16px);
-  padding: 0 var(--tab-bar-padding, 16px);
+  gap: var(--tab-bar-padding, 16px);       /* space between arrows and label */
+  padding: 0 var(--tab-bar-inset, 12px);   /* inset from screen edge and sidebar edge */
   box-sizing: border-box;
   overflow: visible;
   /* width is set explicitly by JS to the available space — no max-width needed */
