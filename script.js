@@ -1,7 +1,7 @@
 // ════════════════════════════════════════════════════════════════
 // ── GLOBAL CONFIG ──
 // ════════════════════════════════════════════════════════════════
-console.log('script.js - v4'); // version 
+console.log('script.js - v5'); // version 
 
 const APP_TITLE       = 'Dimensional Framework';
 
@@ -20,10 +20,10 @@ const PORTRAIT = {
   sidebarFullscreenThreshold:1.00,
   sidebarSnapClose:          0.05,
   sidebarTwoPosition:        true,
-  arrowSize:                 50,    // px — larger touch targets in portrait
-  arrowGap:                  2,
-  arrowOffset:               16,
-  tabBarPadding:             2,    // px — spacing around compact tab label
+  arrowSize:                 40,    // px — larger touch targets in portrait
+  arrowGap:                  2,      // controlls the gap between the bottom tabs and the arrows
+  arrowOffset:               16,    // px — spacing around compact tab label
+  tabBarPadding:             0.1,    // persentage — spacing around compact tab label
 };
 
 const LANDSCAPE = {
@@ -40,9 +40,9 @@ const LANDSCAPE = {
   sidebarFullscreenThreshold:0.80,
   sidebarTwoPosition:        false,
   arrowSize:                 28,    // px
-  arrowGap:                  4,
+  arrowGap:                  4,     // controlls the gap between the bottom tabs and the arrows
   arrowOffset:               12,
-  tabBarPadding:             60,    // px
+  tabBarPadding:             0.1,    // px
 };
 
 const R = () => isPortrait() ? PORTRAIT : LANDSCAPE;
@@ -63,7 +63,7 @@ const SIDEBAR_TWO_POSITION            = () => !!R().sidebarTwoPosition;
 const ARROW_SIZE                      = () => R().arrowSize;
 const ARROW_GAP                       = () => R().arrowGap;
 const ARROW_OFFSET                    = () => R().arrowOffset;
-const TAB_BAR_PADDING                 = () => R().tabBarPadding;
+const TAB_BAR_PADDING                 = () => Math.round(window.innerHeight * R().tabBarPadding);
 
 // ── THEMES ──
 const THEMES = {
