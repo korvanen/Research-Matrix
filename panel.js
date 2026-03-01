@@ -691,11 +691,12 @@ function initPanel(sidebarBox) {
 
 #pp-body-wrap { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; position: relative; }
 
-/* Grid columns are set entirely by updateGrid() in JS — do not set grid-template-columns here.
-   Cards use width:100% so they fill whatever column width JS has calculated. */
+/* Grid columns set by updateGrid() in JS. width:fit-content makes the container
+   shrink to its columns rather than stretching to fill pp-body-wrap. */
 #pp-body {
   padding: 10px 12px 18px; box-sizing: border-box;
   display: grid;
+  width: fit-content;
   align-content: start;
   gap: 10px;
 }
@@ -727,15 +728,17 @@ function initPanel(sidebarBox) {
   color: rgba(0,0,0,.25); line-height: 1.5;
 }
 
-/* Seed card — constrained by grid column width set by updateGrid() */
+/* Seed card — fills its grid column */
 .pp-seed-card {
+  width: 100%;
   border: 2px solid var(--ppc-border, #aaa);
   border-radius: 8px; background: var(--ppc-bg, #f8f8f8);
   overflow: hidden; box-sizing: border-box;
 }
 
-/* Match card — constrained by grid column width set by updateGrid() */
+/* Match card — fills its grid column */
 .pp-match-card {
+  width: 100%;
   border: 1.5px solid var(--ppc-border, #aaa);
   border-radius: 8px; background: var(--ppc-bg, #f8f8f8);
   overflow: visible; box-sizing: border-box;
