@@ -20,7 +20,7 @@ const PANEL_CARD_MAX_W      = 240;
 const PANEL_GOTO_DELAY      = 400;
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
-console.log('[panel.js_v_1]'); // iterate this number bu ++1 each version of the code
+console.log('[panel.js_v_I]');
 document.addEventListener('DOMContentLoaded', () => {
   const wait = setInterval(() => {
     const box = document.getElementById('sidebar-box');
@@ -691,16 +691,25 @@ function initPanel(sidebarBox) {
           btn.classList.remove('pp-goto-visible');
         }
 
-        // Add expanded class (unclamps field text), then measure the true full height.
-        // overflow:hidden on the card makes offsetHeight return the clipped height,
-        // so we temporarily lift it before reading — then restore immediately after.
+        // Add expanded class (unclamps field text).
+        // We can't trust cardEl.offsetHeight because overflow:hidden on the card
+        // AND on each .pp-mm-field clips the reported height.
+        // Instead, sum the scrollHeight of each direct child — these are the head
+        // and body divs which contain everything, and scrollHeight is not clipped.
         cardEl.classList.add('pp-mm-expanded');
         cardEl.style.transition = 'none';
-        cardEl.style.height     = '';             // release to auto
-        cardEl.style.overflow   = 'visible';      // lift clip so full content is measurable
-        void cardEl.offsetHeight;                // force reflow
-        var contentH = cardEl.offsetHeight;      // true full-content height
-        cardEl.style.overflow   = '';             // restore overflow:hidden via CSS
+        cardEl.style.height     = '';
+        void cardEl.offsetHeight;   // flush so scrollHeights reflect unclamped text
+        var contentH = 0;
+        Array.from(cardEl.children).forEach(function(child) {
+          // Skip the absolutely-positioned goto button — it contributes 0 to flow height
+          if (child.classList.contains('pp-goto-btn')) return;
+          contentH += child.scrollHeight;
+        });
+        // Add card-level border (top + bottom)
+        var cardStyle = getComputedStyle(cardEl);
+        contentH += parseFloat(cardStyle.borderTopWidth || 0) +
+                    parseFloat(cardStyle.borderBottomWidth || 0);
 
         // Reserve space below content for the goto button.
         // Seed cards have no button so need no extra room.
