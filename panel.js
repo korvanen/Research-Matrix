@@ -20,7 +20,7 @@ const PANEL_CARD_MAX_W      = 240;
 const PANEL_GOTO_DELAY      = 400;
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
-console.log('[panel.js_v_N]');
+console.log('[panel.js_v_O]');
 document.addEventListener('DOMContentLoaded', () => {
   const wait = setInterval(() => {
     const box = document.getElementById('sidebar-box');
@@ -650,13 +650,10 @@ function initPanel(sidebarBox) {
     var MM_EXPAND_MS    = 260;
     var MM_HOVER_DELAY  = 200;
 
-    // Button is position:absolute inside the card (see CSS), so it never
-    // affects the card's auto-height. Reset just clears inline overrides.
     function _btnReset(btn) {
       if (!btn) return;
       btn.style.transition    = '';
       btn.style.opacity       = '';
-      btn.style.transform     = '';
       btn.style.pointerEvents = '';
       btn.classList.remove('pp-goto-visible');
     }
@@ -664,8 +661,6 @@ function initPanel(sidebarBox) {
     // How long after the expand animation starts before the button fades in
     var BTN_APPEAR_DELAY = Math.round(MM_EXPAND_MS * 0.60);
     var BTN_APPEAR_DUR   = Math.round(MM_EXPAND_MS * 0.55);
-    // Extra px reserved below content for the absolutely-positioned goto button
-    var MM_BTN_SPACE = 40;
 
     function mmSetExpanded(cardEl, expanded, key) {
       var btn = cardEl.querySelector('.pp-goto-btn');
@@ -676,105 +671,57 @@ function initPanel(sidebarBox) {
         cardEl._mmExpandState = 'expanded';
         cardEl.style.zIndex = (_topZ + 1) + '';
 
-        // Snapshot collapsed height (btn is abs-positioned → never affects auto-height)
         if (!collapsedHeights.has(key)) {
           collapsedHeights.set(key, cardEl.offsetHeight);
         }
         var collH = collapsedHeights.get(key);
 
-        // Reset btn to hidden start state
-        if (btn) {
-          btn.style.transition    = 'none';
-          btn.style.opacity       = '0';
-          btn.style.transform     = 'translateY(6px)';
-          btn.style.pointerEvents = 'none';
-          btn.classList.remove('pp-goto-visible');
-        }
-
-        // Add expanded class (unclamps field text).
-        // We can't trust cardEl.offsetHeight because overflow:hidden on the card
-        // AND on each .pp-mm-field clips the reported height.
-        // Measure by summing scrollHeight of all direct children (head + body divs).
-        // The body itself is a flex container — its scrollHeight reliably reflects
-        // the full stacked height of all fields once -webkit-line-clamp is removed.
+        // Add expanded class (unclamps field text), measure true full content height.
+        // overflow:hidden + -webkit-line-clamp both clip offsetHeight, so we sum
+        // scrollHeight of each in-flow child div (head + body) instead.
         cardEl.classList.add('pp-mm-expanded');
         cardEl.style.transition = 'none';
         cardEl.style.height     = '';
-        void cardEl.offsetHeight;   // flush so scrollHeights reflect unclamped text
+        void cardEl.offsetHeight;
         var contentH = 0;
         Array.from(cardEl.children).forEach(function(child) {
           if (child.classList.contains('pp-goto-btn')) return;
           contentH += child.scrollHeight;
         });
-        var cardStyle = getComputedStyle(cardEl);
-        contentH += parseFloat(cardStyle.borderTopWidth || 0) +
-                    parseFloat(cardStyle.borderBottomWidth || 0);
-        // Add space for the absolutely-positioned goto button when present.
-        // offsetHeight is reliable even for absolute elements; fallback to 44px
-        // if the element somehow hasn't rendered (first paint edge case).
-        if (btn) {
-          var btnH = btn.offsetHeight || 44;
-          contentH += btnH + 8 /* bottom:8px offset */ + 8 /* gap above button */;
-        }
+        var cs = getComputedStyle(cardEl);
+        contentH += parseFloat(cs.borderTopWidth || 0) + parseFloat(cs.borderBottomWidth || 0);
+        if (btn) contentH += 50; // button (~27px) + 8px bottom gap + 8px top gap + buffer
 
         var fullH = contentH;
-
-        // Pin back to collH, then animate to fullH in one smooth motion.
-        // The inline height is kept at fullH for the entire expanded lifetime —
-        // releasing it would snap the card back to auto=contentH, collapsing the btn space.
         cardEl.style.height = collH + 'px';
         void cardEl.offsetHeight;
         cardEl.style.transition = 'height ' + MM_EXPAND_MS + 'ms cubic-bezier(0.22,1,0.36,1)';
         cardEl.style.height     = fullH + 'px';
-
-        // ② Button fades in after the border has mostly reached full height
-        if (btn) {
-          cardEl._btnTimer = setTimeout(function() {
-            if (cardEl._mmExpandState !== 'expanded') return;
-            btn.style.transition    = 'opacity ' + BTN_APPEAR_DUR + 'ms ease, ' +
-                                      'transform ' + BTN_APPEAR_DUR + 'ms ease';
-            btn.style.opacity       = '1';
-            btn.style.transform     = 'translateY(0)';
-            btn.style.pointerEvents = 'auto';
-          }, BTN_APPEAR_DELAY);
-        }
-        // No _expandTimer to release height — inline height stays at fullH while expanded
+        // Icon visibility is handled purely by CSS (.pp-mm-expanded .pp-goto-btn { opacity:1 })
+        // No inline style juggling needed for the corner icon.
 
       } else {
         cardEl._mmExpandState = 'collapsed';
 
-        // Hide button instantly — no animation on collapse
-        if (btn) {
-          btn.style.transition    = 'none';
-          btn.style.opacity       = '0';
-          btn.style.transform     = 'translateY(6px)';
-          btn.style.pointerEvents = 'none';
-          btn.classList.remove('pp-goto-visible');
-        }
-
-        // Measure current rendered height BEFORE changing any classes
         void cardEl.offsetHeight;
         var curH  = cardEl.getBoundingClientRect().height;
         var collH = collapsedHeights.get(key) || curH;
 
-        // Pin at current height FIRST, then remove expanded class.
-        // Pinning prevents a flash jump when the class changes auto-height.
         cardEl.style.transition = 'none';
         cardEl.style.height     = curH + 'px';
         void cardEl.offsetHeight;
         cardEl.classList.remove('pp-mm-expanded');
         cardEl.classList.remove('pp-mm-touch-expanded');
 
-        // Animate back to collapsed height
         cardEl.style.transition = 'height ' + MM_EXPAND_MS + 'ms cubic-bezier(0.22,1,0.36,1)';
         cardEl.style.height     = collH + 'px';
 
         cardEl._expandTimer = setTimeout(function() {
           if (cardEl._mmExpandState !== 'collapsed') return;
           cardEl.style.transition = '';
-          cardEl.style.height     = '';   // release → auto = collH ✓
+          cardEl.style.height     = '';
           cardEl.style.zIndex = (cardBaseZ.get(key) || 1) + '';
-          _btnReset(btn);
+          if (btn) _btnReset(btn);
         }, MM_EXPAND_MS + 20);
       }
     }
@@ -794,13 +741,7 @@ function initPanel(sidebarBox) {
         // an intermediate value by transition:none), or already collapsed.
         // Clearing the inline height lets the card reflow to CSS auto size instantly.
         var btn = el.querySelector('.pp-goto-btn');
-        if (btn) {
-          btn.classList.remove('pp-goto-visible');
-          btn.style.transition    = 'none';
-          btn.style.opacity       = '0';
-          btn.style.transform     = 'translateY(6px)';
-          btn.style.pointerEvents = 'none';
-        }
+        if (btn) btn.classList.remove('pp-goto-visible');
         clearTimeout(el._expandTimer);
         clearTimeout(el._btnTimer);
         el._mmExpandState = 'collapsed';
@@ -1328,16 +1269,51 @@ mark.pkw {
   transition: border-bottom-color .15s, font-weight .15s;
 }
 
-/* ── Mindmap goto button: absolute-positioned so it never affects card auto-height ── */
-/* Button space (MM_BTN_SPACE px) is added to fullH in JS — only for cards that have a button */
+/* ── Mindmap goto: small arrow icon pinned to bottom-right corner ── */
 .pp-mm-card .pp-goto-btn {
   position: absolute;
-  bottom: 8px;
-  left: 8px;
-  right: 8px;
-  width: auto;
-  /* Override the tile-mode negative margin — absolute elements don't affect flow height */
-  margin-bottom: 0 !important;
+  bottom: 0;
+  right: 0;
+  width:  1.4em;
+  height: 1.4em;
+  min-width: unset;
+  padding: 0;
+  border-radius: 0 0 6px 0;  /* matches card corner */
+  border: none;
+  border-top: 1.5px solid var(--ppc-border, #aaa);
+  border-left: 1.5px solid var(--ppc-border, #aaa);
+  margin: 0 !important;
+  background: var(--ppc-border, #aaa);
+  color: white;
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  box-shadow: none;
+  display: grid;
+  place-items: center;
+  opacity: 0;
+  transform: none;
+  transition: opacity .18s ease;
+  pointer-events: none;
+  /* hide the text label, show only the SVG arrow */
+  overflow: hidden;
+}
+.pp-mm-card .pp-goto-btn .pp-goto-label { display: none; }
+.pp-mm-card .pp-goto-btn::after {
+  content: '';
+  display: block;
+  width:  0.55em;
+  height: 0.55em;
+  border-top:   1.5px solid white;
+  border-right: 1.5px solid white;
+  transform: rotate(45deg) translate(-1px, 1px);
+  flex-shrink: 0;
+}
+.pp-mm-card .pp-goto-btn:hover { filter: brightness(1.25); }
+.pp-mm-card.pp-mm-expanded .pp-goto-btn {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 /* Mindmap cards */
