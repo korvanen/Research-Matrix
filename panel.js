@@ -20,7 +20,7 @@ const PANEL_CARD_MAX_W      = 240;
 const PANEL_GOTO_DELAY      = 900;
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
-console.log('[panel.js_v_10]');
+console.log('[panel.js_v_11]');
 document.addEventListener('DOMContentLoaded', () => {
   const wait = setInterval(() => {
     const box = document.getElementById('sidebar-box');
@@ -61,9 +61,6 @@ function initPanel(sidebarBox) {
   const sidebarEl  = document.getElementById('sidebar');
 
   // ── Grid layout — single source of truth ────────────────────────────────
-  // Called at most once per animation frame. Measures sidebar width,
-  // computes column count + card width, then stamps the grid template.
-  // Does NOT touch ppBody.style.width — we let the grid fill the container.
   var _lastCols = 0, _lastCardW = 0, _gridRafId = null;
 
   function scheduleUpdateGrid() {
@@ -83,8 +80,6 @@ function initPanel(sidebarBox) {
     var w = (sidebarEl ? sidebarEl.offsetWidth : sidebarBox.offsetWidth) - sbMargin * 2 - pad;
     if (w <= 0) return;
 
-    // Find the largest tab group: count consecutive .pp-match-card runs between .pp-divider elements.
-    // This is the true column cap — we stop scaling once all cards in the biggest group fit at max width.
     var maxGroupSize = 0;
     var currentGroupSize = 0;
     var children = Array.from(ppBody.children);
@@ -100,13 +95,10 @@ function initPanel(sidebarBox) {
     if (currentGroupSize > maxGroupSize) maxGroupSize = currentGroupSize;
     var maxUsefulCols = maxGroupSize > 0 ? maxGroupSize : Infinity;
 
-    // Normal column count: how many fit with each card at least PANEL_CARD_MIN_W wide.
-    // Cap at maxUsefulCols — no ghost columns once the largest group fits in one row.
     var cols  = Math.min(
       Math.max(1, Math.floor((w + gap) / (PANEL_CARD_MIN_W + gap))),
       maxUsefulCols
     );
-    // Distribute available space; cards scale up to PANEL_CARD_MAX_W, then freeze.
     var cardW = Math.min(PANEL_CARD_MAX_W, Math.floor((w - gap * (cols - 1)) / cols));
 
     if (cols === _lastCols && cardW === _lastCardW) return;
@@ -117,10 +109,8 @@ function initPanel(sidebarBox) {
     ppBody.style.width = '';
   }
 
-  // Initial measurement — defer one frame so the sidebar has painted
   scheduleUpdateGrid();
 
-  // Re-measure whenever the sidebar resizes (fires on every drag frame)
   if (window.ResizeObserver) {
     new ResizeObserver(scheduleUpdateGrid).observe(sidebarEl || sidebarBox);
   }
@@ -134,7 +124,7 @@ function initPanel(sidebarBox) {
   var seedCells    = [];
   var lastMatches  = [];
   var _mmActive    = null;
-  var _mmMatchKey  = '';   // fingerprint of matches when mindmap was last built
+  var _mmMatchKey  = '';
   var _hasContent  = false;
 
   // ── Keyword highlight toggle ───────────────────────────────────────────────
@@ -161,12 +151,10 @@ function initPanel(sidebarBox) {
       if (v === 'mindmap') {
         ppBody.style.display   = 'none';
         ppMmWrap.style.display = 'block';
-        // Only rebuild if the match set has changed since the mindmap was last drawn
         var currentKey = lastMatches.map(function(m){ return m.tabIdx+':'+m.rowIdx; }).join('|');
         if (!_mmActive || _mmMatchKey !== currentKey) {
           renderMindmap(lastMatches);
         }
-        // else: positions are preserved, just show the existing canvas
       } else {
         ppBody.style.display   = 'grid';
         ppMmWrap.style.display = 'none';
@@ -308,12 +296,10 @@ function initPanel(sidebarBox) {
 
     if (viewMode === 'mindmap') { viewMode = 'tiles'; viewPill.setValue('tiles', false); }
 
-    // Build the new DOM off-screen in a fragment to avoid incremental reflow
     var frag = document.createDocumentFragment();
 
     var vars = panelThemeVars(srcTabIdx);
 
-    // ── Seed card ──
     var seedCard = document.createElement('div');
     seedCard.className = 'pp-seed-card';
     seedCard.style.setProperty('--ppc-border', vars['--tab-active-bg'] || '#888');
@@ -347,7 +333,6 @@ function initPanel(sidebarBox) {
       emptyEl.className = 'pp-empty';
       emptyEl.textContent = 'No matching entries found';
       frag.appendChild(emptyEl);
-      // Single atomic DOM update
       ppBody.innerHTML = '';
       ppBody.appendChild(frag);
       ppBody.style.display = 'grid';
@@ -361,7 +346,6 @@ function initPanel(sidebarBox) {
     hlOn = true;
     hlPill.setValue('show', false);
 
-    // Group by tab
     var byTab = new Map();
     matches.forEach(function(m) {
       if (!byTab.has(m.tabIdx)) byTab.set(m.tabIdx, []);
@@ -425,17 +409,12 @@ function initPanel(sidebarBox) {
       });
     });
 
-    // ── Single atomic DOM swap ──
-    // Replace content in one operation; the browser reflows exactly once.
     ppBody.innerHTML = '';
     ppBody.appendChild(frag);
     ppBody.style.display = 'grid';
 
-    // Re-measure grid columns now that content has changed
     scheduleUpdateGrid();
 
-    // Stagger-animate only the match cards (not seed, not dividers)
-    // Use CSS custom property so the animation delay doesn't block paint.
     var matchCards = ppBody.querySelectorAll('.pp-match-card');
     matchCards.forEach(function(card, i) {
       card.style.animationDelay = (i * 30) + 'ms';
@@ -677,37 +656,23 @@ function initPanel(sidebarBox) {
   if (window.ResizeObserver) {
     new ResizeObserver(function() {
       if (viewMode !== 'mindmap' || !_mmActive) return;
-      // Run at most once per animation frame — sidebar drag fires many events
       if (_mmResizeRafId) return;
       _mmResizeRafId = requestAnimationFrame(function() {
         _mmResizeRafId = null;
         var newW = mmW(), newH = mmH();
         if (newW === _mmLastW && newH === _mmLastH) return;
 
-        // Build four wall rects representing the canvas edges.
-        // Walls are only "active" on the side that shrank (i.e. the new boundary
-        // is inside where cards currently are).  Expanding edges are ignored so
-        // card positions never move unless a wall is actually in the way.
         var walls = [];
-        var T = PANEL_MM_PAD, B = newH - PANEL_MM_PAD;
-        var L = PANEL_MM_PAD, R = newW - PANEL_MM_PAD;
-
-        // Right wall: push cards left when canvas got narrower
         if (newW < _mmLastW) walls.push({ x: newW, y: 0, w: 1, h: newH });
-        // Bottom wall: push cards up when canvas got shorter
         if (newH < _mmLastH) walls.push({ x: 0, y: newH, w: newW, h: 1 });
 
         _mmLastW = newW; _mmLastH = newH;
 
         if (!walls.length) {
-          // Canvas only grew — no pushing needed, just redraw arrows in case SVG resized
           _mmActive.redrawArrows();
           return;
         }
 
-        // For each card, clamp to the new canvas first (instant, one-time snap to boundary),
-        // then run the full card-vs-card pushApart so cards displaced by the wall
-        // ripple outward using the same physics as manual dragging.
         var dirty = false;
         _mmActive.rects.forEach(function(r, key) {
           var nx = Math.max(0, Math.min(newW - r.w, r.x));
@@ -721,8 +686,6 @@ function initPanel(sidebarBox) {
         });
 
         if (dirty) {
-          // Re-use the existing pushApart closure (captured inside renderMindmap).
-          // We call it with no skip-key so all cards can move.
           _mmActive.pushApart(null);
           _mmActive.redrawArrows();
         } else {
@@ -733,10 +696,6 @@ function initPanel(sidebarBox) {
   }
 
   // ── Mindmap snapshot events ─────────────────────────────────────────────────
-  // 'mm-snapshot-request': script.js asks us to write current card positions
-  //   into window.__mmSnapshotData so it can save them before snap-close.
-  // 'mm-snapshot-restore': script.js passes back a saved snapshot; we apply
-  //   the positions after the open animation completes.
   document.addEventListener('mm-snapshot-request', function() {
     if (!_mmActive) return;
     var positions = new Map();
@@ -756,6 +715,18 @@ function initPanel(sidebarBox) {
     // to reflow before clientWidth/clientHeight return correct values.
     requestAnimationFrame(function() {
       if (!_mmActive || snap.matchKey !== _mmMatchKey) return;
+
+      // Instantly hide cards so the "squished" default layout is never visible
+      _mmActive.cardEls.forEach(function(el) {
+        el.style.transition = 'none';
+        el.style.opacity    = '0';
+        el.style.transform  = 'scale(0.88)';
+      });
+
+      // Force a style flush so the hidden state is committed before we move cards
+      void ppMmWrap.offsetHeight;
+
+      // Move all cards to their saved positions while still invisible
       snap.positions.forEach(function(pos, key) {
         var r  = _mmActive.rects.get(key);
         var el = _mmActive.cardEls.get(key);
@@ -767,6 +738,26 @@ function initPanel(sidebarBox) {
         el.style.top  = ny + 'px';
       });
       _mmActive.redrawArrows();
+
+      // Fade + scale cards into their correct positions smoothly
+      requestAnimationFrame(function() {
+        if (!_mmActive) return;
+        _mmActive.cardEls.forEach(function(el, i) {
+          // Stagger each card slightly for a ripple feel
+          var delay = i * 18;
+          el.style.transition = 'opacity 0.28s ease ' + delay + 'ms, transform 0.28s cubic-bezier(0.34,1.4,0.64,1) ' + delay + 'ms';
+          el.style.opacity    = '1';
+          el.style.transform  = 'scale(1)';
+        });
+        // Clean up transition styles after animation so dragging is unaffected
+        setTimeout(function() {
+          if (!_mmActive) return;
+          _mmActive.cardEls.forEach(function(el) {
+            el.style.transition = '';
+            el.style.transform  = '';
+          });
+        }, 320 + _mmActive.cardEls.size * 18);
+      });
     });
   });
 
@@ -830,16 +821,12 @@ function initPanel(sidebarBox) {
 #pp-body-wrap::-webkit-scrollbar-corner { background: var(--scrollbar-track); }
 
 #pp-body {
-  /* padding provides the horizontal gutter; JS sets gridTemplateColumns only */
   padding: 10px 12px 18px; box-sizing: border-box;
   display: grid;
-  /* auto column count set by JS via gridTemplateColumns */
   gap: 10px;
   align-content: start;
   align-items: start;
-  /* Let the grid fill the container width — no JS pixel width */
   width: 100%;
-  /* Smooth reflow when columns change (e.g. sidebar resize) */
   transition: grid-template-columns 0.18s ease;
 }
 
@@ -934,15 +921,13 @@ function initPanel(sidebarBox) {
 /* "Go to" hover button */
 .pp-goto-btn {
   display: block; width: calc(100% - 16px);
-  /* collapsed: zero margin so card doesn't grow; negative margin eats the button height */
   margin: 0 8px 0;
-  margin-bottom: calc(-1 * (1em + 22px)); /* pull up by own height so card doesn't jump */
+  margin-bottom: calc(-1 * (1em + 22px));
   padding: 5px 8px; border-radius: 6px; border: 1.5px solid;
   background: white; font-size: 10px; font-weight: 600; letter-spacing: .06em;
   text-transform: uppercase; cursor: pointer; text-align: center;
   opacity: 0;
   transform: translateY(4px);
-  /* Only animate compositor-friendly properties — no max-height, no height */
   transition: opacity .22s ease, transform .22s ease, margin-bottom .22s ease;
   box-shadow: 0 1px 6px rgba(0,0,0,.08);
   pointer-events: none;
