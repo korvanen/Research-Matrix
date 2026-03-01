@@ -20,7 +20,7 @@ const PANEL_CARD_MAX_W      = 240;
 const PANEL_GOTO_DELAY      = 400;
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
-console.log('[panel.js_v_J]');
+console.log('[panel.js_v_K]');
 document.addEventListener('DOMContentLoaded', () => {
   const wait = setInterval(() => {
     const box = document.getElementById('sidebar-box');
@@ -635,55 +635,73 @@ function initPanel(sidebarBox) {
     var MM_EXPAND_MS    = 260;
     var MM_HOVER_DELAY  = 200;
 
+    // Button is position:absolute inside the card (see CSS), so it never
+    // affects the card's auto-height. Reset just clears inline overrides.
     function _btnReset(btn) {
       if (!btn) return;
       btn.style.transition    = '';
-      btn.style.marginBottom  = '';
       btn.style.opacity       = '';
       btn.style.transform     = '';
       btn.style.pointerEvents = '';
       btn.classList.remove('pp-goto-visible');
     }
 
+    // Delay (ms) after card starts expanding before button fades in.
+    // Button appears once the border has mostly reached full height.
+    var BTN_APPEAR_DELAY = Math.round(MM_EXPAND_MS * 0.60);
+    var BTN_APPEAR_DUR   = Math.round(MM_EXPAND_MS * 0.55);
+
     function mmSetExpanded(cardEl, expanded, key) {
       var btn = cardEl.querySelector('.pp-goto-btn');
       clearTimeout(cardEl._expandTimer);
+      clearTimeout(cardEl._btnTimer);
 
       if (expanded) {
         cardEl._mmExpandState = 'expanded';
-        // Bring to front while expanded — above all cards including last-dragged
+        // Float above all resting cards while expanded
         cardEl.style.zIndex = (_topZ + 1) + '';
 
+        // Snapshot collapsed height on first expand (btn is absolute, so auto-height
+        // is purely header + body — stable and doesn't include any btn geometry)
         if (!collapsedHeights.has(key)) {
           collapsedHeights.set(key, cardEl.offsetHeight);
         }
         var collH = collapsedHeights.get(key);
 
+        // Ensure btn is hidden and reset before measuring fullH
+        if (btn) {
+          btn.style.transition    = 'none';
+          btn.style.opacity       = '0';
+          btn.style.transform     = 'translateY(6px)';
+          btn.style.pointerEvents = 'none';
+          btn.classList.remove('pp-goto-visible');
+        }
+
+        // Pin at collapsed height, add expanded class (applies padding-bottom
+        // via CSS to reserve space for the abs-positioned button), measure fullH
         cardEl.style.transition = 'none';
         cardEl.style.height     = collH + 'px';
         cardEl.classList.add('pp-mm-expanded');
-        if (btn) {
-          btn.classList.remove('pp-goto-visible');
-          btn.style.transition    = 'none';
-          btn.style.marginBottom  = '8px';
-          btn.style.opacity       = '0';
-          btn.style.transform     = 'translateY(4px)';
-          btn.style.pointerEvents = 'none';
-        }
         void cardEl.offsetHeight;
-
         var fullH = cardEl.scrollHeight;
 
-        cardEl.style.transition = 'height ' + MM_EXPAND_MS + 'ms ease';
+        // ① Animate card border to full height
+        cardEl.style.transition = 'height ' + MM_EXPAND_MS + 'ms cubic-bezier(0.22,1,0.36,1)';
         cardEl.style.height     = fullH + 'px';
-        if (btn) {
-          btn.style.transition    = 'opacity ' + MM_EXPAND_MS + 'ms ease, ' +
-                                    'transform ' + MM_EXPAND_MS + 'ms ease';
-          btn.style.opacity       = '1';
-          btn.style.transform     = 'translateY(0)';
-          btn.style.pointerEvents = 'auto';
-        }
 
+        // ② Button fades in shortly after — into the space already created
+        cardEl._btnTimer = setTimeout(function() {
+          if (cardEl._mmExpandState !== 'expanded') return;
+          if (btn) {
+            btn.style.transition    = 'opacity ' + BTN_APPEAR_DUR + 'ms ease, ' +
+                                      'transform ' + BTN_APPEAR_DUR + 'ms ease';
+            btn.style.opacity       = '1';
+            btn.style.transform     = 'translateY(0)';
+            btn.style.pointerEvents = 'auto';
+          }
+        }, BTN_APPEAR_DELAY);
+
+        // Release inline height after animation completes
         cardEl._expandTimer = setTimeout(function() {
           if (cardEl._mmExpandState !== 'expanded') return;
           cardEl.style.transition = '';
@@ -692,34 +710,38 @@ function initPanel(sidebarBox) {
 
       } else {
         cardEl._mmExpandState = 'collapsed';
-        cardEl.classList.remove('pp-mm-expanded');
-        cardEl.classList.remove('pp-mm-touch-expanded');
 
+        // Hide button immediately — no animation on collapse
         if (btn) {
-          btn.classList.remove('pp-goto-visible');
           btn.style.transition    = 'none';
-          btn.style.marginBottom  = '';
           btn.style.opacity       = '0';
-          btn.style.transform     = 'translateY(4px)';
+          btn.style.transform     = 'translateY(6px)';
           btn.style.pointerEvents = 'none';
+          btn.classList.remove('pp-goto-visible');
         }
 
+        // Measure current rendered height BEFORE touching any classes
         void cardEl.offsetHeight;
         var curH  = cardEl.getBoundingClientRect().height;
         var collH = collapsedHeights.get(key) || curH;
 
+        // Pin at current height, THEN remove expanded class (padding-bottom → 0).
+        // Pinning first prevents a flash jump to auto-height during class removal.
         cardEl.style.transition = 'none';
         cardEl.style.height     = curH + 'px';
         void cardEl.offsetHeight;
+        cardEl.classList.remove('pp-mm-expanded');
+        cardEl.classList.remove('pp-mm-touch-expanded');
 
-        cardEl.style.transition = 'height ' + MM_EXPAND_MS + 'ms ease';
+        // Animate card border back to collapsed height
+        cardEl.style.transition = 'height ' + MM_EXPAND_MS + 'ms cubic-bezier(0.22,1,0.36,1)';
         cardEl.style.height     = collH + 'px';
 
         cardEl._expandTimer = setTimeout(function() {
           if (cardEl._mmExpandState !== 'collapsed') return;
           cardEl.style.transition = '';
           cardEl.style.height     = '';
-          // Restore to this card's own base z (1 for untouched, elevated if ever dragged)
+          // Restore to this card's resting z (1 for untouched, elevated if ever dragged)
           cardEl.style.zIndex = (cardBaseZ.get(key) || 1) + '';
           _btnReset(btn);
         }, MM_EXPAND_MS + 20);
@@ -744,12 +766,12 @@ function initPanel(sidebarBox) {
         if (btn) {
           btn.classList.remove('pp-goto-visible');
           btn.style.transition    = 'none';
-          btn.style.marginBottom  = '';
           btn.style.opacity       = '0';
-          btn.style.transform     = 'translateY(4px)';
+          btn.style.transform     = 'translateY(6px)';
           btn.style.pointerEvents = 'none';
         }
         clearTimeout(el._expandTimer);
+        clearTimeout(el._btnTimer);
         el._mmExpandState = 'collapsed';
         el.classList.remove('pp-mm-expanded');
         el.classList.remove('pp-mm-touch-expanded');
@@ -1273,6 +1295,22 @@ mark.pkw {
   background: transparent; border-bottom: 2px solid currentColor;
   font-weight: 700; padding: 0; color: inherit;
   transition: border-bottom-color .15s, font-weight .15s;
+}
+
+/* ── Mindmap goto button: absolute-positioned so it never affects card auto-height ── */
+/* In the mindmap, the button lives in the padding-bottom space reserved by .pp-mm-expanded */
+.pp-mm-card .pp-goto-btn {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  right: 8px;
+  width: auto;
+  /* Override the tile-mode negative margin — absolute elements don't affect flow height */
+  margin-bottom: 0 !important;
+}
+/* Expanded card reserves space for the absolutely positioned button */
+.pp-mm-card.pp-mm-expanded {
+  padding-bottom: 44px;
 }
 
 /* Mindmap cards */
