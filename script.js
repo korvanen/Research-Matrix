@@ -8,7 +8,7 @@ const ARROW_SIZE      = 28;
 const ARROW_GAP       = 10;
 const ARROW_OFFSET    = 12;
 
-const TAB_BAR_PADDING  = window.innerHeight*0.5;
+const TAB_BAR_PADDING  = window.innerHeight*0.1;
 
 const isPortrait = () => window.innerHeight > window.innerWidth;
 
@@ -581,8 +581,33 @@ function updateSidebarOverlap(skipTabRebuild) {
 
 function applyBarSizes() {
   const th = TOPBAR_HEIGHT(), bh = BOTTOMBAR_HEIGHT();
-  if (topbar)    { topbar.style.height    = topbar.style.minHeight    = th + 'px'; }
-  if (bottombar) { bottombar.style.height = bottombar.style.minHeight = bh + 'px'; }
+
+  // Topbar: stamp explicit height so it doesn't flex with viewport changes
+  if (topbar) { topbar.style.height = topbar.style.minHeight = th + 'px'; }
+
+  // Bottombar: on Android Chrome, window.innerHeight fluctuates as the address
+  // bar shows/hides, so stamping a pixel height causes the bar to disappear.
+  // Instead we drive the height purely from CSS using dvh (dynamic viewport
+  // height), which always tracks the visible area. We only set the derived
+  // CSS custom properties that downstream code needs (tab-height etc.).
+  // dvh is supported in Chrome 108+ / Safari 15.4+.
+  const supportsDvh = CSS.supports('height', '1dvh');
+  if (supportsDvh) {
+    // Let CSS handle bottombar height via .bottombar { height: calc(X * 1dvh) }
+    // We expose the percentage as a variable so style.css can use it.
+    const bottombarPct = R().bottombar * 100;
+    document.documentElement.style.setProperty('--bottombar-dvh', bottombarPct.toFixed(3) + 'dvh');
+    const topbarPct    = R().topbar * 100;
+    document.documentElement.style.setProperty('--topbar-dvh',    topbarPct.toFixed(3) + 'dvh');
+    // Clear any previously stamped inline heights so CSS takes over
+    if (bottombar) { bottombar.style.height = bottombar.style.minHeight = ''; }
+    if (topbar)    { topbar.style.height    = topbar.style.minHeight    = ''; }
+  } else {
+    // Fallback for older browsers
+    if (topbar)    { topbar.style.height    = topbar.style.minHeight    = th + 'px'; }
+    if (bottombar) { bottombar.style.height = bottombar.style.minHeight = bh + 'px'; }
+  }
+
   document.documentElement.style.setProperty('--tab-height',          Math.round(bh * 0.70) + 'px');
   document.documentElement.style.setProperty('--tab-gap',             Math.round(window.innerWidth * 0.008) + 'px');
   document.documentElement.style.setProperty('--sidebar-box-margin',  SIDEBAR_BOX_MARGIN() + 'px');
@@ -787,10 +812,11 @@ document.addEventListener('click', e => {
   const isClose = btn.getAttribute('aria-label') === 'Close sidebar';
   if (SIDEBAR_TWO_POSITION()) {
     if (isOpen)  animateSidebarTo(window.innerWidth, { restoreMm: true });
-    if (isClose) animateSidebarTo(SIDEBAR_MIN());
+    if (isClose) { saveMmSnapshot(); animateSidebarTo(SIDEBAR_MIN()); }
   } else {
     if (isOpen)  animateSidebarTo(SIDEBAR_DEFAULT(), { restoreMm: true });
-    if (isClose) animateSidebarTo(SIDEBAR_DEFAULT());
+    // Landscape close: save before snapping shut so re-open can restore
+    if (isClose) { saveMmSnapshot(); animateSidebarTo(SIDEBAR_DEFAULT()); }
   }
 });
 
@@ -919,3 +945,4 @@ tabBar.innerHTML = '<div style="padding:8px 12px;color:#999;font-size:12px">Load
     loadingOverlay.textContent = `Error: ${err.message}\n${err.stack || ''}`;
   }
 })();
+
