@@ -20,7 +20,7 @@ const PANEL_CARD_MAX_W      = 240;
 const PANEL_GOTO_DELAY      = 400;
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
-console.log('[panel.js_v_E]');
+console.log('[panel.js_v_F]');
 document.addEventListener('DOMContentLoaded', () => {
   const wait = setInterval(() => {
     const box = document.getElementById('sidebar-box');
@@ -636,28 +636,46 @@ function initPanel(sidebarBox) {
     var MM_EXPAND_MS = 220; // ← adjust to change expansion speed (keep in sync with goto CSS)
 
     function mmSetExpanded(cardEl, expanded, key) {
+      // We own the goto button's visibility entirely via inline styles.
+      // This bypasses attachGoTo's class-based show/hide (which fires on mouse events
+      // and would create a "second motion"), and also fixes touch (where synthetic
+      // mouseleave would strip pp-goto-visible right after we add it).
       var btn = cardEl.querySelector('.pp-goto-btn');
 
       if (expanded) {
-        // Store collapsed height on first expand (card is currently in collapsed state)
         if (!collapsedHeights.has(key)) {
           collapsedHeights.set(key, cardEl.offsetHeight);
         }
         var collH = collapsedHeights.get(key);
 
-        // Pin height at collapsed size, remove text clamp, show goto btn, measure full
+        // Step 1: pin at collapsed height, unclamp text, but keep btn invisible.
+        // Snap btn margin-bottom to 8px NOW (no CSS transition) so scrollHeight
+        // already includes the button's space when we measure it.
         cardEl.style.transition = 'none';
         cardEl.style.height     = collH + 'px';
         cardEl.classList.add('pp-mm-expanded');
-        if (btn) btn.classList.add('pp-goto-visible');
-        void cardEl.offsetHeight; // flush so scrollHeight includes btn + full text
+        if (btn) {
+          btn.style.transition   = 'none';
+          btn.style.marginBottom = '8px';     // snap space open instantly
+          btn.style.opacity      = '0';       // but still invisible
+          btn.style.transform    = 'translateY(4px)';
+          btn.style.pointerEvents = 'none';
+        }
+        void cardEl.offsetHeight; // flush — scrollHeight now includes btn space
+
         var fullH = cardEl.scrollHeight;
 
-        // Animate from collapsed → full
+        // Step 2: animate card height from collapsed → full.
+        // Simultaneously fade+slide the button in — one unified motion.
         cardEl.style.transition = 'height ' + MM_EXPAND_MS + 'ms ease';
         cardEl.style.height     = fullH + 'px';
+        if (btn) {
+          btn.style.transition    = 'opacity ' + MM_EXPAND_MS + 'ms ease, transform ' + MM_EXPAND_MS + 'ms ease';
+          btn.style.opacity       = '1';
+          btn.style.transform     = 'translateY(0)';
+          btn.style.pointerEvents = 'auto';
+        }
 
-        // After animation clear fixed height so card can reflow naturally at full size
         var t = setTimeout(function() {
           if (cardEl.classList.contains('pp-mm-expanded')) {
             cardEl.style.transition = '';
@@ -669,28 +687,40 @@ function initPanel(sidebarBox) {
       } else {
         clearTimeout(cardEl._expandTimer);
 
-        // Snapshot current rendered height (may be mid-animation)
         var curH  = cardEl.getBoundingClientRect().height;
         var collH = collapsedHeights.get(key) || curH;
 
-        // Collapse: keep pp-mm-expanded class during animation so text stays unclamped;
-        // remove it only after the card has fully shrunk (otherwise text clips abruptly).
+        // Fade button out quickly, then collapse the card.
+        if (btn) {
+          btn.style.transition    = 'opacity ' + Math.round(MM_EXPAND_MS * 0.5) + 'ms ease';
+          btn.style.opacity       = '0';
+          btn.style.pointerEvents = 'none';
+        }
+
         cardEl.style.transition = 'none';
         cardEl.style.height     = curH + 'px';
-        if (btn) btn.classList.remove('pp-goto-visible');
         void cardEl.offsetHeight;
 
         cardEl.style.transition = 'height ' + MM_EXPAND_MS + 'ms ease';
         cardEl.style.height     = collH + 'px';
 
-        setTimeout(function() {
-          if (!cardEl.classList.contains('pp-mm-expanded')) return; // already re-expanded
+        var collapseTimer = setTimeout(function() {
+          if (!cardEl.classList.contains('pp-mm-expanded')) return;
           cardEl.classList.remove('pp-mm-expanded');
           cardEl.classList.remove('pp-mm-touch-expanded');
           cardEl.style.transition = '';
           cardEl.style.height     = '';
+          // Restore button to default hidden state so CSS class-based
+          // show/hide from attachGoTo still works in tiles mode.
+          if (btn) {
+            btn.style.transition    = '';
+            btn.style.marginBottom  = '';
+            btn.style.opacity       = '';
+            btn.style.transform     = '';
+            btn.style.pointerEvents = '';
+          }
         }, MM_EXPAND_MS + 20);
-        // Mark as not expanded now so callers can check the class synchronously
+
         cardEl.classList.remove('pp-mm-expanded');
         cardEl.classList.remove('pp-mm-touch-expanded');
       }
@@ -706,7 +736,25 @@ function initPanel(sidebarBox) {
         ox = clientX; oy = clientY;
         sl = parseFloat(el.style.left) || 0;
         st = parseFloat(el.style.top)  || 0;
-        el.style.zIndex = 50; el.style.transition = 'none';
+        // Collapse card instantly if it's expanded so we drag the compact version.
+        if (el.classList.contains('pp-mm-expanded')) {
+          clearTimeout(el._expandTimer);
+          el.classList.remove('pp-mm-expanded');
+          el.classList.remove('pp-mm-touch-expanded');
+          el.style.height     = '';
+          el.style.transition = '';
+          var btn = el.querySelector('.pp-goto-btn');
+          if (btn) {
+            btn.style.transition    = '';
+            btn.style.marginBottom  = '';
+            btn.style.opacity       = '';
+            btn.style.transform     = '';
+            btn.style.pointerEvents = '';
+          }
+          collapsedHeights.delete(key); // reset so next expand re-measures
+          if (_mmTouchExpanded === el) _mmTouchExpanded = null;
+        }
+        el.style.zIndex = 500; el.style.transition = 'none';
       }
       function dragMove(clientX, clientY) {
         if (!isDragging) return;
@@ -819,8 +867,10 @@ function initPanel(sidebarBox) {
       cardEls.set(key, card);
 
       // Hover expand — shares the same animation as the goto button.
-      // On mouseenter we also clear touch-expanded so hover now owns the state.
+      // Skip if a drag is in progress (isDragging lives in makeDraggable closure —
+      // check via the data attribute we stamp on dragStart).
       card.addEventListener('mouseenter', function() {
+        if (card.style.zIndex === '500') return; // dragging — no expand
         if (_mmTouchExpanded === card) {
           card.classList.remove('pp-mm-touch-expanded');
           _mmTouchExpanded = null;
@@ -1197,13 +1247,7 @@ function initPanel(sidebarBox) {
   pointer-events: auto;
 }
 .pp-goto-btn:hover { filter: brightness(0.92); }
-/* Touch-expanded: CSS forces the goto button visible regardless of mouse state */
-.pp-mm-card.pp-mm-touch-expanded .pp-goto-btn {
-  opacity: 1 !important;
-  transform: translateY(0) !important;
-  margin-bottom: 8px !important;
-  pointer-events: auto !important;
-}
+/* Touch-expanded: button visibility is handled via inline styles in mmSetExpanded */
 
 /* Keyword highlight */
 mark.pkw {
@@ -1230,14 +1274,14 @@ mark.pkw {
   flex-shrink: 0; opacity: 0.9;
 }
 .pp-mm-head-label {
-  font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  font-size: 9px; font-weight: 600; letter-spacing: .03em; text-transform: uppercase;
+  white-space: normal; word-break: break-word;
   max-height: 0; opacity: 0;
   transition: max-height 0.18s ease, opacity 0.18s ease, padding 0.18s ease;
   padding: 0;
 }
 .pp-mm-card.pp-mm-expanded .pp-mm-head-label {
-  max-height: 32px; opacity: 1; padding: 5px 0;
+  max-height: 80px; opacity: 1; padding: 4px 0;
 }
 .pp-mm-card-body { padding: 5px 8px 7px; display: flex; flex-direction: column; gap: 3px; }
 .pp-mm-field {
