@@ -367,10 +367,11 @@ th, td {
 /* ── COMPACT TAB BAR ── */
 .bottombar.tabs-compact {
   padding: 0;
-  /* Center the tab bar within the full bottombar; the tab bar itself is
-     sized to exactly the available (non-sidebar) width by JS, so this
-     naturally places it in the correct horizontal region. */
-  justify-content: center;
+  /* Tab bar is sized by JS to exactly window.innerWidth - sidebarW,
+     starting at x=0. flex-start places it flush left, which is correct —
+     its own justify-content:center handles centering of the label within
+     that region. */
+  justify-content: flex-start;
   align-items: center;
   overflow: visible;
 }
