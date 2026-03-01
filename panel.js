@@ -20,7 +20,7 @@ const PANEL_CARD_MAX_W      = 240;
 const PANEL_GOTO_DELAY      = 400;
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
-console.log('[panel.js_v_C]');
+console.log('[panel.js_v_D]');
 document.addEventListener('DOMContentLoaded', () => {
   const wait = setInterval(() => {
     const box = document.getElementById('sidebar-box');
@@ -457,7 +457,9 @@ function initPanel(sidebarBox) {
     var cardEls    = new Map();
     var rects      = new Map();
     var arrowDefs  = [];
-    var cardColors = new Map(); // key -> { border, bg }
+    var cardColors      = new Map(); // key -> { border, bg }
+    var collapsedHeights = new Map(); // key -> px height in collapsed state
+    var _mmTouchExpanded = null;      // card element currently expanded by touch
 
     // Returns the card's live border-box rect relative to ppMmWrap.
     // Uses getBoundingClientRect() so it tracks CSS transitions and drag in real-time.
@@ -594,10 +596,67 @@ function initPanel(sidebarBox) {
       });
     }
 
-    // Expand/collapse a mindmap card: reveals full text and syncs with goto button.
-    function mmSetExpanded(cardEl, expanded) {
-      if (expanded) cardEl.classList.add('pp-mm-expanded');
-      else          cardEl.classList.remove('pp-mm-expanded');
+    // Expand/collapse a mindmap card: reveals full text and goto button as one motion.
+    // Uses explicit height animation so the duration matches the goto button exactly.
+    var MM_EXPAND_MS = 220; // ← adjust to change expansion speed (keep in sync with goto CSS)
+
+    function mmSetExpanded(cardEl, expanded, key) {
+      var btn = cardEl.querySelector('.pp-goto-btn');
+
+      if (expanded) {
+        // Store collapsed height on first expand (card is currently in collapsed state)
+        if (!collapsedHeights.has(key)) {
+          collapsedHeights.set(key, cardEl.offsetHeight);
+        }
+        var collH = collapsedHeights.get(key);
+
+        // Pin height at collapsed size, remove text clamp, show goto btn, measure full
+        cardEl.style.transition = 'none';
+        cardEl.style.height     = collH + 'px';
+        cardEl.classList.add('pp-mm-expanded');
+        if (btn) btn.classList.add('pp-goto-visible');
+        void cardEl.offsetHeight; // flush so scrollHeight includes btn + full text
+        var fullH = cardEl.scrollHeight;
+
+        // Animate from collapsed → full
+        cardEl.style.transition = 'height ' + MM_EXPAND_MS + 'ms ease';
+        cardEl.style.height     = fullH + 'px';
+
+        // After animation clear fixed height so card can reflow naturally at full size
+        var t = setTimeout(function() {
+          if (cardEl.classList.contains('pp-mm-expanded')) {
+            cardEl.style.transition = '';
+            cardEl.style.height     = '';
+          }
+        }, MM_EXPAND_MS + 20);
+        cardEl._expandTimer = t;
+
+      } else {
+        clearTimeout(cardEl._expandTimer);
+
+        // Snapshot current rendered height (may be mid-animation)
+        var curH  = cardEl.getBoundingClientRect().height;
+        var collH = collapsedHeights.get(key) || curH;
+
+        // Collapse: keep pp-mm-expanded class during animation so text stays unclamped;
+        // remove it only after the card has fully shrunk (otherwise text clips abruptly).
+        cardEl.style.transition = 'none';
+        cardEl.style.height     = curH + 'px';
+        if (btn) btn.classList.remove('pp-goto-visible');
+        void cardEl.offsetHeight;
+
+        cardEl.style.transition = 'height ' + MM_EXPAND_MS + 'ms ease';
+        cardEl.style.height     = collH + 'px';
+
+        setTimeout(function() {
+          if (!cardEl.classList.contains('pp-mm-expanded')) return; // already re-expanded
+          cardEl.classList.remove('pp-mm-expanded');
+          cardEl.style.transition = '';
+          cardEl.style.height     = '';
+        }, MM_EXPAND_MS + 20);
+        // Mark as not expanded now so callers can check the class synchronously
+        cardEl.classList.remove('pp-mm-expanded');
+      }
     }
 
     function makeDraggable(el, key) {
@@ -650,13 +709,21 @@ function initPanel(sidebarBox) {
         e.preventDefault();
       }, { passive: false });
       el.addEventListener('touchend', function(e) {
-        var dx = (e.changedTouches[0] ? e.changedTouches[0].clientX : touchStartX) - touchStartX;
-        var dy = (e.changedTouches[0] ? e.changedTouches[0].clientY : touchStartY) - touchStartY;
+        var t = e.changedTouches[0];
+        var dx = (t ? t.clientX : touchStartX) - touchStartX;
+        var dy = (t ? t.clientY : touchStartY) - touchStartY;
         var moved = Math.hypot(dx, dy);
         dragEnd();
-        // Tap (< 8px movement): toggle expand just like hover does on desktop
+        // Tap (< 8px movement): expand this card, collapse any other that was open
         if (moved < 8) {
-          mmSetExpanded(el, !el.classList.contains('pp-mm-expanded'));
+          var wantsExpand = !el.classList.contains('pp-mm-expanded');
+          // Collapse the previously touch-expanded card if it's different
+          if (_mmTouchExpanded && _mmTouchExpanded !== el) {
+            var prevKey = _mmTouchExpanded._mmKey;
+            mmSetExpanded(_mmTouchExpanded, false, prevKey);
+          }
+          _mmTouchExpanded = wantsExpand ? el : null;
+          mmSetExpanded(el, wantsExpand, key);
         }
       });
       el.addEventListener('touchcancel', dragEnd);
@@ -700,12 +767,13 @@ function initPanel(sidebarBox) {
       }
 
       ppMmWrap.appendChild(card);
+      card._mmKey = key; // stored so touch-collapse path can retrieve the key
       makeDraggable(card, key);
       cardEls.set(key, card);
 
       // Hover expand — same trigger as goto button so they animate together.
-      card.addEventListener('mouseenter', function() { mmSetExpanded(card, true); });
-      card.addEventListener('mouseleave', function() { mmSetExpanded(card, false); });
+      card.addEventListener('mouseenter', function() { mmSetExpanded(card, true,  key); });
+      card.addEventListener('mouseleave', function() { mmSetExpanded(card, false, key); });
 
       // ResizeObserver: any size change on the card (goto button, future features)
       // automatically redraws connection points to stay glued to the card's stroke.
@@ -1055,7 +1123,7 @@ function initPanel(sidebarBox) {
   text-transform: uppercase; cursor: pointer; text-align: center;
   opacity: 0;
   transform: translateY(4px);
-  transition: opacity .1s ease, transform .1s ease, margin-bottom .1s ease;
+  transition: opacity .22s ease, transform .22s ease, margin-bottom .22s ease;
   box-shadow: 0 1px 6px rgba(0,0,0,.08);
   pointer-events: none;
 }
@@ -1079,7 +1147,7 @@ mark.pkw {
   position: absolute; border: 1.5px solid var(--ppc-border, #aaa);
   border-radius: 8px; background: var(--ppc-bg, #fff);
   box-shadow: 0 2px 10px rgba(0,0,0,.12);
-  cursor: grab; user-select: none; z-index: 1; overflow: visible;
+  cursor: grab; user-select: none; z-index: 1; overflow: hidden;
 }
 .pp-mm-card:active { cursor: grabbing; }
 .pp-mm-card-head {
@@ -1092,11 +1160,13 @@ mark.pkw {
 .pp-mm-field {
   font-size: 10px; line-height: 1.35; color: rgba(0,0,0,.7);
   overflow: hidden;
-  max-height: 40px; /* ~3 lines: 10px × 1.35 × 3 */
-  transition: max-height 0.3s ease;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
 }
 .pp-mm-card.pp-mm-expanded .pp-mm-field {
-  max-height: 600px;
+  display: block;
+  -webkit-line-clamp: unset;
 }
 .pp-mm-cat {
   font-size: 9px; font-weight: 700; letter-spacing: .08em;
