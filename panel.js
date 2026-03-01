@@ -18,8 +18,8 @@ const PANEL_CARD_W          = 160; // mindmap card width (px)
 
 // Tile card fixed width — cards always render at this width and wrap to the
 // next row when there isn't horizontal room for another column. No stretching.
-const PANEL_CARD_MIN_W      = 140; // px — card min width; also determines column breakpoints
-const PANEL_CARD_MAX_W      = 240; // px — card max width (cards stretch up to this within a column)
+const PANEL_CARD_MIN_W      = 50; // px — card min width; also determines column breakpoints
+const PANEL_CARD_MAX_W      = 100; // px — card max width (cards stretch up to this within a column)
 
 const PANEL_GOTO_DELAY      = 900; // ms hover before "Go to" button appears
 
