@@ -20,7 +20,7 @@ const PANEL_CARD_MAX_W      = 240;
 const PANEL_GOTO_DELAY      = 400;
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
-console.log('[panel.js_v_500]');
+console.log('[panel.js_v_A]');
 document.addEventListener('DOMContentLoaded', () => {
   const wait = setInterval(() => {
     const box = document.getElementById('sidebar-box');
@@ -451,7 +451,7 @@ function initPanel(sidebarBox) {
 
     // Top SVG layer — connection point circles sit above cards
     var svgTop = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    svgTop.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:2';
+    svgTop.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:9999';
     ppMmWrap.appendChild(svgTop);
 
     var cardEls    = new Map();
@@ -459,22 +459,49 @@ function initPanel(sidebarBox) {
     var arrowDefs  = [];
     var cardColors = new Map(); // key -> { border, bg }
 
-    // 10 connection points per card: 3 top, 3 bottom, 2 left, 2 right
+    // Read a card's actual rendered position from the DOM (works mid-CSS-transition
+    // and during drag, where getBoundingClientRect returns the interpolated value).
+    function getVisualRect(key) {
+      var el = cardEls.get(key);
+      var r  = rects.get(key);
+      if (!r) return null;
+      if (!el) return { x: r.x, y: r.y, w: r.w, h: r.h };
+      var wrap = ppMmWrap.getBoundingClientRect();
+      var cr   = el.getBoundingClientRect();
+      return { x: cr.left - wrap.left, y: cr.top - wrap.top, w: r.w, h: cr.height };
+    }
+
+    // Bottom edge accounting for a visible "go-to" button below the card.
+    function getVisualBottom(key, vr) {
+      var el = cardEls.get(key);
+      if (!el) return vr.y + vr.h;
+      var btn = el.querySelector('.pp-goto-btn');
+      if (btn && btn.classList.contains('pp-goto-visible')) {
+        var wrap = ppMmWrap.getBoundingClientRect();
+        return btn.getBoundingClientRect().bottom - wrap.top;
+      }
+      return vr.y + vr.h;
+    }
+
+    // 10 connection points: 3 top, 3 bottom, 2 left, 2 right.
+    // All coordinates are read from the live DOM so they track CSS transitions.
     function getConnectionPoints(key) {
-      var r = rects.get(key);
-      if (!r) return [];
-      var x = r.x, y = r.y, W = r.w, H = r.h;
+      var vr = getVisualRect(key);
+      if (!vr) return [];
+      var x = vr.x, y = vr.y, W = vr.w;
+      var bot = getVisualBottom(key, vr);
+      var midH = (bot - y);
       return [
-        { x: x + W * 0.25, y: y        },  // top
-        { x: x + W * 0.5,  y: y        },
-        { x: x + W * 0.75, y: y        },
-        { x: x + W * 0.25, y: y + H    },  // bottom
-        { x: x + W * 0.5,  y: y + H    },
-        { x: x + W * 0.75, y: y + H    },
-        { x: x,            y: y + H / 3     },  // left
-        { x: x,            y: y + H * 2 / 3 },
-        { x: x + W,        y: y + H / 3     },  // right
-        { x: x + W,        y: y + H * 2 / 3 },
+        { x: x + W * 0.25, y: y              },  // top
+        { x: x + W * 0.5,  y: y              },
+        { x: x + W * 0.75, y: y              },
+        { x: x + W * 0.25, y: bot            },  // bottom
+        { x: x + W * 0.5,  y: bot            },
+        { x: x + W * 0.75, y: bot            },
+        { x: x,            y: y + midH / 3   },  // left
+        { x: x,            y: y + midH * 2/3 },
+        { x: x + W,        y: y + midH / 3   },  // right
+        { x: x + W,        y: y + midH * 2/3 },
       ];
     }
 
@@ -527,14 +554,25 @@ function initPanel(sidebarBox) {
         var pair = closestPointPair(ptsA, ptsB);
         if (!pair) return;
 
-        // Line in bottom SVG layer (behind cards and circles)
-        var line = document.createElementNS(ns, 'line');
-        line.setAttribute('x1', pair.a.x); line.setAttribute('y1', pair.a.y);
-        line.setAttribute('x2', pair.b.x); line.setAttribute('y2', pair.b.y);
-        line.setAttribute('stroke',         def.color);
-        line.setAttribute('stroke-width',   '1.5');
-        line.setAttribute('stroke-opacity', '0.45');
-        svg.appendChild(line);
+        // Curved line in bottom SVG layer (behind cards and circles)
+        var ax = pair.a.x, ay = pair.a.y, bx = pair.b.x, by = pair.b.y;
+        var dx = bx - ax, dy = by - ay;
+        var len = Math.hypot(dx, dy);
+        var curve = document.createElementNS(ns, 'path');
+        if (len < 1) {
+          curve.setAttribute('d', 'M' + ax + ',' + ay + ' L' + bx + ',' + by);
+        } else {
+          // Control point offset perpendicular to the line, capped to feel natural
+          var bend  = Math.min(len * 0.30, 48);
+          var cpx   = (ax + bx) / 2 - (dy / len) * bend;
+          var cpy   = (ay + by) / 2 + (dx / len) * bend;
+          curve.setAttribute('d', 'M' + ax + ',' + ay + ' Q' + cpx + ',' + cpy + ' ' + bx + ',' + by);
+        }
+        curve.setAttribute('fill',           'none');
+        curve.setAttribute('stroke',         def.color);
+        curve.setAttribute('stroke-width',   '1.5');
+        curve.setAttribute('stroke-opacity', '0.45');
+        svg.appendChild(curve);
 
         // Connection point circles in top SVG layer (above cards)
         [[pair.a, def.fromKey], [pair.b, def.toKey]].forEach(function(item) {
@@ -559,7 +597,7 @@ function initPanel(sidebarBox) {
         isDragging = true; ox = clientX; oy = clientY;
         sl = parseFloat(el.style.left) || 0;
         st = parseFloat(el.style.top)  || 0;
-        el.style.zIndex = 99; el.style.transition = 'none';
+        el.style.zIndex = 50; el.style.transition = 'none';
       }
       function dragMove(clientX, clientY) {
         if (!isDragging) return;
@@ -630,7 +668,21 @@ function initPanel(sidebarBox) {
             '<div class="pp-mm-field"><span class="pp-flabel">' + panelEscH(header) + '</span>' +
             panelHighlight(text, kwsHL) + '</div>' +
           '</div>';
-        if (matchObj) attachGoTo(card, matchObj, accentColor);
+        if (matchObj) {
+          attachGoTo(card, matchObj, accentColor);
+          // Redraw arrows during the go-to button slide-in/out transition so
+          // connection points (which track the button's visual bottom) animate.
+          var _gotoBtn = card.querySelector('.pp-goto-btn');
+          if (_gotoBtn) {
+            new MutationObserver(function() {
+              var t0 = performance.now(), dur = 350;
+              (function tick(now) {
+                redrawArrows();
+                if (now - t0 < dur) requestAnimationFrame(tick);
+              })(t0);
+            }).observe(_gotoBtn, { attributes: true, attributeFilter: ['class'] });
+          }
+        }
       }
 
       ppMmWrap.appendChild(card);
@@ -819,7 +871,7 @@ function initPanel(sidebarBox) {
 
         // Redraw arrows continuously during the slide
         var start  = performance.now();
-        var dur    = 400;
+        var dur    = 480;
         function arrowRaf(now) {
           _mmActive.redrawArrows();
           if (now - start < dur) requestAnimationFrame(arrowRaf);
