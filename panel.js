@@ -696,7 +696,6 @@ function initPanel(sidebarBox) {
 #pp-body {
   padding: 10px 12px 18px; box-sizing: border-box;
   display: grid;
-  justify-content: start;
   align-content: start;
   gap: 10px;
 }
@@ -728,17 +727,15 @@ function initPanel(sidebarBox) {
   color: rgba(0,0,0,.25); line-height: 1.5;
 }
 
-/* Seed card — fills its grid column, same as match cards */
+/* Seed card — constrained by grid column width set by updateGrid() */
 .pp-seed-card {
-  width: 100%;
   border: 2px solid var(--ppc-border, #aaa);
   border-radius: 8px; background: var(--ppc-bg, #f8f8f8);
   overflow: hidden; box-sizing: border-box;
 }
 
-/* Match card — fills its grid column width (set by updateGrid in JS) */
+/* Match card — constrained by grid column width set by updateGrid() */
 .pp-match-card {
-  width: 100%;
   border: 1.5px solid var(--ppc-border, #aaa);
   border-radius: 8px; background: var(--ppc-bg, #f8f8f8);
   overflow: visible; box-sizing: border-box;
