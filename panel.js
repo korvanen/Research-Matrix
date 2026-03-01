@@ -20,7 +20,7 @@ const PANEL_CARD_MAX_W      = 240;
 const PANEL_GOTO_DELAY      = 400;
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
-console.log('[panel.js_v_I]');
+console.log('[panel.js_v_M]');
 document.addEventListener('DOMContentLoaded', () => {
   const wait = setInterval(() => {
     const box = document.getElementById('sidebar-box');
@@ -694,27 +694,32 @@ function initPanel(sidebarBox) {
         // Add expanded class (unclamps field text).
         // We can't trust cardEl.offsetHeight because overflow:hidden on the card
         // AND on each .pp-mm-field clips the reported height.
-        // Instead, sum the scrollHeight of each direct child — these are the head
-        // and body divs which contain everything, and scrollHeight is not clipped.
+        // Measure by summing scrollHeight of all direct children (head + body divs).
+        // The body itself is a flex container — its scrollHeight reliably reflects
+        // the full stacked height of all fields once -webkit-line-clamp is removed.
         cardEl.classList.add('pp-mm-expanded');
         cardEl.style.transition = 'none';
         cardEl.style.height     = '';
         void cardEl.offsetHeight;   // flush so scrollHeights reflect unclamped text
         var contentH = 0;
         Array.from(cardEl.children).forEach(function(child) {
-          // Skip the absolutely-positioned goto button — it contributes 0 to flow height
           if (child.classList.contains('pp-goto-btn')) return;
           contentH += child.scrollHeight;
         });
-        // Add card-level border (top + bottom)
         var cardStyle = getComputedStyle(cardEl);
         contentH += parseFloat(cardStyle.borderTopWidth || 0) +
                     parseFloat(cardStyle.borderBottomWidth || 0);
+        // Add measured button height + its margins when the card has a goto button
+        if (btn) {
+          var btnStyle  = getComputedStyle(btn);
+          var btnHeight = btn.scrollHeight
+                        + parseFloat(btnStyle.marginTop    || 0)
+                        + parseFloat(btnStyle.marginBottom || 0);
+          // bottom:8px offset is the gap between button bottom and card bottom
+          contentH += btnHeight + 8 /* bottom offset */ + 8 /* top breathing room */;
+        }
 
-        // Reserve space below content for the goto button.
-        // Seed cards have no button so need no extra room.
-        var btnSpace = btn ? MM_BTN_SPACE : 0;
-        var fullH    = contentH + btnSpace;
+        var fullH = contentH;
 
         // Pin back to collH, then animate to fullH in one smooth motion.
         // The inline height is kept at fullH for the entire expanded lifetime —
