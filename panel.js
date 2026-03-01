@@ -20,7 +20,7 @@ const PANEL_CARD_MAX_W      = 240;
 const PANEL_GOTO_DELAY      = 400;
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
-console.log('[panel.js_v_D]');
+console.log('[panel.js_v_E]');
 document.addEventListener('DOMContentLoaded', () => {
   const wait = setInterval(() => {
     const box = document.getElementById('sidebar-box');
@@ -156,8 +156,16 @@ function initPanel(sidebarBox) {
           renderMindmap(lastMatches);
         }
       } else {
-        ppBody.style.display   = 'grid';
         ppMmWrap.style.display = 'none';
+        // Always re-render tiles so it reflects the current selection,
+        // even if the selection changed while the user was in mindmap mode.
+        if (_hasContent && lastMatches !== undefined) {
+          var _td  = typeof TABS !== 'undefined' ? TABS[seedTabIdx] : null;
+          var _tdd = _td && typeof processSheetData === 'function' ? processSheetData(_td.grid) : null;
+          renderTiles(lastMatches, seedKws, seedTabIdx, _tdd);
+        } else {
+          ppBody.style.display = 'grid';
+        }
       }
     }
   );
@@ -298,37 +306,53 @@ function initPanel(sidebarBox) {
 
     var frag = document.createDocumentFragment();
 
-    var vars = panelThemeVars(srcTabIdx);
+    var vars        = panelThemeVars(srcTabIdx);
+    var accentSrc   = vars['--tab-active-bg']    || '#888';
+    var labelSrc    = vars['--tab-active-color'] || '#fff';
+    var bgSrc       = vars['--bg-data']          || '#f8f8f8';
+    var tabLabel    = (srcData && srcData.title) ? srcData.title
+                      : (typeof TABS !== 'undefined' ? TABS[srcTabIdx].name : '');
 
-    var seedCard = document.createElement('div');
-    seedCard.className = 'pp-seed-card';
-    seedCard.style.setProperty('--ppc-border', vars['--tab-active-bg'] || '#888');
-    seedCard.style.setProperty('--ppc-bg',     vars['--bg-data']       || '#f8f8f8');
+    // Build the seed card — same structure as a match card, "Selected" badge in header.
+    function buildSeedCard() {
+      var card = document.createElement('div');
+      card.className = 'pp-match-card pp-seed-card';
+      card.style.setProperty('--ppc-border', accentSrc);
+      card.style.setProperty('--ppc-bg',     bgSrc);
 
-    var seedHead = document.createElement('div');
-    seedHead.className = 'pp-card-head';
-    var tabLabel = (srcData && srcData.title) ? srcData.title : (typeof TABS !== 'undefined' ? TABS[srcTabIdx].name : '');
-    seedHead.innerHTML =
-      '<span class="pp-card-badge" style="background:' + (vars['--tab-active-bg'] || '#888') +
-      ';color:' + (vars['--tab-active-color'] || '#fff') + '">Selected</span>' +
-      '<span class="pp-card-dim">' + panelEscH(tabLabel) + '</span>';
+      var head = document.createElement('div');
+      head.className = 'pp-card-head';
+      // Get cats for the seed row
+      var seedRow = srcData && srcData.rows[seedRowIdx];
+      var seedCatsArr = seedRow ? seedRow.cats.filter(function(c){ return c.trim(); }) : [];
+      head.innerHTML =
+        '<span class="pp-card-badge" style="background:' + accentSrc + ';color:' + labelSrc + '">Selected</span>' +
+        (seedCatsArr.length ? '<span class="pp-card-dim">' + seedCatsArr.map(panelEscH).join(' · ') + '</span>' : '');
 
-    var seedBody = document.createElement('div');
-    seedBody.className = 'pp-card-body';
-    seedCells.forEach(function(c) {
-      var f = document.createElement('div');
-      f.className = 'pp-field';
-      f.innerHTML = '<span class="pp-flabel">' + panelEscH(c.header) + '</span>' +
-        panelHighlight(c.text, kws);
-      seedBody.appendChild(f);
-    });
-    seedCard.appendChild(seedHead);
-    seedCard.appendChild(seedBody);
-    frag.appendChild(seedCard);
+      var body = document.createElement('div');
+      body.className = 'pp-card-body';
+      seedCells.forEach(function(c) {
+        var f = document.createElement('div');
+        f.className = 'pp-field pp-field-matched';
+        f.innerHTML = '<span class="pp-flabel">' + panelEscH(c.header) + '</span>' +
+          panelHighlight(c.text, kws);
+        body.appendChild(f);
+      });
+      card.appendChild(head);
+      card.appendChild(body);
+      return card;
+    }
 
     if (!matches.length) {
       ppSubtitle.textContent  = 'No matches found';
       ppToolrow.style.display = 'none';
+      // Seed card still shown even with no matches, inside its tab group
+      var divNone = document.createElement('div');
+      divNone.className = 'pp-divider';
+      divNone.style.borderColor = accentSrc;
+      divNone.innerHTML = '<span style="background:' + accentSrc + ';color:' + labelSrc + '">' + panelEscH(tabLabel) + '</span>';
+      frag.appendChild(divNone);
+      frag.appendChild(buildSeedCard());
       var emptyEl = document.createElement('div');
       emptyEl.className = 'pp-empty';
       emptyEl.textContent = 'No matching entries found';
@@ -351,11 +375,19 @@ function initPanel(sidebarBox) {
       if (!byTab.has(m.tabIdx)) byTab.set(m.tabIdx, []);
       byTab.get(m.tabIdx).push(m);
     });
+    // Ensure the seed's tab appears even if it has no matches
+    if (!byTab.has(srcTabIdx)) byTab.set(srcTabIdx, []);
 
-    [...byTab.keys()].sort().forEach(function(tabIdx) {
-      var tabMatches  = byTab.get(tabIdx);
+    // Sort tabs: seed tab always first, others in index order
+    var sortedTabKeys = [srcTabIdx].concat(
+      [...byTab.keys()].filter(function(t){ return t !== srcTabIdx; }).sort()
+    );
+
+    sortedTabKeys.forEach(function(tabIdx) {
+      var tabMatches  = byTab.get(tabIdx) || [];
       var tv          = panelThemeVars(tabIdx);
-      var tabName     = (tabMatches[0].title) || (typeof TABS !== 'undefined' ? TABS[tabIdx].name : 'Tab ' + tabIdx);
+      var tabNameStr  = tabIdx === srcTabIdx ? tabLabel
+        : ((tabMatches[0] && tabMatches[0].title) || (typeof TABS !== 'undefined' ? TABS[tabIdx].name : 'Tab ' + tabIdx));
       var accentColor = tv['--tab-active-bg'] || '#888';
       var bgColor     = tv['--bg-data']       || '#f8f8f8';
 
@@ -365,8 +397,11 @@ function initPanel(sidebarBox) {
       divider.innerHTML =
         '<span style="background:' + accentColor +
         ';color:' + (tv['--tab-active-color'] || '#fff') + '">' +
-        panelEscH(tabName) + '</span>';
+        panelEscH(tabNameStr) + '</span>';
       frag.appendChild(divider);
+
+      // Seed card first, inside its own tab group
+      if (tabIdx === srcTabIdx) frag.appendChild(buildSeedCard());
 
       tabMatches.forEach(function(m) {
         var card = document.createElement('div');
@@ -651,11 +686,13 @@ function initPanel(sidebarBox) {
         setTimeout(function() {
           if (!cardEl.classList.contains('pp-mm-expanded')) return; // already re-expanded
           cardEl.classList.remove('pp-mm-expanded');
+          cardEl.classList.remove('pp-mm-touch-expanded');
           cardEl.style.transition = '';
           cardEl.style.height     = '';
         }, MM_EXPAND_MS + 20);
         // Mark as not expanded now so callers can check the class synchronously
         cardEl.classList.remove('pp-mm-expanded');
+        cardEl.classList.remove('pp-mm-touch-expanded');
       }
     }
 
@@ -716,54 +753,64 @@ function initPanel(sidebarBox) {
         dragEnd();
         // Tap (< 8px movement): expand this card, collapse any other that was open
         if (moved < 8) {
-          var wantsExpand = !el.classList.contains('pp-mm-expanded');
-          // Collapse the previously touch-expanded card if it's different
+          var wantsExpand = !el.classList.contains('pp-mm-touch-expanded');
+          // Collapse the previously touch-expanded card
           if (_mmTouchExpanded && _mmTouchExpanded !== el) {
             var prevKey = _mmTouchExpanded._mmKey;
+            _mmTouchExpanded.classList.remove('pp-mm-touch-expanded');
             mmSetExpanded(_mmTouchExpanded, false, prevKey);
           }
           _mmTouchExpanded = wantsExpand ? el : null;
+          if (wantsExpand) el.classList.add('pp-mm-touch-expanded');
+          else             el.classList.remove('pp-mm-touch-expanded');
           mmSetExpanded(el, wantsExpand, key);
         }
       });
       el.addEventListener('touchcancel', dragEnd);
     }
 
-    function makeCard(text, header, tabIdx, key, isSeed, cats, kwsHL, matchObj) {
+    function makeCard(text, header, tabIdx, key, isSeed, cats, kwsHL, matchObj, tabName) {
       var tv = panelThemeVars(tabIdx);
-      var accentColor = tv['--tab-active-bg'] || '#888';
-      var bgColor     = tv['--bg-data']       || '#fff';
+      var accentColor  = tv['--tab-active-bg']    || '#888';
+      var labelColor   = tv['--tab-active-color'] || '#fff';
+      var bgColor      = tv['--bg-data']          || '#fff';
       cardColors.set(key, { border: accentColor, bg: bgColor });
       var card = document.createElement('div');
       card.className = 'pp-mm-card' + (isSeed ? ' pp-mm-seed' : '');
       card.style.width = PANEL_CARD_W + 'px';
       card.style.setProperty('--ppc-border', accentColor);
-      card.style.setProperty('--ppc-bg',     tv['--bg-data'] || '#fff');
+      card.style.setProperty('--ppc-bg',     bgColor);
 
-      if (isSeed) {
-        card.innerHTML =
-          '<div class="pp-mm-card-head" style="background:' + accentColor + '">' +
-            '<span style="color:' + (tv['--tab-active-color'] || '#fff') +
-            ';font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase">Selected</span>' +
-          '</div>' +
-          '<div class="pp-mm-card-body">' +
-            seedCells.map(function(c) {
-              return '<div class="pp-mm-field"><span class="pp-flabel">' +
-                panelEscH(c.header) + '</span>' + panelHighlight(c.text, kwsHL) + '</div>';
-            }).join('') +
-          '</div>';
-      } else {
-        var catLine = cats && cats.length ? cats.map(panelEscH).join(' · ') : '';
-        card.innerHTML =
-          '<div class="pp-mm-card-head" style="background:' + accentColor + '"></div>' +
-          '<div class="pp-mm-card-body">' +
-            (catLine ? '<div class="pp-mm-cat">' + catLine + '</div>' : '') +
-            '<div class="pp-mm-field"><span class="pp-flabel">' + panelEscH(header) + '</span>' +
-            panelHighlight(text, kwsHL) + '</div>' +
-          '</div>';
-        if (matchObj) {
-          attachGoTo(card, matchObj, accentColor);
-        }
+      // Header: thin color bar collapsed; expands to show tab name on hover.
+      // Both seed and match cards share the same header structure.
+      var badgeHtml = isSeed
+        ? '<span class="pp-mm-badge">Selected</span>'
+        : '';
+      var headHtml =
+        '<div class="pp-mm-card-head" style="background:' + accentColor + ';color:' + labelColor + '">' +
+          badgeHtml +
+          '<span class="pp-mm-head-label">' + panelEscH(tabName || '') + '</span>' +
+        '</div>';
+
+      // Body: categories + all cell fields (for seed: seedCells; for match: single best field)
+      var catLine   = cats && cats.length ? cats.map(panelEscH).join(' · ') : '';
+      var fieldsHtml = isSeed
+        ? seedCells.map(function(c) {
+            return '<div class="pp-mm-field"><span class="pp-flabel">' +
+              panelEscH(c.header) + '</span>' + panelHighlight(c.text, kwsHL) + '</div>';
+          }).join('')
+        : '<div class="pp-mm-field"><span class="pp-flabel">' + panelEscH(header) + '</span>' +
+          panelHighlight(text, kwsHL) + '</div>';
+
+      card.innerHTML =
+        headHtml +
+        '<div class="pp-mm-card-body">' +
+          (catLine ? '<div class="pp-mm-cat">' + catLine + '</div>' : '') +
+          fieldsHtml +
+        '</div>';
+
+      if (!isSeed && matchObj) {
+        attachGoTo(card, matchObj, accentColor);
       }
 
       ppMmWrap.appendChild(card);
@@ -771,9 +818,19 @@ function initPanel(sidebarBox) {
       makeDraggable(card, key);
       cardEls.set(key, card);
 
-      // Hover expand — same trigger as goto button so they animate together.
-      card.addEventListener('mouseenter', function() { mmSetExpanded(card, true,  key); });
-      card.addEventListener('mouseleave', function() { mmSetExpanded(card, false, key); });
+      // Hover expand — shares the same animation as the goto button.
+      // On mouseenter we also clear touch-expanded so hover now owns the state.
+      card.addEventListener('mouseenter', function() {
+        if (_mmTouchExpanded === card) {
+          card.classList.remove('pp-mm-touch-expanded');
+          _mmTouchExpanded = null;
+        }
+        mmSetExpanded(card, true, key);
+      });
+      card.addEventListener('mouseleave', function() {
+        if (card.classList.contains('pp-mm-touch-expanded')) return; // touch lock active
+        mmSetExpanded(card, false, key);
+      });
 
       // ResizeObserver: any size change on the card (goto button, future features)
       // automatically redraws connection points to stay glued to the card's stroke.
@@ -784,7 +841,11 @@ function initPanel(sidebarBox) {
     }
 
     var seedKey = 'seed';
-    makeCard('', '', seedTabIdx, seedKey, true, [], seedKws, null);
+    var _seedTab   = typeof TABS !== 'undefined' ? TABS[seedTabIdx] : null;
+    var _seedData  = _seedTab && typeof processSheetData === 'function' ? processSheetData(_seedTab.grid) : null;
+    var _seedCats  = _seedData && _seedData.rows[seedRowIdx] ? _seedData.rows[seedRowIdx].cats.filter(function(c){ return c.trim(); }) : [];
+    var _seedTabName = (_seedData && _seedData.title) ? _seedData.title : (_seedTab ? _seedTab.name : '');
+    makeCard('', '', seedTabIdx, seedKey, true, _seedCats, seedKws, null, _seedTabName);
 
     matches.forEach(function(m) {
       var indices = Array.from({ length: m.row.cells.length }, function(_, i) { return i; })
@@ -804,7 +865,12 @@ function initPanel(sidebarBox) {
       var cats   = m.row.cats ? m.row.cats.filter(function(c) { return c.trim(); }) : [];
       var tv     = panelThemeVars(m.tabIdx);
 
-      makeCard(text, header, m.tabIdx, key, false, cats, m.shared, m);
+      var _mTabData = _seedData; // reuse if same tab, else compute
+      var _mTabD = (m.tabIdx === seedTabIdx && _seedData) ? _seedData :
+        (typeof TABS !== 'undefined' && typeof processSheetData === 'function' ? processSheetData(TABS[m.tabIdx].grid) : null);
+      var _mTabName = (_mTabD && _mTabD.title) ? _mTabD.title :
+        (typeof TABS !== 'undefined' ? TABS[m.tabIdx].name : 'Tab ' + m.tabIdx);
+      makeCard(text, header, m.tabIdx, key, false, cats, m.shared, m, _mTabName);
       arrowDefs.push({ fromKey: seedKey, toKey: key, color: tv['--tab-active-bg'] || '#aaa' });
     });
 
@@ -1053,12 +1119,9 @@ function initPanel(sidebarBox) {
   color: rgba(0,0,0,.25); line-height: 1.5;
 }
 
-/* Seed card */
-.pp-seed-card {
-  min-width: 0;
-  border: 2px solid var(--ppc-border, #aaa);
-  border-radius: 8px; background: var(--ppc-bg, #f8f8f8);
-  overflow: hidden; box-sizing: border-box;
+/* Seed card — shares pp-match-card layout, slightly thicker border to distinguish */
+.pp-seed-card.pp-match-card {
+  border-width: 2px;
 }
 
 /* Match card */
@@ -1134,6 +1197,13 @@ function initPanel(sidebarBox) {
   pointer-events: auto;
 }
 .pp-goto-btn:hover { filter: brightness(0.92); }
+/* Touch-expanded: CSS forces the goto button visible regardless of mouse state */
+.pp-mm-card.pp-mm-touch-expanded .pp-goto-btn {
+  opacity: 1 !important;
+  transform: translateY(0) !important;
+  margin-bottom: 8px !important;
+  pointer-events: auto !important;
+}
 
 /* Keyword highlight */
 mark.pkw {
@@ -1151,11 +1221,24 @@ mark.pkw {
 }
 .pp-mm-card:active { cursor: grabbing; }
 .pp-mm-card-head {
-  min-height: 6px; padding: 4px 8px;
-  display: flex; align-items: center; justify-content: center;
+  min-height: 6px; padding: 0 8px;
+  display: flex; align-items: center; gap: 6px;
   border-radius: 6px 6px 0 0; overflow: hidden;
 }
-.pp-mm-seed .pp-mm-card-head { min-height: 22px; }
+.pp-mm-badge {
+  font-size: 9px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase;
+  flex-shrink: 0; opacity: 0.9;
+}
+.pp-mm-head-label {
+  font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  max-height: 0; opacity: 0;
+  transition: max-height 0.18s ease, opacity 0.18s ease, padding 0.18s ease;
+  padding: 0;
+}
+.pp-mm-card.pp-mm-expanded .pp-mm-head-label {
+  max-height: 32px; opacity: 1; padding: 5px 0;
+}
 .pp-mm-card-body { padding: 5px 8px 7px; display: flex; flex-direction: column; gap: 3px; }
 .pp-mm-field {
   font-size: 10px; line-height: 1.35; color: rgba(0,0,0,.7);
