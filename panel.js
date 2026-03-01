@@ -83,19 +83,17 @@ function initPanel(sidebarBox) {
     var w = (sidebarEl ? sidebarEl.offsetWidth : sidebarBox.offsetWidth) - sbMargin * 2 - pad;
     if (w <= 0) return;
 
-    // Cap useful columns at the largest group of match cards currently rendered.
-    // Once all cards fit at PANEL_CARD_MAX_W, columns freeze — no phantom columns,
-    // no further stretching.
+    // Count actual match cards so we never create phantom columns beyond them.
     var matchCardCount = ppBody.querySelectorAll('.pp-match-card').length;
     var maxUsefulCols  = matchCardCount > 0 ? matchCardCount : Infinity;
 
-    // How many columns fit with cards at least PANEL_CARD_MIN_W wide?
-    var colsByMin = Math.max(1, Math.floor((w + gap) / (PANEL_CARD_MIN_W + gap)));
-    // How many columns fit with cards at exactly PANEL_CARD_MAX_W wide?
-    var colsByMax = Math.max(1, Math.floor((w + gap) / (PANEL_CARD_MAX_W + gap)));
-
-    // Use max-width column count once there's enough room, capped at what's useful.
-    var cols  = Math.min(colsByMin, Math.max(1, colsByMax), maxUsefulCols);
+    // Normal column count: how many fit with each card at least PANEL_CARD_MIN_W wide.
+    // Cap at maxUsefulCols — once all cards fit in the row, stop adding ghost columns.
+    var cols  = Math.min(
+      Math.max(1, Math.floor((w + gap) / (PANEL_CARD_MIN_W + gap))),
+      maxUsefulCols
+    );
+    // Distribute available space; cards scale up to PANEL_CARD_MAX_W, then freeze.
     var cardW = Math.min(PANEL_CARD_MAX_W, Math.floor((w - gap * (cols - 1)) / cols));
 
     if (cols === _lastCols && cardW === _lastCardW) return;
