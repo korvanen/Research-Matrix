@@ -20,7 +20,7 @@ const PANEL_CARD_MAX_W      = 240;
 const PANEL_GOTO_DELAY      = 400;
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
-console.log('[panel.js_v_F]');
+console.log('[panel.js_v_G]');
 document.addEventListener('DOMContentLoaded', () => {
   const wait = setInterval(() => {
     const box = document.getElementById('sidebar-box');
@@ -633,69 +633,89 @@ function initPanel(sidebarBox) {
 
     // Expand/collapse a mindmap card: reveals full text and goto button as one motion.
     // Uses explicit height animation so the duration matches the goto button exactly.
-    var MM_EXPAND_MS = 220; // ← adjust to change expansion speed (keep in sync with goto CSS)
+    var MM_EXPAND_MS    = 220; // ← animation speed in ms
+    var MM_HOVER_DELAY  = 120; // ← ms before hover expand triggers (0 = instant)
+
+    function _btnReset(btn) {
+      if (!btn) return;
+      btn.style.transition    = '';
+      btn.style.marginBottom  = '';
+      btn.style.opacity       = '';
+      btn.style.transform     = '';
+      btn.style.pointerEvents = '';
+    }
+
+    // _mmExpandState per card: 'expanded' | 'collapsed' | undefined
+    // Used by cleanup timers instead of checking the class (which is removed
+    // synchronously while the collapse animation is still running).
 
     function mmSetExpanded(cardEl, expanded, key) {
-      // We own the goto button's visibility entirely via inline styles.
-      // This bypasses attachGoTo's class-based show/hide (which fires on mouse events
-      // and would create a "second motion"), and also fixes touch (where synthetic
-      // mouseleave would strip pp-goto-visible right after we add it).
       var btn = cardEl.querySelector('.pp-goto-btn');
+      clearTimeout(cardEl._expandTimer);
 
       if (expanded) {
+        cardEl._mmExpandState = 'expanded';
+
         if (!collapsedHeights.has(key)) {
           collapsedHeights.set(key, cardEl.offsetHeight);
         }
         var collH = collapsedHeights.get(key);
 
-        // Step 1: pin at collapsed height, unclamp text, but keep btn invisible.
-        // Snap btn margin-bottom to 8px NOW (no CSS transition) so scrollHeight
-        // already includes the button's space when we measure it.
+        // Prep: pin height, unclamp text, snap btn into layout space but invisible.
         cardEl.style.transition = 'none';
         cardEl.style.height     = collH + 'px';
         cardEl.classList.add('pp-mm-expanded');
         if (btn) {
-          btn.style.transition   = 'none';
-          btn.style.marginBottom = '8px';     // snap space open instantly
-          btn.style.opacity      = '0';       // but still invisible
-          btn.style.transform    = 'translateY(4px)';
+          btn.style.transition    = 'none';
+          btn.style.marginBottom  = '8px';  // in-flow for scrollHeight measurement
+          btn.style.opacity       = '0';
+          btn.style.transform     = 'translateY(4px)';
           btn.style.pointerEvents = 'none';
         }
-        void cardEl.offsetHeight; // flush — scrollHeight now includes btn space
+        void cardEl.offsetHeight; // flush — scrollHeight now includes full content + btn
 
         var fullH = cardEl.scrollHeight;
 
-        // Step 2: animate card height from collapsed → full.
-        // Simultaneously fade+slide the button in — one unified motion.
+        // Animate card height and btn fade as a single motion.
         cardEl.style.transition = 'height ' + MM_EXPAND_MS + 'ms ease';
         cardEl.style.height     = fullH + 'px';
         if (btn) {
-          btn.style.transition    = 'opacity ' + MM_EXPAND_MS + 'ms ease, transform ' + MM_EXPAND_MS + 'ms ease';
+          btn.style.transition    = 'opacity ' + MM_EXPAND_MS + 'ms ease, ' +
+                                    'transform ' + MM_EXPAND_MS + 'ms ease';
           btn.style.opacity       = '1';
           btn.style.transform     = 'translateY(0)';
           btn.style.pointerEvents = 'auto';
         }
 
-        var t = setTimeout(function() {
-          if (cardEl.classList.contains('pp-mm-expanded')) {
-            cardEl.style.transition = '';
-            cardEl.style.height     = '';
-          }
+        // After animation: release fixed height so card reflows naturally.
+        cardEl._expandTimer = setTimeout(function() {
+          if (cardEl._mmExpandState !== 'expanded') return;
+          cardEl.style.transition = '';
+          cardEl.style.height     = '';
         }, MM_EXPAND_MS + 20);
-        cardEl._expandTimer = t;
 
       } else {
-        clearTimeout(cardEl._expandTimer);
+        // Mark collapsed immediately — class removal is also synchronous so that
+        // the mouseleave touch-guard check works, but we use _mmExpandState in
+        // timers to avoid the class-already-gone race that caused the stuck-card bug.
+        cardEl._mmExpandState = 'collapsed';
+        cardEl.classList.remove('pp-mm-expanded');
+        cardEl.classList.remove('pp-mm-touch-expanded');
 
-        var curH  = cardEl.getBoundingClientRect().height;
-        var collH = collapsedHeights.get(key) || curH;
-
-        // Fade button out quickly, then collapse the card.
+        // Reset btn margin to CSS default (negative) NOW, before snapshotting height.
+        // This ensures card reflows to collH correctly once inline height is cleared.
         if (btn) {
-          btn.style.transition    = 'opacity ' + Math.round(MM_EXPAND_MS * 0.5) + 'ms ease';
+          btn.style.transition    = 'none';
+          btn.style.marginBottom  = '';   // back to calc(-1*(1em+22px))
           btn.style.opacity       = '0';
+          btn.style.transform     = 'translateY(4px)';
           btn.style.pointerEvents = 'none';
         }
+
+        // Re-read height after btn margin reset (card may have slightly changed).
+        void cardEl.offsetHeight;
+        var curH  = cardEl.getBoundingClientRect().height;
+        var collH = collapsedHeights.get(key) || curH;
 
         cardEl.style.transition = 'none';
         cardEl.style.height     = curH + 'px';
@@ -704,25 +724,12 @@ function initPanel(sidebarBox) {
         cardEl.style.transition = 'height ' + MM_EXPAND_MS + 'ms ease';
         cardEl.style.height     = collH + 'px';
 
-        var collapseTimer = setTimeout(function() {
-          if (!cardEl.classList.contains('pp-mm-expanded')) return;
-          cardEl.classList.remove('pp-mm-expanded');
-          cardEl.classList.remove('pp-mm-touch-expanded');
+        cardEl._expandTimer = setTimeout(function() {
+          if (cardEl._mmExpandState !== 'collapsed') return;
           cardEl.style.transition = '';
           cardEl.style.height     = '';
-          // Restore button to default hidden state so CSS class-based
-          // show/hide from attachGoTo still works in tiles mode.
-          if (btn) {
-            btn.style.transition    = '';
-            btn.style.marginBottom  = '';
-            btn.style.opacity       = '';
-            btn.style.transform     = '';
-            btn.style.pointerEvents = '';
-          }
+          _btnReset(btn);
         }, MM_EXPAND_MS + 20);
-
-        cardEl.classList.remove('pp-mm-expanded');
-        cardEl.classList.remove('pp-mm-touch-expanded');
       }
     }
 
@@ -866,19 +873,27 @@ function initPanel(sidebarBox) {
       makeDraggable(card, key);
       cardEls.set(key, card);
 
-      // Hover expand — shares the same animation as the goto button.
-      // Skip if a drag is in progress (isDragging lives in makeDraggable closure —
-      // check via the data attribute we stamp on dragStart).
+      // Hover expand with configurable delay.
+      // Touch-expanded cards ignore synthetic mouseleave from the browser.
+      var _hoverEnterTimer = null;
       card.addEventListener('mouseenter', function() {
-        if (card.style.zIndex === '500') return; // dragging — no expand
-        if (_mmTouchExpanded === card) {
-          card.classList.remove('pp-mm-touch-expanded');
-          _mmTouchExpanded = null;
-        }
-        mmSetExpanded(card, true, key);
+        if (card.style.zIndex === '500') return; // dragging
+        clearTimeout(_hoverEnterTimer);
+        _hoverEnterTimer = setTimeout(function() {
+          // If this was triggered by a real hover (not synthetic post-touch),
+          // take over from touch mode rather than fighting it.
+          if (_mmTouchExpanded === card) {
+            card.classList.remove('pp-mm-touch-expanded');
+            _mmTouchExpanded = null;
+          }
+          mmSetExpanded(card, true, key);
+        }, MM_HOVER_DELAY);
       });
       card.addEventListener('mouseleave', function() {
-        if (card.classList.contains('pp-mm-touch-expanded')) return; // touch lock active
+        clearTimeout(_hoverEnterTimer);
+        // Ignore synthetic mouseleave fired by mobile browser after a tap.
+        // pp-mm-touch-expanded is set in touchend before any synthetic events fire.
+        if (card.classList.contains('pp-mm-touch-expanded')) return;
         mmSetExpanded(card, false, key);
       });
 
