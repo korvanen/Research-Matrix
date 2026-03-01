@@ -24,7 +24,7 @@ const PANEL_CARD_MAX_W      = 240; // px — card max width (cards stretch up to
 const PANEL_GOTO_DELAY      = 900; // ms hover before "Go to" button appears
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
-console.log('[panel.js_v_1]');
+console.log('[panel.js_v_2]');
 document.addEventListener('DOMContentLoaded', () => {
   console.log('[panel.js] DOMContentLoaded fired');
   const wait = setInterval(() => {
@@ -82,6 +82,7 @@ function initPanel(sidebarBox) {
     var cols  = w > 0 ? Math.max(1, Math.floor(w / PANEL_CARD_MIN_W)) : 1;
     var cardW = w > 0 ? Math.min(PANEL_CARD_MAX_W, Math.floor((w - gap * (cols - 1)) / cols)) : PANEL_CARD_MIN_W;
     var totalW = cols * cardW + (cols - 1) * gap + pad;
+    ppBody.style.display = 'grid';
     ppBody.style.width = totalW + 'px';
     ppBody.style.gridTemplateColumns = 'repeat(' + cols + ', ' + cardW + 'px)';
   }
