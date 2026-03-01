@@ -742,17 +742,17 @@ function initPanel(sidebarBox) {
   color: rgba(0,0,0,.25); line-height: 1.5;
 }
 
-/* Seed card — fills its grid column */
+/* Seed card — grid column constrains width; min-width:0 prevents overflow expansion */
 .pp-seed-card {
-  width: 100%;
+  min-width: 0;
   border: 2px solid var(--ppc-border, #aaa);
   border-radius: 8px; background: var(--ppc-bg, #f8f8f8);
   overflow: hidden; box-sizing: border-box;
 }
 
-/* Match card — fills its grid column */
+/* Match card — grid column constrains width; min-width:0 prevents overflow expansion */
 .pp-match-card {
-  width: 100%;
+  min-width: 0;
   border: 1.5px solid var(--ppc-border, #aaa);
   border-radius: 8px; background: var(--ppc-bg, #f8f8f8);
   overflow: visible; box-sizing: border-box;
