@@ -81,8 +81,9 @@ function initPanel(sidebarBox) {
     }
     var cols  = w > 0 ? Math.max(1, Math.floor(w / PANEL_CARD_MIN_W)) : 1;
     var cardW = w > 0 ? Math.min(PANEL_CARD_MAX_W, Math.floor((w - gap * (cols - 1)) / cols)) : PANEL_CARD_MIN_W;
+    var totalW = cols * cardW + (cols - 1) * gap + pad;
+    ppBody.style.width = totalW + 'px';
     ppBody.style.gridTemplateColumns = 'repeat(' + cols + ', ' + cardW + 'px)';
-    console.log('[updateGrid] wrapClientW=' + ppBodyWrap.clientWidth + ' w=' + w + ' cols=' + cols + ' cardW=' + cardW + ' gridTpl=' + ppBody.style.gridTemplateColumns + ' ppBody.offsetWidth=' + ppBody.offsetWidth);
   }
 
   // Call once immediately, then again after layout has settled
@@ -691,12 +692,10 @@ function initPanel(sidebarBox) {
 
 #pp-body-wrap { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; position: relative; }
 
-/* Grid columns set by updateGrid() in JS. width:fit-content makes the container
-   shrink to its columns rather than stretching to fill pp-body-wrap. */
+/* Grid columns set by updateGrid() in JS. Width also set by JS to prevent flex stretching. */
 #pp-body {
   padding: 10px 12px 18px; box-sizing: border-box;
   display: grid;
-  width: fit-content;
   align-content: start;
   gap: 10px;
 }
