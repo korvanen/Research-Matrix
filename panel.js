@@ -24,15 +24,12 @@ const PANEL_CARD_MAX_W      = 240; // px — card max width (cards stretch up to
 const PANEL_GOTO_DELAY      = 900; // ms hover before "Go to" button appears
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
-console.log('[panel.js_v_2]');
+console.log('[panel.js_v_3]');
 document.addEventListener('DOMContentLoaded', () => {
-  console.log('[panel.js] DOMContentLoaded fired');
   const wait = setInterval(() => {
     const box = document.getElementById('sidebar-box');
-    console.log('[panel.js] polling for sidebar-box:', box);
     if (!box) return;
     clearInterval(wait);
-    console.log('[panel.js] calling initPanel');
     initPanel(box);
   }, 50);
 });
@@ -71,6 +68,7 @@ function initPanel(sidebarBox) {
   // Columns set as explicit px on gridTemplateColumns — no CSS auto-fill needed.
   const ppBodyWrap = document.getElementById('pp-body-wrap');
 
+  var _lastCols = 0, _lastCardW = 0;
   function updateGrid() {
     var pad  = 24;
     var gap  = 10;
@@ -79,8 +77,12 @@ function initPanel(sidebarBox) {
       var sbMargin = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--sidebar-box-margin')) || 8;
       w = (sidebarBox.offsetWidth || sidebarBox.parentElement.offsetWidth) - sbMargin * 2 - pad;
     }
-    var cols  = w > 0 ? Math.max(1, Math.floor(w / PANEL_CARD_MIN_W)) : 1;
-    var cardW = w > 0 ? Math.min(PANEL_CARD_MAX_W, Math.floor((w - gap * (cols - 1)) / cols)) : PANEL_CARD_MIN_W;
+    if (w <= 0) return;
+    var cols  = Math.max(1, Math.floor(w / PANEL_CARD_MIN_W));
+    var cardW = Math.min(PANEL_CARD_MAX_W, Math.floor((w - gap * (cols - 1)) / cols));
+    // No change — skip to avoid triggering ResizeObserver loop
+    if (cols === _lastCols && cardW === _lastCardW) return;
+    _lastCols = cols; _lastCardW = cardW;
     var totalW = cols * cardW + (cols - 1) * gap + pad;
     ppBody.style.display = 'grid';
     ppBody.style.width = totalW + 'px';
@@ -390,23 +392,6 @@ function initPanel(sidebarBox) {
     });
 
     applyHlState();
-
-    // DEBUG: check what the cards actually measure after render
-    requestAnimationFrame(function() {
-      var firstCard = ppBody.querySelector('.pp-match-card, .pp-seed-card');
-      if (firstCard) {
-        var cs = getComputedStyle(firstCard);
-        var pbcs = getComputedStyle(ppBody);
-        console.log('[card debug] ppBody.style.width=' + ppBody.style.width
-          + ' ppBody.offsetWidth=' + ppBody.offsetWidth
-          + ' ppBody.style.gridTemplateColumns=' + ppBody.style.gridTemplateColumns
-          + ' ppBody computed display=' + pbcs.display
-          + ' ppBody computed gridTemplateColumns=' + pbcs.gridTemplateColumns
-          + ' card.offsetWidth=' + firstCard.offsetWidth
-          + ' card computed width=' + cs.width
-          + ' card computed display=' + cs.display);
-      }
-    });
   }
 
   // ── MINDMAP VIEW ──────────────────────────────────────────────────────────
