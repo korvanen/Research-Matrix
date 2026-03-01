@@ -20,7 +20,7 @@ const PANEL_CARD_MAX_W      = 240;
 const PANEL_GOTO_DELAY      = 400;
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
-console.log('[panel.js_v_B]');
+console.log('[panel.js_v_C]');
 document.addEventListener('DOMContentLoaded', () => {
   const wait = setInterval(() => {
     const box = document.getElementById('sidebar-box');
@@ -505,6 +505,20 @@ function initPanel(sidebarBox) {
       return best;
     }
 
+    // Returns the outward unit vector for a connection point based on which
+    // edge of its card it sits on. Used to make bezier control points exit
+    // the card perpendicularly, giving clean elbow-style curves.
+    function getEdgeTangent(pt, key) {
+      var vr = getCardRect(key);
+      if (!vr) return { dx: 0, dy: 1 };
+      var tol = 3;
+      if (Math.abs(pt.y - vr.y)           < tol) return { dx: 0, dy: -1 }; // top
+      if (Math.abs(pt.y - (vr.y + vr.h))  < tol) return { dx: 0, dy:  1 }; // bottom
+      if (Math.abs(pt.x - vr.x)           < tol) return { dx: -1, dy: 0 }; // left
+      if (Math.abs(pt.x - (vr.x + vr.w))  < tol) return { dx:  1, dy: 0 }; // right
+      return { dx: 0, dy: 1 };
+    }
+
     function pushApart(skipKey) {
       for (var pass = 0; pass < PANEL_MM_ITERS; pass++) {
         var moved = false;
@@ -543,20 +557,21 @@ function initPanel(sidebarBox) {
         var pair = closestPointPair(ptsA, ptsB);
         if (!pair) return;
 
-        // Curved line in bottom SVG layer (behind cards and circles)
+        // Cubic bezier in bottom SVG layer — control points exit each card
+        // perpendicularly (tangent to the edge the connection point is on).
         var ax = pair.a.x, ay = pair.a.y, bx = pair.b.x, by = pair.b.y;
-        var dx = bx - ax, dy = by - ay;
-        var len = Math.hypot(dx, dy);
+        var dist = Math.hypot(bx - ax, by - ay);
+        var offset = Math.min(dist * 0.45, 90);
+        var tanA = getEdgeTangent(pair.a, def.fromKey);
+        var tanB = getEdgeTangent(pair.b, def.toKey);
+        var cp1x = ax + tanA.dx * offset, cp1y = ay + tanA.dy * offset;
+        var cp2x = bx + tanB.dx * offset, cp2y = by + tanB.dy * offset;
         var curve = document.createElementNS(ns, 'path');
-        if (len < 1) {
-          curve.setAttribute('d', 'M' + ax + ',' + ay + ' L' + bx + ',' + by);
-        } else {
-          // Control point offset perpendicular to the line, capped to feel natural
-          var bend  = Math.min(len * 0.30, 48);
-          var cpx   = (ax + bx) / 2 - (dy / len) * bend;
-          var cpy   = (ay + by) / 2 + (dx / len) * bend;
-          curve.setAttribute('d', 'M' + ax + ',' + ay + ' Q' + cpx + ',' + cpy + ' ' + bx + ',' + by);
-        }
+        curve.setAttribute('d',
+          'M' + ax + ',' + ay +
+          ' C' + cp1x + ',' + cp1y +
+          ' '  + cp2x + ',' + cp2y +
+          ' '  + bx   + ',' + by);
         curve.setAttribute('fill',           'none');
         curve.setAttribute('stroke',         def.color);
         curve.setAttribute('stroke-width',   '1.5');
@@ -579,17 +594,27 @@ function initPanel(sidebarBox) {
       });
     }
 
+    // Expand/collapse a mindmap card: reveals full text and syncs with goto button.
+    function mmSetExpanded(cardEl, expanded) {
+      if (expanded) cardEl.classList.add('pp-mm-expanded');
+      else          cardEl.classList.remove('pp-mm-expanded');
+    }
+
     function makeDraggable(el, key) {
-      var isDragging = false, ox = 0, oy = 0, sl = 0, st = 0;
+      var isDragging = false, wasDrag = false;
+      var ox = 0, oy = 0, sl = 0, st = 0;
+      var touchStartX = 0, touchStartY = 0;
 
       function dragStart(clientX, clientY) {
-        isDragging = true; ox = clientX; oy = clientY;
+        isDragging = true; wasDrag = false;
+        ox = clientX; oy = clientY;
         sl = parseFloat(el.style.left) || 0;
         st = parseFloat(el.style.top)  || 0;
         el.style.zIndex = 50; el.style.transition = 'none';
       }
       function dragMove(clientX, clientY) {
         if (!isDragging) return;
+        wasDrag = true;
         var r = rects.get(key) || { w: PANEL_CARD_W, h: 80 };
         var pos = clampToCanvas(sl + (clientX - ox), st + (clientY - oy), r.w, r.h);
         el.style.left = pos[0] + 'px'; el.style.top = pos[1] + 'px';
@@ -611,8 +636,11 @@ function initPanel(sidebarBox) {
       document.addEventListener('mousemove', function(e) { dragMove(e.clientX, e.clientY); });
       document.addEventListener('mouseup', dragEnd);
 
+      // Touch: track start position to distinguish tap from drag
       el.addEventListener('touchstart', function(e) {
         if (e.touches.length !== 1) return;
+        touchStartX = e.touches[0].clientX;
+        touchStartY = e.touches[0].clientY;
         dragStart(e.touches[0].clientX, e.touches[0].clientY);
         e.preventDefault();
       }, { passive: false });
@@ -621,7 +649,16 @@ function initPanel(sidebarBox) {
         dragMove(e.touches[0].clientX, e.touches[0].clientY);
         e.preventDefault();
       }, { passive: false });
-      el.addEventListener('touchend', dragEnd);
+      el.addEventListener('touchend', function(e) {
+        var dx = (e.changedTouches[0] ? e.changedTouches[0].clientX : touchStartX) - touchStartX;
+        var dy = (e.changedTouches[0] ? e.changedTouches[0].clientY : touchStartY) - touchStartY;
+        var moved = Math.hypot(dx, dy);
+        dragEnd();
+        // Tap (< 8px movement): toggle expand just like hover does on desktop
+        if (moved < 8) {
+          mmSetExpanded(el, !el.classList.contains('pp-mm-expanded'));
+        }
+      });
       el.addEventListener('touchcancel', dragEnd);
     }
 
@@ -665,6 +702,11 @@ function initPanel(sidebarBox) {
       ppMmWrap.appendChild(card);
       makeDraggable(card, key);
       cardEls.set(key, card);
+
+      // Hover expand — same trigger as goto button so they animate together.
+      card.addEventListener('mouseenter', function() { mmSetExpanded(card, true); });
+      card.addEventListener('mouseleave', function() { mmSetExpanded(card, false); });
+
       // ResizeObserver: any size change on the card (goto button, future features)
       // automatically redraws connection points to stay glued to the card's stroke.
       if (window.ResizeObserver) {
@@ -1049,8 +1091,12 @@ mark.pkw {
 .pp-mm-card-body { padding: 5px 8px 7px; display: flex; flex-direction: column; gap: 3px; }
 .pp-mm-field {
   font-size: 10px; line-height: 1.35; color: rgba(0,0,0,.7);
-  overflow: hidden; display: -webkit-box;
-  -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+  overflow: hidden;
+  max-height: 40px; /* ~3 lines: 10px × 1.35 × 3 */
+  transition: max-height 0.22s ease;
+}
+.pp-mm-card.pp-mm-expanded .pp-mm-field {
+  max-height: 600px;
 }
 .pp-mm-cat {
   font-size: 9px; font-weight: 700; letter-spacing: .08em;
