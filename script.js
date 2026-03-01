@@ -4,12 +4,6 @@
 
 const APP_TITLE       = 'Dimensional Framework';
 
-const ARROW_SIZE      = 28;
-const ARROW_GAP       = 10;
-const ARROW_OFFSET    = 12;
-
-const TAB_BAR_PADDING  = window.innerHeight*0.1;
-
 const isPortrait = () => window.innerHeight > window.innerWidth;
 
 const PORTRAIT = {
@@ -25,6 +19,10 @@ const PORTRAIT = {
   sidebarFullscreenThreshold:1.00,
   sidebarSnapClose:          0.05,
   sidebarTwoPosition:        true,
+  arrowSize:                 36,    // px — larger touch targets in portrait
+  arrowGap:                  12,
+  arrowOffset:               16,
+  tabBarPadding:             24,    // px — spacing around compact tab label
 };
 
 const LANDSCAPE = {
@@ -40,6 +38,10 @@ const LANDSCAPE = {
   sidebarOverlapThreshold:   0.50,
   sidebarFullscreenThreshold:0.80,
   sidebarTwoPosition:        false,
+  arrowSize:                 28,    // px
+  arrowGap:                  10,
+  arrowOffset:               12,
+  tabBarPadding:             16,    // px
 };
 
 const R = () => isPortrait() ? PORTRAIT : LANDSCAPE;
@@ -57,6 +59,10 @@ const SIDEBAR_OVERLAP_THRESHOLD       = () => Math.round(window.innerWidth  * (3
 const SIDEBAR_FULLSCREEN_THRESHOLD    = () => Math.round(window.innerWidth  * R().sidebarFullscreenThreshold);
 const SIDEBAR_SNAP_CLOSE              = () => Math.round(window.innerWidth  * R().sidebarSnapClose);
 const SIDEBAR_TWO_POSITION            = () => !!R().sidebarTwoPosition;
+const ARROW_SIZE                      = () => R().arrowSize;
+const ARROW_GAP                       = () => R().arrowGap;
+const ARROW_OFFSET                    = () => R().arrowOffset;
+const TAB_BAR_PADDING                 = () => R().tabBarPadding;
 
 // ── THEMES ──
 const THEMES = {
@@ -520,11 +526,11 @@ function buildTabBarCompact() {
   tabBar.innerHTML = '';
   bottombar.classList.add('tabs-compact');
   const sidebarW    = sidebar.offsetWidth;
-  const isOverlap   = sidebar.classList.contains('is-overlapping');
-  const fullscreenW = SIDEBAR_FULLSCREEN_THRESHOLD();
-  const available   = isOverlap ? Math.max(0, window.innerWidth - fullscreenW) : window.innerWidth;
-  // Set explicit width (not just maxWidth) so the tab bar occupies exactly
-  // the available space and its flex children center within that region.
+  // Available = the non-sidebar portion of the screen.
+  // bottombar spans full window width; sidebar sits on top (is-overlapping) or
+  // beside it in the grid. Either way the visually free space is
+  // window.innerWidth - sidebarW, starting at x=0.
+  const available   = Math.max(0, window.innerWidth - sidebarW);
   tabBar.style.width = available + 'px'; tabBar.style.maxWidth = ''; tabBar.style.padding = '';
   if (!TABS.length) return;
   const tabData = processSheetData(TABS[activeTab].grid);
@@ -614,10 +620,10 @@ function applyBarSizes() {
   document.documentElement.style.setProperty('--tab-gap',             Math.round(window.innerWidth * 0.008) + 'px');
   document.documentElement.style.setProperty('--sidebar-box-margin',  SIDEBAR_BOX_MARGIN() + 'px');
   document.documentElement.style.setProperty('--drag-handle-width',   DRAG_HANDLE_WIDTH() + 'px');
-  document.documentElement.style.setProperty('--handle-arrow-size',   ARROW_SIZE + 'px');
-  document.documentElement.style.setProperty('--handle-arrow-gap',    ARROW_GAP  + 'px');
-  document.documentElement.style.setProperty('--handle-arrow-offset', ARROW_OFFSET + 'px');
-  document.documentElement.style.setProperty('--tab-bar-padding',     TAB_BAR_PADDING + 'px');
+  document.documentElement.style.setProperty('--handle-arrow-size',   ARROW_SIZE() + 'px');
+  document.documentElement.style.setProperty('--handle-arrow-gap',    ARROW_GAP()  + 'px');
+  document.documentElement.style.setProperty('--handle-arrow-offset', ARROW_OFFSET() + 'px');
+  document.documentElement.style.setProperty('--tab-bar-padding',     TAB_BAR_PADDING() + 'px');
   updateSidebarOverlap();
 }
 
@@ -787,10 +793,10 @@ function applySidebarWidth(w) {
 function applyBarSizes_noOverlap() {
   document.documentElement.style.setProperty('--sidebar-box-margin',  SIDEBAR_BOX_MARGIN() + 'px');
   document.documentElement.style.setProperty('--drag-handle-width',   DRAG_HANDLE_WIDTH() + 'px');
-  document.documentElement.style.setProperty('--handle-arrow-size',   ARROW_SIZE + 'px');
-  document.documentElement.style.setProperty('--handle-arrow-gap',    ARROW_GAP  + 'px');
-  document.documentElement.style.setProperty('--handle-arrow-offset', ARROW_OFFSET + 'px');
-  document.documentElement.style.setProperty('--tab-bar-padding',     TAB_BAR_PADDING + 'px');
+  document.documentElement.style.setProperty('--handle-arrow-size',   ARROW_SIZE() + 'px');
+  document.documentElement.style.setProperty('--handle-arrow-gap',    ARROW_GAP()  + 'px');
+  document.documentElement.style.setProperty('--handle-arrow-offset', ARROW_OFFSET() + 'px');
+  document.documentElement.style.setProperty('--tab-bar-padding',     TAB_BAR_PADDING() + 'px');
 }
 
 // ── Handle arrows ──
