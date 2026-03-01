@@ -24,7 +24,7 @@ const PANEL_CARD_MAX_W      = 240; // px — card max width (cards stretch up to
 const PANEL_GOTO_DELAY      = 900; // ms hover before "Go to" button appears
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
-console.log('[panel.js_v_7]');
+console.log('[panel.js_v_8]');
 document.addEventListener('DOMContentLoaded', () => {
   const wait = setInterval(() => {
     const box = document.getElementById('sidebar-box');
@@ -62,53 +62,44 @@ function initPanel(sidebarBox) {
   const ppBody     = document.getElementById('pp-body');
   const ppMmWrap   = document.getElementById('pp-mm-wrap');
 
-  // ── Grid column calculation ───────────────────────────────────────────────
-  // cols  = floor(availableWidth / PANEL_CARD_MIN_W), minimum 1
-  // cardW = (availableWidth - gaps) / cols, clamped to PANEL_CARD_MAX_W
-  // Columns set as explicit px on gridTemplateColumns — no CSS auto-fill needed.
   const ppBodyWrap = document.getElementById('pp-body-wrap');
+  const sidebarEl  = document.getElementById('sidebar');
 
   var _lastCols = 0, _lastCardW = 0;
   function updateGrid() {
-    var pad  = 24;
-    var gap  = 10;
-    var w = ppBodyWrap.clientWidth - pad;
-    if (w <= 0) {
-      var sbMargin = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--sidebar-box-margin')) || 8;
-      w = (sidebarBox.offsetWidth || sidebarBox.parentElement.offsetWidth) - sbMargin * 2 - pad;
-    }
+    var pad = 24; // #pp-body padding: 12px left + 12px right
+    var gap = 10;
+    // Read from sidebar.offsetWidth — set explicitly by script.js on every drag frame,
+    // so it never oscillates. Avoids scrollbar feedback loop from ppBodyWrap.clientWidth.
+    var sbMargin = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--sidebar-box-margin')) || 8;
+    var w = (sidebarEl ? sidebarEl.offsetWidth : sidebarBox.offsetWidth) - sbMargin * 2 - pad;
     if (w <= 0) return;
 
-    // How many columns fit such that each card is >= PANEL_CARD_MIN_W?
-    // n cols needs w >= n*MIN + (n-1)*gap  →  n <= (w+gap)/(MIN+gap)
-    var cols = Math.max(1, Math.floor((w + gap) / (PANEL_CARD_MIN_W + gap)));
+    // cols: how many columns fit with each card >= PANEL_CARD_MIN_W
+    // n cols needs: n*MIN + (n-1)*gap <= w  →  n <= (w+gap)/(MIN+gap)
+    var cols  = Math.max(1, Math.floor((w + gap) / (PANEL_CARD_MIN_W + gap)));
+    var cardW = Math.min(PANEL_CARD_MAX_W, Math.floor((w - gap * (cols - 1)) / cols));
 
-    // Card width for that column count
-    var cardW = Math.floor((w - gap * (cols - 1)) / cols);
-
-    // Cap card width at MAX — if we're above max, it means there is leftover space, leave it empty
-    cardW = Math.min(PANEL_CARD_MAX_W, cardW);
-
-    // No change — skip to avoid triggering ResizeObserver loop
     if (cols === _lastCols && cardW === _lastCardW) return;
     _lastCols = cols; _lastCardW = cardW;
 
+    // Set ppBody width to exactly the columns — leftover space stays empty
     var totalW = cols * cardW + (cols - 1) * gap + pad;
     ppBody.style.display = 'grid';
-    ppBody.style.width = totalW + 'px';
+    ppBody.style.width   = totalW + 'px';
     ppBody.style.gridTemplateColumns = 'repeat(' + cols + ', ' + cardW + 'px)';
   }
 
-  // Call once immediately, then again after layout has settled
   updateGrid();
-  requestAnimationFrame(function() { updateGrid(); });
+  requestAnimationFrame(updateGrid);
 
+  // Observe the sidebar element — its width is the authoritative source
   if (window.ResizeObserver) {
     var _gridRaf = null;
     new ResizeObserver(function() {
       if (_gridRaf) return;
       _gridRaf = requestAnimationFrame(function() { _gridRaf = null; updateGrid(); });
-    }).observe(ppBodyWrap);
+    }).observe(sidebarEl || sidebarBox);
   }
 
   // ── State ─────────────────────────────────────────────────────────────────
@@ -801,21 +792,20 @@ function initPanel(sidebarBox) {
   text-transform: uppercase; display: inline-block; align-self: flex-start;
 }
 
-/* "Go to" hover button — absolutely positioned so it overlays the card bottom
-   without changing card height. Card needs position:relative (already set). */
+/* "Go to" hover button — in normal flow, expands the card height on hover */
 .pp-goto-btn {
-  position: absolute; bottom: 0; left: 8px; right: 8px;
-  transform: translateY(calc(100% + 4px));
-  padding: 5px 8px; border-radius: 0 0 6px 6px; border: 1.5px solid;
-  border-top: none;
+  display: block; width: calc(100% - 16px); margin: 0 8px 8px;
+  padding: 5px 8px; border-radius: 6px; border: 1.5px solid;
   background: white; font-size: 10px; font-weight: 600; letter-spacing: .06em;
   text-transform: uppercase; cursor: pointer; text-align: center;
-  opacity: 0;
-  transition: opacity .25s ease, transform .25s cubic-bezier(0.34, 1.56, 0.64, 1);
-  box-shadow: 0 4px 8px rgba(0,0,0,.12);
-  z-index: 10;
+  opacity: 0; transform: translateY(6px);
+  transition: opacity .25s ease, transform .25s ease, max-height .25s ease;
+  box-shadow: 0 1px 6px rgba(0,0,0,.08);
+  max-height: 0; overflow: hidden;
 }
-.pp-goto-btn.pp-goto-visible { opacity: 1; transform: translateY(100%); }
+.pp-goto-btn.pp-goto-visible {
+  opacity: 1; transform: translateY(0); max-height: 40px;
+}
 .pp-goto-btn:hover { filter: brightness(0.92); }
 
 /* Keyword highlight */
