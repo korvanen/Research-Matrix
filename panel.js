@@ -20,7 +20,7 @@ const PANEL_CARD_MAX_W      = 240;
 const PANEL_GOTO_DELAY      = 400;
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
-console.log('[panel.js_v_A]');
+console.log('[panel.js_v_B]');
 document.addEventListener('DOMContentLoaded', () => {
   const wait = setInterval(() => {
     const box = document.getElementById('sidebar-box');
@@ -459,9 +459,12 @@ function initPanel(sidebarBox) {
     var arrowDefs  = [];
     var cardColors = new Map(); // key -> { border, bg }
 
-    // Read a card's actual rendered position from the DOM (works mid-CSS-transition
-    // and during drag, where getBoundingClientRect returns the interpolated value).
-    function getVisualRect(key) {
+    // Returns the card's live border-box rect relative to ppMmWrap.
+    // Uses getBoundingClientRect() so it tracks CSS transitions and drag in real-time.
+    // The card element's own bbox expands/contracts as children change size (e.g. the
+    // goto button's margin-bottom animates from -38px hidden → 8px visible), so we
+    // never need to special-case individual children — the card stroke IS the boundary.
+    function getCardRect(key) {
       var el = cardEls.get(key);
       var r  = rects.get(key);
       if (!r) return null;
@@ -471,37 +474,23 @@ function initPanel(sidebarBox) {
       return { x: cr.left - wrap.left, y: cr.top - wrap.top, w: r.w, h: cr.height };
     }
 
-    // Bottom edge accounting for a visible "go-to" button below the card.
-    function getVisualBottom(key, vr) {
-      var el = cardEls.get(key);
-      if (!el) return vr.y + vr.h;
-      var btn = el.querySelector('.pp-goto-btn');
-      if (btn && btn.classList.contains('pp-goto-visible')) {
-        var wrap = ppMmWrap.getBoundingClientRect();
-        return btn.getBoundingClientRect().bottom - wrap.top;
-      }
-      return vr.y + vr.h;
-    }
-
-    // 10 connection points: 3 top, 3 bottom, 2 left, 2 right.
-    // All coordinates are read from the live DOM so they track CSS transitions.
+    // 10 connection points glued to the card's stroke: 3 top, 3 bottom, 2 left, 2 right.
+    // Reads live DOM every call so they move with any size change automatically.
     function getConnectionPoints(key) {
-      var vr = getVisualRect(key);
+      var vr = getCardRect(key);
       if (!vr) return [];
-      var x = vr.x, y = vr.y, W = vr.w;
-      var bot = getVisualBottom(key, vr);
-      var midH = (bot - y);
+      var x = vr.x, y = vr.y, W = vr.w, H = vr.h;
       return [
-        { x: x + W * 0.25, y: y              },  // top
-        { x: x + W * 0.5,  y: y              },
-        { x: x + W * 0.75, y: y              },
-        { x: x + W * 0.25, y: bot            },  // bottom
-        { x: x + W * 0.5,  y: bot            },
-        { x: x + W * 0.75, y: bot            },
-        { x: x,            y: y + midH / 3   },  // left
-        { x: x,            y: y + midH * 2/3 },
-        { x: x + W,        y: y + midH / 3   },  // right
-        { x: x + W,        y: y + midH * 2/3 },
+        { x: x + W * 0.25, y: y         },  // top
+        { x: x + W * 0.5,  y: y         },
+        { x: x + W * 0.75, y: y         },
+        { x: x + W * 0.25, y: y + H     },  // bottom
+        { x: x + W * 0.5,  y: y + H     },
+        { x: x + W * 0.75, y: y + H     },
+        { x: x,            y: y + H / 3 },  // left
+        { x: x,            y: y + H * 2/3 },
+        { x: x + W,        y: y + H / 3 },  // right
+        { x: x + W,        y: y + H * 2/3 },
       ];
     }
 
@@ -670,24 +659,17 @@ function initPanel(sidebarBox) {
           '</div>';
         if (matchObj) {
           attachGoTo(card, matchObj, accentColor);
-          // Redraw arrows during the go-to button slide-in/out transition so
-          // connection points (which track the button's visual bottom) animate.
-          var _gotoBtn = card.querySelector('.pp-goto-btn');
-          if (_gotoBtn) {
-            new MutationObserver(function() {
-              var t0 = performance.now(), dur = 350;
-              (function tick(now) {
-                redrawArrows();
-                if (now - t0 < dur) requestAnimationFrame(tick);
-              })(t0);
-            }).observe(_gotoBtn, { attributes: true, attributeFilter: ['class'] });
-          }
         }
       }
 
       ppMmWrap.appendChild(card);
       makeDraggable(card, key);
       cardEls.set(key, card);
+      // ResizeObserver: any size change on the card (goto button, future features)
+      // automatically redraws connection points to stay glued to the card's stroke.
+      if (window.ResizeObserver) {
+        new ResizeObserver(function() { redrawArrows(); }).observe(card);
+      }
       return card;
     }
 
