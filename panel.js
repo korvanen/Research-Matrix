@@ -1055,7 +1055,7 @@ function initPanel(sidebarBox) {
   text-transform: uppercase; cursor: pointer; text-align: center;
   opacity: 0;
   transform: translateY(4px);
-  transition: opacity .22s ease, transform .22s ease, margin-bottom .22s ease;
+  transition: opacity .1s ease, transform .1s ease, margin-bottom .1s ease;
   box-shadow: 0 1px 6px rgba(0,0,0,.08);
   pointer-events: none;
 }
@@ -1093,7 +1093,7 @@ mark.pkw {
   font-size: 10px; line-height: 1.35; color: rgba(0,0,0,.7);
   overflow: hidden;
   max-height: 40px; /* ~3 lines: 10px × 1.35 × 3 */
-  transition: max-height 0.22s ease;
+  transition: max-height 0.3s ease;
 }
 .pp-mm-card.pp-mm-expanded .pp-mm-field {
   max-height: 600px;
