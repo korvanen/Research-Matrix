@@ -24,11 +24,15 @@ const PANEL_CARD_MAX_W      = 240; // px — card max width (cards stretch up to
 const PANEL_GOTO_DELAY      = 900; // ms hover before "Go to" button appears
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
+console.log('[panel.js] script loaded');
 document.addEventListener('DOMContentLoaded', () => {
+  console.log('[panel.js] DOMContentLoaded fired');
   const wait = setInterval(() => {
     const box = document.getElementById('sidebar-box');
+    console.log('[panel.js] polling for sidebar-box:', box);
     if (!box) return;
     clearInterval(wait);
+    console.log('[panel.js] calling initPanel');
     initPanel(box);
   }, 50);
 });
@@ -68,19 +72,17 @@ function initPanel(sidebarBox) {
   const ppBodyWrap = document.getElementById('pp-body-wrap');
 
   function updateGrid() {
-    var pad  = 24; // 12px left + 12px right from #pp-body padding
+    var pad  = 24;
     var gap  = 10;
-    // ppBodyWrap.clientWidth is 0 if the sidebar hasn't laid out yet —
-    // fall back to the sidebar element's own width minus margins
     var w = ppBodyWrap.clientWidth - pad;
     if (w <= 0) {
       var sbMargin = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--sidebar-box-margin')) || 8;
       w = (sidebarBox.offsetWidth || sidebarBox.parentElement.offsetWidth) - sbMargin * 2 - pad;
     }
-    if (w <= 0) return;
-    var cols  = Math.max(1, Math.floor(w / PANEL_CARD_MIN_W));
-    var cardW = Math.min(PANEL_CARD_MAX_W, Math.floor((w - gap * (cols - 1)) / cols));
+    var cols  = w > 0 ? Math.max(1, Math.floor(w / PANEL_CARD_MIN_W)) : 1;
+    var cardW = w > 0 ? Math.min(PANEL_CARD_MAX_W, Math.floor((w - gap * (cols - 1)) / cols)) : PANEL_CARD_MIN_W;
     ppBody.style.gridTemplateColumns = 'repeat(' + cols + ', ' + cardW + 'px)';
+    console.log('[updateGrid] wrapClientW=' + ppBodyWrap.clientWidth + ' w=' + w + ' cols=' + cols + ' cardW=' + cardW + ' gridTpl=' + ppBody.style.gridTemplateColumns + ' ppBody.offsetWidth=' + ppBody.offsetWidth);
   }
 
   // Call once immediately, then again after layout has settled
