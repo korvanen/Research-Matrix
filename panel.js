@@ -20,7 +20,7 @@ const PANEL_CARD_MAX_W      = 240;
 const PANEL_GOTO_DELAY      = 400;
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
-console.log('[panel.js_v_G]');
+console.log('[panel.js_v_H]');
 document.addEventListener('DOMContentLoaded', () => {
   const wait = setInterval(() => {
     const box = document.getElementById('sidebar-box');
@@ -633,8 +633,8 @@ function initPanel(sidebarBox) {
 
     // Expand/collapse a mindmap card: reveals full text and goto button as one motion.
     // Uses explicit height animation so the duration matches the goto button exactly.
-    var MM_EXPAND_MS    = 220; // ← animation speed in ms
-    var MM_HOVER_DELAY  = 120; // ← ms before hover expand triggers (0 = instant)
+    var MM_EXPAND_MS    = 260; // ← animation speed in ms
+    var MM_HOVER_DELAY  = 200; // ← ms before hover expand triggers (0 = instant)
 
     function _btnReset(btn) {
       if (!btn) return;
