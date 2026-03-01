@@ -24,7 +24,7 @@ const PANEL_CARD_MAX_W      = 240; // px — card max width (cards stretch up to
 const PANEL_GOTO_DELAY      = 900; // ms hover before "Go to" button appears
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
-console.log('[panel.js] script loaded');
+console.log('[panel.js_v_1]');
 document.addEventListener('DOMContentLoaded', () => {
   console.log('[panel.js] DOMContentLoaded fired');
   const wait = setInterval(() => {
@@ -395,13 +395,15 @@ function initPanel(sidebarBox) {
       var firstCard = ppBody.querySelector('.pp-match-card, .pp-seed-card');
       if (firstCard) {
         var cs = getComputedStyle(firstCard);
+        var pbcs = getComputedStyle(ppBody);
         console.log('[card debug] ppBody.style.width=' + ppBody.style.width
           + ' ppBody.offsetWidth=' + ppBody.offsetWidth
           + ' ppBody.style.gridTemplateColumns=' + ppBody.style.gridTemplateColumns
+          + ' ppBody computed display=' + pbcs.display
+          + ' ppBody computed gridTemplateColumns=' + pbcs.gridTemplateColumns
           + ' card.offsetWidth=' + firstCard.offsetWidth
           + ' card computed width=' + cs.width
-          + ' card computed maxWidth=' + cs.maxWidth
-          + ' card computed minWidth=' + cs.minWidth);
+          + ' card computed display=' + cs.display);
       }
     });
   }
