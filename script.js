@@ -8,7 +8,7 @@ const ARROW_SIZE      = 28;
 const ARROW_GAP       = 10;
 const ARROW_OFFSET    = 12;
 
-const TAB_BAR_PADDING  = window.innerHeight*0.5;
+const TAB_BAR_PADDING  = window.innerHeight*0.1;
 
 const isPortrait = () => window.innerHeight > window.innerWidth;
 
@@ -523,7 +523,9 @@ function buildTabBarCompact() {
   const isOverlap   = sidebar.classList.contains('is-overlapping');
   const fullscreenW = SIDEBAR_FULLSCREEN_THRESHOLD();
   const available   = isOverlap ? Math.max(0, window.innerWidth - fullscreenW) : window.innerWidth;
-  tabBar.style.width = ''; tabBar.style.maxWidth = available + 'px'; tabBar.style.padding = '';
+  // Set explicit width (not just maxWidth) so the tab bar occupies exactly
+  // the available space and its flex children center within that region.
+  tabBar.style.width = available + 'px'; tabBar.style.maxWidth = ''; tabBar.style.padding = '';
   if (!TABS.length) return;
   const tabData = processSheetData(TABS[activeTab].grid);
   const label   = (tabData && tabData.title) ? tabData.title : TABS[activeTab].name;
@@ -945,4 +947,3 @@ tabBar.innerHTML = '<div style="padding:8px 12px;color:#999;font-size:12px">Load
     loadingOverlay.textContent = `Error: ${err.message}\n${err.stack || ''}`;
   }
 })();
-
