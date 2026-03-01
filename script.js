@@ -1,7 +1,7 @@
 // ════════════════════════════════════════════════════════════════
 // ── GLOBAL CONFIG ──
 // ════════════════════════════════════════════════════════════════
-console.log('script.js - v5'); // version 
+console.log('script.js [v7]');
 
 const APP_TITLE       = 'Dimensional Framework';
 
@@ -20,10 +20,10 @@ const PORTRAIT = {
   sidebarFullscreenThreshold:1.00,
   sidebarSnapClose:          0.05,
   sidebarTwoPosition:        true,
-  arrowSize:                 40,    // px — larger touch targets in portrait
-  arrowGap:                  2,      // controlls the gap between the bottom tabs and the arrows
-  arrowOffset:               16,    // px — spacing around compact tab label
-  tabBarPadding:             0.1,    // persentage — spacing around compact tab label
+  arrowSize:                 36,    // px — larger touch targets in portrait
+  arrowOffset:               16,
+  tabBarPadding:             24,    // px — gap between arrow buttons and tab label
+  tabBarInset:               20,    // px — gap between arrow buttons and screen/sidebar edges
 };
 
 const LANDSCAPE = {
@@ -40,9 +40,9 @@ const LANDSCAPE = {
   sidebarFullscreenThreshold:0.80,
   sidebarTwoPosition:        false,
   arrowSize:                 28,    // px
-  arrowGap:                  4,     // controlls the gap between the bottom tabs and the arrows
   arrowOffset:               12,
-  tabBarPadding:             0.1,    // px
+  tabBarPadding:             16,    // px — gap between arrow buttons and tab label
+  tabBarInset:               12,    // px — gap between arrow buttons and screen/sidebar edges
 };
 
 const R = () => isPortrait() ? PORTRAIT : LANDSCAPE;
@@ -61,9 +61,9 @@ const SIDEBAR_FULLSCREEN_THRESHOLD    = () => Math.round(window.innerWidth  * R(
 const SIDEBAR_SNAP_CLOSE              = () => Math.round(window.innerWidth  * R().sidebarSnapClose);
 const SIDEBAR_TWO_POSITION            = () => !!R().sidebarTwoPosition;
 const ARROW_SIZE                      = () => R().arrowSize;
-const ARROW_GAP                       = () => R().arrowGap;
 const ARROW_OFFSET                    = () => R().arrowOffset;
-const TAB_BAR_PADDING                 = () => Math.round(window.innerHeight * R().tabBarPadding);
+const TAB_BAR_PADDING                 = () => R().tabBarPadding;
+const TAB_BAR_INSET                   = () => R().tabBarInset;
 
 // ── THEMES ──
 const THEMES = {
@@ -622,9 +622,9 @@ function applyBarSizes() {
   document.documentElement.style.setProperty('--sidebar-box-margin',  SIDEBAR_BOX_MARGIN() + 'px');
   document.documentElement.style.setProperty('--drag-handle-width',   DRAG_HANDLE_WIDTH() + 'px');
   document.documentElement.style.setProperty('--handle-arrow-size',   ARROW_SIZE() + 'px');
-  document.documentElement.style.setProperty('--handle-arrow-gap',    ARROW_GAP()  + 'px');
   document.documentElement.style.setProperty('--handle-arrow-offset', ARROW_OFFSET() + 'px');
   document.documentElement.style.setProperty('--tab-bar-padding',     TAB_BAR_PADDING() + 'px');
+  document.documentElement.style.setProperty('--tab-bar-inset',        TAB_BAR_INSET()   + 'px');
   updateSidebarOverlap();
 }
 
@@ -795,9 +795,9 @@ function applyBarSizes_noOverlap() {
   document.documentElement.style.setProperty('--sidebar-box-margin',  SIDEBAR_BOX_MARGIN() + 'px');
   document.documentElement.style.setProperty('--drag-handle-width',   DRAG_HANDLE_WIDTH() + 'px');
   document.documentElement.style.setProperty('--handle-arrow-size',   ARROW_SIZE() + 'px');
-  document.documentElement.style.setProperty('--handle-arrow-gap',    ARROW_GAP()  + 'px');
   document.documentElement.style.setProperty('--handle-arrow-offset', ARROW_OFFSET() + 'px');
   document.documentElement.style.setProperty('--tab-bar-padding',     TAB_BAR_PADDING() + 'px');
+  document.documentElement.style.setProperty('--tab-bar-inset',        TAB_BAR_INSET()   + 'px');
 }
 
 // ── Handle arrows ──
