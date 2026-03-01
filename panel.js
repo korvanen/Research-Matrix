@@ -20,7 +20,7 @@ const PANEL_CARD_MAX_W      = 240;
 const PANEL_GOTO_DELAY      = 400;
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
-console.log('[panel.js_v_123]');
+console.log('[panel.js_v_3]');
 document.addEventListener('DOMContentLoaded', () => {
   const wait = setInterval(() => {
     const box = document.getElementById('sidebar-box');
@@ -710,55 +710,60 @@ function initPanel(sidebarBox) {
     if (!snap || !_mmActive) return;
     if (snap.matchKey !== _mmMatchKey) return;
 
-    // Hide cards SYNCHRONOUSLY before any rAF so there is zero chance of a
-    // visible frame showing the default "smooshed" layout. The browser won't
-    // paint the hidden state because we force a style flush right here.
-    _mmActive.cardEls.forEach(function(el) {
-      el.style.transition = 'none';
-      el.style.opacity    = '0';
-      el.style.transform  = 'scale(0.88)';
-    });
-    void ppMmWrap.offsetHeight; // flush — commits opacity:0 before first rAF
-
-    // One rAF so mmW/mmH are measured after the browser has committed the new
-    // sidebar dimensions (critical on portrait: sidebar goes 0 → full-width).
+    // Cards are already visible at their default (smooshed) positions.
+    // We want them to smoothly slide to the saved positions rather than snap.
+    // Strategy:
+    //   rAF 1 — let the current default layout paint so cards are visibly
+    //            present at their starting positions.
+    //   rAF 2 — add left/top transitions, then update coords to saved values.
+    //            The browser will tween between the two positions automatically.
     requestAnimationFrame(function() {
       if (!_mmActive || snap.matchKey !== _mmMatchKey) return;
 
-      // Move all cards to their saved positions while still invisible
+      // Measure saved positions clamped to the new canvas size
+      var targets = new Map();
       snap.positions.forEach(function(pos, key) {
-        var r  = _mmActive.rects.get(key);
-        var el = _mmActive.cardEls.get(key);
-        if (!r || !el) return;
-        var nx = Math.max(0, Math.min(mmW() - r.w, pos.x));
-        var ny = Math.max(0, Math.min(mmH() - r.h, pos.y));
-        r.x = nx; r.y = ny;
-        el.style.left = nx + 'px';
-        el.style.top  = ny + 'px';
-      });
-      _mmActive.redrawArrows();
-
-      // Second rAF: browser has now laid out cards at correct positions.
-      // Fade + scale them in with a gentle staggered animation.
-      requestAnimationFrame(function() {
-        if (!_mmActive) return;
-        var maxDelay = 0;
-        _mmActive.cardEls.forEach(function(el, i) {
-          var delay = i * 25; // 25 ms stagger between cards
-          maxDelay  = delay;
-          el.style.transition = 'opacity 0.28s ease ' + delay + 'ms, ' +
-                                 'transform 0.36s cubic-bezier(0.34,1.4,0.64,1) ' + delay + 'ms';
-          el.style.opacity   = '1';
-          el.style.transform = 'scale(1)';
+        var r = _mmActive.rects.get(key);
+        if (!r) return;
+        targets.set(key, {
+          nx: Math.max(0, Math.min(mmW() - r.w, pos.x)),
+          ny: Math.max(0, Math.min(mmH() - r.h, pos.y))
         });
-        // Clean up transition styles after animation so dragging is unaffected
+      });
+
+      // Enable position transitions on every card
+      _mmActive.cardEls.forEach(function(el) {
+        el.style.transition = 'left 0.38s cubic-bezier(0.25,1,0.5,1), ' +
+                              'top  0.38s cubic-bezier(0.25,1,0.5,1)';
+      });
+
+      // rAF 2 — update positions; browser animates from current → saved
+      requestAnimationFrame(function() {
+        if (!_mmActive || snap.matchKey !== _mmMatchKey) return;
+
+        targets.forEach(function(t, key) {
+          var r  = _mmActive.rects.get(key);
+          var el = _mmActive.cardEls.get(key);
+          if (!r || !el) return;
+          r.x = t.nx; r.y = t.ny;
+          el.style.left = t.nx + 'px';
+          el.style.top  = t.ny + 'px';
+        });
+
+        // Redraw arrows continuously during the slide
+        var start  = performance.now();
+        var dur    = 400;
+        function arrowRaf(now) {
+          _mmActive.redrawArrows();
+          if (now - start < dur) requestAnimationFrame(arrowRaf);
+        }
+        requestAnimationFrame(arrowRaf);
+
+        // Clean up transitions once the slide is done so dragging is unaffected
         setTimeout(function() {
           if (!_mmActive) return;
-          _mmActive.cardEls.forEach(function(el) {
-            el.style.transition = '';
-            el.style.transform  = '';
-          });
-        }, maxDelay + 380);
+          _mmActive.cardEls.forEach(function(el) { el.style.transition = ''; });
+        }, 420);
       });
     });
   });
