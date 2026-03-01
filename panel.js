@@ -10,21 +10,17 @@
 // ════════════════════════════════════════════════════════════════════════════
 
 // ── SETTINGS ─────────────────────────────────────────────────────────────────
-const PANEL_KW_MIN_WORD_LEN = 4;   // minimum characters for a word to be a keyword
-const PANEL_MIN_SHARED      = 2;   // minimum shared keywords to count as a match
-const PANEL_MM_PAD          = 10;  // mindmap collision padding (px)
-const PANEL_MM_ITERS        = 20;  // mindmap collision resolution iterations
-const PANEL_CARD_W          = 160; // mindmap card width (px)
-
-// Tile card fixed width — cards always render at this width and wrap to the
-// next row when there isn't horizontal room for another column. No stretching.
-const PANEL_CARD_MIN_W      = 140; // px — card min width; also determines column breakpoints
-const PANEL_CARD_MAX_W      = 240; // px — card max width (cards stretch up to this within a column)
-
-const PANEL_GOTO_DELAY      = 900; // ms hover before "Go to" button appears
+const PANEL_KW_MIN_WORD_LEN = 4;
+const PANEL_MIN_SHARED      = 2;
+const PANEL_MM_PAD          = 10;
+const PANEL_MM_ITERS        = 20;
+const PANEL_CARD_W          = 160;
+const PANEL_CARD_MIN_W      = 140;
+const PANEL_CARD_MAX_W      = 240;
+const PANEL_GOTO_DELAY      = 900;
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
-console.log('[panel.js_v_8]');
+console.log('[panel.js_v_9]');
 document.addEventListener('DOMContentLoaded', () => {
   const wait = setInterval(() => {
     const box = document.getElementById('sidebar-box');
@@ -61,45 +57,51 @@ function initPanel(sidebarBox) {
   const ppViewWrap = document.getElementById('pp-view-wrap');
   const ppBody     = document.getElementById('pp-body');
   const ppMmWrap   = document.getElementById('pp-mm-wrap');
-
   const ppBodyWrap = document.getElementById('pp-body-wrap');
   const sidebarEl  = document.getElementById('sidebar');
 
-  var _lastCols = 0, _lastCardW = 0;
-  function updateGrid() {
-    var pad = 24; // #pp-body padding: 12px left + 12px right
+  // ── Grid layout — single source of truth ────────────────────────────────
+  // Called at most once per animation frame. Measures sidebar width,
+  // computes column count + card width, then stamps the grid template.
+  // Does NOT touch ppBody.style.width — we let the grid fill the container.
+  var _lastCols = 0, _lastCardW = 0, _gridRafId = null;
+
+  function scheduleUpdateGrid() {
+    if (_gridRafId) return;
+    _gridRafId = requestAnimationFrame(() => {
+      _gridRafId = null;
+      _doUpdateGrid();
+    });
+  }
+
+  function _doUpdateGrid() {
+    var pad = 24;
     var gap = 10;
-    // Read from sidebar.offsetWidth — set explicitly by script.js on every drag frame,
-    // so it never oscillates. Avoids scrollbar feedback loop from ppBodyWrap.clientWidth.
-    var sbMargin = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--sidebar-box-margin')) || 8;
+    var sbMargin = parseInt(
+      getComputedStyle(document.documentElement).getPropertyValue('--sidebar-box-margin')
+    ) || 8;
     var w = (sidebarEl ? sidebarEl.offsetWidth : sidebarBox.offsetWidth) - sbMargin * 2 - pad;
     if (w <= 0) return;
 
-    // cols: how many columns fit with each card >= PANEL_CARD_MIN_W
-    // n cols needs: n*MIN + (n-1)*gap <= w  →  n <= (w+gap)/(MIN+gap)
     var cols  = Math.max(1, Math.floor((w + gap) / (PANEL_CARD_MIN_W + gap)));
     var cardW = Math.min(PANEL_CARD_MAX_W, Math.floor((w - gap * (cols - 1)) / cols));
 
     if (cols === _lastCols && cardW === _lastCardW) return;
-    _lastCols = cols; _lastCardW = cardW;
+    _lastCols = cols;
+    _lastCardW = cardW;
 
-    // Set ppBody width to exactly the columns — leftover space stays empty
-    var totalW = cols * cardW + (cols - 1) * gap + pad;
-    ppBody.style.display = 'grid';
-    ppBody.style.width   = totalW + 'px';
     ppBody.style.gridTemplateColumns = 'repeat(' + cols + ', ' + cardW + 'px)';
+    // Width is now handled purely by CSS padding on ppBodyWrap; no JS pixel width needed.
+    // Clearing any stale width that older versions may have set:
+    ppBody.style.width = '';
   }
 
-  updateGrid();
-  requestAnimationFrame(updateGrid);
+  // Initial measurement — defer one frame so the sidebar has painted
+  scheduleUpdateGrid();
 
-  // Observe the sidebar element — its width is the authoritative source
+  // Re-measure whenever the sidebar resizes (fires on every drag frame)
   if (window.ResizeObserver) {
-    var _gridRaf = null;
-    new ResizeObserver(function() {
-      if (_gridRaf) return;
-      _gridRaf = requestAnimationFrame(function() { _gridRaf = null; updateGrid(); });
-    }).observe(sidebarEl || sidebarBox);
+    new ResizeObserver(scheduleUpdateGrid).observe(sidebarEl || sidebarBox);
   }
 
   // ── State ─────────────────────────────────────────────────────────────────
@@ -170,7 +172,7 @@ function initPanel(sidebarBox) {
     if (!data) return false;
 
     var allDataRows = Array.from(document.querySelectorAll('#data-body tr'));
-    var selectedCols = new Map(); // rowIndex → Set of colIndices
+    var selectedCols = new Map();
 
     allDataRows.forEach(function(dtr, ri) {
       Array.from(dtr.querySelectorAll('td')).forEach(function(td, ci) {
@@ -184,7 +186,7 @@ function initPanel(sidebarBox) {
     if (!selectedCols.size) return false;
 
     var allText = [];
-    var cellMap = new Map(); // header → Set of cell texts
+    var cellMap = new Map();
 
     selectedCols.forEach(function(cols, ri) {
       var row = data.rows[ri];
@@ -237,7 +239,7 @@ function initPanel(sidebarBox) {
     }
   }
 
-  // ── MutationObserver — watches for selection class changes in data-body ────
+  // ── MutationObserver ──────────────────────────────────────────────────────
   var _refreshTimer = null;
 
   function attachObserver() {
@@ -261,7 +263,6 @@ function initPanel(sidebarBox) {
   }
   attachObserver();
 
-  // Cat-body click: slight delay so script.js finishes its DOM update first
   var catBodyEl2 = document.getElementById('cat-body');
   if (catBodyEl2) catBodyEl2.addEventListener('click', function(e) {
     if (!e.target.closest('td')) return;
@@ -270,25 +271,19 @@ function initPanel(sidebarBox) {
   });
 
   // ── TILES VIEW ────────────────────────────────────────────────────────────
-  // Layout: CSS Grid with fixed-width columns (PANEL_TILE_CARD_W px each).
-  // The browser auto-fills as many columns as the sidebar width allows — no JS needed.
-  // The seed card spans all columns (grid-column: 1 / -1).
-  // Tab-group dividers also span all columns.
   function renderTiles(matches, kws, srcTabIdx, srcData) {
-    ppBody.innerHTML       = '';
-    ppBody.style.display   = 'grid';
     ppMmWrap.style.display = 'none';
     ppMmWrap.innerHTML     = '';
     _mmActive = null;
 
     if (viewMode === 'mindmap') { viewMode = 'tiles'; viewPill.setValue('tiles', false); }
 
-    updateGrid();
-    requestAnimationFrame(updateGrid);
+    // Build the new DOM off-screen in a fragment to avoid incremental reflow
+    var frag = document.createDocumentFragment();
 
     var vars = panelThemeVars(srcTabIdx);
 
-    // Seed card — fixed-width, same as match cards
+    // ── Seed card ──
     var seedCard = document.createElement('div');
     seedCard.className = 'pp-seed-card';
     seedCard.style.setProperty('--ppc-border', vars['--tab-active-bg'] || '#888');
@@ -296,10 +291,10 @@ function initPanel(sidebarBox) {
 
     var seedHead = document.createElement('div');
     seedHead.className = 'pp-card-head';
-    var tabLabel = srcData.title || (typeof TABS !== 'undefined' ? TABS[srcTabIdx].name : '');
+    var tabLabel = (srcData && srcData.title) ? srcData.title : (typeof TABS !== 'undefined' ? TABS[srcTabIdx].name : '');
     seedHead.innerHTML =
-      '<span class="pp-card-badge" style="background:' + (vars['--tab-active-bg']||'#888') +
-      ';color:' + (vars['--tab-active-color']||'#fff') + '">Selected</span>' +
+      '<span class="pp-card-badge" style="background:' + (vars['--tab-active-bg'] || '#888') +
+      ';color:' + (vars['--tab-active-color'] || '#fff') + '">Selected</span>' +
       '<span class="pp-card-dim">' + panelEscH(tabLabel) + '</span>';
 
     var seedBody = document.createElement('div');
@@ -313,12 +308,20 @@ function initPanel(sidebarBox) {
     });
     seedCard.appendChild(seedHead);
     seedCard.appendChild(seedBody);
-    ppBody.appendChild(seedCard);
+    frag.appendChild(seedCard);
 
     if (!matches.length) {
       ppSubtitle.textContent  = 'No matches found';
       ppToolrow.style.display = 'none';
-      ppBody.insertAdjacentHTML('beforeend', '<div class="pp-empty">No matching entries found</div>');
+      var emptyEl = document.createElement('div');
+      emptyEl.className = 'pp-empty';
+      emptyEl.textContent = 'No matching entries found';
+      frag.appendChild(emptyEl);
+      // Single atomic DOM update
+      ppBody.innerHTML = '';
+      ppBody.appendChild(frag);
+      ppBody.style.display = 'grid';
+      scheduleUpdateGrid();
       return;
     }
 
@@ -328,7 +331,7 @@ function initPanel(sidebarBox) {
     hlOn = true;
     hlPill.setValue('show', false);
 
-    // Group matches by tab, then render a divider + cards for each tab
+    // Group by tab
     var byTab = new Map();
     matches.forEach(function(m) {
       if (!byTab.has(m.tabIdx)) byTab.set(m.tabIdx, []);
@@ -338,30 +341,28 @@ function initPanel(sidebarBox) {
     [...byTab.keys()].sort().forEach(function(tabIdx) {
       var tabMatches  = byTab.get(tabIdx);
       var tv          = panelThemeVars(tabIdx);
-      var tabName     = tabMatches[0].title || (typeof TABS !== 'undefined' ? TABS[tabIdx].name : 'Tab ' + tabIdx);
+      var tabName     = (tabMatches[0].title) || (typeof TABS !== 'undefined' ? TABS[tabIdx].name : 'Tab ' + tabIdx);
       var accentColor = tv['--tab-active-bg'] || '#888';
       var bgColor     = tv['--bg-data']       || '#f8f8f8';
 
-      // Divider spans all grid columns
       var divider = document.createElement('div');
       divider.className = 'pp-divider';
       divider.style.borderColor = accentColor;
       divider.innerHTML =
         '<span style="background:' + accentColor +
-        ';color:' + (tv['--tab-active-color']||'#fff') + '">' +
+        ';color:' + (tv['--tab-active-color'] || '#fff') + '">' +
         panelEscH(tabName) + '</span>';
-      ppBody.appendChild(divider);
+      frag.appendChild(divider);
 
-      tabMatches.forEach(function(m, mi) {
+      tabMatches.forEach(function(m) {
         var card = document.createElement('div');
         card.className = 'pp-match-card';
         card.style.setProperty('--ppc-border', accentColor);
         card.style.setProperty('--ppc-bg',     bgColor);
-        card.style.animationDelay = (mi * 40) + 'ms';
 
         var head = document.createElement('div');
         head.className = 'pp-card-head';
-        var cats = m.row.cats ? m.row.cats.filter(c => c.trim()) : [];
+        var cats = m.row.cats ? m.row.cats.filter(function(c) { return c.trim(); }) : [];
         if (cats.length) {
           head.innerHTML = '<span class="pp-card-dim">' + cats.map(panelEscH).join(' · ') + '</span>';
         }
@@ -372,7 +373,9 @@ function initPanel(sidebarBox) {
           if (!text.trim()) return;
           var f = document.createElement('div');
           f.className = 'pp-field';
-          var matchedKws = new Set([...m.shared].filter(k => panelExtractKW(text).includes(k)));
+          var matchedKws = new Set([...m.shared].filter(function(k) {
+            return panelExtractKW(text).includes(k);
+          }));
           if (matchedKws.size) f.classList.add('pp-field-matched');
           f.innerHTML = '<span class="pp-flabel">' + panelEscH(m.headers[ci] || '') + '</span>' +
             panelHighlight(text, matchedKws);
@@ -386,10 +389,26 @@ function initPanel(sidebarBox) {
         card.appendChild(head);
         card.appendChild(body);
         card.appendChild(sharedPill);
-        ppBody.appendChild(card);
+        frag.appendChild(card);
 
         attachGoTo(card, m, accentColor);
       });
+    });
+
+    // ── Single atomic DOM swap ──
+    // Replace content in one operation; the browser reflows exactly once.
+    ppBody.innerHTML = '';
+    ppBody.appendChild(frag);
+    ppBody.style.display = 'grid';
+
+    // Re-measure grid columns now that content has changed
+    scheduleUpdateGrid();
+
+    // Stagger-animate only the match cards (not seed, not dividers)
+    // Use CSS custom property so the animation delay doesn't block paint.
+    var matchCards = ppBody.querySelectorAll('.pp-match-card');
+    matchCards.forEach(function(card, i) {
+      card.style.animationDelay = (i * 30) + 'ms';
     });
 
     applyHlState();
@@ -484,7 +503,6 @@ function initPanel(sidebarBox) {
         redrawArrows();
       }
 
-      // Mouse
       el.addEventListener('mousedown', function(e) {
         if (e.button !== 0) return;
         dragStart(e.clientX, e.clientY);
@@ -493,11 +511,10 @@ function initPanel(sidebarBox) {
       document.addEventListener('mousemove', function(e) { dragMove(e.clientX, e.clientY); });
       document.addEventListener('mouseup', dragEnd);
 
-      // Touch
       el.addEventListener('touchstart', function(e) {
         if (e.touches.length !== 1) return;
         dragStart(e.touches[0].clientX, e.touches[0].clientY);
-        e.preventDefault(); // prevent scroll while dragging card
+        e.preventDefault();
       }, { passive: false });
       el.addEventListener('touchmove', function(e) {
         if (e.touches.length !== 1) return;
@@ -520,14 +537,14 @@ function initPanel(sidebarBox) {
       if (isSeed) {
         card.innerHTML =
           '<div class="pp-mm-card-head" style="background:' + accentColor + '">' +
-            '<span style="color:' + (tv['--tab-active-color']||'#fff') +
+            '<span style="color:' + (tv['--tab-active-color'] || '#fff') +
             ';font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase">Selected</span>' +
           '</div>' +
           '<div class="pp-mm-card-body">' +
-            seedCells.map(c =>
-              '<div class="pp-mm-field"><span class="pp-flabel">' +
-              panelEscH(c.header) + '</span>' + panelHighlight(c.text, kwsHL) + '</div>'
-            ).join('') +
+            seedCells.map(function(c) {
+              return '<div class="pp-mm-field"><span class="pp-flabel">' +
+                panelEscH(c.header) + '</span>' + panelHighlight(c.text, kwsHL) + '</div>';
+            }).join('') +
           '</div>';
       } else {
         var catLine = cats && cats.length ? cats.map(panelEscH).join(' · ') : '';
@@ -551,13 +568,13 @@ function initPanel(sidebarBox) {
     makeCard('', '', seedTabIdx, seedKey, true, [], seedKws, null);
 
     matches.forEach(function(m) {
-      var indices = Array.from({ length: m.row.cells.length }, (_, i) => i)
-        .filter(ci => (m.row.cells[ci] || '').trim());
+      var indices = Array.from({ length: m.row.cells.length }, function(_, i) { return i; })
+        .filter(function(ci) { return (m.row.cells[ci] || '').trim(); });
       if (!indices.length) return;
 
-      indices.sort((a, b) => {
-        var ka = panelExtractKW(m.row.cells[a]).filter(k => m.shared.has(k)).length;
-        var kb = panelExtractKW(m.row.cells[b]).filter(k => m.shared.has(k)).length;
+      indices.sort(function(a, b) {
+        var ka = panelExtractKW(m.row.cells[a]).filter(function(k) { return m.shared.has(k); }).length;
+        var kb = panelExtractKW(m.row.cells[b]).filter(function(k) { return m.shared.has(k); }).length;
         return kb - ka;
       });
 
@@ -565,7 +582,7 @@ function initPanel(sidebarBox) {
       var text   = m.row.cells[bestColIdx] || '';
       var header = m.headers[bestColIdx]   || '';
       var key    = 'm-' + m.tabIdx + '-' + m.rowIdx;
-      var cats   = m.row.cats ? m.row.cats.filter(c => c.trim()) : [];
+      var cats   = m.row.cats ? m.row.cats.filter(function(c) { return c.trim(); }) : [];
       var tv     = panelThemeVars(m.tabIdx);
 
       makeCard(text, header, m.tabIdx, key, false, cats, m.shared, m);
@@ -621,7 +638,7 @@ function initPanel(sidebarBox) {
       redrawArrows();
       _mmActive = { rects, cardEls, arrowDefs, redrawArrows };
       _mmLastW = mmW(); _mmLastH = mmH();
-      requestAnimationFrame(() => applyHlState());
+      requestAnimationFrame(function() { applyHlState(); });
     });
   }
 
@@ -694,16 +711,26 @@ function initPanel(sidebarBox) {
 #pp-hl-wrap, #pp-view-wrap { flex: 1; min-width: 0; display: flex; }
 #pp-hl-wrap .pp-pill, #pp-view-wrap .pp-pill { width: 100%; }
 
-#pp-body-wrap { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; position: relative; }
+#pp-body-wrap {
+  flex: 1; min-height: 0;
+  overflow-y: auto; overflow-x: hidden;
+  position: relative;
+}
 
-/* Grid columns set by updateGrid() in JS. Width also set by JS to prevent flex stretching. */
 #pp-body {
+  /* padding provides the horizontal gutter; JS sets gridTemplateColumns only */
   padding: 10px 12px 18px; box-sizing: border-box;
   display: grid;
+  /* auto column count set by JS via gridTemplateColumns */
+  gap: 10px;
   align-content: start;
   align-items: start;
-  gap: 10px;
+  /* Let the grid fill the container width — no JS pixel width */
+  width: 100%;
+  /* Smooth reflow when columns change (e.g. sidebar resize) */
+  transition: grid-template-columns 0.18s ease;
 }
+
 #pp-mm-wrap { position: absolute; inset: 0; display: none; overflow: hidden; }
 
 /* Pill */
@@ -732,26 +759,27 @@ function initPanel(sidebarBox) {
   color: rgba(0,0,0,.25); line-height: 1.5;
 }
 
-/* Seed card — grid column constrains width; min-width:0 prevents overflow expansion */
+/* Seed card — always spans all columns */
 .pp-seed-card {
+  grid-column: 1 / -1;
   min-width: 0;
   border: 2px solid var(--ppc-border, #aaa);
   border-radius: 8px; background: var(--ppc-bg, #f8f8f8);
   overflow: hidden; box-sizing: border-box;
 }
 
-/* Match card — grid column constrains width; min-width:0 prevents overflow expansion */
+/* Match card */
 .pp-match-card {
   min-width: 0;
   border: 1.5px solid var(--ppc-border, #aaa);
   border-radius: 8px; background: var(--ppc-bg, #f8f8f8);
   overflow: visible; box-sizing: border-box;
-  animation: pp-fade-in .25s ease both;
+  animation: pp-fade-in .22s ease both;
   position: relative;
 }
 @keyframes pp-fade-in {
-  from { opacity: 0; transform: translateY(4px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
 }
 
 /* Divider — spans all grid columns */
@@ -792,7 +820,7 @@ function initPanel(sidebarBox) {
   text-transform: uppercase; display: inline-block; align-self: flex-start;
 }
 
-/* "Go to" hover button — in normal flow, expands the card height on hover */
+/* "Go to" hover button */
 .pp-goto-btn {
   display: block; width: calc(100% - 16px); margin: 0 8px 8px;
   padding: 5px 8px; border-radius: 6px; border: 1.5px solid;
