@@ -20,7 +20,7 @@ const PANEL_CARD_MAX_W      = 240;
 const PANEL_GOTO_DELAY      = 900;
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
-console.log('[panel.js_v_9]');
+console.log('[panel.js_v_10]');
 document.addEventListener('DOMContentLoaded', () => {
   const wait = setInterval(() => {
     const box = document.getElementById('sidebar-box');
@@ -83,7 +83,19 @@ function initPanel(sidebarBox) {
     var w = (sidebarEl ? sidebarEl.offsetWidth : sidebarBox.offsetWidth) - sbMargin * 2 - pad;
     if (w <= 0) return;
 
-    var cols  = Math.max(1, Math.floor((w + gap) / (PANEL_CARD_MIN_W + gap)));
+    // Cap useful columns at the largest group of match cards currently rendered.
+    // Once all cards fit at PANEL_CARD_MAX_W, columns freeze — no phantom columns,
+    // no further stretching.
+    var matchCardCount = ppBody.querySelectorAll('.pp-match-card').length;
+    var maxUsefulCols  = matchCardCount > 0 ? matchCardCount : Infinity;
+
+    // How many columns fit with cards at least PANEL_CARD_MIN_W wide?
+    var colsByMin = Math.max(1, Math.floor((w + gap) / (PANEL_CARD_MIN_W + gap)));
+    // How many columns fit with cards at exactly PANEL_CARD_MAX_W wide?
+    var colsByMax = Math.max(1, Math.floor((w + gap) / (PANEL_CARD_MAX_W + gap)));
+
+    // Use max-width column count once there's enough room, capped at what's useful.
+    var cols  = Math.min(colsByMin, Math.max(1, colsByMax), maxUsefulCols);
     var cardW = Math.min(PANEL_CARD_MAX_W, Math.floor((w - gap * (cols - 1)) / cols));
 
     if (cols === _lastCols && cardW === _lastCardW) return;
@@ -91,8 +103,6 @@ function initPanel(sidebarBox) {
     _lastCardW = cardW;
 
     ppBody.style.gridTemplateColumns = 'repeat(' + cols + ', ' + cardW + 'px)';
-    // Width is now handled purely by CSS padding on ppBodyWrap; no JS pixel width needed.
-    // Clearing any stale width that older versions may have set:
     ppBody.style.width = '';
   }
 
@@ -759,9 +769,8 @@ function initPanel(sidebarBox) {
   color: rgba(0,0,0,.25); line-height: 1.5;
 }
 
-/* Seed card — always spans all columns */
+/* Seed card */
 .pp-seed-card {
-  grid-column: 1 / -1;
   min-width: 0;
   border: 2px solid var(--ppc-border, #aaa);
   border-radius: 8px; background: var(--ppc-bg, #f8f8f8);
