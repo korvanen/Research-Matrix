@@ -24,7 +24,7 @@ const PANEL_CARD_MAX_W      = 240; // px — card max width (cards stretch up to
 const PANEL_GOTO_DELAY      = 900; // ms hover before "Go to" button appears
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
-console.log('[panel.js_v_3]');
+console.log('[panel.js_v_4]');
 document.addEventListener('DOMContentLoaded', () => {
   const wait = setInterval(() => {
     const box = document.getElementById('sidebar-box');
@@ -78,8 +78,18 @@ function initPanel(sidebarBox) {
       w = (sidebarBox.offsetWidth || sidebarBox.parentElement.offsetWidth) - sbMargin * 2 - pad;
     }
     if (w <= 0) return;
-    var cols  = Math.max(1, Math.floor(w / PANEL_CARD_MIN_W));
-    var cardW = Math.min(PANEL_CARD_MAX_W, Math.floor((w - gap * (cols - 1)) / cols));
+    // Find how many columns fit at PANEL_CARD_MIN_W
+    var cols = Math.max(1, Math.floor(w / PANEL_CARD_MIN_W));
+    // Calculate card width for that column count
+    var cardW = Math.floor((w - gap * (cols - 1)) / cols);
+    // If cards would exceed max width with fewer columns, reduce cols until cardW <= max
+    // (this shouldn't happen, but guard against it)
+    cardW = Math.min(PANEL_CARD_MAX_W, cardW);
+    // Key fix: if all cols already fit at max width, lock cols to the minimum needed
+    // i.e. don't add another column just because there's more space
+    var minColsAtMax = Math.ceil((w + gap) / (PANEL_CARD_MAX_W + gap));
+    if (cols > minColsAtMax) cols = minColsAtMax;
+    cardW = Math.min(PANEL_CARD_MAX_W, Math.floor((w - gap * (cols - 1)) / cols));
     // No change — skip to avoid triggering ResizeObserver loop
     if (cols === _lastCols && cardW === _lastCardW) return;
     _lastCols = cols; _lastCardW = cardW;
