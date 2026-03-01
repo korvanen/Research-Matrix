@@ -20,7 +20,7 @@ const PANEL_CARD_MAX_W      = 240;
 const PANEL_GOTO_DELAY      = 400;
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
-console.log('[panel.js_v_3]');
+console.log('[panel.js_v_123]');
 document.addEventListener('DOMContentLoaded', () => {
   const wait = setInterval(() => {
     const box = document.getElementById('sidebar-box');
@@ -709,22 +709,21 @@ function initPanel(sidebarBox) {
     var snap = e.detail;
     if (!snap || !_mmActive) return;
     if (snap.matchKey !== _mmMatchKey) return;
-    // Always apply inside a rAF so mmW/mmH are measured after the browser has
-    // committed the new sidebar dimensions — critical on portrait where the
-    // sidebar transitions from 0px to full-width and ppMmWrap needs one frame
-    // to reflow before clientWidth/clientHeight return correct values.
+
+    // Hide cards SYNCHRONOUSLY before any rAF so there is zero chance of a
+    // visible frame showing the default "smooshed" layout. The browser won't
+    // paint the hidden state because we force a style flush right here.
+    _mmActive.cardEls.forEach(function(el) {
+      el.style.transition = 'none';
+      el.style.opacity    = '0';
+      el.style.transform  = 'scale(0.88)';
+    });
+    void ppMmWrap.offsetHeight; // flush — commits opacity:0 before first rAF
+
+    // One rAF so mmW/mmH are measured after the browser has committed the new
+    // sidebar dimensions (critical on portrait: sidebar goes 0 → full-width).
     requestAnimationFrame(function() {
       if (!_mmActive || snap.matchKey !== _mmMatchKey) return;
-
-      // Instantly hide cards so the "squished" default layout is never visible
-      _mmActive.cardEls.forEach(function(el) {
-        el.style.transition = 'none';
-        el.style.opacity    = '0';
-        el.style.transform  = 'scale(0.88)';
-      });
-
-      // Force a style flush so the hidden state is committed before we move cards
-      void ppMmWrap.offsetHeight;
 
       // Move all cards to their saved positions while still invisible
       snap.positions.forEach(function(pos, key) {
@@ -739,15 +738,18 @@ function initPanel(sidebarBox) {
       });
       _mmActive.redrawArrows();
 
-      // Fade + scale cards into their correct positions smoothly
+      // Second rAF: browser has now laid out cards at correct positions.
+      // Fade + scale them in with a gentle staggered animation.
       requestAnimationFrame(function() {
         if (!_mmActive) return;
+        var maxDelay = 0;
         _mmActive.cardEls.forEach(function(el, i) {
-          // Stagger each card slightly for a ripple feel
-          var delay = i * 1800;
-          el.style.transition = 'opacity 4s ease ' + delay + 'ms, transform 1s cubic-bezier(0.34,1.4,0.64,1) ' + delay + 'ms'; // the line I changed
-          el.style.opacity    = '1';
-          el.style.transform  = 'scale(1)';
+          var delay = i * 25; // 25 ms stagger between cards
+          maxDelay  = delay;
+          el.style.transition = 'opacity 0.28s ease ' + delay + 'ms, ' +
+                                 'transform 0.36s cubic-bezier(0.34,1.4,0.64,1) ' + delay + 'ms';
+          el.style.opacity   = '1';
+          el.style.transform = 'scale(1)';
         });
         // Clean up transition styles after animation so dragging is unaffected
         setTimeout(function() {
@@ -756,7 +758,7 @@ function initPanel(sidebarBox) {
             el.style.transition = '';
             el.style.transform  = '';
           });
-        }, 320 + _mmActive.cardEls.size * 18);
+        }, maxDelay + 380);
       });
     });
   });
