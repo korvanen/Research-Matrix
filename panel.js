@@ -24,7 +24,7 @@ const PANEL_CARD_MAX_W      = 240; // px — card max width (cards stretch up to
 const PANEL_GOTO_DELAY      = 900; // ms hover before "Go to" button appears
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
-console.log('[panel.js_v_5]');
+console.log('[panel.js_v_6]');
 document.addEventListener('DOMContentLoaded', () => {
   const wait = setInterval(() => {
     const box = document.getElementById('sidebar-box');
@@ -78,18 +78,24 @@ function initPanel(sidebarBox) {
       w = (sidebarBox.offsetWidth || sidebarBox.parentElement.offsetWidth) - sbMargin * 2 - pad;
     }
     if (w <= 0) return;
-    // Find how many columns fit at PANEL_CARD_MIN_W
-    var cols = Math.max(1, Math.floor(w / PANEL_CARD_MIN_W));
-    // Calculate card width for that column count
-    var cardW = Math.floor((w - gap * (cols - 1)) / cols);
-    // If cards would exceed max width with fewer columns, reduce cols until cardW <= max
-    // (this shouldn't happen, but guard against it)
-    cardW = Math.min(PANEL_CARD_MAX_W, cardW);
-    // Key fix: if all cols already fit at max width, lock cols to the minimum needed
-    // i.e. don't add another column just because there's more space
-    var maxCols = Math.floor((w + gap) / (PANEL_CARD_MAX_W + gap));
-    if (cols > maxCols && maxCols >= 1) cols = maxCols;
-    cardW = Math.min(PANEL_CARD_MAX_W, Math.floor((w - gap * (cols - 1)) / cols));
+    // Start with 1 column and increase only when the current cardW would exceed PANEL_CARD_MAX_W.
+    // This gives: stretch min→max in 1 col, snap to 2 cols at min, stretch again, etc.
+    // Once all cols fit at max width, extra space stays empty (cols stays at maxCols).
+    var maxCols = Math.max(1, Math.floor((w + gap) / (PANEL_CARD_MAX_W + gap)));
+    var cols = Math.max(1, Math.floor((w + gap) / (PANEL_CARD_MAX_W + gap)));
+    // Now find how many cols at MIN fit — this is the upper bound
+    var colsAtMin = Math.max(1, Math.floor(w / PANEL_CARD_MIN_W));
+    // cols = how many columns such that cardW is between MIN and MAX
+    // Increase cols from 1 until cardW drops to MIN or below
+    cols = 1;
+    while (cols < colsAtMin) {
+      var nextCardW = Math.floor((w - gap * cols) / (cols + 1));
+      if (nextCardW < PANEL_CARD_MIN_W) break;
+      cols++;
+    }
+    // Cap at maxCols so we never exceed MAX width per card
+    if (cols > maxCols) cols = maxCols;
+    var cardW = Math.min(PANEL_CARD_MAX_W, Math.floor((w - gap * (cols - 1)) / cols));
     // No change — skip to avoid triggering ResizeObserver loop
     if (cols === _lastCols && cardW === _lastCardW) return;
     _lastCols = cols; _lastCardW = cardW;
@@ -710,6 +716,7 @@ function initPanel(sidebarBox) {
   padding: 10px 12px 18px; box-sizing: border-box;
   display: grid;
   align-content: start;
+  align-items: start;
   gap: 10px;
 }
 #pp-mm-wrap { position: absolute; inset: 0; display: none; overflow: hidden; }
@@ -800,17 +807,21 @@ function initPanel(sidebarBox) {
   text-transform: uppercase; display: inline-block; align-self: flex-start;
 }
 
-/* "Go to" hover button */
+/* "Go to" hover button — absolutely positioned so it overlays the card bottom
+   without changing card height. Card needs position:relative (already set). */
 .pp-goto-btn {
-  display: block; width: calc(100% - 16px); margin: 0 8px 8px;
-  padding: 5px 8px; border-radius: 6px; border: 1.5px solid;
+  position: absolute; bottom: 0; left: 8px; right: 8px;
+  transform: translateY(calc(100% + 4px));
+  padding: 5px 8px; border-radius: 0 0 6px 6px; border: 1.5px solid;
+  border-top: none;
   background: white; font-size: 10px; font-weight: 600; letter-spacing: .06em;
   text-transform: uppercase; cursor: pointer; text-align: center;
-  opacity: 0; transform: translateY(6px);
-  transition: opacity .35s ease, transform .35s ease;
-  box-shadow: 0 1px 6px rgba(0,0,0,.08);
+  opacity: 0;
+  transition: opacity .25s ease, transform .25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  box-shadow: 0 4px 8px rgba(0,0,0,.12);
+  z-index: 10;
 }
-.pp-goto-btn.pp-goto-visible { opacity: 1; transform: translateY(0); }
+.pp-goto-btn.pp-goto-visible { opacity: 1; transform: translateY(100%); }
 .pp-goto-btn:hover { filter: brightness(0.92); }
 
 /* Keyword highlight */
