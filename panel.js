@@ -83,12 +83,25 @@ function initPanel(sidebarBox) {
     var w = (sidebarEl ? sidebarEl.offsetWidth : sidebarBox.offsetWidth) - sbMargin * 2 - pad;
     if (w <= 0) return;
 
-    // Count actual match cards so we never create phantom columns beyond them.
-    var matchCardCount = ppBody.querySelectorAll('.pp-match-card').length;
-    var maxUsefulCols  = matchCardCount > 0 ? matchCardCount : Infinity;
+    // Find the largest tab group: count consecutive .pp-match-card runs between .pp-divider elements.
+    // This is the true column cap — we stop scaling once all cards in the biggest group fit at max width.
+    var maxGroupSize = 0;
+    var currentGroupSize = 0;
+    var children = Array.from(ppBody.children);
+    for (var ci = 0; ci < children.length; ci++) {
+      var ch = children[ci];
+      if (ch.classList.contains('pp-divider')) {
+        if (currentGroupSize > maxGroupSize) maxGroupSize = currentGroupSize;
+        currentGroupSize = 0;
+      } else if (ch.classList.contains('pp-match-card')) {
+        currentGroupSize++;
+      }
+    }
+    if (currentGroupSize > maxGroupSize) maxGroupSize = currentGroupSize;
+    var maxUsefulCols = maxGroupSize > 0 ? maxGroupSize : Infinity;
 
     // Normal column count: how many fit with each card at least PANEL_CARD_MIN_W wide.
-    // Cap at maxUsefulCols — once all cards fit in the row, stop adding ghost columns.
+    // Cap at maxUsefulCols — no ghost columns once the largest group fits in one row.
     var cols  = Math.min(
       Math.max(1, Math.floor((w + gap) / (PANEL_CARD_MIN_W + gap))),
       maxUsefulCols
@@ -723,7 +736,14 @@ function initPanel(sidebarBox) {
   flex: 1; min-height: 0;
   overflow-y: auto; overflow-x: hidden;
   position: relative;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+  scrollbar-width: thin;
 }
+#pp-body-wrap::-webkit-scrollbar { width: 8px; height: 8px; }
+#pp-body-wrap::-webkit-scrollbar-track { background: var(--scrollbar-track); }
+#pp-body-wrap::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 4px; }
+#pp-body-wrap::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-thumb-hover); }
+#pp-body-wrap::-webkit-scrollbar-corner { background: var(--scrollbar-track); }
 
 #pp-body {
   /* padding provides the horizontal gutter; JS sets gridTemplateColumns only */
