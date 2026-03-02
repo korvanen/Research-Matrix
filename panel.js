@@ -17,10 +17,10 @@ const PANEL_MM_ITERS        = 20;
 const PANEL_CARD_W          = 160;
 const PANEL_CARD_MIN_W      = 140;
 const PANEL_CARD_MAX_W      = 240;
-const PANEL_GOTO_DELAY      = 900;
+const PANEL_GOTO_DELAY      = 400;
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
-console.log('[panel.js_v_D]');
+console.log('[panel.js_v_R]');
 document.addEventListener('DOMContentLoaded', () => {
   const wait = setInterval(() => {
     const box = document.getElementById('sidebar-box');
@@ -352,10 +352,12 @@ function initPanel(sidebarBox) {
           catEl.textContent = c.cats.join(' · ');
           body.appendChild(catEl);
         }
+        var _sc = parseCitation(c.text);
         var f = document.createElement('div');
         f.className = 'pp-field pp-field-matched';
         f.innerHTML = '<span class="pp-flabel">' + panelEscH(c.header) + '</span>' +
-          panelHighlight(c.text, kws);
+          panelHighlight(_sc.body, kws) +
+          citationPillHtml(_sc.citation, accentSrc, labelSrc);
         body.appendChild(f);
       });
 
@@ -437,14 +439,16 @@ function initPanel(sidebarBox) {
         body.className = 'pp-card-body';
         m.row.cells.forEach(function(text, ci) {
           if (!text.trim()) return;
+          var _mc = parseCitation(text);
           var f = document.createElement('div');
           f.className = 'pp-field';
           var matchedKws = new Set([...m.shared].filter(function(k) {
-            return panelExtractKW(text).includes(k);
+            return panelExtractKW(_mc.body).includes(k);
           }));
           if (matchedKws.size) f.classList.add('pp-field-matched');
           f.innerHTML = '<span class="pp-flabel">' + panelEscH(m.headers[ci] || '') + '</span>' +
-            panelHighlight(text, matchedKws);
+            panelHighlight(_mc.body, matchedKws) +
+            citationPillHtml(_mc.citation, accentColor, tv['--tab-active-color'] || '#fff');
           body.appendChild(f);
         });
 
@@ -925,30 +929,36 @@ function initPanel(sidebarBox) {
         var firstCatHtml = (firstCell && firstCell.cats && firstCell.cats.length)
           ? '<div class="pp-mm-cat">' + firstCell.cats.map(panelEscH).join(' · ') + '</div>'
           : '';
+        var _sfc = parseCitation(firstCell ? firstCell.text : '');
         var firstFieldHtml = firstCell
           ? '<div class="pp-mm-field"><span class="pp-flabel">' + panelEscH(firstCell.header) + '</span>' +
-            panelHighlight(firstCell.text, kwsHL) + '</div>'
+            panelHighlight(_sfc.body, kwsHL) +
+            citationPillHtml(_sfc.citation, accentColor, labelColor) + '</div>'
           : '';
         var extraHtml = '';
         if (seedCells.length > 1) {
           extraHtml = '<div class="pp-mm-seed-extra">' +
             seedCells.slice(1).map(function(c) {
+              var _ec = parseCitation(c.text);
               var catHtml = (c.cats && c.cats.length)
                 ? '<div class="pp-mm-cat">' + c.cats.map(panelEscH).join(' · ') + '</div>'
                 : '';
               return '<div class="pp-mm-seed-sep"></div>' + catHtml +
                 '<div class="pp-mm-field"><span class="pp-flabel">' + panelEscH(c.header) + '</span>' +
-                panelHighlight(c.text, kwsHL) + '</div>';
+                panelHighlight(_ec.body, kwsHL) +
+                citationPillHtml(_ec.citation, accentColor, labelColor) + '</div>';
             }).join('') +
           '</div>';
         }
         bodyHtml = firstCatHtml + firstFieldHtml + extraHtml;
       } else {
         var catLine = cats && cats.length ? cats.map(panelEscH).join(' · ') : '';
+        var _mcc = parseCitation(text);
         bodyHtml =
           (catLine ? '<div class="pp-mm-cat">' + catLine + '</div>' : '') +
           '<div class="pp-mm-field"><span class="pp-flabel">' + panelEscH(header) + '</span>' +
-          panelHighlight(text, kwsHL) + '</div>';
+          panelHighlight(_mcc.body, kwsHL) +
+          citationPillHtml(_mcc.citation, accentColor, labelColor) + '</div>';
       }
 
       var cardBody = document.createElement('div');
