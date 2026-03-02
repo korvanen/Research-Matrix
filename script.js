@@ -3,14 +3,7 @@
 // ════════════════════════════════════════════════════════════════
 console.log('script.js [v10]');
 
-// DEBUG — paste this right after:  const all = await fetchODS();
-const zip2 = await JSZip.loadAsync(await (await fetch(ODS_URL)).arrayBuffer());
-const rawXml = await zip2.file('content.xml').async('string');
-// Find the first cell that contains #NAME? or a formula
-const snippet = rawXml.match(/.{0,300}(#NAME\?|table:formula).{0,300}/g);
-console.log('=== ODS DEBUG ===');
-(snippet || ['nothing matched']).slice(0, 5).forEach(s => console.log(s));
-// END DEBUG
+
 
 const APP_TITLE       = 'Dimensional Framework';
 
@@ -1028,6 +1021,15 @@ tabBar.innerHTML = '<div style="padding:8px 12px;color:#999;font-size:12px">Load
     loadingOverlay.textContent = 'Fetching data…';
     const all = await fetchODS();
     loadingOverlay.textContent = `Fetched ${all.length} sheets, filtering…`;
+
+  // DEBUG
+    const zip2 = await JSZip.loadAsync(await (await fetch(ODS_URL)).arrayBuffer());
+    const rawXml = await zip2.file('content.xml').async('string');
+    const snippet = rawXml.match(/.{0,300}(#NAME\?|table:formula).{0,300}/g);
+    console.log('=== ODS DEBUG ===');
+    (snippet || ['nothing matched']).slice(0, 5).forEach(s => console.log(s));
+    // END DEBUG
+    
     TABS = all.filter(s => s.name.includes('MX'));
     if (!TABS.length) {
       loadingOverlay.textContent = `No MX tabs found. Sheets: ${all.map(s=>s.name).join(', ')}`;
