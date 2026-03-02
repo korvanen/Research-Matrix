@@ -43,7 +43,7 @@ body {
   font-family: Inter, system-ui, sans-serif;
   font-size: 14px;
   height: 100vh;
-  height: 100dvh; /* dynamic viewport — tracks Chrome address bar show/hide */
+  height: 100dvh;
   overflow: hidden;
 }
 
@@ -52,7 +52,7 @@ body {
   display: grid;
   width: 100vw;
   height: 100vh;
-  height: 100dvh; /* dynamic viewport — prevents grid overflow under mobile chrome UI */
+  height: 100dvh;
   grid-template-columns: auto 1fr var(--sidebar-reserved-width, 0px);
   grid-template-rows: auto 1fr auto;
   grid-template-areas:
@@ -91,7 +91,6 @@ body {
   padding: 0 30px 10px;
   box-shadow: 0 1px 4px rgba(0,0,0,.06);
   z-index: 10;
-  /* dvh: tracks visible area as Chrome address bar animates */
   height: var(--topbar-dvh, unset);
   min-height: var(--topbar-dvh, unset);
 }
@@ -309,12 +308,9 @@ th, td {
   overflow: hidden;
   transition: opacity .18s ease;
   position: relative;
-  /* dvh: tracks the visible viewport so the bar stays in view as
-     Chrome's address bar and bottom UI animate in/out on Android */
   height: var(--bottombar-dvh, unset);
   min-height: var(--bottombar-dvh, unset);
 }
-.bottombar.tabs-hidden {}
 
 /* ── FULL TAB BAR ── */
 .tab-bar {
@@ -366,10 +362,6 @@ th, td {
 /* ── COMPACT TAB BAR ── */
 .bottombar.tabs-compact {
   padding: 0;
-  /* Tab bar is sized by JS to exactly window.innerWidth - sidebarW,
-     starting at x=0. flex-start places it flush left, which is correct —
-     its own justify-content:center handles centering of the label within
-     that region. */
   justify-content: flex-start;
   align-items: center;
   overflow: visible;
@@ -379,11 +371,10 @@ th, td {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: var(--tab-bar-padding, 16px);       /* space between arrows and label */
-  padding: 0 var(--tab-bar-inset, 12px);   /* inset from screen edge and sidebar edge */
+  gap: var(--tab-bar-padding, 16px);
+  padding: 0 var(--tab-bar-inset, 12px);
   box-sizing: border-box;
   overflow: visible;
-  /* width is set explicitly by JS to the available space — no max-width needed */
   min-width: 0;
   flex-shrink: 0;
 }
@@ -474,7 +465,6 @@ th, td {
 }
 
 /* ── Category cell rotation ── */
-/* Applied by JS when text is too wide to fit on one line */
 .cat-table td.cat-rotated {
   white-space: nowrap;
   word-break: normal;
@@ -492,9 +482,7 @@ th, td {
   text-align: center;
 }
 
-/* ── Citation pill ──   font-size: 10px; line-height: 1.35; */ 
-/* Inline citation tag shown in sidebar cards after the field body text.     */
-/* Colors are set inline by JS to match the card header accent/text colors.  */
+/* ── Citation pill ── */
 .pp-cite-pill {
   display: inline-block;
   margin-top: 4px;
@@ -530,3 +518,115 @@ td.selected-group, th.selected-group { background: var(--selected-group) !import
 .data-scroll::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 4px; }
 .data-scroll::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-thumb-hover); }
 .data-scroll::-webkit-scrollbar-corner { background: var(--scrollbar-track); }
+
+
+/* ════════════════════════════════════════════════════════════════
+   ── SIDEBAR PANEL SHARED STYLES ──
+   Used by panel.js, panel-find-matches.js, panel-keywords.js
+   ════════════════════════════════════════════════════════════════ */
+
+/* ── Tool navigation bar ── */
+#pp-tool-nav {
+  flex-shrink: 0;
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  padding: 6px 8px 0;
+  border-bottom: 1px solid var(--sidebar-box-border, rgba(0,0,0,.1));
+  background: transparent;
+}
+.pp-tool-btn {
+  flex: 1;
+  border: none;
+  background: transparent;
+  padding: 6px 10px 7px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  color: rgba(0,0,0,.35);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: color .15s, border-color .15s;
+  white-space: nowrap;
+  border-radius: 4px 4px 0 0;
+}
+.pp-tool-btn:hover { color: rgba(0,0,0,.60); }
+.pp-tool-btn.pp-tool-btn-active {
+  color: var(--color-topbar-sheet, #111);
+  border-bottom-color: var(--color-topbar-sheet, #111);
+}
+
+/* ── Tool panes ── */
+.pp-tool-pane {
+  display: none;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+.pp-tool-pane.pp-tool-pane-active {
+  display: flex;
+}
+
+/* ── Segmented pill control ──
+   Used in the Find Matches sub-bar and anywhere else a pill toggle is needed */
+.pp-pill {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  background: rgba(0,0,0,.07);
+  border-radius: 20px;
+  padding: 2px;
+  box-sizing: border-box;
+}
+.pp-ind {
+  position: absolute;
+  top: 2px; bottom: 2px;
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 1px 4px rgba(0,0,0,.15);
+  transition: left .18s ease, width .18s ease;
+  pointer-events: none;
+}
+.pp-btn {
+  flex: 1;
+  position: relative;
+  z-index: 1;
+  border: none;
+  background: transparent;
+  border-radius: 16px;
+  padding: 4px 5px;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  color: rgba(0,0,0,.35);
+  cursor: pointer;
+  transition: color .15s;
+  white-space: nowrap;
+}
+.pp-btn.active { color: rgba(0,0,0,.75); }
+
+/* ── Keyword highlight mark ── */
+mark.pkw {
+  background: transparent;
+  border-bottom: 2px solid currentColor;
+  font-weight: 700;
+  padding: 0;
+  color: inherit;
+  transition: border-bottom-color .15s, font-weight .15s;
+}
+
+/* ── Shared empty state ── */
+.pp-empty {
+  grid-column: 1 / -1;
+  padding: 24px 8px;
+  text-align: center;
+  font-size: 11px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: rgba(0,0,0,.25);
+  line-height: 1.5;
+}
