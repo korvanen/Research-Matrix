@@ -20,7 +20,7 @@ const PANEL_CARD_MAX_W      = 240;
 const PANEL_GOTO_DELAY      = 400;
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
-console.log('[panel.js_v_C]');
+console.log('[panel.js_v_D]');
 document.addEventListener('DOMContentLoaded', () => {
   const wait = setInterval(() => {
     const box = document.getElementById('sidebar-box');
@@ -958,8 +958,21 @@ function initPanel(sidebarBox) {
       card.appendChild(cardHead);
       card.appendChild(cardBody);
 
+      // For mindmap cards, create the goto button permanently in the DOM
+      // so CSS controls visibility (hover/expanded/locked) without
+      // attachGoTo's dynamic create-on-hover/remove-on-leave approach.
       if (!isSeed && matchObj) {
-        attachGoTo(card, matchObj, accentColor);
+        var gotoBtn = document.createElement('button');
+        gotoBtn.className = 'pp-goto-btn';
+        gotoBtn.title = 'Go to';
+        gotoBtn.style.borderColor = accentColor || 'rgba(0,0,0,.2)';
+        gotoBtn.style.color = accentColor || 'rgba(0,0,0,.6)';
+        gotoBtn.addEventListener('click', function(e) {
+          e.stopPropagation();
+          panelGoTo(matchObj);
+        });
+        gotoBtn.addEventListener('mousedown', function(e) { e.stopPropagation(); });
+        card.appendChild(gotoBtn);
       }
 
       ppMmWrap.appendChild(card);
