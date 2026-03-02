@@ -20,7 +20,7 @@ const PANEL_CARD_MAX_W      = 240;
 const PANEL_GOTO_DELAY      = 400;
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
-console.log('[panel.js_v_S]');
+console.log('[panel.js_v_T]');
 document.addEventListener('DOMContentLoaded', () => {
   const wait = setInterval(() => {
     const box = document.getElementById('sidebar-box');
@@ -720,7 +720,6 @@ function initPanel(sidebarBox) {
         });
         var cs = getComputedStyle(cardEl);
         contentH += parseFloat(cs.borderTopWidth || 0) + parseFloat(cs.borderBottomWidth || 0);
-        // Extra space below card for the goto button (which is now outside the flow)
         var fullH = contentH;
 
         cardEl.style.height = collH + 'px';
@@ -1450,46 +1449,57 @@ mark.pkw {
 }
 
 /* ── Goto button — mindmap variant ─────────────────────
-   Sits BELOW the card (outside its bounds) as a full-width
-   pill button, visible only when expanded.
-   We use margin-top instead of position:absolute so it
-   naturally extends below the card without needing
-   overflow:visible tricks on the card itself — the card IS
-   overflow:visible when expanded. */
+   Small icon pinned to the bottom-right corner of the card,
+   mirroring the lock icon in the header. Visible only when
+   expanded. Uses overflow:visible on the expanded card so
+   it isn't clipped. */
 .pp-mm-card .pp-goto-btn {
-  /* Reset tiles-view positioning */
-  position: static;
-  display: block;
-  width: calc(100% - 12px);
-  margin: 4px 6px 6px;
-  padding: 4px 8px;
-  border-radius: 0 0 6px 6px;
-  border: 1.5px solid var(--ppc-border, #aaa);
-  border-top: none;
-  background: var(--ppc-bg, #fff);
-  color: var(--ppc-border, #888);
-  font-size: 10px; font-weight: 600;
-  letter-spacing: .06em; text-transform: uppercase;
-  cursor: pointer; text-align: center;
-  box-shadow: 0 3px 8px rgba(0,0,0,.10);
-  /* Hidden by default */
+  position: absolute;
+  bottom: 5px;
+  right: 6px;
+  width: 18px;
+  height: 18px;
+  border: none;
+  background: transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
   opacity: 0;
-  max-height: 0;
-  overflow: hidden;
   pointer-events: none;
-  transition: opacity .22s ease, max-height .22s ease;
+  transition: opacity .18s ease, background .12s ease;
+  padding: 0;
+  margin: 0;
+  box-shadow: none;
   transform: none;
-  margin-bottom: 0;
+  color: var(--ppc-border, #888);
+  /* Hide the text label — icon only */
+  font-size: 0;
+  letter-spacing: 0;
+  text-transform: none;
 }
 .pp-mm-card.pp-mm-expanded .pp-goto-btn {
-  opacity: 1;
-  max-height: 40px;
+  opacity: 0.45;
   pointer-events: auto;
 }
-.pp-mm-card .pp-goto-btn:hover { filter: brightness(0.90); }
-/* Show only the text label in mindmap (not the ::after arrow) */
-.pp-mm-card .pp-goto-btn::after { display: none; }
-.pp-mm-card .pp-goto-btn .pp-goto-label { display: inline; }
+.pp-mm-card .pp-goto-btn:hover {
+  opacity: 0.9 !important;
+  background: rgba(0,0,0,0.08);
+  filter: none;
+}
+/* Arrow icon via ::after — diagonal arrow pointing top-right */
+.pp-mm-card .pp-goto-btn::after {
+  content: '';
+  display: block;
+  width:  7px;
+  height: 7px;
+  border-top:   1.8px solid currentColor;
+  border-right: 1.8px solid currentColor;
+  transform: rotate(45deg) translate(-1px, 1px);
+  flex-shrink: 0;
+}
+/* Hide the text label span */
+.pp-mm-card .pp-goto-btn .pp-goto-label { display: none; }
 `;
     document.head.appendChild(style);
   }
