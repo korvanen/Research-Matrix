@@ -20,7 +20,7 @@ const PANEL_CARD_MAX_W      = 240;
 const PANEL_GOTO_DELAY      = 400;
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
-console.log('[panel.js_v_Y]');
+console.log('[panel.js_v_Z]');
 document.addEventListener('DOMContentLoaded', () => {
   const wait = setInterval(() => {
     const box = document.getElementById('sidebar-box');
@@ -1420,7 +1420,9 @@ mark.pkw {
 }
 /* Show lock icon when card is hovered or expanded */
 .pp-mm-card:hover .pp-mm-lock,
-.pp-mm-card.pp-mm-expanded .pp-mm-lock {
+.pp-mm-card.pp-mm-expanded .pp-mm-lock,
+.pp-mm-card:hover .pp-goto-btn,
+.pp-mm-card.pp-mm-expanded .pp-goto-btn {
   opacity: 0.45;
   pointer-events: auto;
 }
@@ -1428,11 +1430,19 @@ mark.pkw {
   opacity: 0.85 !important;
   background: rgba(255,255,255,0.20);
 }
+.pp-mm-card .pp-goto-btn:hover {
+  opacity: 0.85 !important;
+  background: rgba(0,0,0,0.08);
+}
 /* Active/locked state — always fully visible */
 .pp-mm-lock.pp-mm-lock-active {
   opacity: 1 !important;
   pointer-events: auto;
   background: rgba(255,255,255,0.25);
+}
+.pp-mm-card.pp-mm-card-locked .pp-goto-btn {
+  opacity: 1 !important;
+  pointer-events: auto;
 }
 .pp-mm-lock svg { display: block; pointer-events: none; }
 
@@ -1490,22 +1500,7 @@ mark.pkw {
   letter-spacing: 0;
   text-transform: none;
 }
-/* Show when card is hovered or expanded — mirrors lock icon exactly */
-.pp-mm-card:hover .pp-goto-btn,
-.pp-mm-card.pp-mm-expanded .pp-goto-btn {
-  opacity: 0.45;
-  pointer-events: auto;
-}
-.pp-mm-card .pp-goto-btn:hover {
-  opacity: 0.85 !important;
-  background: rgba(0,0,0,0.08);
-  filter: none;
-}
-/* Locked state — always fully visible, mirrors .pp-mm-lock-active */
-.pp-mm-card.pp-mm-card-locked .pp-goto-btn {
-  opacity: 1 !important;
-  pointer-events: auto;
-}
+/* Mirrors lock icon exactly — visible whenever lock icon is visible */
 /* Arrow icon — same diagonal top-right arrow as tiles mode goto */
 .pp-mm-card .pp-goto-btn::after {
   content: '';
