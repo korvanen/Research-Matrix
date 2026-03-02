@@ -498,10 +498,10 @@ th, td {
 .pp-cite-pill {
   display: inline-block;
   margin-top: 4px;
-  padding: 1px 7px;
+  padding: 3px 7px;
   border-radius: 20px;
-  font-size: 10px;
-  font-weight: 400;
+  font-size: 8px;
+  font-weight: 200;
   letter-spacing: .07em;
   line-height: 1.35;
   white-space: nowrap;
