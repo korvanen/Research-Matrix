@@ -20,7 +20,7 @@ const PANEL_CARD_MAX_W      = 240;
 const PANEL_GOTO_DELAY      = 400;
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
-console.log('[panel.js_v_U]');
+console.log('[panel.js_v_V]');
 document.addEventListener('DOMContentLoaded', () => {
   const wait = setInterval(() => {
     const box = document.getElementById('sidebar-box');
@@ -986,6 +986,7 @@ function initPanel(sidebarBox) {
       });
       card.addEventListener('mouseleave', function() {
         clearTimeout(_hoverEnterTimer);
+        clearTimeout(card._postDragExpandTimer);
         if (card.classList.contains('pp-mm-touch-expanded')) return;
         // Don't collapse if locked
         if (isLocked(key)) return;
@@ -1492,22 +1493,22 @@ mark.pkw {
   text-transform: none;
 }
 .pp-mm-card.pp-mm-expanded .pp-goto-btn {
-  opacity: 0.45;
+  opacity: 1;
   pointer-events: auto;
 }
 .pp-mm-card .pp-goto-btn:hover {
-  opacity: 0.9 !important;
-  background: rgba(0,0,0,0.08);
+  opacity: 1 !important;
+  background: rgba(0,0,0,0.10);
   filter: none;
 }
-/* Arrow icon via ::after — diagonal arrow pointing top-right */
+/* Arrow icon — same diagonal top-right arrow as tiles mode goto */
 .pp-mm-card .pp-goto-btn::after {
   content: '';
   display: block;
-  width:  7px;
-  height: 7px;
-  border-top:   1.8px solid currentColor;
-  border-right: 1.8px solid currentColor;
+  width:  6px;
+  height: 6px;
+  border-top:   2px solid currentColor;
+  border-right: 2px solid currentColor;
   transform: rotate(45deg) translate(-1px, 1px);
   flex-shrink: 0;
 }
