@@ -3,6 +3,15 @@
 // ════════════════════════════════════════════════════════════════
 console.log('script.js [v10]');
 
+// DEBUG — paste this right after:  const all = await fetchODS();
+const zip2 = await JSZip.loadAsync(await (await fetch(ODS_URL)).arrayBuffer());
+const rawXml = await zip2.file('content.xml').async('string');
+// Find the first cell that contains #NAME? or a formula
+const snippet = rawXml.match(/.{0,300}(#NAME\?|table:formula).{0,300}/g);
+console.log('=== ODS DEBUG ===');
+(snippet || ['nothing matched']).slice(0, 5).forEach(s => console.log(s));
+// END DEBUG
+
 const APP_TITLE       = 'Dimensional Framework';
 
 const isPortrait = () => window.innerHeight > window.innerWidth;
