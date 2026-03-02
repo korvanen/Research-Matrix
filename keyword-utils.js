@@ -3,7 +3,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 
 // Minimum per-token length inside a phrase
-const PANEL_KW_MIN_WORD_LEN = 4;
+const PANEL_KW_MIN_WORD_LEN = 2;
 
 // Minimum number of words in a keyword phrase (set to 2 or 3 as you need)
 const PANEL_KW_MIN_PHRASE_WORDS = 2; // or 3
