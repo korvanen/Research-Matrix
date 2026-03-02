@@ -1,7 +1,7 @@
 // ════════════════════════════════════════════════════════════════
 // ── GLOBAL CONFIG ──
 // ════════════════════════════════════════════════════════════════
-console.log('script.js [v1]');
+console.log('script.js [v10]');
 
 const APP_TITLE       = 'Dimensional Framework';
 
@@ -346,7 +346,9 @@ function renderSheet(data) {
     const tr = document.createElement('tr');
     row.cells.forEach(val => {
       const td = document.createElement('td');
-      td.textContent = val;
+      // Strip trailing citation from display; it appears in sidebar cards as a pill
+      const _parsed = typeof parseCitation === 'function' ? parseCitation(val) : { body: val };
+      td.textContent = _parsed.body;
       if (groupEndRows.has(ri)) td.classList.add('group-end');
       tr.appendChild(td);
     });
