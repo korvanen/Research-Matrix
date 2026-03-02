@@ -473,6 +473,25 @@ th, td {
   pointer-events: none;
 }
 
+/* ── Category cell rotation ── */
+/* Applied by JS when text is too wide to fit on one line */
+.cat-table td.cat-rotated {
+  white-space: nowrap;
+  word-break: normal;
+  padding: 0;
+  overflow: hidden;
+  position: relative;
+}
+.cat-table td.cat-rotated .cat-inner {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(-90deg);
+  white-space: nowrap;
+  display: block;
+  text-align: center;
+}
+
 .data-table td:last-child { border-right: none; }
 .header-table th:last-child { border-right: none; }
 
