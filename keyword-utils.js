@@ -2,10 +2,8 @@
 // keyword-utils.js — Keyword extraction, indexing and match-search algorithm
 // ════════════════════════════════════════════════════════════════════════════
 
-// Minimum shared keywords required for a row to count as a match.
-const PANEL_MIN_SHARED = 2;
-
 // Minimum word length for a token to be treated as a keyword.
+// Note: PANEL_MIN_SHARED is defined in panel-find-matches.js
 const PANEL_KW_MIN_WORD_LEN = 4;
 
 // ── Stop words ───────────────────────────────────────────────────────────────
