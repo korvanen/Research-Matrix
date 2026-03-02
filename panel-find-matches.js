@@ -11,7 +11,6 @@
 // ════════════════════════════════════════════════════════════════════════════
 console.log('[panel-find-matches.js v1]');
 
-const PANEL_KW_MIN_WORD_LEN = 4;
 const PANEL_MIN_SHARED      = 2;
 const PANEL_MM_PAD          = 10;
 const PANEL_MM_ITERS        = 20;
