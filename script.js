@@ -1,7 +1,7 @@
 // ════════════════════════════════════════════════════════════════
 // ── GLOBAL CONFIG ──
 // ════════════════════════════════════════════════════════════════
-console.log('script.js [v10]');
+console.log('script.js [v1]');
 
 const APP_TITLE       = 'Dimensional Framework';
 
@@ -20,10 +20,10 @@ const PORTRAIT = {
   sidebarFullscreenThreshold:1.00,
   sidebarSnapClose:          0.05,
   sidebarTwoPosition:        true,
-  arrowSize:                 36,    // px — larger touch targets in portrait
+  arrowSize:                 36,
   arrowOffset:               16,
-  tabBarPadding:             0.01,    // — gap between arrow buttons and tab label
-  tabBarInset:               0.03,    // — gap between arrow buttons and screen/sidebar edges
+  tabBarPadding:             0.01,
+  tabBarInset:               0.03,
 };
 
 const LANDSCAPE = {
@@ -39,10 +39,10 @@ const LANDSCAPE = {
   sidebarOverlapThreshold:   0.50,
   sidebarFullscreenThreshold:0.80,
   sidebarTwoPosition:        false,
-  arrowSize:                 28,    // px
+  arrowSize:                 28,
   arrowOffset:               12,
-  tabBarPadding:             0.05,    //  — gap between arrow buttons and tab label
-  tabBarInset:               0.05,    //  — gap between arrow buttons and screen/sidebar edges
+  tabBarPadding:             0.05,
+  tabBarInset:               0.05,
 };
 
 const R = () => isPortrait() ? PORTRAIT : LANDSCAPE;
@@ -356,6 +356,74 @@ function renderSheet(data) {
   updateLayout(data.headers.length);
 }
 
+// ── Category cell rotation ──
+// Measures each category td; if the text is too wide to fit on one line,
+// wraps it in a rotated inner span and records the minimum height needed
+// so that _doSyncRowHeights can respect it.
+const _rotatedMinH = new Map(); // rowIndex (of first row in span) -> { neededH, rowspan }
+
+function _measureTextWidth(text, td) {
+  const cs = getComputedStyle(td);
+  const probe = document.createElement('span');
+  probe.style.cssText =
+    'position:absolute;visibility:hidden;white-space:nowrap;' +
+    'font-size:'     + cs.fontSize      + ';' +
+    'font-weight:'   + cs.fontWeight    + ';' +
+    'font-family:'   + cs.fontFamily    + ';' +
+    'letter-spacing:'+ cs.letterSpacing + ';' +
+    'text-transform:'+ cs.textTransform;
+  probe.textContent = text;
+  document.body.appendChild(probe);
+  const w = probe.getBoundingClientRect().width;
+  document.body.removeChild(probe);
+  return w;
+}
+
+function applyRotations() {
+  _rotatedMinH.clear();
+
+  // Reset any previous rotation state
+  catBody.querySelectorAll('td.cat-rotated').forEach(td => {
+    const inner = td.querySelector('.cat-inner');
+    if (inner) td.textContent = inner.textContent;
+    td.classList.remove('cat-rotated');
+    td.style.height = '';
+  });
+
+  // Walk all cat tds; each td that has text may need rotation
+  // We need to know the rowIndex of the first row of each span.
+  // catBody rows map 1:1 with data rows; a td with rowSpan > 1 only
+  // appears in the first tr of its span.
+  const catRows = Array.from(catBody.querySelectorAll('tr'));
+  catRows.forEach((tr, rowIdx) => {
+    Array.from(tr.querySelectorAll('td')).forEach(td => {
+      const text = td.textContent.trim();
+      if (!text) return;
+
+      const catW   = td.getBoundingClientRect().width;
+      const padH   = 28; // 14px padding each side, used for horizontal fit check
+      const textW  = _measureTextWidth(text, td);
+
+      if (textW <= catW - padH) return; // fits — leave as normal
+
+      // Needs rotation
+      td.classList.add('cat-rotated');
+      const inner = document.createElement('span');
+      inner.className = 'cat-inner';
+      inner.textContent = text;
+      td.textContent = '';
+      td.appendChild(inner);
+
+      // After -90° rotation: text width becomes height requirement
+      const neededH = Math.ceil(textW) + 12; // +12px breathing room
+      inner.style.width = neededH + 'px';
+
+      // Record minimum height for this span so syncRowHeights can enforce it
+      _rotatedMinH.set(rowIdx, { neededH, rowspan: td.rowSpan || 1 });
+    });
+  });
+}
+
 // ── Layout ──
 function updateLayout(numDataCols) {
   numDataCols = numDataCols ?? dataTable.querySelectorAll('tbody tr:first-child td').length;
@@ -373,7 +441,12 @@ function updateLayout(numDataCols) {
   headerRow.querySelectorAll('th').forEach(th => { th.style.width = th.style.minWidth = colW + 'px'; });
   dataBody.querySelectorAll('td').forEach(td => { td.style.width = td.style.minWidth = colW + 'px'; });
   void dataScroll.offsetHeight;
-  requestAnimationFrame(() => { requestAnimationFrame(() => { syncRowHeights(); }); });
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      applyRotations();
+      syncRowHeights();
+    });
+  });
 }
 
 let _syncTimer = null;
@@ -384,9 +457,29 @@ function syncRowHeights() {
 function _doSyncRowHeights() {
   const dataRows = Array.from(dataBody.querySelectorAll('tr'));
   const catRows  = Array.from(catBody.querySelectorAll('tr'));
+
+  // Clear all explicit heights so we can measure natural sizes
   dataRows.forEach(tr => tr.style.height = '');
   catRows.forEach(tr  => tr.style.height = '');
   void dataBody.offsetHeight;
+
+  // Natural heights after clearing
+  const naturalH = dataRows.map(tr => tr.getBoundingClientRect().height);
+
+  // For each rotated cat cell, ensure the cumulative height of its spanned
+  // data rows is at least as tall as the rotated text needs.
+  // If not, add the deficit to the first row of the span.
+  _rotatedMinH.forEach(({ neededH, rowspan }, startRow) => {
+    const cumH = naturalH.slice(startRow, startRow + rowspan).reduce((a, b) => a + b, 0);
+    if (cumH >= neededH) return;
+    const deficit = neededH - cumH;
+    const newH = naturalH[startRow] + deficit;
+    dataRows[startRow].style.height = newH + 'px';
+    catRows[startRow].style.height  = newH + 'px';
+    naturalH[startRow] = newH; // keep array consistent for subsequent spans
+  });
+
+  // Standard max-sync: each row gets height = max(data row, cat row)
   dataRows.forEach((dataRow, i) => {
     const catRow = catRows[i];
     if (!catRow) return;
@@ -394,6 +487,7 @@ function _doSyncRowHeights() {
     dataRow.style.height = h + 'px';
     catRow.style.height  = h + 'px';
   });
+
   const scrollbarH = dataScroll.offsetHeight - dataScroll.clientHeight;
   const scrollbarW = dataScroll.offsetWidth  - dataScroll.clientWidth;
   catScroll.style.paddingBottom   = scrollbarH + 'px';
@@ -527,10 +621,6 @@ function buildTabBarCompact() {
   tabBar.innerHTML = '';
   bottombar.classList.add('tabs-compact');
   const sidebarW    = sidebar.offsetWidth;
-  // Available = the non-sidebar portion of the screen.
-  // bottombar spans full window width; sidebar sits on top (is-overlapping) or
-  // beside it in the grid. Either way the visually free space is
-  // window.innerWidth - sidebarW, starting at x=0.
   const available   = Math.max(0, window.innerWidth - sidebarW);
   tabBar.style.width = available + 'px'; tabBar.style.maxWidth = ''; tabBar.style.padding = '';
   if (!TABS.length) return;
@@ -590,33 +680,19 @@ function updateSidebarOverlap(skipTabRebuild) {
 
 function applyBarSizes() {
   const th = TOPBAR_HEIGHT(), bh = BOTTOMBAR_HEIGHT();
-
-  // Topbar: stamp explicit height so it doesn't flex with viewport changes
   if (topbar) { topbar.style.height = topbar.style.minHeight = th + 'px'; }
-
-  // Bottombar: on Android Chrome, window.innerHeight fluctuates as the address
-  // bar shows/hides, so stamping a pixel height causes the bar to disappear.
-  // Instead we drive the height purely from CSS using dvh (dynamic viewport
-  // height), which always tracks the visible area. We only set the derived
-  // CSS custom properties that downstream code needs (tab-height etc.).
-  // dvh is supported in Chrome 108+ / Safari 15.4+.
   const supportsDvh = CSS.supports('height', '1dvh');
   if (supportsDvh) {
-    // Let CSS handle bottombar height via .bottombar { height: calc(X * 1dvh) }
-    // We expose the percentage as a variable so style.css can use it.
     const bottombarPct = R().bottombar * 100;
     document.documentElement.style.setProperty('--bottombar-dvh', bottombarPct.toFixed(3) + 'dvh');
     const topbarPct    = R().topbar * 100;
     document.documentElement.style.setProperty('--topbar-dvh',    topbarPct.toFixed(3) + 'dvh');
-    // Clear any previously stamped inline heights so CSS takes over
     if (bottombar) { bottombar.style.height = bottombar.style.minHeight = ''; }
     if (topbar)    { topbar.style.height    = topbar.style.minHeight    = ''; }
   } else {
-    // Fallback for older browsers
     if (topbar)    { topbar.style.height    = topbar.style.minHeight    = th + 'px'; }
     if (bottombar) { bottombar.style.height = bottombar.style.minHeight = bh + 'px'; }
   }
-
   document.documentElement.style.setProperty('--tab-height',          Math.round(bh * 0.70) + 'px');
   document.documentElement.style.setProperty('--tab-gap',             Math.round(window.innerWidth * 0.008) + 'px');
   document.documentElement.style.setProperty('--sidebar-box-margin',  SIDEBAR_BOX_MARGIN() + 'px');
@@ -679,12 +755,8 @@ function showTab(idx) {
   renderSheet(data);
 }
 
-// ── Mindmap snapshot — save/restore card positions across sidebar close/open ──
-// panel.js exposes its active mindmap state via these two custom events.
-// 'mm-snapshot-request':  script.js asks panel.js to write window.__mmSnapshotData
-// 'mm-snapshot-restore':  script.js passes a saved snapshot back to panel.js
-
-let _mmSnapshot = null;  // { matchKey, positions: Map<cardKey, {x, y}> }
+// ── Mindmap snapshot ──
+let _mmSnapshot = null;
 
 function saveMmSnapshot() {
   window.__mmSnapshotData = null;
@@ -759,10 +831,6 @@ function animateSidebarTo(targetW, { restoreMm = false } = {}) {
       updateLayout();
       updateHandleArrows(targetW);
       positionDragHandle();
-      // Restore mindmap positions once the open animation is complete
-      // Defer two rAFs so the browser fully reflows ppMmWrap to its new
-      // dimensions before we clamp and place cards. One rAF is not enough
-      // on portrait/mobile where the sidebar goes 0 → full-width.
       if (restoreMm) requestAnimationFrame(function() {
         requestAnimationFrame(restoreMmSnapshot);
       });
@@ -824,7 +892,6 @@ document.addEventListener('click', e => {
     if (isClose) { saveMmSnapshot(); animateSidebarTo(SIDEBAR_MIN()); }
   } else {
     if (isOpen)  animateSidebarTo(SIDEBAR_DEFAULT(), { restoreMm: true });
-    // Landscape close: save before snapping shut so re-open can restore
     if (isClose) { saveMmSnapshot(); animateSidebarTo(SIDEBAR_DEFAULT()); }
   }
 });
@@ -860,7 +927,6 @@ dragHandleFixed.addEventListener('mousedown', startDrag);
 document.addEventListener('mousemove', e => {
   if (!dragging) return;
   const newW = Math.min(SIDEBAR_MAX(), Math.max(SIDEBAR_MIN(), startSidebarWidth + (startX - e.clientX)));
-  // Save mindmap positions once, just before crossing the snap-close threshold
   if (!_snapSaved && newW <= SIDEBAR_SNAP_CLOSE()) {
     saveMmSnapshot();
     _snapSaved = true;
@@ -882,13 +948,10 @@ document.addEventListener('mouseup', () => {
   else { updateHandleArrows(); positionDragHandle(); }
 });
 
-// ── Portrait bottombar fix ────────────────────────────────────────────────────
-// On mobile browsers the bottombar can vanish when the viewport shifts (address
-// bar, keyboard, zoom). Re-stamp its pixel height on every viewport change.
+// ── Portrait bottombar fix ──
 function fixBottombar() {
   if (!bottombar) return;
   const bh = BOTTOMBAR_HEIGHT();
-  // Clear then restore in a double-rAF to guarantee a paint flush
   bottombar.style.height = bottombar.style.minHeight = '';
   requestAnimationFrame(() => requestAnimationFrame(() => {
     bottombar.style.height = bottombar.style.minHeight = bh + 'px';
@@ -911,7 +974,6 @@ window.addEventListener('resize', () => {
   updateHandleArrows();
 });
 
-// visualViewport covers iOS rubber-band / pinch-zoom edge cases
 if (window.visualViewport) {
   window.visualViewport.addEventListener('resize', fixBottombar);
 }
