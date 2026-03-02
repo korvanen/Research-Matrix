@@ -182,7 +182,7 @@ function makeTheme(base) {
 
 // ════════════════════════════════════════════════════════════════
 
-const ODS_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRKom5SD7yrnPoGV4pzsf4f20uv0nkrZXEDRA6_-g_ZTogUVBNPzeDAr4Przl7WA9Y07ev5XNuZbhTz/pub?output=ods';
+const XLSX_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRKom5SD7yrnPoGV4pzsf4f20uv0nkrZXEDRA6_-g_ZTogUVBNPzeDAr4Przl7WA9Y07ev5XNuZbhTz/pub?output=xlsx';
 
 // ── Refs ──
 const sidebar        = document.getElementById('sidebar');
@@ -212,50 +212,31 @@ let NUM_CAT_COLS = 1;
 
 // ── ODS fetch & parse ──
 async function fetchODS() {
-  const res = await fetch(ODS_URL);
-  if (!res.ok) throw new Error(`Failed to fetch ODS: ${res.status}`);
-  const zip = await JSZip.loadAsync(await res.arrayBuffer());
-  const xml = await zip.file('content.xml').async('string');
-  const doc = new DOMParser().parseFromString(xml, 'application/xml');
-  const ns  = 'urn:oasis:names:tc:opendocument:xmlns:table:1.0';
-  return Array.from(doc.getElementsByTagNameNS(ns, 'table')).map(t => ({
-    name: t.getAttributeNS(ns, 'name') || t.getAttribute('table:name'),
-    grid: parseODSTable(t, ns)
+  const res = await fetch(XLSX_URL);
+  if (!res.ok) throw new Error(`Failed to fetch XLSX: ${res.status}`);
+  const workbook = XLSX.read(await res.arrayBuffer(), {
+    type: 'array',
+    cellText: true,
+    cellNF: false,
+    cellHTML: false,
+  });
+  return workbook.SheetNames.map(name => ({
+    name,
+    grid: parseXLSXSheet(workbook.Sheets[name])
   }));
 }
 
-function parseODSTable(table, ns) {
-  const tns  = 'urn:oasis:names:tc:opendocument:xmlns:text:1.0';
-  const ons  = 'urn:oasis:names:tc:opendocument:xmlns:office:1.0';
-  const rows = [];
-  for (const rowEl of table.getElementsByTagNameNS(ns, 'table-row')) {
-    const row = [];
-    for (const cell of rowEl.children) {
-      const repeat = parseInt(cell.getAttribute('table:number-columns-repeated') || '1');
-
-      // 1. Prefer the rendered text inside <text:p> — this is the cached display
-      //    value Google Sheets writes for all cells, including formula cells.
-      const ps   = cell.getElementsByTagNameNS(tns, 'p');
-      let   text = ps.length ? Array.from(ps).map(p => p.textContent).join(' ') : '';
-
-      // 2. If no <text:p> exists (rare: blank formula cell), fall back to the
-      //    office:value / office:string-value attributes holding the computed result.
-      if (!text) {
-        text =
-          cell.getAttributeNS(ons, 'string-value') ||
-          cell.getAttribute('office:string-value') ||
-          cell.getAttributeNS(ons, 'value')        ||
-          cell.getAttribute('office:value')        ||
-          cell.getAttributeNS(ons, 'date-value')   ||
-          cell.getAttribute('office:date-value')   ||
-          '';
-      }
-
-      for (let i = 0; i < repeat; i++) row.push(text);
-    }
-    while (row.length && !row[row.length - 1]) row.pop();
-    rows.push(row);
-  }
+function parseXLSXSheet(sheet) {
+  const raw = XLSX.utils.sheet_to_json(sheet, {
+    header: 1,
+    raw: false,
+    defval: '',
+  });
+  const rows = raw.map(row => {
+    const r = Array.from(row).map(v => (v === null || v === undefined) ? '' : String(v));
+    while (r.length && r[r.length - 1] === '') r.pop();
+    return r;
+  });
   while (rows.length && !rows[rows.length - 1].length) rows.pop();
   return rows;
 }
