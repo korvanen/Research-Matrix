@@ -20,7 +20,7 @@ const PANEL_CARD_MAX_W      = 240;
 const PANEL_GOTO_DELAY      = 400;
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
-console.log('[panel.js_v_V]');
+console.log('[panel.js_v_W]');
 document.addEventListener('DOMContentLoaded', () => {
   const wait = setInterval(() => {
     const box = document.getElementById('sidebar-box');
@@ -713,9 +713,6 @@ function initPanel(sidebarBox) {
         cardEl.style.height     = '';
         void cardEl.offsetHeight;
 
-        // Switch to overflow:visible so the goto button isn't clipped
-        cardEl.style.overflow = 'visible';
-
         var contentH = 0;
         Array.from(cardEl.children).forEach(function(child) {
           if (child.classList.contains('pp-goto-btn')) return;
@@ -753,8 +750,6 @@ function initPanel(sidebarBox) {
           if (cardEl._mmExpandState !== 'collapsed') return;
           cardEl.style.transition = '';
           cardEl.style.height     = '';
-          // Restore overflow:hidden for collapsed state (clips head background to border-radius)
-          cardEl.style.overflow   = '';
           cardEl.style.zIndex = (cardBaseZ.get(key) || 1) + '';
           if (btn) _btnReset(btn);
         }, MM_EXPAND_MS + 20);
@@ -783,7 +778,6 @@ function initPanel(sidebarBox) {
           el.classList.remove('pp-mm-touch-expanded');
           el.style.transition = 'none';
           el.style.height     = '';
-          el.style.overflow   = '';
           collapsedHeights.delete(key);
           if (_mmTouchExpanded === el) _mmTouchExpanded = null;
         }
@@ -1378,6 +1372,9 @@ mark.pkw {
   overflow: hidden;
 }
 .pp-mm-card:active { cursor: grabbing; }
+/* Expanded cards need overflow:visible so the abs-positioned goto button
+   isn't clipped — driven by CSS so it applies in all states (hover, locked, etc.) */
+.pp-mm-card.pp-mm-expanded { overflow: visible; }
 
 /* Card head — border-radius on its own so background clips even
    when the parent card uses overflow:visible */
