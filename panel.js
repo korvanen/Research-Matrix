@@ -20,7 +20,7 @@ const PANEL_CARD_MAX_W      = 240;
 const PANEL_GOTO_DELAY      = 400;
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
-console.log('[panel.js_v_T]');
+console.log('[panel.js_v_U]');
 document.addEventListener('DOMContentLoaded', () => {
   const wait = setInterval(() => {
     const box = document.getElementById('sidebar-box');
@@ -697,6 +697,9 @@ function initPanel(sidebarBox) {
       clearTimeout(cardEl._btnTimer);
 
       if (expanded) {
+        // Already fully expanded — don't re-animate (prevents flicker on locked cards)
+        if (cardEl._mmExpandState === 'expanded') return;
+
         cardEl._mmExpandState = 'expanded';
         cardEl.style.zIndex = (_topZ + 1) + '';
 
@@ -807,9 +810,19 @@ function initPanel(sidebarBox) {
         el.style.zIndex = _topZ + '';
         redrawArrows();
 
-        // If locked, re-expand after drag
+        // If locked, re-expand immediately after drag
         if (isLocked(key)) {
           mmSetExpanded(el, true, key);
+          return;
+        }
+
+        // For unlocked cards: if the mouse is still physically over the card,
+        // mouseenter won't re-fire. Re-trigger the hover expand manually.
+        if (el.matches(':hover')) {
+          clearTimeout(el._postDragExpandTimer);
+          el._postDragExpandTimer = setTimeout(function() {
+            if (!el._mmIsDragging) mmSetExpanded(el, true, key);
+          }, MM_HOVER_DELAY);
         }
       }
 
