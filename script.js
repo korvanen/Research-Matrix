@@ -224,13 +224,31 @@ async function fetchODS() {
 
 function parseODSTable(table, ns) {
   const tns  = 'urn:oasis:names:tc:opendocument:xmlns:text:1.0';
+  const ons  = 'urn:oasis:names:tc:opendocument:xmlns:office:1.0';
   const rows = [];
   for (const rowEl of table.getElementsByTagNameNS(ns, 'table-row')) {
     const row = [];
     for (const cell of rowEl.children) {
       const repeat = parseInt(cell.getAttribute('table:number-columns-repeated') || '1');
-      const ps     = cell.getElementsByTagNameNS(tns, 'p');
-      const text   = ps.length ? Array.from(ps).map(p => p.textContent).join(' ') : '';
+
+      // 1. Prefer the rendered text inside <text:p> — this is the cached display
+      //    value Google Sheets writes for all cells, including formula cells.
+      const ps   = cell.getElementsByTagNameNS(tns, 'p');
+      let   text = ps.length ? Array.from(ps).map(p => p.textContent).join(' ') : '';
+
+      // 2. If no <text:p> exists (rare: blank formula cell), fall back to the
+      //    office:value / office:string-value attributes holding the computed result.
+      if (!text) {
+        text =
+          cell.getAttributeNS(ons, 'string-value') ||
+          cell.getAttribute('office:string-value') ||
+          cell.getAttributeNS(ons, 'value')        ||
+          cell.getAttribute('office:value')        ||
+          cell.getAttributeNS(ons, 'date-value')   ||
+          cell.getAttribute('office:date-value')   ||
+          '';
+      }
+
       for (let i = 0; i < repeat; i++) row.push(text);
     }
     while (row.length && !row[row.length - 1]) row.pop();
