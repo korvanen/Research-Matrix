@@ -20,7 +20,7 @@ const PANEL_CARD_MAX_W      = 240;
 const PANEL_GOTO_DELAY      = 400;
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
-console.log('[panel.js_v_R]');
+console.log('[panel.js_v_S]');
 document.addEventListener('DOMContentLoaded', () => {
   const wait = setInterval(() => {
     const box = document.getElementById('sidebar-box');
@@ -38,18 +38,50 @@ function initPanel(sidebarBox) {
   sidebarBox.style.display       = 'flex';
   sidebarBox.style.flexDirection = 'column';
 
+  // ── Tool nav + panes ──────────────────────────────────────────────────────
   sidebarBox.innerHTML =
-    '<div id="pp-head">' +
-      '<div id="pp-subtitle">Click a cell to find matches</div>' +
-      '<div id="pp-toolrow" style="display:none">' +
-        '<div id="pp-hl-wrap"></div>' +
-        '<div id="pp-view-wrap"></div>' +
+    '<div id="pp-tool-nav">' +
+      '<button class="pp-tool-btn pp-tool-btn-active" data-tool="find-matches">Find Matches</button>' +
+      '<button class="pp-tool-btn" data-tool="keywords">Keywords</button>' +
+    '</div>' +
+    // ── Find Matches pane ──
+    '<div id="pp-tool-pane-find-matches" class="pp-tool-pane pp-tool-pane-active">' +
+      '<div id="pp-head">' +
+        '<div id="pp-subtitle">Click a cell to find matches</div>' +
+        '<div id="pp-toolrow" style="display:none">' +
+          '<div id="pp-hl-wrap"></div>' +
+          '<div id="pp-view-wrap"></div>' +
+        '</div>' +
+      '</div>' +
+      '<div id="pp-body-wrap">' +
+        '<div id="pp-body"></div>' +
+        '<div id="pp-mm-wrap"></div>' +
       '</div>' +
     '</div>' +
-    '<div id="pp-body-wrap">' +
-      '<div id="pp-body"></div>' +
-      '<div id="pp-mm-wrap"></div>' +
+    // ── Keywords pane ──
+    '<div id="pp-tool-pane-keywords" class="pp-tool-pane">' +
+      '<div id="pp-kw-body">' +
+        '<div class="pp-empty pp-kw-empty">Keywords tool coming soon</div>' +
+      '</div>' +
     '</div>';
+
+  // ── Tool switching ────────────────────────────────────────────────────────
+  var _activeTool = 'find-matches';
+
+  document.getElementById('pp-tool-nav').addEventListener('click', function(e) {
+    var btn = e.target.closest('.pp-tool-btn');
+    if (!btn) return;
+    var tool = btn.dataset.tool;
+    if (tool === _activeTool) return;
+    _activeTool = tool;
+
+    document.querySelectorAll('.pp-tool-btn').forEach(function(b) {
+      b.classList.toggle('pp-tool-btn-active', b.dataset.tool === tool);
+    });
+    document.querySelectorAll('.pp-tool-pane').forEach(function(p) {
+      p.classList.toggle('pp-tool-pane-active', p.id === 'pp-tool-pane-' + tool);
+    });
+  });
 
   const ppSubtitle = document.getElementById('pp-subtitle');
   const ppToolrow  = document.getElementById('pp-toolrow');
@@ -519,7 +551,6 @@ function initPanel(sidebarBox) {
     var cardBaseZ  = new Map();
 
     // ── Lock state ─────────────────────────────────────────────────────────
-    // Set of card keys that are pinned in expanded state
     var _lockedCards = new Set();
 
     function isLocked(key) { return _lockedCards.has(key); }
@@ -530,7 +561,6 @@ function initPanel(sidebarBox) {
       } else {
         _lockedCards.delete(key);
       }
-      // Update card and lock icon visuals
       if (cardEl) cardEl.classList.toggle('pp-mm-card-locked', locked);
       var lockIcon = cardEl ? cardEl.querySelector('.pp-mm-lock') : null;
       if (lockIcon) {
@@ -540,18 +570,14 @@ function initPanel(sidebarBox) {
       }
     }
 
-    // ── SVG lock icon ──────────────────────────────────────────────────────
-    // Returns an SVG string for the lock (closed or open)
     function lockIconSVG(locked) {
       if (locked) {
-        // Closed lock
         return '<svg viewBox="0 0 12 14" fill="none" xmlns="http://www.w3.org/2000/svg" width="10" height="10">' +
           '<rect x="1.5" y="6" width="9" height="7" rx="1.5" fill="currentColor" opacity="0.9"/>' +
           '<path d="M3.5 6V4.5a2.5 2.5 0 0 1 5 0V6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" fill="none"/>' +
           '<circle cx="6" cy="9.5" r="1" fill="white" opacity="0.8"/>' +
           '</svg>';
       } else {
-        // Open lock
         return '<svg viewBox="0 0 12 14" fill="none" xmlns="http://www.w3.org/2000/svg" width="10" height="10">' +
           '<rect x="1.5" y="6" width="9" height="7" rx="1.5" fill="currentColor" opacity="0.35"/>' +
           '<path d="M3.5 6V4.5a2.5 2.5 0 0 1 5 0V3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" fill="none" opacity="0.45"/>' +
@@ -702,7 +728,6 @@ function initPanel(sidebarBox) {
       clearTimeout(cardEl._btnTimer);
 
       if (expanded) {
-        // Already fully expanded — don't re-animate (prevents flicker on locked cards)
         if (cardEl._mmExpandState === 'expanded') return;
 
         cardEl._mmExpandState = 'expanded';
@@ -733,7 +758,6 @@ function initPanel(sidebarBox) {
         cardEl.style.height     = fullH + 'px';
 
       } else {
-        // Don't collapse if locked
         if (isLocked(key)) return;
 
         cardEl._mmExpandState = 'collapsed';
@@ -772,7 +796,6 @@ function initPanel(sidebarBox) {
         sl = parseFloat(el.style.left) || 0;
         st = parseFloat(el.style.top)  || 0;
 
-        // If locked, keep expanded during drag (don't collapse)
         if (!isLocked(key)) {
           var btn = el.querySelector('.pp-goto-btn');
           if (btn) btn.classList.remove('pp-goto-visible');
@@ -809,14 +832,11 @@ function initPanel(sidebarBox) {
         el.style.zIndex = _topZ + '';
         redrawArrows();
 
-        // If locked, re-expand immediately after drag
         if (isLocked(key)) {
           mmSetExpanded(el, true, key);
           return;
         }
 
-        // For unlocked cards: if the mouse is still physically over the card,
-        // mouseenter won't re-fire. Re-trigger the hover expand manually.
         if (el.matches(':hover')) {
           clearTimeout(el._postDragExpandTimer);
           el._postDragExpandTimer = setTimeout(function() {
@@ -827,7 +847,6 @@ function initPanel(sidebarBox) {
 
       el.addEventListener('mousedown', function(e) {
         if (e.button !== 0) return;
-        // Don't start drag on lock icon or goto button
         if (e.target.closest('.pp-mm-lock') || e.target.closest('.pp-goto-btn')) return;
         dragStart(e.clientX, e.clientY);
         e.preventDefault(); e.stopPropagation();
@@ -882,12 +901,6 @@ function initPanel(sidebarBox) {
       card.style.setProperty('--ppc-border', accentColor);
       card.style.setProperty('--ppc-bg',     bgColor);
 
-      // ── Card head with lock icon ──────────────────────────────────────────
-      var badgeHtml = isSeed
-        ? '<span class="pp-mm-badge">Selected</span>'
-        : '';
-
-      // Lock icon button — faint until hovered/locked
       var lockBtn = document.createElement('button');
       lockBtn.className = 'pp-mm-lock';
       lockBtn.setAttribute('aria-label', 'Lock card expanded');
@@ -900,11 +913,10 @@ function initPanel(sidebarBox) {
       cardHead.style.background = accentColor;
       cardHead.style.color = labelColor;
       cardHead.innerHTML =
-        badgeHtml +
+        (isSeed ? '<span class="pp-mm-badge">Selected</span>' : '') +
         '<span class="pp-mm-head-label">' + panelEscH(tabName || '') + '</span>';
       cardHead.appendChild(lockBtn);
 
-      // Lock button click handler
       lockBtn.addEventListener('click', function(e) {
         e.stopPropagation();
         e.preventDefault();
@@ -912,17 +924,14 @@ function initPanel(sidebarBox) {
         setLocked(key, nowLocked, card);
         lockBtn.innerHTML = lockIconSVG(nowLocked);
         if (nowLocked) {
-          // Ensure card is expanded when locked
           mmSetExpanded(card, true, key);
         } else {
-          // If mouse isn't over card, collapse
           if (!card.matches(':hover')) {
             mmSetExpanded(card, false, key);
           }
         }
       });
 
-      // ── Card body ─────────────────────────────────────────────────────────
       var bodyHtml = '';
       if (isSeed) {
         var firstCell = seedCells[0];
@@ -968,9 +977,6 @@ function initPanel(sidebarBox) {
       card.appendChild(cardHead);
       card.appendChild(cardBody);
 
-      // For mindmap cards, create the goto button permanently in the DOM
-      // so CSS controls visibility (hover/expanded/locked) without
-      // attachGoTo's dynamic create-on-hover/remove-on-leave approach.
       if (!isSeed && matchObj) {
         var gotoBtn = document.createElement('button');
         gotoBtn.className = 'pp-goto-btn';
@@ -1006,7 +1012,6 @@ function initPanel(sidebarBox) {
         clearTimeout(_hoverEnterTimer);
         clearTimeout(card._postDragExpandTimer);
         if (card.classList.contains('pp-mm-touch-expanded')) return;
-        // Don't collapse if locked
         if (isLocked(key)) return;
         mmSetExpanded(card, false, key);
       });
@@ -1215,6 +1220,69 @@ function initPanel(sidebarBox) {
     style.textContent = `
 #sidebar-box { box-sizing: border-box; }
 
+/* ── Tool navigation bar ── */
+#pp-tool-nav {
+  flex-shrink: 0;
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  padding: 6px 8px 0;
+  border-bottom: 1px solid var(--sidebar-box-border, rgba(0,0,0,.1));
+  background: transparent;
+}
+.pp-tool-btn {
+  flex: 1;
+  border: none;
+  background: transparent;
+  padding: 6px 10px 7px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  color: rgba(0,0,0,.35);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: color .15s, border-color .15s;
+  white-space: nowrap;
+  border-radius: 4px 4px 0 0;
+}
+.pp-tool-btn:hover { color: rgba(0,0,0,.60); }
+.pp-tool-btn.pp-tool-btn-active {
+  color: var(--color-topbar-sheet, #111);
+  border-bottom-color: var(--color-topbar-sheet, #111);
+}
+
+/* ── Tool panes ── */
+.pp-tool-pane {
+  display: none;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+.pp-tool-pane.pp-tool-pane-active {
+  display: flex;
+}
+
+/* ── Keywords pane ── */
+#pp-kw-body {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+}
+.pp-kw-empty {
+  font-size: 11px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: rgba(0,0,0,.22);
+  text-align: center;
+  line-height: 1.6;
+}
+
+/* ── Find Matches pane internals ── */
 #pp-head {
   flex-shrink: 0; padding: 10px 12px 8px;
   border-bottom: 1px solid var(--sidebar-box-border, rgba(0,0,0,.1));
@@ -1280,10 +1348,8 @@ function initPanel(sidebarBox) {
   color: rgba(0,0,0,.25); line-height: 1.5;
 }
 
-/* Seed card — shares pp-match-card layout, slightly thicker border to distinguish */
-.pp-seed-card.pp-match-card {
-  border-width: 2px;
-}
+/* Seed card */
+.pp-seed-card.pp-match-card { border-width: 2px; }
 
 /* Match card */
 .pp-match-card {
@@ -1337,15 +1403,11 @@ function initPanel(sidebarBox) {
   text-transform: uppercase; display: inline-block; align-self: flex-start;
 }
 
-/* Seed card multi-cell separators and category labels */
 .pp-seed-cats {
   font-size: 9px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
   color: rgba(0,0,0,.35); margin-bottom: 1px;
 }
-.pp-seed-sep {
-  border-top: 1px solid rgba(0,0,0,.08);
-  margin: 4px 0;
-}
+.pp-seed-sep { border-top: 1px solid rgba(0,0,0,.08); margin: 4px 0; }
 
 /* "Go to" hover button — tiles view */
 .pp-goto-btn {
@@ -1362,10 +1424,7 @@ function initPanel(sidebarBox) {
   pointer-events: none;
 }
 .pp-goto-btn.pp-goto-visible {
-  opacity: 1;
-  transform: translateY(0);
-  margin-bottom: 8px;
-  pointer-events: auto;
+  opacity: 1; transform: translateY(0); margin-bottom: 8px; pointer-events: auto;
 }
 .pp-goto-btn:hover { filter: brightness(0.92); }
 
@@ -1376,10 +1435,7 @@ mark.pkw {
   transition: border-bottom-color .15s, font-weight .15s;
 }
 
-/* ═══════════════════════════════════════════════════════
-   MINDMAP CARDS
-   ═══════════════════════════════════════════════════════ */
-
+/* ══ MINDMAP CARDS ══ */
 .pp-mm-card {
   position: absolute;
   border: 1.5px solid var(--ppc-border, #aaa);
@@ -1389,19 +1445,11 @@ mark.pkw {
   cursor: grab;
   user-select: none;
   z-index: 1;
-  /* overflow:hidden clips the card head background to border-radius,
-     but we switch to overflow:visible on expand so the goto button
-     and any shadow aren't clipped. The head itself clips its background
-     via its own border-radius. */
   overflow: hidden;
 }
 .pp-mm-card:active { cursor: grabbing; }
-/* Expanded cards need overflow:visible so the abs-positioned goto button
-   isn't clipped — driven by CSS so it applies in all states (hover, locked, etc.) */
 .pp-mm-card.pp-mm-expanded { overflow: visible; }
 
-/* Card head — border-radius on its own so background clips even
-   when the parent card uses overflow:visible */
 .pp-mm-card-head {
   border-radius: 6px 6px 0 0;
   min-height: 6px;
@@ -1427,116 +1475,64 @@ mark.pkw {
   max-height: 80px; opacity: 1; padding: 4px 0;
 }
 
-/* ── Lock icon button ───────────────────────────────── */
 .pp-mm-card .pp-goto-btn {
   position: absolute;
-  bottom: 5px;
-  right: 6px;
-  width: 18px;
-  height: 18px;
-  border: none;
-  background: transparent;
-  border-radius: 4px;
-  cursor: pointer;
-  display: grid;
-  place-items: center;
-  opacity: 0;
-  pointer-events: none;
+  bottom: 5px; right: 6px;
+  width: 18px; height: 18px;
+  border: none; background: transparent;
+  border-radius: 4px; cursor: pointer;
+  display: grid; place-items: center;
+  opacity: 0; pointer-events: none;
   transition: opacity .18s ease, background .12s ease;
-  padding: 0;
-  margin: 0;
-  box-shadow: none;
-  transform: none;
+  padding: 0; margin: 0; box-shadow: none; transform: none;
   color: var(--ppc-border, #888);
-  /* Hide the text label — icon only */
-  font-size: 0;
-  letter-spacing: 0;
-  text-transform: none;
+  font-size: 0; letter-spacing: 0; text-transform: none;
 }
-
 .pp-mm-lock {
   flex-shrink: 0;
   width: 18px; height: 18px;
   border: none; background: transparent;
-  border-radius: 4px;
-  cursor: pointer;
+  border-radius: 4px; cursor: pointer;
   display: grid; place-items: center;
   opacity: 0;
   transition: opacity .18s ease, background .12s ease;
-  padding: 0;
-  margin-left: auto;
-  pointer-events: none;
+  padding: 0; margin-left: auto; pointer-events: none;
 }
-/* Show lock icon when card is hovered or expanded */
 .pp-mm-card:hover .pp-mm-lock,
 .pp-mm-card.pp-mm-expanded .pp-mm-lock,
 .pp-mm-card:hover .pp-goto-btn,
 .pp-mm-card.pp-mm-expanded .pp-goto-btn {
-  opacity: 0.45;
-  pointer-events: auto;
+  opacity: 0.45; pointer-events: auto;
 }
-.pp-mm-lock:hover {
-  opacity: 0.85 !important;
-  background: rgba(255,255,255,0.20);
-}
-.pp-mm-card .pp-goto-btn:hover {
-  opacity: 0.85 !important;
-  background: rgba(0,0,0,0.08);
-}
-/* Active/locked state — always fully visible */
+.pp-mm-lock:hover { opacity: 0.85 !important; background: rgba(255,255,255,0.20); }
+.pp-mm-card .pp-goto-btn:hover { opacity: 0.85 !important; background: rgba(0,0,0,0.08); }
 .pp-mm-lock.pp-mm-lock-active {
-  opacity: 1 !important;
-  pointer-events: auto;
-  background: rgba(255,255,255,0.25);
+  opacity: 1 !important; pointer-events: auto; background: rgba(255,255,255,0.25);
 }
-.pp-mm-card.pp-mm-card-locked .pp-goto-btn {
-  opacity: 1 !important;
-  pointer-events: auto;
-}
+.pp-mm-card.pp-mm-card-locked .pp-goto-btn { opacity: 1 !important; pointer-events: auto; }
 .pp-mm-lock svg { display: block; pointer-events: none; }
 
-
-/* ── Card body ──────────────────────────────────────── */
 .pp-mm-card-body { padding: 5px 8px 7px; display: flex; flex-direction: column; gap: 3px; }
 .pp-mm-field {
   font-size: 10px; line-height: 1.35; color: rgba(0,0,0,.7);
   overflow: hidden;
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
 }
-.pp-mm-card.pp-mm-expanded .pp-mm-field {
-  display: block;
-  -webkit-line-clamp: unset;
-}
+.pp-mm-card.pp-mm-expanded .pp-mm-field { display: block; -webkit-line-clamp: unset; }
 .pp-mm-cat {
   font-size: 9px; font-weight: 700; letter-spacing: .08em;
   text-transform: uppercase; color: rgba(0,0,0,.35); margin-bottom: 2px;
 }
 .pp-mm-seed-extra { display: none; }
 .pp-mm-card.pp-mm-expanded .pp-mm-seed-extra { display: block; }
-.pp-mm-seed-sep {
-  border-top: 1px solid rgba(255,255,255,.25);
-  margin: 4px 0;
-}
+.pp-mm-seed-sep { border-top: 1px solid rgba(255,255,255,.25); margin: 4px 0; }
 
-/* ── Goto button — mindmap variant ─────────────────────
-   Small icon pinned to the bottom-right corner of the card,
-   mirroring the lock icon in the header. Visible only when
-   expanded. Uses overflow:visible on the expanded card so
-   it isn't clipped. */
-/* Arrow icon — same diagonal top-right arrow as tiles mode goto */
 .pp-mm-card .pp-goto-btn::after {
   content: '';
-  display: block;
-  width:  6px;
-  height: 6px;
-  border-top:   2px solid currentColor;
-  border-right: 2px solid currentColor;
-  transform: rotate(45deg) translate(-1px, 1px);
-  flex-shrink: 0;
+  display: block; width: 6px; height: 6px;
+  border-top: 2px solid currentColor; border-right: 2px solid currentColor;
+  transform: rotate(45deg) translate(-1px, 1px); flex-shrink: 0;
 }
-/* Hide the text label span */
 .pp-mm-card .pp-goto-btn .pp-goto-label { display: none; }
 `;
     document.head.appendChild(style);
