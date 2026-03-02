@@ -411,32 +411,47 @@ function initFindMatchesTool(paneEl, sidebarEl) {
   }
   showEmpty();
 
-  // ── Multi-layer match builder ─────────────────────────────────────────────────
-  // Returns flat array of match objects each with .layer (1-based) and .parentKey
-  function buildLayeredMatches(skws, stIdx, srIdx, numLayers) {
-    const seen = new Set();
-    seen.add(stIdx + ':' + srIdx);
-    const result = [];
-    let currentSeeds = [{ kws: skws, tabIdx: stIdx, rowIdx: srIdx, cardKey: 'seed' }];
+ // ── Multi-layer match builder ─────────────────────────────────────────────────
+// Returns flat array of match objects each with .layer (1-based) and .parentKey
+function buildLayeredMatches(skws, stIdx, srIdx, numLayers) {
+  const seen = new Set();
+  seen.add(stIdx + ':' + srIdx);
+  const result = [];
 
-    for (let layer = 1; layer <= numLayers; layer++) {
-      const nextSeeds = [];
-      currentSeeds.forEach(seed => {
-        const matches = findMatches(seed.kws, seed.tabIdx, seed.rowIdx);
-        matches.forEach(m => {
-          const entryKey = m.tabIdx + ':' + m.rowIdx;
-          if (seen.has(entryKey)) return;
-          seen.add(entryKey);
-          const cardKey = 'm-' + m.tabIdx + '-' + m.rowIdx;
-          result.push(Object.assign({}, m, { layer, parentKey: seed.cardKey }));
-          nextSeeds.push({ kws: m.kws, tabIdx: m.tabIdx, rowIdx: m.rowIdx, cardKey });
-        });
+  // Ensure the initial seed kws is a Set (it already is in buildSeedFromSelection)
+  let currentSeeds = [{ kws: (skws && typeof skws.has === 'function') ? skws : new Set(skws || []), tabIdx: stIdx, rowIdx: srIdx, cardKey: 'seed' }];
+
+  for (let layer = 1; layer <= numLayers; layer++) {
+    const nextSeeds = [];
+    currentSeeds.forEach(seed => {
+      const matches = findMatches(seed.kws, seed.tabIdx, seed.rowIdx);
+      matches.forEach(m => {
+        const entryKey = m.tabIdx + ':' + m.rowIdx;
+        if (seen.has(entryKey)) return;
+        seen.add(entryKey);
+
+        const cardKey = 'm-' + m.tabIdx + '-' + m.rowIdx;
+
+        // Normalize shared and kws to Sets
+        const sharedSet = (m.shared && typeof m.shared.has === 'function') ? m.shared : new Set(m.shared || []);
+        const kwsSet    = (m.kws    && typeof m.kws.has    === 'function') ? m.kws    : new Set(m.kws    || []);
+
+        result.push(Object.assign({}, m, {
+          layer,
+          parentKey: seed.cardKey,
+          shared: sharedSet,
+          kws: kwsSet,
+        }));
+
+        nextSeeds.push({ kws: kwsSet, tabIdx: m.tabIdx, rowIdx: m.rowIdx, cardKey });
       });
-      currentSeeds = nextSeeds;
-      if (!currentSeeds.length) break;
-    }
-    return result;
+    });
+    currentSeeds = nextSeeds;
+    if (!currentSeeds.length) break;
   }
+  return result;
+}
+
 
   // ── Build seed from grid selection ───────────────────────────────────────────
   function buildSeedFromSelection() {
