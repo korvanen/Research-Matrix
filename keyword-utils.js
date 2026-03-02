@@ -8,22 +8,30 @@ const PANEL_KW_MIN_WORD_LEN = 4;
 
 // ── Stop words ───────────────────────────────────────────────────────────────
 const PANEL_STOP_WORDS = new Set([
-  'that','this','with','from','have','they','will','been','were','their',
-  'when','also','into','more','than','then','some','what','there','which',
-  'about','these','other','would','could','should','through','where','those',
-  'building','built','environment','architecture','architectural','planning',
-  'residential','area','part','time','work','using','used','only','within',
-  'between','among','example','context','claim','housing','where','rarely',
+  // Academic & Logic Fluff
+'study', 'research', 'analysis', 'paper', 'article', 'theory', 'concept', 'model', 
+'system', 'process', 'result', 'data', 'using', 'based', 'approach', 'within', 
+'among', 'between', 'also', 'often', 'likely', 'potential', 'impact', 'development',
+// Over-used Domain Fluff (High-frequency, low-meaning in this context)
+'cohousing', 'housing', 'living', 'social', 'community', 'urban', 'people', 'resident'
 ]);
 
 // ── Keyword extraction ────────────────────────────────────────────────────────
 function panelExtractKW(text) {
   return [...new Set(
     String(text).toLowerCase()
-      .replace(/[^a-z\s]/g, ' ')
-      .split(/\s+/)
-      .filter(w => w.length >= PANEL_KW_MIN_WORD_LEN && !PANEL_STOP_WORDS.has(w))
-      .map(w => w.endsWith('s') && !w.endsWith('ss') ? w.slice(0, -1) : w)
+    .replace(/[^a-z\s]/g, ' ')
+    .split(/\s+/)
+    .filter(w => w.length >= PANEL_KW_MIN_WORD_LEN)
+    .map(w => {
+      // Basic English Stemming (Suffix stripping)
+      return w
+        .replace(/ies$/, 'y')    // communities -> community
+        .replace(/s$/, '')       // residents -> resident
+        .replace(/ing$/, '')     // planning -> plan
+        .replace(/ed$/, '');     // used -> us
+    })
+    .filter(w => !PANEL_STOP_WORDS.has(w))
   )];
 }
 
@@ -48,13 +56,35 @@ function buildRowIndex() {
 
 // ── Match finder ──────────────────────────────────────────────────────────────
 function findMatches(seedKws, seedTabIdx, seedRowIdx) {
-  const matches = [];
-  buildRowIndex().forEach(entry => {
-    if (entry.tabIdx === seedTabIdx && entry.rowIdx === seedRowIdx) return;
-    const shared = new Set([...seedKws].filter(k => entry.kws.has(k)));
-    if (shared.size < PANEL_MIN_SHARED) return;
-    matches.push({ ...entry, shared });
+  const allRows = buildRowIndex();
+  
+  // 1. Calculate "Global Frequency" of every word in your matrix
+  const globalFreq = {};
+  allRows.forEach(row => {
+    row.kws.forEach(kw => {
+      globalFreq[kw] = (globalFreq[kw] || 0) + 1;
+    });
   });
-  matches.sort((a, b) => b.shared.size - a.shared.size);
-  return matches;
+
+  const matches = [];
+  allRows.forEach(entry => {
+    if (entry.tabIdx === seedTabIdx && entry.rowIdx === seedRowIdx) return;
+
+    // 2. Find shared words
+    const shared = [...seedKws].filter(k => entry.kws.has(k));
+    
+    // 3. Calculate a "Match Score" based on rarity
+    // A word appearing in 2 rows is worth more than a word appearing in 50.
+    let score = 0;
+    shared.forEach(kw => {
+      score += (1 / (globalFreq[kw] || 1)); 
+    });
+
+    if (shared.length >= PANEL_MIN_SHARED) {
+      matches.push({ ...entry, shared, score });
+    }
+  });
+
+  // Sort by weighted score, not just raw count
+  return matches.sort((a, b) => b.score - a.score);
 }
