@@ -1,7 +1,7 @@
 // ════════════════════════════════════════════════════════════════
 // ── GLOBAL CONFIG ──
 // ════════════════════════════════════════════════════════════════
-console.log('script.js [v10]');
+console.log('script.js [vA]');
 
 
 
@@ -1002,15 +1002,6 @@ tabBar.innerHTML = '<div style="padding:8px 12px;color:#999;font-size:12px">Load
     loadingOverlay.textContent = 'Fetching data…';
     const all = await fetchODS();
     loadingOverlay.textContent = `Fetched ${all.length} sheets, filtering…`;
-
-  // DEBUG
-const zip2 = await JSZip.loadAsync(await (await fetch(ODS_URL)).arrayBuffer());
-const rawXml = await zip2.file('content.xml').async('string');
-const snippet = rawXml.match(/.{0,200}#NAME\?.{0,200}/g);
-console.log('=== #NAME? OCCURRENCES ===', snippet ? snippet.length : 0);
-(snippet || ['not found in XML']).slice(0, 8).forEach(s => console.log(s));
-    // END DEBUG
-    
     TABS = all.filter(s => s.name.includes('MX'));
     if (!TABS.length) {
       loadingOverlay.textContent = `No MX tabs found. Sheets: ${all.map(s=>s.name).join(', ')}`;
