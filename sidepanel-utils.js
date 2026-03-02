@@ -91,14 +91,15 @@ function citationPillHtml(citation, accentColor, textColor) {
 function panelGoTo(match) {
   var tabIdx = match.tabIdx;
   var rowIdx = match.rowIdx;
+  var needsTabSwitch = typeof activeTab !== 'undefined' && activeTab !== tabIdx;
 
-  if (typeof activeTab !== 'undefined' && activeTab !== tabIdx) {
+  if (needsTabSwitch) {
     activeTab = tabIdx;
     if (typeof buildTabBar === 'function') buildTabBar();
-    if (typeof showTab === 'function') showTab(tabIdx);
+    if (typeof showTab    === 'function') showTab(tabIdx);
   }
 
-  requestAnimationFrame(function() {
+  function doSelect() {
     if (typeof clearSelection === 'function') clearSelection();
 
     var dataRows = Array.from(document.querySelectorAll('#data-body tr'));
@@ -112,13 +113,22 @@ function panelGoTo(match) {
       var targets = getHighlightTargets(firstTd);
       if (targets) {
         applySelection(targets);
-        firstTd.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        firstTd.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
     } else {
       firstTd.classList.add('selected-cell');
-      firstTd.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      firstTd.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
-  });
+  }
+
+  if (needsTabSwitch) {
+    // showTab → renderSheet → updateLayout uses two nested rAFs for layout;
+    // a plain rAF fires too early and finds the old DOM. A short timeout
+    // clears the async pipeline and guarantees the new rows are in place.
+    setTimeout(doSelect, 150);
+  } else {
+    requestAnimationFrame(doSelect);
+  }
 }
 
 // ── Attach "Go to" hover button ───────────────────────────────────────────────
