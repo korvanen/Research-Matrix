@@ -9,10 +9,12 @@ const PANEL_KW_MIN_WORD_LEN = 4;
 const PANEL_KW_MIN_PHRASE_WORDS = 2; // or 3
 
 // Which n-gram sizes to build. If you want only 2- or 3-word phrases:
-const PANEL_KW_NGRAM_SIZES = [3, 4]; // do NOT include 1
+const PANEL_KW_NGRAM_SIZES = [2, 3, 4]; // do NOT include 1
 
 // ── Stop words ───────────────────────────────────────────────────────────────
 const PANEL_STOP_WORDS = new Set([
+  // Common words unrelated to the topic
+  'with', 'high', 
   // Academic & Logic Fluff
   'study', 'research', 'analysis', 'paper', 'article', 'theory', 'concept', 'model',
   'system', 'process', 'result', 'data', 'using', 'based', 'approach', 'within',
