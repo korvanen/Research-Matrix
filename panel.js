@@ -17,7 +17,7 @@ const PANEL_MM_ITERS        = 20;
 const PANEL_CARD_W          = 160;
 const PANEL_CARD_MIN_W      = 140;
 const PANEL_CARD_MAX_W      = 240;
-const PANEL_GOTO_DELAY      = 400;
+const PANEL_GOTO_DELAY      = 900;
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
 console.log('[panel.js_v_D]');
