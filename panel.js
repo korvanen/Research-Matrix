@@ -20,7 +20,7 @@ const PANEL_CARD_MAX_W      = 240;
 const PANEL_GOTO_DELAY      = 400;
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
-console.log('[panel.js_v_Z]');
+console.log('[panel.js_v_A]');
 document.addEventListener('DOMContentLoaded', () => {
   const wait = setInterval(() => {
     const box = document.getElementById('sidebar-box');
@@ -1405,6 +1405,32 @@ mark.pkw {
 }
 
 /* ── Lock icon button ───────────────────────────────── */
+.pp-mm-card .pp-goto-btn {
+  position: absolute;
+  bottom: 5px;
+  right: 6px;
+  width: 18px;
+  height: 18px;
+  border: none;
+  background: transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .18s ease, background .12s ease;
+  padding: 0;
+  margin: 0;
+  box-shadow: none;
+  transform: none;
+  color: var(--ppc-border, #888);
+  /* Hide the text label — icon only */
+  font-size: 0;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
 .pp-mm-lock {
   flex-shrink: 0;
   width: 18px; height: 18px;
@@ -1446,6 +1472,7 @@ mark.pkw {
 }
 .pp-mm-lock svg { display: block; pointer-events: none; }
 
+
 /* ── Card body ──────────────────────────────────────── */
 .pp-mm-card-body { padding: 5px 8px 7px; display: flex; flex-direction: column; gap: 3px; }
 .pp-mm-field {
@@ -1475,32 +1502,6 @@ mark.pkw {
    mirroring the lock icon in the header. Visible only when
    expanded. Uses overflow:visible on the expanded card so
    it isn't clipped. */
-.pp-mm-card .pp-goto-btn {
-  position: absolute;
-  bottom: 5px;
-  right: 6px;
-  width: 18px;
-  height: 18px;
-  border: none;
-  background: transparent;
-  border-radius: 4px;
-  cursor: pointer;
-  display: grid;
-  place-items: center;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity .18s ease, background .12s ease;
-  padding: 0;
-  margin: 0;
-  box-shadow: none;
-  transform: none;
-  color: var(--ppc-border, #888);
-  /* Hide the text label — icon only */
-  font-size: 0;
-  letter-spacing: 0;
-  text-transform: none;
-}
-/* Mirrors lock icon exactly — visible whenever lock icon is visible */
 /* Arrow icon — same diagonal top-right arrow as tiles mode goto */
 .pp-mm-card .pp-goto-btn::after {
   content: '';
