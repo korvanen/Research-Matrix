@@ -1,25 +1,20 @@
 // ════════════════════════════════════════════════════════════════════════════
 // panel-find-matches.js — "Find Matches" sidebar tool
-//
-// Exported global: initFindMatchesTool(paneEl, sidebarEl) → { reset }
-//
-// Depends on (loaded before this file):
-//   keyword-utils.js  — panelExtractKW, findMatches
-//   panel-utils.js    — panelEscH, panelHighlight, panelThemeVars, buildPill,
-//                       panelGoTo, attachGoTo, parseCitation, citationPillHtml
-//   script.js         — TABS, activeTab, processSheetData, clearSelection
 // ════════════════════════════════════════════════════════════════════════════
-console.log('[panel-find-matches.js v1]');
+console.log('[panel-find-matches.js v2]');
 
-const PANEL_MIN_SHARED      = 2;
-const PANEL_MM_PAD          = 10;
-const PANEL_MM_ITERS        = 20;
-const PANEL_CARD_W          = 160;
-const PANEL_CARD_MIN_W      = 140;
-const PANEL_CARD_MAX_W      = 240;
-const PANEL_GOTO_DELAY      = 400;
+const PANEL_MIN_SHARED   = 2;
+const PANEL_MM_PAD       = 10;
+const PANEL_MM_ITERS     = 20;
+const PANEL_CARD_W       = 160;
+const PANEL_CARD_MIN_W   = 140;
+const PANEL_CARD_MAX_W   = 240;
+const PANEL_GOTO_DELAY   = 400;
 
-// ── Inject tool-specific styles (one-time) ───────────────────────────────────
+// Opacity per relation layer (index 0 = layer 1, index 1 = layer 2, …)
+const LAYER_OPACITY = [1, 0.58, 0.38, 0.24, 0.14];
+
+// ── Inject tool-specific styles ──────────────────────────────────────────────
 (function injectFindMatchesStyles() {
   if (document.getElementById('pp-find-matches-styles')) return;
   const style = document.createElement('style');
@@ -39,9 +34,36 @@ const PANEL_GOTO_DELAY      = 400;
   letter-spacing: .04em; line-height: 1.3; min-height: 14px;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-#pp-toolrow { display: flex; flex-direction: row; gap: 5px; align-items: stretch; }
-#pp-hl-wrap, #pp-view-wrap { flex: 1; min-width: 0; display: flex; }
-#pp-hl-wrap .pp-pill, #pp-view-wrap .pp-pill { width: 100%; }
+#pp-toolrow {
+  display: flex; flex-direction: row; gap: 5px; align-items: center;
+}
+#pp-hl-wrap    { flex: 0 0 auto; display: flex; align-items: center; }
+#pp-layers-wrap { flex: 1; min-width: 0; display: flex; }
+#pp-view-wrap  { flex: 1; min-width: 0; display: flex; }
+#pp-layers-wrap .pp-pill,
+#pp-view-wrap   .pp-pill { width: 100%; }
+
+/* KW toggle button */
+.pp-kw-toggle {
+  border: none;
+  border-radius: 20px;
+  padding: 6px 11px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background .15s, color .15s, box-shadow .15s;
+  white-space: nowrap;
+  background: rgba(0,0,0,.07);
+  color: rgba(0,0,0,.32);
+  line-height: 1;
+}
+.pp-kw-toggle.pp-kw-on {
+  background: rgba(0,0,0,.74);
+  color: #fff;
+  box-shadow: 0 1px 4px rgba(0,0,0,.18);
+}
 
 #pp-body-wrap {
   flex: 1; min-height: 0;
@@ -74,6 +96,7 @@ const PANEL_GOTO_DELAY      = 400;
   overflow: visible; box-sizing: border-box;
   animation: pp-fade-in .22s ease both;
   position: relative;
+  transition: opacity .18s ease;
 }
 @keyframes pp-fade-in {
   from { opacity: 0; transform: translateY(6px); }
@@ -149,6 +172,7 @@ const PANEL_GOTO_DELAY      = 400;
   box-shadow: 0 2px 10px rgba(0,0,0,.12);
   cursor: grab; user-select: none; z-index: 1;
   overflow: hidden;
+  transition: opacity .18s ease;
 }
 .pp-mm-card:active { cursor: grabbing; }
 .pp-mm-card.pp-mm-expanded { overflow: visible; }
@@ -227,7 +251,7 @@ const PANEL_GOTO_DELAY      = 400;
   document.head.appendChild(style);
 })();
 
-// ── Main init ────────────────────────────────────────────────────────────────
+// ── Main init ─────────────────────────────────────────────────────────────────
 function initFindMatchesTool(paneEl, sidebarEl) {
 
   paneEl.innerHTML =
@@ -235,6 +259,7 @@ function initFindMatchesTool(paneEl, sidebarEl) {
       '<div id="pp-subtitle">Click a cell to find matches</div>' +
       '<div id="pp-toolrow" style="display:none">' +
         '<div id="pp-hl-wrap"></div>' +
+        '<div id="pp-layers-wrap"></div>' +
         '<div id="pp-view-wrap"></div>' +
       '</div>' +
     '</div>' +
@@ -243,14 +268,15 @@ function initFindMatchesTool(paneEl, sidebarEl) {
       '<div id="pp-mm-wrap"></div>' +
     '</div>';
 
-  const ppSubtitle = paneEl.querySelector('#pp-subtitle');
-  const ppToolrow  = paneEl.querySelector('#pp-toolrow');
-  const ppHlWrap   = paneEl.querySelector('#pp-hl-wrap');
-  const ppViewWrap = paneEl.querySelector('#pp-view-wrap');
-  const ppBody     = paneEl.querySelector('#pp-body');
-  const ppMmWrap   = paneEl.querySelector('#pp-mm-wrap');
+  const ppSubtitle  = paneEl.querySelector('#pp-subtitle');
+  const ppToolrow   = paneEl.querySelector('#pp-toolrow');
+  const ppHlWrap    = paneEl.querySelector('#pp-hl-wrap');
+  const ppLayersWrap = paneEl.querySelector('#pp-layers-wrap');
+  const ppViewWrap  = paneEl.querySelector('#pp-view-wrap');
+  const ppBody      = paneEl.querySelector('#pp-body');
+  const ppMmWrap    = paneEl.querySelector('#pp-mm-wrap');
 
-  // ── Grid layout ────────────────────────────────────────────────────────────
+  // ── Grid layout ─────────────────────────────────────────────────────────────
   let _lastCols = 0, _lastCardW = 0, _gridRafId = null;
 
   function scheduleUpdateGrid() {
@@ -285,10 +311,11 @@ function initFindMatchesTool(paneEl, sidebarEl) {
   scheduleUpdateGrid();
   if (window.ResizeObserver) new ResizeObserver(scheduleUpdateGrid).observe(sidebarEl || paneEl);
 
-  // ── State ──────────────────────────────────────────────────────────────────
-  let hlOn      = true;
-  let viewMode  = 'tiles';
-  let seedKws   = new Set();
+  // ── State ────────────────────────────────────────────────────────────────────
+  let hlOn        = true;
+  let viewMode    = 'tiles';
+  let _numLayers  = 1;
+  let seedKws     = new Set();
   let seedTabIdx  = -1;
   let seedRowIdx  = -1;
   let seedCells   = [];
@@ -307,13 +334,30 @@ function initFindMatchesTool(paneEl, sidebarEl) {
     );
   }
 
-  // ── Pills ──────────────────────────────────────────────────────────────────
-  const hlPill = buildPill(
-    [{ label: 'Show KW', value: 'show' }, { label: 'Hide KW', value: 'hide' }],
-    v => { hlOn = v === 'show'; applyHlState(); }
-  );
-  ppHlWrap.appendChild(hlPill.el);
+  // ── KW toggle button ─────────────────────────────────────────────────────────
+  const hlBtn = document.createElement('button');
+  hlBtn.className = 'pp-kw-toggle pp-kw-on';
+  hlBtn.textContent = 'KW';
+  hlBtn.title = 'Toggle keyword highlights';
+  ppHlWrap.appendChild(hlBtn);
+  hlBtn.addEventListener('click', () => {
+    hlOn = !hlOn;
+    hlBtn.classList.toggle('pp-kw-on',  hlOn);
+    hlBtn.classList.toggle('pp-kw-off', !hlOn);
+    applyHlState();
+  });
 
+  // ── Layers pill (1–5) ─────────────────────────────────────────────────────────
+  const layersPill = buildPill(
+    [1, 2, 3, 4, 5].map(n => ({ label: String(n), value: n })),
+    v => {
+      _numLayers = v;
+      if (_hasContent) refreshFromSelection();
+    }
+  );
+  ppLayersWrap.appendChild(layersPill.el);
+
+  // ── View pill ─────────────────────────────────────────────────────────────────
   const viewPill = buildPill(
     [{ label: 'Tiles', value: 'tiles' }, { label: 'Mindmap', value: 'mindmap' }],
     v => {
@@ -349,7 +393,7 @@ function initFindMatchesTool(paneEl, sidebarEl) {
   );
   ppViewWrap.appendChild(viewPill.el);
 
-  // ── Empty state ────────────────────────────────────────────────────────────
+  // ── Empty state ───────────────────────────────────────────────────────────────
   function showEmpty(msg) {
     msg = msg || 'Click a cell to find matches';
     ppSubtitle.textContent  = msg;
@@ -362,10 +406,39 @@ function initFindMatchesTool(paneEl, sidebarEl) {
     _hasContent = false;
     viewMode    = 'tiles';
     viewPill.setValue('tiles', false);
+    layersPill.setValue(1, false);
+    _numLayers  = 1;
   }
   showEmpty();
 
-  // ── Build seed from grid selection ─────────────────────────────────────────
+  // ── Multi-layer match builder ─────────────────────────────────────────────────
+  // Returns flat array of match objects each with .layer (1-based) and .parentKey
+  function buildLayeredMatches(skws, stIdx, srIdx, numLayers) {
+    const seen = new Set();
+    seen.add(stIdx + ':' + srIdx);
+    const result = [];
+    let currentSeeds = [{ kws: skws, tabIdx: stIdx, rowIdx: srIdx, cardKey: 'seed' }];
+
+    for (let layer = 1; layer <= numLayers; layer++) {
+      const nextSeeds = [];
+      currentSeeds.forEach(seed => {
+        const matches = findMatches(seed.kws, seed.tabIdx, seed.rowIdx);
+        matches.forEach(m => {
+          const entryKey = m.tabIdx + ':' + m.rowIdx;
+          if (seen.has(entryKey)) return;
+          seen.add(entryKey);
+          const cardKey = 'm-' + m.tabIdx + '-' + m.rowIdx;
+          result.push(Object.assign({}, m, { layer, parentKey: seed.cardKey }));
+          nextSeeds.push({ kws: m.kws, tabIdx: m.tabIdx, rowIdx: m.rowIdx, cardKey });
+        });
+      });
+      currentSeeds = nextSeeds;
+      if (!currentSeeds.length) break;
+    }
+    return result;
+  }
+
+  // ── Build seed from grid selection ───────────────────────────────────────────
   function buildSeedFromSelection() {
     const curTabIdx = typeof activeTab !== 'undefined' ? activeTab : 0;
     const tab  = typeof TABS !== 'undefined' ? TABS[curTabIdx] : null;
@@ -413,7 +486,7 @@ function initFindMatchesTool(paneEl, sidebarEl) {
     return true;
   }
 
-  // ── Refresh on selection change ────────────────────────────────────────────
+  // ── Refresh on selection change ───────────────────────────────────────────────
   function refreshFromSelection() {
     const curTabIdx = typeof activeTab !== 'undefined' ? activeTab : 0;
     const tab  = typeof TABS !== 'undefined' ? TABS[curTabIdx] : null;
@@ -424,7 +497,7 @@ function initFindMatchesTool(paneEl, sidebarEl) {
       return;
     }
 
-    lastMatches = findMatches(seedKws, curTabIdx, seedRowIdx);
+    lastMatches = buildLayeredMatches(seedKws, curTabIdx, seedRowIdx, _numLayers);
     _hasContent = true;
     _mmModeSnapshot = null;
 
@@ -436,7 +509,7 @@ function initFindMatchesTool(paneEl, sidebarEl) {
     }
   }
 
-  // ── MutationObserver on data-body ──────────────────────────────────────────
+  // ── MutationObserver on data-body ────────────────────────────────────────────
   let _refreshTimer = null;
 
   function attachObserver() {
@@ -462,7 +535,7 @@ function initFindMatchesTool(paneEl, sidebarEl) {
     _refreshTimer = setTimeout(refreshFromSelection, 80);
   });
 
-  // ── TILES VIEW ────────────────────────────────────────────────────────────
+  // ── TILES VIEW ────────────────────────────────────────────────────────────────
   function renderTiles(matches, kws, srcTabIdx, srcData) {
     ppMmWrap.style.display = 'none';
     ppMmWrap.innerHTML     = '';
@@ -508,7 +581,7 @@ function initFindMatchesTool(paneEl, sidebarEl) {
 
     if (!matches.length) {
       ppSubtitle.textContent  = 'No matches found';
-      ppToolrow.style.display = 'none';
+      ppToolrow.style.display = 'flex';
       const divNone = document.createElement('div');
       divNone.className = 'pp-divider';
       divNone.style.borderColor = accentSrc;
@@ -526,14 +599,24 @@ function initFindMatchesTool(paneEl, sidebarEl) {
       return;
     }
 
-    ppSubtitle.textContent = `${matches.length} match${matches.length === 1 ? '' : 'es'} · ${[...kws].slice(0, 4).join(', ')}`;
+    const layer1Count = matches.filter(m => m.layer === 1).length;
+    const layerStr    = _numLayers > 1 ? ` · ${_numLayers} layers` : '';
+    ppSubtitle.textContent = `${matches.length} match${matches.length === 1 ? '' : 'es'}${layerStr} · ${[...kws].slice(0, 4).join(', ')}`;
     ppToolrow.style.display = 'flex';
     hlOn = true;
-    hlPill.setValue('show', false);
+    hlBtn.classList.add('pp-kw-on'); hlBtn.classList.remove('pp-kw-off');
 
+    // Group by tab; within each tab sort by layer asc then shared desc
     const byTab = new Map();
-    matches.forEach(m => { if (!byTab.has(m.tabIdx)) byTab.set(m.tabIdx, []); byTab.get(m.tabIdx).push(m); });
+    matches.forEach(m => {
+      if (!byTab.has(m.tabIdx)) byTab.set(m.tabIdx, []);
+      byTab.get(m.tabIdx).push(m);
+    });
     if (!byTab.has(srcTabIdx)) byTab.set(srcTabIdx, []);
+
+    byTab.forEach((arr, tabIdx) => {
+      arr.sort((a, b) => a.layer - b.layer || b.shared.size - a.shared.size);
+    });
 
     const sortedTabKeys = [srcTabIdx, ...[...byTab.keys()].filter(t => t !== srcTabIdx).sort()];
 
@@ -554,10 +637,13 @@ function initFindMatchesTool(paneEl, sidebarEl) {
       if (tabIdx === srcTabIdx) frag.appendChild(buildSeedCard());
 
       tabMatches.forEach(m => {
+        const layerOpacity = LAYER_OPACITY[m.layer - 1] !== undefined ? LAYER_OPACITY[m.layer - 1] : 0.14;
+
         const card = document.createElement('div');
         card.className = 'pp-match-card';
         card.style.setProperty('--ppc-border', accentColor);
         card.style.setProperty('--ppc-bg',     bgColor);
+        if (m.layer > 1) card.style.opacity = layerOpacity;
 
         const head = document.createElement('div');
         head.className = 'pp-card-head';
@@ -597,7 +683,7 @@ function initFindMatchesTool(paneEl, sidebarEl) {
     applyHlState();
   }
 
-  // ── MINDMAP VIEW ──────────────────────────────────────────────────────────
+  // ── MINDMAP VIEW ──────────────────────────────────────────────────────────────
   function mmW() { return ppMmWrap.clientWidth  || 300; }
   function mmH() { return ppMmWrap.clientHeight || 400; }
 
@@ -713,18 +799,21 @@ function initFindMatchesTool(paneEl, sidebarEl) {
         const { a, b } = pair;
         const dist = Math.hypot(b.x - a.x, b.y - a.y), offset = Math.min(dist * 0.45, 90);
         const tanA = getEdgeTangent(a, def.fromKey), tanB = getEdgeTangent(b, def.toKey);
+        const layerOpacity = LAYER_OPACITY[def.layer - 1] !== undefined ? LAYER_OPACITY[def.layer - 1] : 0.14;
         const curve = document.createElementNS(ns, 'path');
         curve.setAttribute('d', `M${a.x},${a.y} C${a.x + tanA.dx * offset},${a.y + tanA.dy * offset} ${b.x + tanB.dx * offset},${b.y + tanB.dy * offset} ${b.x},${b.y}`);
         curve.setAttribute('fill', 'none');
         curve.setAttribute('stroke', def.color);
-        curve.setAttribute('stroke-width', '1.5');
-        curve.setAttribute('stroke-opacity', '0.45');
+        curve.setAttribute('stroke-width', def.layer > 1 ? '1' : '1.5');
+        curve.setAttribute('stroke-opacity', String(0.45 * layerOpacity));
+        if (def.layer > 1) curve.setAttribute('stroke-dasharray', '5,4');
         svg.appendChild(curve);
         [[a, def.fromKey], [b, def.toKey]].forEach(([pt, k]) => {
           const colors = cardColors.get(k) || { border: def.color, bg: '#fff' };
           const circle = document.createElementNS(ns, 'circle');
           circle.setAttribute('cx', pt.x); circle.setAttribute('cy', pt.y); circle.setAttribute('r', '4');
           circle.setAttribute('fill', colors.bg); circle.setAttribute('stroke', colors.border); circle.setAttribute('stroke-width', '1.5');
+          circle.setAttribute('opacity', String(layerOpacity));
           svgTop.appendChild(circle);
         });
       });
@@ -847,7 +936,8 @@ function initFindMatchesTool(paneEl, sidebarEl) {
       el.addEventListener('touchcancel', dragEnd);
     }
 
-    function makeCard(text, header, tabIdx, key, isSeed, cats, kwsHL, matchObj, tabName) {
+    // makeCard: layer param controls opacity for layer 2+ cards
+    function makeCard(text, header, tabIdx, key, isSeed, cats, kwsHL, matchObj, tabName, layer) {
       const tv = panelThemeVars(tabIdx);
       const accentColor = tv['--tab-active-bg']    || '#888';
       const labelColor  = tv['--tab-active-color'] || '#fff';
@@ -859,6 +949,11 @@ function initFindMatchesTool(paneEl, sidebarEl) {
       card.style.width = PANEL_CARD_W + 'px';
       card.style.setProperty('--ppc-border', accentColor);
       card.style.setProperty('--ppc-bg',     bgColor);
+      // Apply layer opacity for non-seed cards
+      if (!isSeed && layer > 1) {
+        const lo = LAYER_OPACITY[layer - 1] !== undefined ? LAYER_OPACITY[layer - 1] : 0.14;
+        card.style.opacity = lo;
+      }
 
       const lockBtn = document.createElement('button');
       lockBtn.className = 'pp-mm-lock';
@@ -944,15 +1039,15 @@ function initFindMatchesTool(paneEl, sidebarEl) {
       return card;
     }
 
-    // ── Seed card ────────────────────────────────────────────────────────────
+    // ── Seed card ──────────────────────────────────────────────────────────────
     const seedKey    = 'seed';
     const _seedTab   = typeof TABS !== 'undefined' ? TABS[seedTabIdx] : null;
     const _seedData  = _seedTab && typeof processSheetData === 'function' ? processSheetData(_seedTab.grid) : null;
     const _seedCats  = _seedData && _seedData.rows[seedRowIdx] ? _seedData.rows[seedRowIdx].cats.filter(c => c.trim()) : [];
     const _seedTabName = (_seedData && _seedData.title) ? _seedData.title : (_seedTab ? _seedTab.name : '');
-    makeCard('', '', seedTabIdx, seedKey, true, _seedCats, seedKws, null, _seedTabName);
+    makeCard('', '', seedTabIdx, seedKey, true, _seedCats, seedKws, null, _seedTabName, 0);
 
-    // ── Match cards ──────────────────────────────────────────────────────────
+    // ── Match cards ────────────────────────────────────────────────────────────
     matches.forEach(m => {
       const indices = Array.from({ length: m.row.cells.length }, (_, i) => i)
         .filter(ci => (m.row.cells[ci] || '').trim())
@@ -963,7 +1058,7 @@ function initFindMatchesTool(paneEl, sidebarEl) {
       if (!indices.length) return;
 
       const bestColIdx = indices[0];
-      const key    = `m-${m.tabIdx}-${m.rowIdx}`;
+      const key    = 'm-' + m.tabIdx + '-' + m.rowIdx;
       const cats   = m.row.cats ? m.row.cats.filter(c => c.trim()) : [];
       const tv     = panelThemeVars(m.tabIdx);
       const _mTabD = (m.tabIdx === seedTabIdx && _seedData) ? _seedData
@@ -971,11 +1066,11 @@ function initFindMatchesTool(paneEl, sidebarEl) {
       const _mTabName = (_mTabD && _mTabD.title) ? _mTabD.title
         : (typeof TABS !== 'undefined' ? TABS[m.tabIdx].name : 'Tab ' + m.tabIdx);
 
-      makeCard(m.row.cells[bestColIdx] || '', m.headers[bestColIdx] || '', m.tabIdx, key, false, cats, m.shared, m, _mTabName);
-      arrowDefs.push({ fromKey: seedKey, toKey: key, color: tv['--tab-active-bg'] || '#aaa' });
+      makeCard(m.row.cells[bestColIdx] || '', m.headers[bestColIdx] || '', m.tabIdx, key, false, cats, m.shared, m, _mTabName, m.layer);
+      arrowDefs.push({ fromKey: m.parentKey, toKey: key, color: tv['--tab-active-bg'] || '#aaa', layer: m.layer });
     });
 
-    // ── Layout cards ─────────────────────────────────────────────────────────
+    // ── Layout cards ───────────────────────────────────────────────────────────
     requestAnimationFrame(() => {
       const W = mmW(), H = mmH(), cx = W / 2, cy = H / 2;
       const sCard = cardEls.get(seedKey);
@@ -984,13 +1079,27 @@ function initFindMatchesTool(paneEl, sidebarEl) {
       if (sCard) { sCard.style.left = sx + 'px'; sCard.style.top = sy + 'px'; }
       rects.set(seedKey, { x: sx, y: sy, w: PANEL_CARD_W, h: sH });
 
-      const ringR = Math.min(W, H) * 0.33;
+      // Group matches by layer for ring layout
+      const byLayer = new Map();
+      matches.forEach(m => {
+        if (!byLayer.has(m.layer)) byLayer.set(m.layer, []);
+        byLayer.get(m.layer).push(m);
+      });
+
+      const maxLayer = matches.length ? Math.max(...matches.map(m => m.layer)) : 1;
+
       matches.forEach((m, i) => {
-        const key    = `m-${m.tabIdx}-${m.rowIdx}`;
+        const key    = 'm-' + m.tabIdx + '-' + m.rowIdx;
         const cardEl = cardEls.get(key);
         if (!cardEl) return;
-        const angle = (2 * Math.PI * i / matches.length) - Math.PI / 2;
-        const cH    = cardEl.offsetHeight || 80;
+
+        // Spread each layer on a progressively larger ring
+        const layerMatches = byLayer.get(m.layer) || [];
+        const idxInLayer   = layerMatches.indexOf(m);
+        const ringFraction = maxLayer > 1 ? 0.22 + 0.18 * m.layer : 0.33;
+        const ringR        = Math.min(W, H) * ringFraction;
+        const angle        = (2 * Math.PI * idxInLayer / layerMatches.length) - Math.PI / 2;
+        const cH           = cardEl.offsetHeight || 80;
         let x = cx + ringR * Math.cos(angle) - PANEL_CARD_W / 2;
         let y = cy + ringR * Math.sin(angle) - cH / 2;
 
@@ -1021,7 +1130,7 @@ function initFindMatchesTool(paneEl, sidebarEl) {
     });
   }
 
-  // ── Mindmap resize ───────────────────────────────────────────────────────
+  // ── Mindmap resize ────────────────────────────────────────────────────────────
   let _mmLastW = 0, _mmLastH = 0, _mmResizeRafId = null;
   if (window.ResizeObserver) {
     new ResizeObserver(() => {
@@ -1050,7 +1159,7 @@ function initFindMatchesTool(paneEl, sidebarEl) {
     }).observe(ppMmWrap);
   }
 
-  // ── Mindmap snapshot events ───────────────────────────────────────────────
+  // ── Mindmap snapshot events ───────────────────────────────────────────────────
   document.addEventListener('mm-snapshot-request', () => {
     if (!_mmActive) return;
     const positions = new Map();
@@ -1084,6 +1193,6 @@ function initFindMatchesTool(paneEl, sidebarEl) {
     });
   });
 
-  // ── Return API to panel.js ────────────────────────────────────────────────
+  // ── Return API ────────────────────────────────────────────────────────────────
   return { reset: showEmpty };
 }
