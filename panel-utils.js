@@ -6,7 +6,6 @@
 // ════════════════════════════════════════════════════════════════════════════
 
 // ── Stop words for keyword extraction ────────────────────────────────────────
-// Add/remove words here to tune what counts as a meaningful keyword
 const PANEL_STOP_WORDS = new Set([
   'that','this','with','from','have','they','will','been','were','their',
   'when','also','into','more','than','then','some','what','there','which',
@@ -17,7 +16,6 @@ const PANEL_STOP_WORDS = new Set([
 ]);
 
 // ── Keyword extraction ────────────────────────────────────────────────────────
-// Returns a deduplicated array of stemmed, filtered keywords from a text string.
 function panelExtractKW(text) {
   return [...new Set(
     String(text).toLowerCase()
@@ -35,7 +33,6 @@ function panelEscH(t) {
 }
 
 // ── Keyword highlighting ──────────────────────────────────────────────────────
-// Wraps matched keywords in <mark class="pkw"> for CSS styling.
 function panelHighlight(text, kwSet) {
   if (!kwSet || !kwSet.size) return panelEscH(text);
   const pat = new RegExp(
@@ -45,16 +42,12 @@ function panelHighlight(text, kwSet) {
 }
 
 // ── Theme variable lookup ─────────────────────────────────────────────────────
-// Returns the CSS variable map for a given tab index, falling back to 'default'.
-// Depends on THEMES and TAB_THEMES from script.js.
 function panelThemeVars(tabIdx) {
   const name = (typeof TAB_THEMES !== 'undefined' && TAB_THEMES[tabIdx]) || 'default';
   return (typeof THEMES !== 'undefined' && (THEMES[name] || THEMES.default)) || {};
 }
 
 // ── Row index builder ─────────────────────────────────────────────────────────
-// Flattens all TABS into a searchable array of { tabIdx, rowIdx, row, headers, title, kws }.
-// Depends on TABS and processSheetData from script.js.
 function buildRowIndex() {
   if (typeof TABS === 'undefined' || !TABS.length) return [];
   const rows = [];
@@ -74,8 +67,6 @@ function buildRowIndex() {
 }
 
 // ── Match finder ─────────────────────────────────────────────────────────────
-// Finds rows across all tabs that share >= PANEL_MIN_SHARED keywords with seedKws,
-// excluding the seed row itself.
 function findMatches(seedKws, seedTabIdx, seedRowIdx) {
   const matches = [];
   buildRowIndex().forEach(entry => {
@@ -89,9 +80,6 @@ function findMatches(seedKws, seedTabIdx, seedRowIdx) {
 }
 
 // ── Pill toggle builder ───────────────────────────────────────────────────────
-// Creates a segmented pill control. Returns { el, setValue }.
-// options: [{ label, value }, ...]
-// onSwitch: called with the selected value when user clicks
 function buildPill(options, onSwitch) {
   const wrap = document.createElement('div');
   wrap.className = 'pp-pill';
@@ -124,10 +112,34 @@ function buildPill(options, onSwitch) {
   return { el: wrap, setValue };
 }
 
+// ── Citation extraction ───────────────────────────────────────────────────────
+// Detects a trailing citation at the very end of cell text — the last (...)
+// group only, so mid-sentence parens like "(between)" are never affected.
+// Returns { body, citation } where citation is the inner text without parens
+// (e.g. "Beck, 2019"), or { body: text, citation: null } if none found.
+var _citationRe = /\s*\(([^)]+)\)\s*\.?\s*$/;
+function parseCitation(text) {
+  text = String(text == null ? '' : text);
+  var m = _citationRe.exec(text);
+  if (!m) return { body: text, citation: null };
+  return {
+    body:     text.slice(0, m.index).trimEnd(),
+    citation: m[1],
+  };
+}
+
+// ── Citation pill HTML builder ────────────────────────────────────────────────
+// Returns an HTML string for a colored citation pill.
+// accentColor: background + border color (matches card header).
+// textColor:   font color (matches card header text).
+function citationPillHtml(citation, accentColor, textColor) {
+  if (!citation) return '';
+  return '<span class="pp-cite-pill" style="background:' +
+    panelEscH(accentColor) + ';color:' + panelEscH(textColor) + '">' +
+    panelEscH(citation) + '</span>';
+}
+
 // ── Go-to navigation ──────────────────────────────────────────────────────────
-// Switches to the tab containing match, then selects the first cell of that row.
-// Depends on activeTab, buildTabBar, showTab, clearSelection,
-// getHighlightTargets, applySelection from script.js.
 function panelGoTo(match) {
   var tabIdx = match.tabIdx;
   var rowIdx = match.rowIdx;
@@ -162,8 +174,6 @@ function panelGoTo(match) {
 }
 
 // ── Attach "Go to" hover button ───────────────────────────────────────────────
-// Adds a delayed-reveal "Go to ↗" button to a card element on hover.
-// accentColor: border/text color string for the button
 function attachGoTo(card, match, accentColor) {
   var hoverTimer = null;
   var btn = null;
