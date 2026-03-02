@@ -1,7 +1,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 // panel-find-matches.js — "Find Matches" sidebar tool
 // ════════════════════════════════════════════════════════════════════════════
-console.log('[panel-find-matches.js v2]');
+console.log('[panel-find-matches.js yyyyy]');
 
 const PANEL_MIN_SHARED   = 2;
 const PANEL_MM_PAD       = 10;
@@ -98,9 +98,12 @@ const LAYER_OPACITY = [1, 0.58, 0.38, 0.24, 0.14];
   position: relative;
   transition: opacity .18s ease;
 }
+
+/* FIX: animation ends at --ppc-opacity (default 1) so layer-opacity inline
+   style is not clobbered by animation fill-mode:both. */
 @keyframes pp-fade-in {
   from { opacity: 0; transform: translateY(6px); }
-  to   { opacity: 1; transform: none; }
+  to   { opacity: var(--ppc-opacity, 1); transform: none; }
 }
 
 /* Divider */
@@ -658,7 +661,13 @@ function buildLayeredMatches(skws, stIdx, srIdx, numLayers) {
         card.className = 'pp-match-card';
         card.style.setProperty('--ppc-border', accentColor);
         card.style.setProperty('--ppc-bg',     bgColor);
-        if (m.layer > 1) card.style.opacity = layerOpacity;
+
+        // FIX: set --ppc-opacity so the pp-fade-in animation ends at the correct
+        // layer opacity rather than always at 1 (animation fill-mode:both overrides
+        // inline style, but respects CSS custom properties in the keyframe).
+        if (m.layer > 1) {
+          card.style.setProperty('--ppc-opacity', layerOpacity);
+        }
 
         const head = document.createElement('div');
         head.className = 'pp-card-head';
