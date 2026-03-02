@@ -20,7 +20,7 @@ const PANEL_CARD_MAX_W      = 240;
 const PANEL_GOTO_DELAY      = 400;
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
-console.log('[panel.js_v_W]');
+console.log('[panel.js_v_X]');
 document.addEventListener('DOMContentLoaded', () => {
   const wait = setInterval(() => {
     const box = document.getElementById('sidebar-box');
@@ -526,7 +526,8 @@ function initPanel(sidebarBox) {
       } else {
         _lockedCards.delete(key);
       }
-      // Update lock icon visual
+      // Update card and lock icon visuals
+      if (cardEl) cardEl.classList.toggle('pp-mm-card-locked', locked);
       var lockIcon = cardEl ? cardEl.querySelector('.pp-mm-lock') : null;
       if (lockIcon) {
         lockIcon.classList.toggle('pp-mm-lock-active', locked);
@@ -1490,6 +1491,11 @@ mark.pkw {
   text-transform: none;
 }
 .pp-mm-card.pp-mm-expanded .pp-goto-btn {
+  opacity: 1;
+  pointer-events: auto;
+}
+/* Locked cards: goto button always fully visible (no hover required) */
+.pp-mm-card.pp-mm-card-locked .pp-goto-btn {
   opacity: 1;
   pointer-events: auto;
 }
