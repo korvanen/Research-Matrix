@@ -1,13 +1,13 @@
 // ════════════════════════════════════════════════════════════════════════════
-// sidepanel-clusters.js — "Clusters" tool  v9
+// sidepanel-clusters.js — "Clusters" tool  v10
 //
-// Changes from v8:
-//  • Controls: 4-column grid  (Outer | Inner | Depth | Re-cluster)
-//  • Pan navigation on canvas AND nest-bodies — no more scrollbars
-//  • Drag-to-reorder: grab a nest by its header, or a card directly,
-//    to swap it with any sibling inside the same container
+// Top-level clusters are freely draggable floating boxes on the canvas.
+// Sub-clusters tile inside their parent (flex-wrap, unchanged).
+// Cards auto-tile inside leaf bodies (flex-wrap, unchanged).
+// Canvas background can be panned to navigate.
+// Controls: 4-column grid (Outer | Inner | Depth | Re-cluster).
 // ════════════════════════════════════════════════════════════════════════════
-console.log('[sidepanel-clusters.js v9]');
+console.log('[sidepanel-clusters.js v10]');
 
 (function injectClusterStyles() {
   if (document.getElementById('pp-cluster-styles')) return;
@@ -73,15 +73,11 @@ console.log('[sidepanel-clusters.js v9]');
   width:11px;height:11px;border-radius:50%;border:none;
   background:var(--color-topbar-sheet,#111);box-shadow:0 1px 3px rgba(0,0,0,.22);cursor:pointer;
 }
-
-/* Button column — vertically fills the grid row */
 .pp-cl-btn-col {
-  display: flex; align-items: stretch; justify-content: stretch;
-  align-self: stretch; height: 100%;
+  display: flex; align-items: stretch; justify-content: stretch; align-self: stretch; height: 100%;
 }
 #pp-cl-recluster {
-  flex: 1;
-  border:none;border-radius:5px;padding:4px 6px;
+  flex: 1; border:none;border-radius:5px;padding:4px 6px;
   font-size:8px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;
   background:rgba(0,0,0,.07);color:rgba(0,0,0,.45);
   cursor:pointer;transition:background .15s,color .15s;
@@ -91,27 +87,35 @@ console.log('[sidepanel-clusters.js v9]');
 #pp-cl-recluster:hover { background:rgba(0,0,0,.13);color:rgba(0,0,0,.75); }
 #pp-cl-recluster.pp-cl-reclustering { background:rgba(0,0,0,.04);color:rgba(0,0,0,.25);cursor:default; }
 
-/* ══ CANVAS — pan surface (no scrollbars) ══ */
+/* ══ CANVAS — pannable viewport ══ */
 #pp-cl-canvas {
   flex: 1; min-height: 0;
   overflow: hidden;
   position: relative;
-  cursor: grab;
+  cursor: default;
   user-select: none;
 }
-#pp-cl-canvas.pp-cl-panning { cursor: grabbing; }
+#pp-cl-canvas.pp-cl-panning { cursor: grabbing !important; }
 
-#pp-cl-canvas-inner {
-  position: absolute; top: 0; left: 0;
-  display: flex; flex-wrap: wrap;
-  gap: 12px; padding: 12px;
-  align-content: flex-start;
-  /* wide enough to never clip children */
-  min-width: 100%; min-height: 100%;
+/* World: a zero-size origin point; depth-0 nests are absolute children of this */
+#pp-cl-canvas-world {
+  position: absolute;
+  top: 0; left: 0;
+  width: 0; height: 0;
   will-change: transform;
 }
 
-/* ─── Nest container ─── */
+/* Empty state centred in the viewport (not the world) */
+#pp-cl-empty {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 8px;
+  font-size: 11px; letter-spacing: .08em; text-transform: uppercase;
+  color: rgba(0,0,0,.25); text-align: center; padding: 24px;
+  pointer-events: none;
+}
+
+/* ─── All nests ─── */
 .pp-cl-nest {
   position: relative;
   flex-shrink: 0;
@@ -119,13 +123,19 @@ console.log('[sidepanel-clusters.js v9]');
   overflow: hidden;
   box-sizing: border-box;
   animation: pp-cl-nest-in .30s cubic-bezier(0.22,1,0.36,1) both;
-  transition: box-shadow .18s ease, opacity .15s ease;
+  transition: box-shadow .18s ease;
 }
 @keyframes pp-cl-nest-in { from{opacity:0;transform:scale(.92);}to{opacity:1;transform:scale(1);} }
 
+/* depth-0 = absolutely positioned floating box */
 .pp-cl-nest[data-depth="0"] {
-  border-radius:16px;border-width:2px;border-style:solid;
-  box-shadow:0 2px 14px rgba(0,0,0,.08);
+  position: absolute;
+  border-radius: 16px; border-width: 2px; border-style: solid;
+  box-shadow: 0 2px 14px rgba(0,0,0,.08);
+}
+.pp-cl-nest[data-depth="0"].pp-cl-nest-lifted {
+  box-shadow: 0 10px 36px rgba(0,0,0,.20);
+  transition: box-shadow .10s ease;
 }
 .pp-cl-nest[data-depth="1"] {
   border-radius:11px;border-width:1.5px;border-style:solid;
@@ -140,23 +150,16 @@ console.log('[sidepanel-clusters.js v9]');
   box-shadow:none;
 }
 
-/* dragging / drop-target states */
-.pp-cl-nest.pp-cl-item-dragging  { opacity:.45; pointer-events:none; }
-.pp-cl-nest.pp-cl-drop-target,
-.pp-cl-card.pp-cl-drop-target    {
-  outline: 2px dashed rgba(0,0,0,.35);
-  outline-offset: 2px;
-  border-radius: inherit;
-}
-
-/* ─── Nest header — drag handle ─── */
+/* ─── Nest header ─── */
 .pp-cl-nest-head {
   display:flex;align-items:center;gap:4px;flex-shrink:0;
   border-bottom:1px solid rgba(0,0,0,.08);
-  cursor: grab;
 }
-.pp-cl-nest-head:active { cursor: grabbing; }
-.pp-cl-nest[data-depth="0"] .pp-cl-nest-head { padding:5px 8px 4px; }
+/* depth-0 header = drag handle */
+.pp-cl-nest[data-depth="0"] > .pp-cl-nest-head {
+  cursor: grab; padding: 5px 8px 4px;
+}
+.pp-cl-nest[data-depth="0"] > .pp-cl-nest-head:active { cursor: grabbing; }
 .pp-cl-nest[data-depth="1"] .pp-cl-nest-head { padding:3px 7px; }
 .pp-cl-nest[data-depth="2"] .pp-cl-nest-head { padding:2px 6px; }
 .pp-cl-nest[data-depth="3"] .pp-cl-nest-head { padding:2px 5px; }
@@ -168,7 +171,6 @@ console.log('[sidepanel-clusters.js v9]');
 .pp-cl-nest[data-depth="1"] .pp-cl-nest-badge { font-size:7px;padding:1px 5px; }
 .pp-cl-nest[data-depth="2"] .pp-cl-nest-badge { font-size:7px;padding:1px 4px;opacity:.85; }
 .pp-cl-nest[data-depth="3"] .pp-cl-nest-badge { font-size:6px;padding:1px 4px;opacity:.80; }
-
 .pp-cl-nest-count {
   font-weight:500;color:rgba(0,0,0,.35);flex:1;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
@@ -178,15 +180,13 @@ console.log('[sidepanel-clusters.js v9]');
 .pp-cl-nest[data-depth="2"] .pp-cl-nest-count { font-size:7px; }
 .pp-cl-nest[data-depth="3"] .pp-cl-nest-count { font-size:6px; }
 
-/* ─── Nest body — pan instead of scroll ─── */
+/* ─── Nest body — flex-wrap for inner nests & cards ─── */
 .pp-cl-nest-body {
   flex: 1; min-height: 0;
   overflow: hidden;
-  position: relative;
   display: flex; flex-wrap: wrap;
   align-content: flex-start;
 }
-/* Per-depth body padding + gap */
 .pp-cl-nest[data-depth="0"] > .pp-cl-nest-body { padding:7px; gap:7px; }
 .pp-cl-nest[data-depth="1"] > .pp-cl-nest-body { padding:5px; gap:5px; }
 .pp-cl-nest[data-depth="2"] > .pp-cl-nest-body { padding:4px; gap:4px; }
@@ -199,7 +199,6 @@ console.log('[sidepanel-clusters.js v9]');
 }
 .pp-cl-nest:hover > .pp-cl-resize-handle,
 .pp-cl-nest.pp-cl-resizing > .pp-cl-resize-handle { opacity: 1; }
-
 .pp-cl-resize-handle::before,
 .pp-cl-resize-handle::after {
   content: ''; position: absolute; background: rgba(0,0,0,.36);
@@ -209,43 +208,33 @@ console.log('[sidepanel-clusters.js v9]');
 .pp-cl-resize-handle:hover::after { background: rgba(0,0,0,.72); }
 .pp-cl-resize-handle::before { width: 9px; height: 2.5px; }
 .pp-cl-resize-handle::after  { width: 2.5px; height: 9px; }
-
 .pp-cl-rh-nw { top:3px; left:3px; cursor:nwse-resize; }
-.pp-cl-rh-nw::before { top:6px; left:0; }
-.pp-cl-rh-nw::after  { top:0; left:6px; }
+.pp-cl-rh-nw::before { top:6px; left:0; } .pp-cl-rh-nw::after { top:0; left:6px; }
 .pp-cl-rh-ne { top:3px; right:3px; cursor:nesw-resize; }
-.pp-cl-rh-ne::before { top:6px; right:0; }
-.pp-cl-rh-ne::after  { top:0; right:6px; }
+.pp-cl-rh-ne::before { top:6px; right:0; } .pp-cl-rh-ne::after { top:0; right:6px; }
 .pp-cl-rh-sw { bottom:3px; left:3px; cursor:nesw-resize; }
-.pp-cl-rh-sw::before { bottom:6px; left:0; }
-.pp-cl-rh-sw::after  { bottom:0; left:6px; }
+.pp-cl-rh-sw::before { bottom:6px; left:0; } .pp-cl-rh-sw::after { bottom:0; left:6px; }
 .pp-cl-rh-se { bottom:3px; right:3px; cursor:nwse-resize; }
-.pp-cl-rh-se::before { bottom:6px; right:0; }
-.pp-cl-rh-se::after  { bottom:0; right:6px; }
+.pp-cl-rh-se::before { bottom:6px; right:0; } .pp-cl-rh-se::after { bottom:0; right:6px; }
 
-/* ─── Cards ─── */
+/* ─── Cards — auto-tiling ─── */
 .pp-cl-card {
-  flex: 0 0 78px;
-  width: 78px; height: 56px;
+  flex: 0 0 78px; width: 78px; height: 56px;
   border: 1.5px solid var(--ppc-border,#aaa);
-  border-radius: 6px;
-  background: var(--ppc-bg,#f8f8f8);
+  border-radius: 6px; background: var(--ppc-bg,#f8f8f8);
   box-shadow: 0 1px 4px rgba(0,0,0,.07);
   overflow: hidden; box-sizing: border-box;
   animation: pp-cl-card-in .20s ease both;
-  transition: box-shadow .12s, transform .12s, opacity .15s;
-  cursor: grab;
+  transition: box-shadow .12s, transform .12s;
+  cursor: default;
   display: flex; flex-direction: column;
 }
-.pp-cl-card:active { cursor: grabbing; }
 .pp-cl-card:hover {
   box-shadow: 0 2px 10px rgba(0,0,0,.16);
   transform: translateY(-1px);
   z-index: 2; position: relative;
 }
-.pp-cl-card.pp-cl-item-dragging { opacity:.4; pointer-events:none; }
 @keyframes pp-cl-card-in { from{opacity:0;transform:scale(.82);}to{opacity:1;transform:scale(1);} }
-
 .pp-cl-card-head { padding:2px 5px;display:flex;align-items:center;gap:3px;flex-shrink:0; }
 .pp-cl-card-badge {
   font-size:7px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;
@@ -284,15 +273,6 @@ console.log('[sidepanel-clusters.js v9]');
   display:inline-block;padding:2px 6px;border-radius:4px;border:1px solid rgba(0,0,0,.15);transition:background .12s;
 }
 .pp-cl-tooltip-goto:hover { background:rgba(0,0,0,.06); }
-
-/* ─── Empty state ─── */
-#pp-cl-empty {
-  display:flex;flex-direction:column;
-  align-items:center;justify-content:center;gap:8px;
-  font-size:11px;letter-spacing:.08em;text-transform:uppercase;
-  color:rgba(0,0,0,.25);text-align:center;padding:24px;pointer-events:none;
-  position:absolute;inset:0;
-}
 `;
   document.head.appendChild(s);
 })();
@@ -327,9 +307,8 @@ function initClustersTool(paneEl, sidebarEl) {
       '</div>' +
     '</div>' +
     '<div id="pp-cl-canvas">' +
-      '<div id="pp-cl-canvas-inner">' +
-        '<div id="pp-cl-empty">Clusters will appear<br>once embeddings finish</div>' +
-      '</div>' +
+      '<div id="pp-cl-canvas-world"></div>' +
+      '<div id="pp-cl-empty">Clusters will appear<br>once embeddings finish</div>' +
     '</div>' +
     '<div class="pp-cl-tooltip" id="pp-cl-tooltip">' +
       '<div class="pp-cl-tooltip-head">Entry</div>' +
@@ -342,7 +321,7 @@ function initClustersTool(paneEl, sidebarEl) {
   const statusEl     = paneEl.querySelector('#pp-cl-status');
   const labelEl      = paneEl.querySelector('#pp-cl-label');
   const canvas       = paneEl.querySelector('#pp-cl-canvas');
-  const canvasInner  = paneEl.querySelector('#pp-cl-canvas-inner');
+  const world        = paneEl.querySelector('#pp-cl-canvas-world');
   const emptyEl      = paneEl.querySelector('#pp-cl-empty');
   const tooltip      = document.getElementById('pp-cl-tooltip');
   const ttCluster    = document.getElementById('pp-cl-tt-cluster');
@@ -357,20 +336,26 @@ function initClustersTool(paneEl, sidebarEl) {
   const depthSlider = paneEl.querySelector('#pp-cl-depth'), depthVal = paneEl.querySelector('#pp-cl-depth-val');
 
   // ── Constants ─────────────────────────────────────────────────────────────
-  const LETTERS   = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-  const CARD_W    = 78;
-  const CARD_H    = 56;
-  const TILE_COLS = 3;
-  const BODY_GAP  = [7, 5, 4, 3];
-  const BODY_PAD  = [7, 5, 4, 3];
+  const LETTERS      = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  const CARD_W       = 78;
+  const TILE_COLS    = 3;
+  const BODY_GAP     = [7, 5, 4, 3];
+  const BODY_PAD     = [7, 5, 4, 3];
   const RESIZE_MIN_W = 90;
   const RESIZE_MIN_H = 50;
+  const NEST_GAP     = 16;
 
   // ── State ─────────────────────────────────────────────────────────────────
   let _outerMin = 2, _outerMax = 12, _innerMin = 2, _innerMax = 4, _depth = 2;
   let _rendered = false, _ttRow = null;
   let _cachedEmbedded = null, _cachedVectors = null;
   let _reclusterTimer = null;
+  let _panX = 0, _panY = 0;
+  let _topZ = 10;
+
+  function applyWorldTransform() {
+    world.style.transform = `translate(${_panX}px,${_panY}px)`;
+  }
 
   // ── Helpers ───────────────────────────────────────────────────────────────
   function e(t) { return typeof panelEscH === 'function' ? panelEscH(t) : String(t); }
@@ -408,202 +393,106 @@ function initClustersTool(paneEl, sidebarEl) {
   });
 
   // ════════════════════════════════════════════════════════════════════════
-  // ── Pan-to-navigate ──────────────────────────────────────────────────────
-  // Attaches grab-pan to any overflow:hidden container, translating an inner
-  // surface element.  Returns { reset() } so render can snap back to origin.
+  // ── Canvas pan ───────────────────────────────────────────────────────────
+  // Drag on empty canvas space (not on a nest) pans the whole world.
   // ════════════════════════════════════════════════════════════════════════
-  function makePannable(containerEl, innerEl) {
-    let panX = 0, panY = 0;
-    let active = false, startCX = 0, startCY = 0, startPX = 0, startPY = 0;
-    let didMove = false;
+  let _panActive = false, _panSX = 0, _panSY = 0, _panBaseX = 0, _panBaseY = 0;
 
-    function setTranslate() {
-      innerEl.style.transform = `translate(${panX}px,${panY}px)`;
-    }
-
-    function pointerDown(cx, cy) {
-      active = true; didMove = false;
-      startCX = cx; startCY = cy;
-      startPX = panX; startPY = panY;
-      containerEl.classList.add('pp-cl-panning');
-    }
-    function pointerMove(cx, cy) {
-      if (!active) return;
-      const dx = cx - startCX, dy = cy - startCY;
-      if (!didMove && Math.hypot(dx, dy) < 4) return;
-      didMove = true;
-      panX = startPX + dx;
-      panY = startPY + dy;
-      setTranslate();
-    }
-    function pointerUp() {
-      if (!active) return;
-      active = false;
-      containerEl.classList.remove('pp-cl-panning');
-    }
-
-    // ── mouse ──
-    containerEl.addEventListener('mousedown', ev => {
-      if (ev.button !== 0) return;
-      // don't pan when clicking interactive / drag-handle elements
-      if (ev.target.closest('.pp-cl-resize-handle,.pp-cl-nest-head,.pp-cl-card')) return;
-      if (['INPUT','BUTTON'].includes(ev.target.tagName)) return;
-      pointerDown(ev.clientX, ev.clientY);
-      ev.preventDefault();
-    });
-
-    // ── touch ──
-    containerEl.addEventListener('touchstart', ev => {
-      if (ev.touches.length !== 1) return;
-      if (ev.target.closest('.pp-cl-resize-handle,.pp-cl-nest-head,.pp-cl-card')) return;
-      if (['INPUT','BUTTON'].includes(ev.target.tagName)) return;
-      pointerDown(ev.touches[0].clientX, ev.touches[0].clientY);
-    }, { passive: true });
-
-    // global move / up — scoped to this instance via closure
-    const onDocMM = ev => pointerMove(ev.clientX, ev.clientY);
-    const onDocMU = () => pointerUp();
-    const onDocTM = ev => {
-      if (active && ev.touches.length === 1) {
-        pointerMove(ev.touches[0].clientX, ev.touches[0].clientY);
-        ev.preventDefault();
-      }
-    };
-    const onDocTE = () => pointerUp();
-
-    document.addEventListener('mousemove',  onDocMM);
-    document.addEventListener('mouseup',    onDocMU);
-    document.addEventListener('touchmove',  onDocTM, { passive: false });
-    document.addEventListener('touchend',   onDocTE);
-
-    return {
-      reset() { panX = 0; panY = 0; setTranslate(); },
-      wasMoved() { return didMove; }
-    };
-  }
-
-  // Wire up the main canvas pan
-  const canvasPan = makePannable(canvas, canvasInner);
-
-  // ════════════════════════════════════════════════════════════════════════
-  // ── Drag-to-reorder ──────────────────────────────────────────────────────
-  // Dragging a nest's header bar reorders it among siblings in its parent.
-  // Dragging a card reorders it among sibling cards in its nest-body.
-  // Uses a simple "insert before hovered sibling" approach — no ghost clone
-  // needed; the dragging item itself fades and the target gets an outline.
-  // ════════════════════════════════════════════════════════════════════════
-  let _dEl = null;          // the element being dragged
-  let _dContainer = null;   // its parent container
-  let _dSX = 0, _dSY = 0;  // pointer start
-  let _dMoved = false;      // crossed threshold?
-  let _dOver = null;        // current drop target sibling
-
-  function dragIgnoreEl(el) {
-    // Elements that should NOT trigger item-drag
-    return el.closest('.pp-cl-resize-handle');
-  }
-
-  function beginDrag(itemEl, cx, cy) {
-    _dEl        = itemEl;
-    _dContainer = itemEl.parentElement;
-    _dSX = cx; _dSY = cy;
-    _dMoved = false;
-    _dOver  = null;
-    hideTooltip();
-  }
-
-  function updateDrag(cx, cy) {
-    if (!_dEl) return;
-    const dist = Math.hypot(cx - _dSX, cy - _dSY);
-    if (!_dMoved && dist < 6) return;
-    if (!_dMoved) {
-      _dMoved = true;
-      _dEl.classList.add('pp-cl-item-dragging');
-    }
-
-    // Find sibling under pointer
-    const newOver = siblingAtPoint(_dContainer, cx, cy, _dEl);
-    if (newOver !== _dOver) {
-      if (_dOver) _dOver.classList.remove('pp-cl-drop-target');
-      _dOver = newOver;
-      if (_dOver) _dOver.classList.add('pp-cl-drop-target');
-    }
-  }
-
-  function commitDrag(cx, cy) {
-    if (!_dEl) return;
-    if (_dMoved) {
-      if (_dOver) {
-        _dOver.classList.remove('pp-cl-drop-target');
-        _dContainer.insertBefore(_dEl, _dOver);
-      }
-      _dEl.classList.remove('pp-cl-item-dragging');
-    }
-    _dEl = null; _dContainer = null; _dOver = null; _dMoved = false;
-  }
-
-  function siblingAtPoint(container, cx, cy, exclude) {
-    const kids = Array.from(container.children);
-    for (const k of kids) {
-      if (k === exclude) continue;
-      if (k.classList.contains('pp-cl-resize-handle')) continue;
-      if (k.id === 'pp-cl-empty') continue;
-      const r = k.getBoundingClientRect();
-      if (cx >= r.left && cx <= r.right && cy >= r.top && cy <= r.bottom) return k;
-    }
-    return null;
-  }
-
-  // Global drag-move / drag-end listeners (added once)
-  document.addEventListener('mousemove', ev => updateDrag(ev.clientX, ev.clientY));
-  document.addEventListener('mouseup',   ev => commitDrag(ev.clientX, ev.clientY));
-  document.addEventListener('touchmove', ev => {
-    if (_dEl && ev.touches.length === 1) {
-      ev.preventDefault();
-      updateDrag(ev.touches[0].clientX, ev.touches[0].clientY);
-    }
-  }, { passive: false });
-  document.addEventListener('touchend', ev => {
-    if (_dEl) {
-      const t = ev.changedTouches[0];
-      commitDrag(t ? t.clientX : _dSX, t ? t.clientY : _dSY);
-    }
+  canvas.addEventListener('mousedown', ev => {
+    if (ev.button !== 0) return;
+    if (ev.target.closest('.pp-cl-nest')) return;
+    _panActive = true;
+    _panSX = ev.clientX; _panSY = ev.clientY;
+    _panBaseX = _panX;   _panBaseY = _panY;
+    canvas.classList.add('pp-cl-panning');
+    ev.preventDefault();
   });
+  canvas.addEventListener('touchstart', ev => {
+    if (ev.touches.length !== 1) return;
+    if (ev.target.closest('.pp-cl-nest')) return;
+    _panActive = true;
+    _panSX = ev.touches[0].clientX; _panSY = ev.touches[0].clientY;
+    _panBaseX = _panX; _panBaseY = _panY;
+  }, { passive: true });
 
-  // Attach drag listeners to a nest element (via its header bar)
-  function makeNestDraggable(nestEl) {
+  document.addEventListener('mousemove', ev => {
+    if (!_panActive) return;
+    _panX = _panBaseX + (ev.clientX - _panSX);
+    _panY = _panBaseY + (ev.clientY - _panSY);
+    applyWorldTransform();
+  });
+  document.addEventListener('mouseup', () => {
+    if (!_panActive) return;
+    _panActive = false;
+    canvas.classList.remove('pp-cl-panning');
+  });
+  document.addEventListener('touchmove', ev => {
+    if (!_panActive || ev.touches.length !== 1) return;
+    _panX = _panBaseX + (ev.touches[0].clientX - _panSX);
+    _panY = _panBaseY + (ev.touches[0].clientY - _panSY);
+    applyWorldTransform();
+    ev.preventDefault();
+  }, { passive: false });
+  document.addEventListener('touchend', () => { _panActive = false; });
+
+  // ════════════════════════════════════════════════════════════════════════
+  // ── Free-drag for depth-0 nests (via header) ─────────────────────────────
+  // ════════════════════════════════════════════════════════════════════════
+  let _nestDrag = null;  // { el, startElX, startElY, startCX, startCY }
+
+  function makeNestFreeDraggable(nestEl) {
     const head = nestEl.querySelector(':scope > .pp-cl-nest-head');
     if (!head) return;
 
+    function beginDrag(cx, cy) {
+      _nestDrag = {
+        el:       nestEl,
+        startElX: parseInt(nestEl.style.left) || 0,
+        startElY: parseInt(nestEl.style.top)  || 0,
+        startCX:  cx,
+        startCY:  cy,
+      };
+      nestEl.style.zIndex = String(++_topZ);
+      nestEl.classList.add('pp-cl-nest-lifted');
+      hideTooltip();
+    }
+
     head.addEventListener('mousedown', ev => {
-      if (ev.button !== 0 || dragIgnoreEl(ev.target)) return;
+      if (ev.button !== 0) return;
+      if (ev.target.closest('.pp-cl-resize-handle')) return;
       ev.stopPropagation();
       ev.preventDefault();
-      beginDrag(nestEl, ev.clientX, ev.clientY);
+      beginDrag(ev.clientX, ev.clientY);
     });
-
     head.addEventListener('touchstart', ev => {
-      if (ev.touches.length !== 1 || dragIgnoreEl(ev.target)) return;
-      ev.stopPropagation();
-      beginDrag(nestEl, ev.touches[0].clientX, ev.touches[0].clientY);
-    }, { passive: true });
-  }
-
-  // Attach drag listeners to a card
-  function makeCardDraggable(cardEl) {
-    cardEl.addEventListener('mousedown', ev => {
-      if (ev.button !== 0) return;
-      ev.stopPropagation();
-      // short-circuit tooltip
-      beginDrag(cardEl, ev.clientX, ev.clientY);
-    });
-
-    cardEl.addEventListener('touchstart', ev => {
       if (ev.touches.length !== 1) return;
+      if (ev.target.closest('.pp-cl-resize-handle')) return;
       ev.stopPropagation();
-      beginDrag(cardEl, ev.touches[0].clientX, ev.touches[0].clientY);
+      beginDrag(ev.touches[0].clientX, ev.touches[0].clientY);
     }, { passive: true });
   }
+
+  document.addEventListener('mousemove', ev => {
+    if (!_nestDrag) return;
+    _nestDrag.el.style.left = (_nestDrag.startElX + ev.clientX - _nestDrag.startCX) + 'px';
+    _nestDrag.el.style.top  = (_nestDrag.startElY + ev.clientY - _nestDrag.startCY) + 'px';
+  });
+  document.addEventListener('mouseup', () => {
+    if (!_nestDrag) return;
+    _nestDrag.el.classList.remove('pp-cl-nest-lifted');
+    _nestDrag = null;
+  });
+  document.addEventListener('touchmove', ev => {
+    if (!_nestDrag || ev.touches.length !== 1) return;
+    ev.preventDefault();
+    _nestDrag.el.style.left = (_nestDrag.startElX + ev.touches[0].clientX - _nestDrag.startCX) + 'px';
+    _nestDrag.el.style.top  = (_nestDrag.startElY + ev.touches[0].clientY - _nestDrag.startCY) + 'px';
+  }, { passive: false });
+  document.addEventListener('touchend', () => {
+    if (!_nestDrag) return;
+    _nestDrag.el.classList.remove('pp-cl-nest-lifted');
+    _nestDrag = null;
+  });
 
   // ── Clustering ────────────────────────────────────────────────────────────
   function topDims(vec, n) {
@@ -697,16 +586,15 @@ function initClustersTool(paneEl, sidebarEl) {
     const alphaAccent = Math.max(0.35, 1 - (depth-1)*0.18);
     return {
       accent:      accent + Math.round(alphaAccent*255).toString(16).padStart(2,'0'),
-      accentSolid: accent,
-      label, bg
+      accentSolid: accent, label, bg
     };
   }
 
-  // ── Initial width calculation ─────────────────────────────────────────────
+  // ── Initial size calculation ──────────────────────────────────────────────
   function nestInitialWidth(depth, childCount, isLeaf, childWidth) {
-    const gap = BODY_GAP[Math.min(depth, BODY_GAP.length-1)];
-    const pad = BODY_PAD[Math.min(depth, BODY_PAD.length-1)];
-    const cw  = isLeaf ? CARD_W : (childWidth || 180);
+    const gap  = BODY_GAP[Math.min(depth, BODY_GAP.length-1)];
+    const pad  = BODY_PAD[Math.min(depth, BODY_PAD.length-1)];
+    const cw   = isLeaf ? CARD_W : (childWidth || 180);
     const cols = Math.min(TILE_COLS, Math.max(1, Math.ceil(Math.sqrt(Math.max(1, childCount)))));
     return cols * cw + (cols - 1) * gap + pad * 2;
   }
@@ -714,66 +602,50 @@ function initClustersTool(paneEl, sidebarEl) {
   // ── Corner resize ─────────────────────────────────────────────────────────
   function makeResizable(nestEl) {
     const corners = [
-      { cls: 'nw', dw: -1, dh: -1 },
-      { cls: 'ne', dw:  1, dh: -1 },
-      { cls: 'sw', dw: -1, dh:  1 },
-      { cls: 'se', dw:  1, dh:  1 },
+      { cls: 'nw', dw: -1, dh: -1 }, { cls: 'ne', dw:  1, dh: -1 },
+      { cls: 'sw', dw: -1, dh:  1 }, { cls: 'se', dw:  1, dh:  1 },
     ];
-
     corners.forEach(({ cls, dw, dh }) => {
       const handle = document.createElement('div');
       handle.className = 'pp-cl-resize-handle pp-cl-rh-' + cls;
       nestEl.appendChild(handle);
 
       let active = false, sx, sy, sw, sh;
-
-      function onDown(cx, cy) {
+      const onDown = (cx, cy) => {
         active = true; sx = cx; sy = cy;
-        sw = nestEl.offsetWidth;
-        sh = nestEl.offsetHeight;
+        sw = nestEl.offsetWidth; sh = nestEl.offsetHeight;
         nestEl.classList.add('pp-cl-resizing');
         document.body.style.cursor = (cls === 'nw' || cls === 'se') ? 'nwse-resize' : 'nesw-resize';
         document.body.style.userSelect = 'none';
-      }
-      function onMove(cx, cy) {
+      };
+      const onMove = (cx, cy) => {
         if (!active) return;
-        const newW = Math.max(RESIZE_MIN_W, sw + dw * (cx - sx));
-        const newH = Math.max(RESIZE_MIN_H, sh + dh * (cy - sy));
-        nestEl.style.width  = newW + 'px';
-        nestEl.style.height = newH + 'px';
-      }
-      function onUp() {
+        nestEl.style.width  = Math.max(RESIZE_MIN_W, sw + dw * (cx - sx)) + 'px';
+        nestEl.style.height = Math.max(RESIZE_MIN_H, sh + dh * (cy - sy)) + 'px';
+      };
+      const onUp = () => {
         if (!active) return; active = false;
         nestEl.classList.remove('pp-cl-resizing');
-        document.body.style.cursor = '';
-        document.body.style.userSelect = '';
-        document.removeEventListener('mousemove', onMM);
-        document.removeEventListener('mouseup',   onMU);
-        document.removeEventListener('touchmove', onTM);
-        document.removeEventListener('touchend',  onTE);
-      }
-
-      function onMM(ev) { onMove(ev.clientX, ev.clientY); }
-      function onMU()   { onUp(); }
-      function onTM(ev) {
-        if (!active || !ev.touches.length) return;
-        ev.preventDefault(); onMove(ev.touches[0].clientX, ev.touches[0].clientY);
-      }
-      function onTE() { onUp(); }
+        document.body.style.cursor = ''; document.body.style.userSelect = '';
+        document.removeEventListener('mousemove', onMM); document.removeEventListener('mouseup', onMU);
+        document.removeEventListener('touchmove', onTM); document.removeEventListener('touchend', onTE);
+      };
+      const onMM = ev => onMove(ev.clientX, ev.clientY);
+      const onMU = () => onUp();
+      const onTM = ev => { if (!active || !ev.touches.length) return; ev.preventDefault(); onMove(ev.touches[0].clientX, ev.touches[0].clientY); };
+      const onTE = () => onUp();
 
       handle.addEventListener('mousedown', ev => {
         if (ev.button !== 0) return;
         ev.stopPropagation(); ev.preventDefault();
         onDown(ev.clientX, ev.clientY);
-        document.addEventListener('mousemove', onMM);
-        document.addEventListener('mouseup',   onMU);
+        document.addEventListener('mousemove', onMM); document.addEventListener('mouseup', onMU);
       });
       handle.addEventListener('touchstart', ev => {
         if (ev.touches.length !== 1) return;
         ev.stopPropagation(); ev.preventDefault();
         onDown(ev.touches[0].clientX, ev.touches[0].clientY);
-        document.addEventListener('touchmove', onTM, { passive: false });
-        document.addEventListener('touchend',  onTE);
+        document.addEventListener('touchmove', onTM, { passive: false }); document.addEventListener('touchend', onTE);
       }, { passive: false });
     });
   }
@@ -792,7 +664,7 @@ function initClustersTool(paneEl, sidebarEl) {
     const card = document.createElement('div');
     card.className = 'pp-cl-card';
     card.style.setProperty('--ppc-border', col.accentSolid + '77');
-    card.style.setProperty('--ppc-bg',     col.bg);
+    card.style.setProperty('--ppc-bg', col.bg);
     if (delay) card.style.animationDelay = delay + 'ms';
     card.innerHTML =
       '<div class="pp-cl-card-head">' +
@@ -804,14 +676,9 @@ function initClustersTool(paneEl, sidebarEl) {
         '<div class="pp-cl-card-text">' + e(parsed.body) + '</div>' +
       '</div>';
 
-    card.addEventListener('mouseenter', ev => {
-      if (_dEl) return; // suppress tooltip while dragging
-      showTooltip(ev, r, path, col, parsed.body, cats, tabName);
-    });
+    card.addEventListener('mouseenter', ev => showTooltip(ev, r, path, col, parsed.body, cats, tabName));
     card.addEventListener('mousemove',  ev => moveTooltip(ev));
     card.addEventListener('mouseleave', ()  => hideTooltip());
-
-    makeCardDraggable(card);
     return card;
   }
 
@@ -820,7 +687,6 @@ function initClustersTool(paneEl, sidebarEl) {
     const col    = colorForPath(path);
     const isLeaf = (depth >= maxDepth);
     const gap    = BODY_GAP[Math.min(depth, BODY_GAP.length-1)];
-    const pad    = BODY_PAD[Math.min(depth, BODY_PAD.length-1)];
 
     let children = null;
     if (!isLeaf) {
@@ -838,7 +704,7 @@ function initClustersTool(paneEl, sidebarEl) {
     nest.setAttribute('data-depth', String(depth));
     nest.style.borderColor = col.accentSolid + (depth===0 ? '55' : '33');
     nest.style.background  = col.accentSolid + (depth===0 ? '0a' : '07');
-    nest.style.animationDelay = ((path[path.length-1]||0) * (depth===0 ? 55 : 30)) + 'ms';
+    if (depth > 0) nest.style.animationDelay = ((path[path.length-1]||0) * 30) + 'ms';
 
     const label      = path.map((idx,d) => d===0 ? (LETTERS[idx]||idx) : (idx+1)).join('.');
     const countLabel = rows.length + ' entr' + (rows.length===1 ? 'y' : 'ies');
@@ -857,10 +723,7 @@ function initClustersTool(paneEl, sidebarEl) {
     nest.appendChild(body);
 
     if (isLeaf) {
-      rows.forEach((r, ri) => {
-        const card = buildCard(r, [...path], col, ri * 14);
-        body.appendChild(card);
-      });
+      rows.forEach((r, ri) => body.appendChild(buildCard(r, [...path], col, ri * 14)));
       nest.style.width = nestInitialWidth(depth, rows.length, true) + 'px';
     } else {
       let childNestW = 0;
@@ -872,21 +735,20 @@ function initClustersTool(paneEl, sidebarEl) {
           body.appendChild(child);
           return child;
         });
-      const numChildren = childEls.length;
-      nest.style.width = nestInitialWidth(depth, numChildren, false, childNestW + gap) + 'px';
+      nest.style.width = nestInitialWidth(depth, childEls.length, false, childNestW + gap) + 'px';
     }
 
     makeResizable(nest);
-    makeNestDraggable(nest);
+    if (depth === 0) makeNestFreeDraggable(nest);
     return nest;
   }
 
   // ── Main render ───────────────────────────────────────────────────────────
   function render(rows) {
-    // Clear previous nests, keep emptyEl
-    Array.from(canvasInner.children).forEach(c => { if (c !== emptyEl) c.remove(); });
+    Array.from(world.children).forEach(c => c.remove());
     emptyEl.style.display = 'none';
-    canvasPan.reset();
+    _panX = 0; _panY = 0; applyWorldTransform();
+    _topZ = 10;
 
     const maxDepth  = _depth - 1;
     const topAsgn   = autoCluster(rows, _outerMin, _outerMax);
@@ -894,9 +756,30 @@ function initClustersTool(paneEl, sidebarEl) {
     const topGroups = Array.from({length:numTop}, ()=>[]);
     rows.forEach((r,i) => topGroups[topAsgn[i]].push(r));
 
+    const nestEls = [];
     topGroups.forEach((members, oi) => {
       if (!members.length) return;
-      canvasInner.appendChild(buildNestRecursive(members, 0, maxDepth, [oi]));
+      const nest = buildNestRecursive(members, 0, maxDepth, [oi]);
+      nest.style.animationDelay = (oi * 55) + 'ms';
+      world.appendChild(nest);
+      nestEls.push(nest);
+    });
+
+    // Initial layout: wrap nests left→right across the canvas width
+    requestAnimationFrame(() => {
+      const canvasW = canvas.offsetWidth || 400;
+      let curX = NEST_GAP, curY = NEST_GAP, rowH = 0;
+      nestEls.forEach(n => {
+        const nw = n.offsetWidth  || parseInt(n.style.width)  || 200;
+        const nh = n.offsetHeight || 200;
+        if (curX + nw > canvasW - NEST_GAP && curX > NEST_GAP) {
+          curX = NEST_GAP; curY += rowH + NEST_GAP; rowH = 0;
+        }
+        n.style.left = curX + 'px';
+        n.style.top  = curY + 'px';
+        curX += nw + NEST_GAP;
+        rowH  = Math.max(rowH, nh);
+      });
     });
 
     subtitle.textContent =
