@@ -304,14 +304,12 @@ function initClustersTool(paneEl, sidebarEl) {
             '<div class="pp-cl-range-row"><span class="pp-cl-range-label">Min</span><input class="pp-cl-range pp-cl-inner" id="pp-cl-imin" type="range" min="2" max="8" value="2" step="1"><span class="pp-cl-range-val" id="pp-cl-imin-val">2</span></div>' +
             '<div class="pp-cl-range-row"><span class="pp-cl-range-label">Max</span><input class="pp-cl-range pp-cl-inner" id="pp-cl-imax" type="range" min="2" max="8" value="4" step="1"><span class="pp-cl-range-val" id="pp-cl-imax-val">4</span></div>' +
           '</div>' +
-          '<div class="pp-cl-slider-col">' +
+           '<div class="pp-cl-slider-col">' +
             '<div class="pp-cl-group-label">Depth</div>' +
             '<div class="pp-cl-range-row"><span class="pp-cl-range-label">Lvl</span><input class="pp-cl-range pp-cl-depth" id="pp-cl-depth" type="range" min="1" max="4" value="2" step="1"><span class="pp-cl-range-val" id="pp-cl-depth-val">2</span></div>' +
           '</div>' +
+          '<button id="pp-cl-recluster">Re-cluster</button>' +
         '</div>' +
-        '<button id="pp-cl-recluster">Re-cluster</button>' +
-      '</div>' +
-    '</div>' +
     '<div id="pp-cl-canvas"><div id="pp-cl-empty">Clusters will appear<br>once embeddings finish</div></div>' +
     '<div class="pp-cl-tooltip" id="pp-cl-tooltip">' +
       '<div class="pp-cl-tooltip-head">Entry</div>' +
