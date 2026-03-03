@@ -1,11 +1,11 @@
 // ════════════════════════════════════════════════════════════════════════════
-// sidepanel-clusters.js — "Clusters" tool  v3
+// sidepanel-clusters.js — "Clusters" tool  v4
 //
 // Each cluster is a draggable NEST div. Cards live inside the nest and
 // are positioned relative to it — they cannot be dragged out.
 // Nests use the same push-apart collision logic as mindmap cards.
 // ════════════════════════════════════════════════════════════════════════════
-console.log('[sidepanel-clusters.js v3]');
+console.log('[sidepanel-clusters.js v4]');
 
 (function injectClusterStyles() {
   if (document.getElementById('pp-cluster-styles')) return;
@@ -421,14 +421,15 @@ function initClustersTool(paneEl, sidebarEl) {
     }
     const vars  = results.map(r => r.variance);
     const range = (vars[0] - vars[vars.length - 1]) || 1;
-    let ci = 0;
+    let chosenK = results[0].k; // default to minK
     for (let i = 1; i < results.length; i++) {
-      if ((vars[i - 1] - vars[i]) / range < 0.10) { ci = i - 1; break; }
-      ci = i;
+      if ((vars[i - 1] - vars[i]) / range < 0.10) { chosenK = results[i - 1].k; break; }
+      chosenK = results[i].k;
     }
-    // Never go below the user's minimum
-    ci = Math.max(ci, 0); // ci is index into results which starts at minK
-    return results[ci].asgn;
+    // Clamp chosen k to [minK, maxK] — enforces the user's slider values
+    chosenK = Math.max(minK, Math.min(maxK, chosenK));
+    const chosen = results.find(r => r.k === chosenK) || results[results.length - 1];
+    return chosen.asgn;
   }
 
   // ── Push-apart collision (mirrors mindmap logic exactly) ──────────────────
