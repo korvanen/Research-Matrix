@@ -77,9 +77,6 @@ function parseCitation(text) {
 }
 
 // ── Citation pill HTML builder ────────────────────────────────────────────────
-// Returns an HTML string for a colored citation pill.
-// accentColor: background + border color (matches card header).
-// textColor:   font color (matches card header text).
 function citationPillHtml(citation, accentColor, textColor) {
   if (!citation) return '';
   return '<span class="pp-cite-pill" style="background:' +
@@ -87,10 +84,46 @@ function citationPillHtml(citation, accentColor, textColor) {
     panelEscH(citation) + '</span>';
 }
 
+// ── Best column picker ────────────────────────────────────────────────────────
+// Returns the index of the cell that contains the most shared-keyword hits.
+// Falls back to the first non-empty column, then 0.
+function _bestColForMatch(match) {
+  if (!match || !match.row || !match.row.cells) return 0;
+  var cells  = match.row.cells;
+  var shared = match.shared; // Set
+
+  var bestIdx   = -1;
+  var bestScore = -1;
+
+  cells.forEach(function(cell, ci) {
+    if (!cell || !cell.trim()) return;
+    var score = 0;
+    if (shared && typeof shared.forEach === 'function') {
+      var kws = (typeof panelExtractKW === 'function') ? panelExtractKW(cell) : [];
+      shared.forEach(function(k) { if (kws.indexOf(k) !== -1) score++; });
+    }
+    // Higher keyword score wins; ties go to the first non-empty column
+    if (score > bestScore || bestIdx === -1) {
+      bestScore = score;
+      bestIdx   = ci;
+    }
+  });
+
+  return bestIdx >= 0 ? bestIdx : 0;
+}
+
 // ── Go-to navigation ──────────────────────────────────────────────────────────
-function panelGoTo(match) {
-  var tabIdx = match.tabIdx;
-  var rowIdx = match.rowIdx;
+// match  — match object with .tabIdx, .rowIdx, .row, .shared
+// colIdx — explicit column to select (0-based). When omitted, the column with
+//          the most shared-keyword hits is chosen automatically, so both tiles
+//          and mindmap always land on the correct cell.
+function panelGoTo(match, colIdx) {
+  var tabIdx     = match.tabIdx;
+  var rowIdx     = match.rowIdx;
+  var targetCol  = (typeof colIdx === 'number' && colIdx >= 0)
+    ? colIdx
+    : _bestColForMatch(match);
+
   var needsTabSwitch = typeof activeTab !== 'undefined' && activeTab !== tabIdx;
 
   if (needsTabSwitch) {
@@ -106,35 +139,41 @@ function panelGoTo(match) {
     var tr = dataRows[rowIdx];
     if (!tr) return;
 
-    var firstTd = tr.querySelector('td');
-    if (!firstTd) return;
+    var tds = Array.from(tr.querySelectorAll('td'));
+    // targetCol is the data-column index — use it directly; fall back to td[0]
+    var td = tds[targetCol] !== undefined ? tds[targetCol] : tds[0];
+    if (!td) return;
 
     if (typeof getHighlightTargets === 'function' && typeof applySelection === 'function') {
-      var targets = getHighlightTargets(firstTd);
+      var targets = getHighlightTargets(td);
       if (targets) {
         applySelection(targets);
-        firstTd.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        td.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
     } else {
-      firstTd.classList.add('selected-cell');
-      firstTd.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      td.classList.add('selected-cell');
+      td.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
   }
 
   if (needsTabSwitch) {
-    // showTab → renderSheet → updateLayout uses two nested rAFs for layout;
-    // a plain rAF fires too early and finds the old DOM. A short timeout
-    // clears the async pipeline and guarantees the new rows are in place.
+    // showTab → renderSheet → updateLayout uses two nested rAFs before the
+    // layout is stable. setTimeout clears the async pipeline and guarantees
+    // the new rows are in place before we query them.
     setTimeout(doSelect, 150);
   } else {
     requestAnimationFrame(doSelect);
   }
 }
 
-// ── Attach "Go to" hover button ───────────────────────────────────────────────
+// ── Attach "Go to" hover button (tiles view) ──────────────────────────────────
+// Computes the best column once at attach-time so every click on this card
+// navigates to the most-relevant cell rather than always column 0.
 function attachGoTo(card, match, accentColor) {
+  // Compute once — reused on every hover/click for this card
+  var bestCol    = _bestColForMatch(match);
   var hoverTimer = null;
-  var btn = null;
+  var btn        = null;
 
   function showBtn() {
     if (btn) return;
@@ -142,10 +181,10 @@ function attachGoTo(card, match, accentColor) {
     btn.className = 'pp-goto-btn';
     btn.textContent = 'Go to ↗';
     btn.style.borderColor = accentColor || 'rgba(0,0,0,.2)';
-    btn.style.color = accentColor || 'rgba(0,0,0,.6)';
+    btn.style.color       = accentColor || 'rgba(0,0,0,.6)';
     btn.addEventListener('click', function(e) {
       e.stopPropagation();
-      panelGoTo(match);
+      panelGoTo(match, bestCol);
     });
     btn.addEventListener('mouseenter', function() { clearTimeout(hoverTimer); });
     btn.addEventListener('mouseleave', function() { hideBtn(); });
