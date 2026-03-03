@@ -1,7 +1,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 // keyword-utils.js — Keyword extraction + hybrid semantic match finder
 // ════════════════════════════════════════════════════════════════════════════
-console.log("THIS TIME?!")
+console.log("TIME?!")
 const PANEL_KW_MIN_WORD_LEN     = 2;
 const PANEL_KW_MIN_PHRASE_WORDS = 2;
 const PANEL_KW_NGRAM_SIZES      = [2];
@@ -199,7 +199,7 @@ function findMatches(seedKws, seedTabIdx, seedRowIdx, excludeSet) {
     }
     const hasEmbeddingMatch = embScore >= EMBEDDING_SIMILARITY_THRESHOLD;
 
-    if (!hasKeywordMatch && !hasEmbeddingMatch) return;
+    if (!hasEmbeddingMatch) return; // !hasKeywordMatch &&
 
     candidates.push({ ...entry, shared, kwScore, embScore });
   });
