@@ -8,7 +8,7 @@ const PANEL_KW_NGRAM_SIZES     = [2];
 
 // ── Scoring weights ───────────────────────────────────────────────────────────
 // Adjust these to tune the balance between lexical and semantic matching.
-const KEYWORD_WEIGHT   = 0.35; // share of final score from keyword overlap
+const KEYWORD_WEIGHT   = 0.35; // share of final score from keyword overlap. set tot 0.00 to disable keyword wighting
 const EMBEDDING_WEIGHT = 0.65; // share of final score from semantic similarity
 
 // Minimum cosine similarity to include a row that has no keyword overlap.
