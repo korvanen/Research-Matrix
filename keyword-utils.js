@@ -1,10 +1,10 @@
 // ════════════════════════════════════════════════════════════════════════════
 // keyword-utils.js — Keyword extraction + hybrid semantic match finder
 // ════════════════════════════════════════════════════════════════════════════
-console.log("utils are updated")
-const PANEL_KW_MIN_WORD_LEN    = 2;
+console.log("MAYBE THIS TIME?!")
+const PANEL_KW_MIN_WORD_LEN     = 2;
 const PANEL_KW_MIN_PHRASE_WORDS = 2;
-const PANEL_KW_NGRAM_SIZES     = [2];
+const PANEL_KW_NGRAM_SIZES      = [2];
 
 // ── Scoring weights ───────────────────────────────────────────────────────────
 const _DEFAULT_KEYWORD_WEIGHT   = 0.35;
@@ -45,7 +45,7 @@ function normalizeToken(w) {
 
 function extractTokens(text) {
   const raw = String(text)
-    .replace(/"|"/g, '"')
+    .replace(/\u201c|\u201d/g, '"')
     .replace(/[^a-zA-Z0-9"''\s]/g, ' ');
 
   const quoted = [];
@@ -110,30 +110,60 @@ function buildRowIndex() {
 }
 
 // ── Embedding vector store ────────────────────────────────────────────────────
-let _embeddingVectors = new Map();
-let _embeddingsReady  = false;
+let _embeddingVectors  = new Map();
+let _embeddingsReady   = false;
+let _embeddingInFlight = false;
 
 async function initEmbeddings() {
+  // Prevent double-run: the module fires this once model is ready,
+  // and script.js may also call it. Only the first successful run counts.
+  if (_embeddingsReady || _embeddingInFlight) {
+    console.log('[keyword-utils] initEmbeddings: already running or done, skipping');
+    return;
+  }
+
   if (!window.EmbeddingUtils) {
-    console.warn('[keyword-utils] EmbeddingUtils not available — keyword-only mode');
+    console.warn('[keyword-utils] EmbeddingUtils not on window yet — keyword-only mode');
     return;
   }
 
   const rows = buildRowIndex();
   if (!rows.length) {
-    console.warn('[keyword-utils] No rows to embed — TABS may not be loaded yet');
+    // TABS not loaded yet — embedding-utils.js will call us again once the
+    // model is ready, by which time script.js will have populated TABS.
+    console.warn('[keyword-utils] initEmbeddings: TABS not populated yet, aborting this call');
     return;
   }
 
-  console.log(`[keyword-utils] Embedding ${rows.length} rows in background…`);
-  _embeddingVectors = await window.EmbeddingUtils.embedAllRows(rows);
-  _embeddingsReady  = true;
-  console.log(`[keyword-utils] Embeddings ready (${_embeddingVectors.size} rows)`);
+  _embeddingInFlight = true;
+  console.log(`[keyword-utils] Embedding ${rows.length} rows…`);
 
-  // ── KEY FIX: tell the sidebar to re-render the current selection now
-  // that real embScore values are available. Without this, cards rendered
-  // before embeddings finished always show "model not ready".
-  document.dispatchEvent(new CustomEvent('embeddings-ready', { bubbles: true }));
+  try {
+    const vectors = await window.EmbeddingUtils.embedAllRows(rows);
+
+    if (!vectors || vectors.size === 0) {
+      // Log every row's text so we can see what getCachedEmbedding received
+      console.error('[keyword-utils] embedAllRows returned 0 vectors. Diagnosing…');
+      rows.slice(0, 3).forEach(r => {
+        const text = r.row.cells.join(' ').trim();
+        console.error('  sample row text:', JSON.stringify(text.slice(0, 80)));
+      });
+      _embeddingInFlight = false;
+      return;
+    }
+
+    _embeddingVectors  = vectors;
+    _embeddingsReady   = true;
+    _embeddingInFlight = false;
+    console.log(`[keyword-utils] Embeddings ready — ${vectors.size} rows indexed`);
+
+    // Tell the sidebar to re-render the current selection with real ML scores
+    document.dispatchEvent(new CustomEvent('embeddings-ready', { bubbles: true }));
+
+  } catch (err) {
+    _embeddingInFlight = false;
+    console.error('[keyword-utils] initEmbeddings threw:', err);
+  }
 }
 
 // ── Hybrid match finder ───────────────────────────────────────────────────────
@@ -178,8 +208,8 @@ function findMatches(seedKws, seedTabIdx, seedRowIdx, excludeSet) {
 
   const maxKw = Math.max(...candidates.map(c => c.kwScore), 1e-9);
   candidates.forEach(c => {
-    const normKw   = c.kwScore / maxKw;
-    const kwContrib  = normKw   * _activeKeywordWeight;
+    const normKw     = c.kwScore / maxKw;
+    const kwContrib  = normKw     * _activeKeywordWeight;
     const embContrib = c.embScore * _activeEmbeddingWeight;
     c.normKwScore = normKw;
     c.kwContrib   = kwContrib;
