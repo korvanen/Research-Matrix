@@ -9,7 +9,7 @@
 //   6. sidepanel-shell.js         — this file
 //
 // ════════════════════════════════════════════════════════════════════════════
-console.log('[sidepanel-shell.js v5]');
+console.log('[sidepanel-shell.js hhhhh]');
 
 document.addEventListener('DOMContentLoaded', () => {
   const wait = setInterval(() => {
