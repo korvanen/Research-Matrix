@@ -5,7 +5,7 @@
 //   • Depth-0 cluster bodies are pannable (inner div translates)
 //   • Cards: removed badge label AND tab name — only content text (+ optional cat row)
 //   • Cluster/sub-cluster heads: coloured dot only, no alphanumeric label
-console.log('[sidepanel-clusters.js vA]');
+console.log('[sidepanel-clusters.js v11]');
 
 (function injectClusterStyles() {
   if (document.getElementById('pp-cluster-styles')) return;
