@@ -1,7 +1,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 // panel-find-matches.js — "Find Matches" sidebar tool
 // ════════════════════════════════════════════════════════════════════════════
-console.log('[panel-find-matches.js yyyyy]');
+console.log('[panel-find-matches.js is updated]');
 
 const PANEL_MIN_SHARED   = 2;
 const PANEL_MM_PAD       = 10;
@@ -250,6 +250,48 @@ const LAYER_OPACITY = [1, 0.58, 0.38, 0.24, 0.14];
   transform: rotate(45deg) translate(-1px, 1px); flex-shrink: 0;
 }
 .pp-mm-card .pp-goto-btn .pp-goto-label { display: none; }
+
+/* ── Model status bar ── */
+#pp-model-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  transition: opacity .6s ease, background .4s ease;
+}
+#pp-model-status.pp-model-loading {
+  background: rgba(0,0,0,.06);
+  color: rgba(0,0,0,.4);
+}
+#pp-model-status.pp-model-ready {
+  background: rgba(60,180,100,.12);
+  color: rgba(30,130,60,.9);
+}
+#pp-model-status.pp-model-error {
+  background: rgba(200,60,60,.10);
+  color: rgba(180,40,40,.85);
+}
+.pp-model-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  transition: background .4s ease;
+}
+#pp-model-status.pp-model-loading .pp-model-dot {
+  background: rgba(0,0,0,.25);
+  animation: pp-dot-pulse 1.2s ease-in-out infinite;
+}
+#pp-model-status.pp-model-ready .pp-model-dot  { background: rgba(40,160,80,.9); }
+#pp-model-status.pp-model-error .pp-model-dot  { background: rgba(180,40,40,.85); }
+@keyframes pp-dot-pulse {
+  0%, 100% { opacity: .25; transform: scale(0.85); }
+  50%       { opacity: 1;   transform: scale(1.1); }
+}
 `;
   document.head.appendChild(style);
 })();
@@ -260,6 +302,10 @@ function initFindMatchesTool(paneEl, sidebarEl) {
   paneEl.innerHTML =
     '<div id="pp-head">' +
       '<div id="pp-subtitle">Click a cell to find matches</div>' +
+      '<div id="pp-model-status" class="pp-model-loading">' +
+        '<div class="pp-model-dot"></div>' +
+        '<span id="pp-model-label">Model loading\u2026</span>' +
+      '</div>' +
       '<div id="pp-toolrow" style="display:none">' +
         '<div id="pp-hl-wrap"></div>' +
         '<div id="pp-layers-wrap"></div>' +
@@ -271,13 +317,13 @@ function initFindMatchesTool(paneEl, sidebarEl) {
       '<div id="pp-mm-wrap"></div>' +
     '</div>';
 
-  const ppSubtitle  = paneEl.querySelector('#pp-subtitle');
-  const ppToolrow   = paneEl.querySelector('#pp-toolrow');
-  const ppHlWrap    = paneEl.querySelector('#pp-hl-wrap');
+  const ppSubtitle   = paneEl.querySelector('#pp-subtitle');
+  const ppToolrow    = paneEl.querySelector('#pp-toolrow');
+  const ppHlWrap     = paneEl.querySelector('#pp-hl-wrap');
   const ppLayersWrap = paneEl.querySelector('#pp-layers-wrap');
-  const ppViewWrap  = paneEl.querySelector('#pp-view-wrap');
-  const ppBody      = paneEl.querySelector('#pp-body');
-  const ppMmWrap    = paneEl.querySelector('#pp-mm-wrap');
+  const ppViewWrap   = paneEl.querySelector('#pp-view-wrap');
+  const ppBody       = paneEl.querySelector('#pp-body');
+  const ppMmWrap     = paneEl.querySelector('#pp-mm-wrap');
 
   // ── Grid layout ─────────────────────────────────────────────────────────────
   let _lastCols = 0, _lastCardW = 0, _gridRafId = null;
@@ -336,6 +382,46 @@ function initFindMatchesTool(paneEl, sidebarEl) {
       })
     );
   }
+
+  // ── Model status indicator ────────────────────────────────────────────────────
+  const ppModelStatus = paneEl.querySelector('#pp-model-status');
+  const ppModelLabel  = paneEl.querySelector('#pp-model-label');
+  let _statusFadeTimer = null;
+
+  function setModelStatus(state, text) {
+    clearTimeout(_statusFadeTimer);
+    ppModelStatus.className = 'pp-model-' + state;
+    ppModelStatus.style.opacity = '1';
+    ppModelLabel.textContent = text;
+    if (state === 'ready') {
+      // Fade out after 3 s — bar stays in DOM but invisible so layout is stable
+      _statusFadeTimer = setTimeout(() => { ppModelStatus.style.opacity = '0'; }, 3000);
+    }
+  }
+
+  // If the model loaded before this pane was initialised (e.g. fast cache hit)
+  if (window.EmbeddingUtils && window.EmbeddingUtils.isReady()) {
+    setModelStatus('ready', 'Semantic model ready');
+  }
+
+  window.addEventListener('embedder-ready', () => {
+    setModelStatus('ready', 'Semantic model ready');
+  });
+
+  window.addEventListener('embedding-progress', e => {
+    const { pct } = e.detail;
+    setModelStatus('loading', 'Indexing\u2026 ' + pct + '%');
+  });
+
+  window.addEventListener('embedding-complete', e => {
+    setModelStatus('ready', 'Model ready \u00b7 ' + e.detail.total + ' rows');
+  });
+
+  window.addEventListener('error', e => {
+    if (e.message && e.message.toLowerCase().includes('transformers')) {
+      setModelStatus('error', 'Model unavailable \u2014 keyword mode');
+    }
+  });
 
   // ── KW toggle button ─────────────────────────────────────────────────────────
   const hlBtn = document.createElement('button');
@@ -414,47 +500,42 @@ function initFindMatchesTool(paneEl, sidebarEl) {
   }
   showEmpty();
 
- // ── Multi-layer match builder ─────────────────────────────────────────────────
-// Returns flat array of match objects each with .layer (1-based) and .parentKey
-function buildLayeredMatches(skws, stIdx, srIdx, numLayers) {
-  const seen = new Set();
-  seen.add(stIdx + ':' + srIdx);
-  const result = [];
+  // ── Multi-layer match builder ─────────────────────────────────────────────────
+  function buildLayeredMatches(skws, stIdx, srIdx, numLayers) {
+    const seen = new Set();
+    seen.add(stIdx + ':' + srIdx);
+    const result = [];
 
-  // Ensure the initial seed kws is a Set (it already is in buildSeedFromSelection)
-  let currentSeeds = [{ kws: (skws && typeof skws.has === 'function') ? skws : new Set(skws || []), tabIdx: stIdx, rowIdx: srIdx, cardKey: 'seed' }];
+    let currentSeeds = [{ kws: (skws && typeof skws.has === 'function') ? skws : new Set(skws || []), tabIdx: stIdx, rowIdx: srIdx, cardKey: 'seed' }];
 
-  for (let layer = 1; layer <= numLayers; layer++) {
-    const nextSeeds = [];
-    currentSeeds.forEach(seed => {
-      const matches = findMatches(seed.kws, seed.tabIdx, seed.rowIdx);
-      matches.forEach(m => {
-        const entryKey = m.tabIdx + ':' + m.rowIdx;
-        if (seen.has(entryKey)) return;
-        seen.add(entryKey);
+    for (let layer = 1; layer <= numLayers; layer++) {
+      const nextSeeds = [];
+      currentSeeds.forEach(seed => {
+        const matches = findMatches(seed.kws, seed.tabIdx, seed.rowIdx);
+        matches.forEach(m => {
+          const entryKey = m.tabIdx + ':' + m.rowIdx;
+          if (seen.has(entryKey)) return;
+          seen.add(entryKey);
 
-        const cardKey = 'm-' + m.tabIdx + '-' + m.rowIdx;
+          const cardKey   = 'm-' + m.tabIdx + '-' + m.rowIdx;
+          const sharedSet = (m.shared && typeof m.shared.has === 'function') ? m.shared : new Set(m.shared || []);
+          const kwsSet    = (m.kws    && typeof m.kws.has    === 'function') ? m.kws    : new Set(m.kws    || []);
 
-        // Normalize shared and kws to Sets
-        const sharedSet = (m.shared && typeof m.shared.has === 'function') ? m.shared : new Set(m.shared || []);
-        const kwsSet    = (m.kws    && typeof m.kws.has    === 'function') ? m.kws    : new Set(m.kws    || []);
+          result.push(Object.assign({}, m, {
+            layer,
+            parentKey: seed.cardKey,
+            shared: sharedSet,
+            kws: kwsSet,
+          }));
 
-        result.push(Object.assign({}, m, {
-          layer,
-          parentKey: seed.cardKey,
-          shared: sharedSet,
-          kws: kwsSet,
-        }));
-
-        nextSeeds.push({ kws: kwsSet, tabIdx: m.tabIdx, rowIdx: m.rowIdx, cardKey });
+          nextSeeds.push({ kws: kwsSet, tabIdx: m.tabIdx, rowIdx: m.rowIdx, cardKey });
+        });
       });
-    });
-    currentSeeds = nextSeeds;
-    if (!currentSeeds.length) break;
+      currentSeeds = nextSeeds;
+      if (!currentSeeds.length) break;
+    }
+    return result;
   }
-  return result;
-}
-
 
   // ── Build seed from grid selection ───────────────────────────────────────────
   function buildSeedFromSelection() {
@@ -583,7 +664,7 @@ function buildLayeredMatches(skws, stIdx, srIdx, numLayers) {
         if (c.cats && c.cats.length) {
           const catEl = document.createElement('div');
           catEl.className = 'pp-seed-cats';
-          catEl.textContent = c.cats.join(' · ');
+          catEl.textContent = c.cats.join(' \u00b7 ');
           body.appendChild(catEl);
         }
         const _sc = parseCitation(c.text);
@@ -617,14 +698,12 @@ function buildLayeredMatches(skws, stIdx, srIdx, numLayers) {
       return;
     }
 
-    const layer1Count = matches.filter(m => m.layer === 1).length;
-    const layerStr    = _numLayers > 1 ? ` · ${_numLayers} layers` : '';
-    ppSubtitle.textContent = `${matches.length} match${matches.length === 1 ? '' : 'es'}${layerStr} · ${[...kws].slice(0, 4).join(', ')}`;
+    const layerStr = _numLayers > 1 ? ` \u00b7 ${_numLayers} layers` : '';
+    ppSubtitle.textContent = `${matches.length} match${matches.length === 1 ? '' : 'es'}${layerStr} \u00b7 ${[...kws].slice(0, 4).join(', ')}`;
     ppToolrow.style.display = 'flex';
     hlOn = true;
     hlBtn.classList.add('pp-kw-on'); hlBtn.classList.remove('pp-kw-off');
 
-    // Group by tab; within each tab sort by layer asc then shared desc
     const byTab = new Map();
     matches.forEach(m => {
       if (!byTab.has(m.tabIdx)) byTab.set(m.tabIdx, []);
@@ -632,7 +711,7 @@ function buildLayeredMatches(skws, stIdx, srIdx, numLayers) {
     });
     if (!byTab.has(srcTabIdx)) byTab.set(srcTabIdx, []);
 
-    byTab.forEach((arr, tabIdx) => {
+    byTab.forEach((arr) => {
       arr.sort((a, b) => a.layer - b.layer || b.shared.size - a.shared.size);
     });
 
@@ -661,18 +740,12 @@ function buildLayeredMatches(skws, stIdx, srIdx, numLayers) {
         card.className = 'pp-match-card';
         card.style.setProperty('--ppc-border', accentColor);
         card.style.setProperty('--ppc-bg',     bgColor);
-
-        // FIX: set --ppc-opacity so the pp-fade-in animation ends at the correct
-        // layer opacity rather than always at 1 (animation fill-mode:both overrides
-        // inline style, but respects CSS custom properties in the keyframe).
-        if (m.layer > 1) {
-          card.style.setProperty('--ppc-opacity', layerOpacity);
-        }
+        if (m.layer > 1) card.style.setProperty('--ppc-opacity', layerOpacity);
 
         const head = document.createElement('div');
         head.className = 'pp-card-head';
         const cats = m.row.cats ? m.row.cats.filter(c => c.trim()) : [];
-        if (cats.length) head.innerHTML = `<span class="pp-card-dim">${cats.map(panelEscH).join(' · ')}</span>`;
+        if (cats.length) head.innerHTML = `<span class="pp-card-dim">${cats.map(panelEscH).join(' \u00b7 ')}</span>`;
 
         const body = document.createElement('div');
         body.className = 'pp-card-body';
@@ -960,8 +1033,7 @@ function buildLayeredMatches(skws, stIdx, srIdx, numLayers) {
       el.addEventListener('touchcancel', dragEnd);
     }
 
-    // makeCard: layer param controls opacity for layer 2+ cards
-    function makeCard(text, header, tabIdx, key, isSeed, cats, kwsHL, matchObj, tabName, layer) {
+    function makeCard(text, header, tabIdx, key, isSeed, cats, kwsHL, matchObj, tabName, layer, gotoColIdx) {
       const tv = panelThemeVars(tabIdx);
       const accentColor = tv['--tab-active-bg']    || '#888';
       const labelColor  = tv['--tab-active-color'] || '#fff';
@@ -973,7 +1045,6 @@ function buildLayeredMatches(skws, stIdx, srIdx, numLayers) {
       card.style.width = PANEL_CARD_W + 'px';
       card.style.setProperty('--ppc-border', accentColor);
       card.style.setProperty('--ppc-bg',     bgColor);
-      // Apply layer opacity for non-seed cards
       if (!isSeed && layer > 1) {
         const lo = LAYER_OPACITY[layer - 1] !== undefined ? LAYER_OPACITY[layer - 1] : 0.14;
         card.style.opacity = lo;
@@ -1007,18 +1078,18 @@ function buildLayeredMatches(skws, stIdx, srIdx, numLayers) {
         const fc = seedCells[0];
         const _sfc = parseCitation(fc ? fc.text : '');
         bodyHtml =
-          (fc && fc.cats && fc.cats.length ? `<div class="pp-mm-cat">${fc.cats.map(panelEscH).join(' · ')}</div>` : '') +
+          (fc && fc.cats && fc.cats.length ? `<div class="pp-mm-cat">${fc.cats.map(panelEscH).join(' \u00b7 ')}</div>` : '') +
           (fc ? `<div class="pp-mm-field"><span class="pp-flabel">${panelEscH(fc.header)}</span>${panelHighlight(_sfc.body, kwsHL)}${citationPillHtml(_sfc.citation, accentColor, labelColor)}</div>` : '') +
           (seedCells.length > 1 ? '<div class="pp-mm-seed-extra">' + seedCells.slice(1).map(c => {
             const _ec = parseCitation(c.text);
             return '<div class="pp-mm-seed-sep"></div>' +
-              (c.cats && c.cats.length ? `<div class="pp-mm-cat">${c.cats.map(panelEscH).join(' · ')}</div>` : '') +
+              (c.cats && c.cats.length ? `<div class="pp-mm-cat">${c.cats.map(panelEscH).join(' \u00b7 ')}</div>` : '') +
               `<div class="pp-mm-field"><span class="pp-flabel">${panelEscH(c.header)}</span>${panelHighlight(_ec.body, kwsHL)}${citationPillHtml(_ec.citation, accentColor, labelColor)}</div>`;
           }).join('') + '</div>' : '');
       } else {
         const _mcc = parseCitation(text);
         bodyHtml =
-          (cats && cats.length ? `<div class="pp-mm-cat">${cats.map(panelEscH).join(' · ')}</div>` : '') +
+          (cats && cats.length ? `<div class="pp-mm-cat">${cats.map(panelEscH).join(' \u00b7 ')}</div>` : '') +
           `<div class="pp-mm-field"><span class="pp-flabel">${panelEscH(header)}</span>${panelHighlight(_mcc.body, kwsHL)}${citationPillHtml(_mcc.citation, accentColor, labelColor)}</div>`;
       }
 
@@ -1034,7 +1105,7 @@ function buildLayeredMatches(skws, stIdx, srIdx, numLayers) {
         gotoBtn.title = 'Go to';
         gotoBtn.style.borderColor = accentColor;
         gotoBtn.style.color = accentColor;
-        gotoBtn.addEventListener('click', e => { e.stopPropagation(); panelGoTo(matchObj); });
+        gotoBtn.addEventListener('click', e => { e.stopPropagation(); panelGoTo(matchObj, gotoColIdx); });
         gotoBtn.addEventListener('mousedown', e => e.stopPropagation());
         card.appendChild(gotoBtn);
       }
@@ -1064,10 +1135,10 @@ function buildLayeredMatches(skws, stIdx, srIdx, numLayers) {
     }
 
     // ── Seed card ──────────────────────────────────────────────────────────────
-    const seedKey    = 'seed';
-    const _seedTab   = typeof TABS !== 'undefined' ? TABS[seedTabIdx] : null;
-    const _seedData  = _seedTab && typeof processSheetData === 'function' ? processSheetData(_seedTab.grid) : null;
-    const _seedCats  = _seedData && _seedData.rows[seedRowIdx] ? _seedData.rows[seedRowIdx].cats.filter(c => c.trim()) : [];
+    const seedKey      = 'seed';
+    const _seedTab     = typeof TABS !== 'undefined' ? TABS[seedTabIdx] : null;
+    const _seedData    = _seedTab && typeof processSheetData === 'function' ? processSheetData(_seedTab.grid) : null;
+    const _seedCats    = _seedData && _seedData.rows[seedRowIdx] ? _seedData.rows[seedRowIdx].cats.filter(c => c.trim()) : [];
     const _seedTabName = (_seedData && _seedData.title) ? _seedData.title : (_seedTab ? _seedTab.name : '');
     makeCard('', '', seedTabIdx, seedKey, true, _seedCats, seedKws, null, _seedTabName, 0);
 
@@ -1090,7 +1161,7 @@ function buildLayeredMatches(skws, stIdx, srIdx, numLayers) {
       const _mTabName = (_mTabD && _mTabD.title) ? _mTabD.title
         : (typeof TABS !== 'undefined' ? TABS[m.tabIdx].name : 'Tab ' + m.tabIdx);
 
-      makeCard(m.row.cells[bestColIdx] || '', m.headers[bestColIdx] || '', m.tabIdx, key, false, cats, m.shared, m, _mTabName, m.layer);
+      makeCard(m.row.cells[bestColIdx] || '', m.headers[bestColIdx] || '', m.tabIdx, key, false, cats, m.shared, m, _mTabName, m.layer, bestColIdx);
       arrowDefs.push({ fromKey: m.parentKey, toKey: key, color: tv['--tab-active-bg'] || '#aaa', layer: m.layer });
     });
 
@@ -1103,21 +1174,18 @@ function buildLayeredMatches(skws, stIdx, srIdx, numLayers) {
       if (sCard) { sCard.style.left = sx + 'px'; sCard.style.top = sy + 'px'; }
       rects.set(seedKey, { x: sx, y: sy, w: PANEL_CARD_W, h: sH });
 
-      // Group matches by layer for ring layout
       const byLayer = new Map();
       matches.forEach(m => {
         if (!byLayer.has(m.layer)) byLayer.set(m.layer, []);
         byLayer.get(m.layer).push(m);
       });
-
       const maxLayer = matches.length ? Math.max(...matches.map(m => m.layer)) : 1;
 
-      matches.forEach((m, i) => {
+      matches.forEach((m) => {
         const key    = 'm-' + m.tabIdx + '-' + m.rowIdx;
         const cardEl = cardEls.get(key);
         if (!cardEl) return;
 
-        // Spread each layer on a progressively larger ring
         const layerMatches = byLayer.get(m.layer) || [];
         const idxInLayer   = layerMatches.indexOf(m);
         const ringFraction = maxLayer > 1 ? 0.22 + 0.18 * m.layer : 0.33;
