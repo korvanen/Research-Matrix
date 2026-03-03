@@ -1,60 +1,50 @@
 // ════════════════════════════════════════════════════════════════════════════
-// keyword-utils.js — Multi-word (phrase) keyword extraction with n-grams
+// keyword-utils.js — Keyword extraction + hybrid semantic match finder
 // ════════════════════════════════════════════════════════════════════════════
 
-// Minimum per-token length inside a phrase
-const PANEL_KW_MIN_WORD_LEN = 2;
+const PANEL_KW_MIN_WORD_LEN    = 2;
+const PANEL_KW_MIN_PHRASE_WORDS = 2;
+const PANEL_KW_NGRAM_SIZES     = [2];
 
-// Minimum number of words in a keyword phrase (set to 2 or 3 as you need)
-const PANEL_KW_MIN_PHRASE_WORDS = 2; // or 3
+// ── Scoring weights ───────────────────────────────────────────────────────────
+// Adjust these to tune the balance between lexical and semantic matching.
+const KEYWORD_WEIGHT   = 0.35; // share of final score from keyword overlap
+const EMBEDDING_WEIGHT = 0.65; // share of final score from semantic similarity
 
-// Which n-gram sizes to build. If you want only 2- or 3-word phrases:
-const PANEL_KW_NGRAM_SIZES = [2]; // do NOT include 1
+// Minimum cosine similarity to include a row that has no keyword overlap.
+// Rows below this AND below PANEL_MIN_SHARED keywords are excluded.
+const EMBEDDING_SIMILARITY_THRESHOLD = 0.45;
 
-// ── Stop words ───────────────────────────────────────────────────────────────
+// ── Stop words ────────────────────────────────────────────────────────────────
 const PANEL_STOP_WORDS = new Set([
-  // Common words unrelated to the topic
-  'with', 'high', 
-  // Academic & Logic Fluff
+  'with', 'high',
   'study', 'research', 'analysis', 'paper', 'article', 'theory', 'concept', 'model',
   'system', 'process', 'result', 'data', 'using', 'based', 'approach', 'within',
   'among', 'between', 'also', 'often', 'likely', 'potential', 'impact', 'development',
-  // Over-used Domain Fluff (High-frequency, low-meaning in this context)
   'cohousing', 'housing', 'living', 'social', 'community', 'urban', 'people', 'resident'
 ]);
 
-// Optional: stop-phrases (exact multi-word sequences to ignore)
-const PANEL_STOP_PHRASES = new Set([
-  // e.g., 'in conclusion', 'as well as'
-]);
+const PANEL_STOP_PHRASES = new Set([]);
 
-// ── Normalization helpers ────────────────────────────────────────────────────
+// ── Normalisation helpers ─────────────────────────────────────────────────────
 function normalizeToken(w) {
-  // Lowercase, strip non-letters
   let t = String(w).toLowerCase().replace(/[^a-z]/g, '');
   if (!t) return '';
-
-  // Very-light stemming (order matters)
   t = t
-    .replace(/ies$/, 'y')   // communities -> community
-    .replace(/ing$/, '')    // planning -> plan
-    .replace(/ed$/, '')     // used -> us
-    .replace(/s$/, '');     // residents -> resident (after other rules)
+    .replace(/ies$/, 'y')
+    .replace(/ing$/, '')
+    .replace(/ed$/,  '')
+    .replace(/s$/,   '');
   return t;
 }
 
 function extractTokens(text) {
   const raw = String(text)
-    // Preserve quoted phrases by temporarily marking them (we’ll re-add them later)
-    .replace(/“|”/g, '"')
-    .replace(/[^a-zA-Z0-9"’‘\s]/g, ' ');
-  
-  // Capture quoted multi-word phrases before tokenization
+    .replace(/"|"/g, '"')
+    .replace(/[^a-zA-Z0-9"''\s]/g, ' ');
+
   const quoted = [];
-  raw.replace(/"([^"]+)"/g, (_, phrase) => {
-    quoted.push(phrase.trim());
-    return '';
-  });
+  raw.replace(/"([^"]+)"/g, (_, phrase) => { quoted.push(phrase.trim()); return ''; });
 
   const tokens = raw
     .toLowerCase()
@@ -71,24 +61,17 @@ function makeNgrams(tokens, sizes) {
     if (n < PANEL_KW_MIN_PHRASE_WORDS) continue;
     for (let i = 0; i <= tokens.length - n; i++) {
       const slice = tokens.slice(i, i + n);
-      // Enforce per-token length and stop-word exclusion
-      if (slice.some(t => t.length < PANEL_KW_MIN_WORD_LEN || PANEL_STOP_WORDS.has(t))) {
-        continue;
-      }
+      if (slice.some(t => t.length < PANEL_KW_MIN_WORD_LEN || PANEL_STOP_WORDS.has(t))) continue;
       const phrase = slice.join(' ');
-      if (!PANEL_STOP_PHRASES.has(phrase)) {
-        phrases.push(phrase);
-      }
+      if (!PANEL_STOP_PHRASES.has(phrase)) phrases.push(phrase);
     }
   }
   return phrases;
 }
 
-// ── Keyword extraction (phrases only) ────────────────────────────────────────
 function panelExtractKW(text) {
   const { tokens, quoted } = extractTokens(text);
 
-  // Normalize quoted phrases into token sequences and filter
   const normalizedQuoted = quoted
     .map(q => q.split(/\s+/).map(normalizeToken).filter(Boolean))
     .filter(arr => arr.length >= PANEL_KW_MIN_PHRASE_WORDS)
@@ -97,10 +80,7 @@ function panelExtractKW(text) {
     .map(arr => arr.join(' '))
     .filter(p => !PANEL_STOP_PHRASES.has(p));
 
-  // Build n-gram phrases (2-grams, 3-grams, etc.)
   const ngramPhrases = makeNgrams(tokens, PANEL_KW_NGRAM_SIZES);
-
-  // Return unique set of phrases
   return [...new Set([...normalizedQuoted, ...ngramPhrases])];
 }
 
@@ -114,48 +94,91 @@ function buildRowIndex() {
     data.rows.forEach((row, rowIdx) => {
       const text = row.cells.join(' ');
       rows.push({
-        tabIdx,
-        rowIdx,
-        row,
+        tabIdx, rowIdx, row,
         headers: data.headers,
-        title: data.title || tab.name,
-        // NOTE: kws now contains multi-word phrases only
-        kws: new Set(panelExtractKW(text))
+        title:   data.title || tab.name,
+        kws:     new Set(panelExtractKW(text)),
       });
     });
   });
   return rows;
 }
 
-// ── Match finder (unchanged, works with phrase keys) ─────────────────────────
-function findMatches(seedKws, seedTabIdx, seedRowIdx) {
-  const allRows = buildRowIndex();
+// ── Embedding vector store ────────────────────────────────────────────────────
+// Populated asynchronously by initEmbeddings() (called from script.js after
+// data loads). findMatches() uses whatever is available; if embeddings aren't
+// ready yet it falls back gracefully to keyword-only scoring.
+let _embeddingVectors = new Map(); // 'tabIdx:rowIdx' -> number[]
+let _embeddingsReady  = false;
 
-  // 1. Global frequency of phrases
+async function initEmbeddings() {
+  if (!window.EmbeddingUtils) {
+    console.warn('[keyword-utils] EmbeddingUtils not available — keyword-only mode');
+    return;
+  }
+
+  const rows = buildRowIndex();
+  if (!rows.length) return;
+
+  console.log(`[keyword-utils] Embedding ${rows.length} rows in background…`);
+  _embeddingVectors = await window.EmbeddingUtils.embedAllRows(rows);
+  _embeddingsReady  = true;
+  console.log(`[keyword-utils] Embeddings ready (${_embeddingVectors.size} rows)`);
+
+  // Notify the sidebar that better results are now available if the user
+  // has already made a selection — it can optionally refresh.
+  document.dispatchEvent(new CustomEvent('embeddings-ready', { bubbles: true }));
+}
+
+// ── Hybrid match finder ───────────────────────────────────────────────────────
+function findMatches(seedKws, seedTabIdx, seedRowIdx) {
+  const allRows  = buildRowIndex();
+  const seedKey  = seedTabIdx + ':' + seedRowIdx;
+  const seedVec  = _embeddingsReady ? _embeddingVectors.get(seedKey) : null;
+
+  // Global keyword frequency for IDF weighting
   const globalFreq = {};
   allRows.forEach(row => {
-    row.kws.forEach(kw => {
-      globalFreq[kw] = (globalFreq[kw] || 0) + 1;
-    });
+    row.kws.forEach(kw => { globalFreq[kw] = (globalFreq[kw] || 0) + 1; });
   });
 
-  const matches = [];
+  const candidates = [];
+
   allRows.forEach(entry => {
     if (entry.tabIdx === seedTabIdx && entry.rowIdx === seedRowIdx) return;
 
-    // 2. Shared phrases
+    // ── Keyword score (IDF-weighted overlap) ──────────────────────────────
     const shared = [...seedKws].filter(k => entry.kws.has(k));
+    let kwScore = 0;
+    shared.forEach(kw => { kwScore += 1 / (globalFreq[kw] || 1); });
+    const hasKeywordMatch = shared.length >= PANEL_MIN_SHARED;
 
-    // 3. Score by rarity (phrases in fewer rows are more informative)
-    let score = 0;
-    shared.forEach(kw => {
-      score += (1 / (globalFreq[kw] || 1));
-    });
-
-    if (shared.length >= PANEL_MIN_SHARED) {
-      matches.push({ ...entry, shared, score });
+    // ── Embedding score (cosine similarity) ──────────────────────────────
+    let embScore = 0;
+    if (seedVec) {
+      const entryVec = _embeddingVectors.get(entry.tabIdx + ':' + entry.rowIdx);
+      if (entryVec) {
+        embScore = window.EmbeddingUtils.cosineSimilarity(seedVec, entryVec);
+      }
     }
+    const hasEmbeddingMatch = embScore >= EMBEDDING_SIMILARITY_THRESHOLD;
+
+    // Include if either criterion passes
+    if (!hasKeywordMatch && !hasEmbeddingMatch) return;
+
+    candidates.push({ ...entry, shared, kwScore, embScore });
   });
 
-  return matches.sort((a, b) => b.score - a.score);
+  if (!candidates.length) return [];
+
+  // ── Normalise keyword scores relative to the best candidate ──────────────
+  // This puts keyword scores on the same [0,1] scale as embedding scores
+  // so the weighted sum is meaningful.
+  const maxKw = Math.max(...candidates.map(c => c.kwScore), 1e-9);
+  candidates.forEach(c => {
+    const normKw = c.kwScore / maxKw;
+    c.score = normKw * KEYWORD_WEIGHT + c.embScore * EMBEDDING_WEIGHT;
+  });
+
+  return candidates.sort((a, b) => b.score - a.score);
 }
