@@ -7,12 +7,20 @@ const PANEL_KW_MIN_PHRASE_WORDS = 2;
 const PANEL_KW_NGRAM_SIZES     = [2];
 
 // ── Scoring weights ───────────────────────────────────────────────────────────
-// Adjust these to tune the balance between lexical and semantic matching.
-const KEYWORD_WEIGHT   = 0.35; // share of final score from keyword overlap
-const EMBEDDING_WEIGHT = 0.65; // share of final score from semantic similarity
+// These are the DEFAULT values restored when both modes are enabled.
+// Call setMatchWeights(kw, emb) at runtime to override (e.g. from KW/ML buttons).
+const _DEFAULT_KEYWORD_WEIGHT   = 0.35;
+const _DEFAULT_EMBEDDING_WEIGHT = 0.65;
+
+let _activeKeywordWeight   = _DEFAULT_KEYWORD_WEIGHT;
+let _activeEmbeddingWeight = _DEFAULT_EMBEDDING_WEIGHT;
+
+function setMatchWeights(kw, emb) {
+  _activeKeywordWeight   = kw;
+  _activeEmbeddingWeight = emb;
+}
 
 // Minimum cosine similarity to include a row that has no keyword overlap.
-// Rows below this AND below PANEL_MIN_SHARED keywords are excluded.
 const EMBEDDING_SIMILARITY_THRESHOLD = 0.45;
 
 // ── Stop words ────────────────────────────────────────────────────────────────
@@ -170,7 +178,6 @@ function findMatches(seedKws, seedTabIdx, seedRowIdx, excludeSet) {
     }
     const hasEmbeddingMatch = embScore >= EMBEDDING_SIMILARITY_THRESHOLD;
 
-    // Include if either criterion passes
     if (!hasKeywordMatch && !hasEmbeddingMatch) return;
 
     candidates.push({ ...entry, shared, kwScore, embScore });
@@ -178,13 +185,16 @@ function findMatches(seedKws, seedTabIdx, seedRowIdx, excludeSet) {
 
   if (!candidates.length) return [];
 
-  // ── Normalise keyword scores relative to the best candidate ──────────────
-  // This puts keyword scores on the same [0,1] scale as embedding scores
-  // so the weighted sum is meaningful.
+  // Normalise keyword scores to [0,1] relative to the best candidate
   const maxKw = Math.max(...candidates.map(c => c.kwScore), 1e-9);
   candidates.forEach(c => {
-    const normKw = c.kwScore / maxKw;
-    c.score = normKw * KEYWORD_WEIGHT + c.embScore * EMBEDDING_WEIGHT;
+    const normKw   = c.kwScore / maxKw;
+    const kwContrib  = normKw * _activeKeywordWeight;
+    const embContrib = c.embScore * _activeEmbeddingWeight;
+    c.normKwScore = normKw;
+    c.kwContrib   = kwContrib;   // baked-in contribution — used by score bar
+    c.embContrib  = embContrib;
+    c.score = kwContrib + embContrib;
   });
 
   return candidates.sort((a, b) => b.score - a.score);
