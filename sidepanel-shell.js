@@ -1,7 +1,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 // sidepanel-shell.js — Sidebar shell
 //
-// LOAD ORDER (in index.html):
+// LOAD ORDER (in index.html):,,,,,,
 //   1. keyword-utils.js
 //   2. sidepanel-utils.js
 //   3. sidepanel-find-matches.js  — initFindMatchesTool()
