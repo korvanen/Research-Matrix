@@ -1,14 +1,12 @@
 // ════════════════════════════════════════════════════════════════════════════
 // keyword-utils.js — Keyword extraction + hybrid semantic match finder
 // ════════════════════════════════════════════════════════════════════════════
-
+console.log("utils are updated")
 const PANEL_KW_MIN_WORD_LEN    = 2;
 const PANEL_KW_MIN_PHRASE_WORDS = 2;
 const PANEL_KW_NGRAM_SIZES     = [2];
 
 // ── Scoring weights ───────────────────────────────────────────────────────────
-// These are the DEFAULT values restored when both modes are enabled.
-// Call setMatchWeights(kw, emb) at runtime to override (e.g. from KW/ML buttons).
 const _DEFAULT_KEYWORD_WEIGHT   = 0.35;
 const _DEFAULT_EMBEDDING_WEIGHT = 0.65;
 
@@ -20,7 +18,6 @@ function setMatchWeights(kw, emb) {
   _activeEmbeddingWeight = emb;
 }
 
-// Minimum cosine similarity to include a row that has no keyword overlap.
 const EMBEDDING_SIMILARITY_THRESHOLD = 0.45;
 
 // ── Stop words ────────────────────────────────────────────────────────────────
@@ -113,10 +110,7 @@ function buildRowIndex() {
 }
 
 // ── Embedding vector store ────────────────────────────────────────────────────
-// Populated asynchronously by initEmbeddings() (called from script.js after
-// data loads). findMatches() uses whatever is available; if embeddings aren't
-// ready yet it falls back gracefully to keyword-only scoring.
-let _embeddingVectors = new Map(); // 'tabIdx:rowIdx' -> number[]
+let _embeddingVectors = new Map();
 let _embeddingsReady  = false;
 
 async function initEmbeddings() {
@@ -126,32 +120,31 @@ async function initEmbeddings() {
   }
 
   const rows = buildRowIndex();
-  if (!rows.length) return;
+  if (!rows.length) {
+    console.warn('[keyword-utils] No rows to embed — TABS may not be loaded yet');
+    return;
+  }
 
   console.log(`[keyword-utils] Embedding ${rows.length} rows in background…`);
   _embeddingVectors = await window.EmbeddingUtils.embedAllRows(rows);
   _embeddingsReady  = true;
   console.log(`[keyword-utils] Embeddings ready (${_embeddingVectors.size} rows)`);
 
-  // Notify the sidebar that better results are now available if the user
-  // has already made a selection — it can optionally refresh.
+  // ── KEY FIX: tell the sidebar to re-render the current selection now
+  // that real embScore values are available. Without this, cards rendered
+  // before embeddings finished always show "model not ready".
   document.dispatchEvent(new CustomEvent('embeddings-ready', { bubbles: true }));
 }
 
 // ── Hybrid match finder ───────────────────────────────────────────────────────
-// excludeSet — optional Set of 'tabIdx:rowIdx' strings to exclude from results.
-// Always includes seedTabIdx:seedRowIdx automatically.
 function findMatches(seedKws, seedTabIdx, seedRowIdx, excludeSet) {
-  const allRows  = buildRowIndex();
-  const seedKey  = seedTabIdx + ':' + seedRowIdx;
-  const seedVec  = _embeddingsReady ? _embeddingVectors.get(seedKey) : null;
+  const allRows = buildRowIndex();
+  const seedKey = seedTabIdx + ':' + seedRowIdx;
+  const seedVec = _embeddingsReady ? _embeddingVectors.get(seedKey) : null;
 
-  // Build the full exclusion set — always skip the seed row plus any
-  // additional rows passed in (e.g. all rows in a selected category)
   const excluded = new Set(excludeSet || []);
   excluded.add(seedKey);
 
-  // Global keyword frequency for IDF weighting
   const globalFreq = {};
   allRows.forEach(row => {
     row.kws.forEach(kw => { globalFreq[kw] = (globalFreq[kw] || 0) + 1; });
@@ -162,13 +155,11 @@ function findMatches(seedKws, seedTabIdx, seedRowIdx, excludeSet) {
   allRows.forEach(entry => {
     if (excluded.has(entry.tabIdx + ':' + entry.rowIdx)) return;
 
-    // ── Keyword score (IDF-weighted overlap) ──────────────────────────────
     const shared = [...seedKws].filter(k => entry.kws.has(k));
     let kwScore = 0;
     shared.forEach(kw => { kwScore += 1 / (globalFreq[kw] || 1); });
     const hasKeywordMatch = shared.length >= PANEL_MIN_SHARED;
 
-    // ── Embedding score (cosine similarity) ──────────────────────────────
     let embScore = 0;
     if (seedVec) {
       const entryVec = _embeddingVectors.get(entry.tabIdx + ':' + entry.rowIdx);
@@ -185,14 +176,13 @@ function findMatches(seedKws, seedTabIdx, seedRowIdx, excludeSet) {
 
   if (!candidates.length) return [];
 
-  // Normalise keyword scores to [0,1] relative to the best candidate
   const maxKw = Math.max(...candidates.map(c => c.kwScore), 1e-9);
   candidates.forEach(c => {
     const normKw   = c.kwScore / maxKw;
-    const kwContrib  = normKw * _activeKeywordWeight;
+    const kwContrib  = normKw   * _activeKeywordWeight;
     const embContrib = c.embScore * _activeEmbeddingWeight;
     c.normKwScore = normKw;
-    c.kwContrib   = kwContrib;   // baked-in contribution — used by score bar
+    c.kwContrib   = kwContrib;
     c.embContrib  = embContrib;
     c.score = kwContrib + embContrib;
   });
