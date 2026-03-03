@@ -1,9 +1,9 @@
 // ════════════════════════════════════════════════════════════════════════════
 // panel-find-matches.js — "Find Matches" sidebar tool
 // ════════════════════════════════════════════════════════════════════════════
-console.log('[panel-find-matches.js is updated]');
+console.log('[panel-find-matches.js v.2]');
 
-const PANEL_MIN_SHARED   = 0;
+const PANEL_MIN_SHARED   = 2;
 const PANEL_MM_PAD       = 10;
 const PANEL_MM_ITERS     = 20;
 const PANEL_CARD_W       = 160;
@@ -502,8 +502,20 @@ function initFindMatchesTool(paneEl, sidebarEl) {
 
   // ── Multi-layer match builder ─────────────────────────────────────────────────
   function buildLayeredMatches(skws, stIdx, srIdx, numLayers) {
-    const seen = new Set();
-    seen.add(stIdx + ':' + srIdx);
+    // Collect every currently-selected row so they are all excluded from
+    // results — not just the first one (srIdx). This prevents items from
+    // a selected category appearing as matches of themselves.
+    const allDataRows = Array.from(document.querySelectorAll('#data-body tr'));
+    const selectedRowKeys = new Set();
+    allDataRows.forEach((dtr, ri) => {
+      const hasSelected = Array.from(dtr.querySelectorAll('td')).some(
+        td => td.classList.contains('selected-cell') || td.classList.contains('selected-group')
+      );
+      if (hasSelected) selectedRowKeys.add(stIdx + ':' + ri);
+    });
+    selectedRowKeys.add(stIdx + ':' + srIdx);
+
+    const seen = new Set(selectedRowKeys);
     const result = [];
 
     let currentSeeds = [{ kws: (skws && typeof skws.has === 'function') ? skws : new Set(skws || []), tabIdx: stIdx, rowIdx: srIdx, cardKey: 'seed' }];
@@ -511,7 +523,7 @@ function initFindMatchesTool(paneEl, sidebarEl) {
     for (let layer = 1; layer <= numLayers; layer++) {
       const nextSeeds = [];
       currentSeeds.forEach(seed => {
-        const matches = findMatches(seed.kws, seed.tabIdx, seed.rowIdx);
+        const matches = findMatches(seed.kws, seed.tabIdx, seed.rowIdx, selectedRowKeys);
         matches.forEach(m => {
           const entryKey = m.tabIdx + ':' + m.rowIdx;
           if (seen.has(entryKey)) return;
