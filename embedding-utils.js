@@ -1,8 +1,6 @@
 // ════════════════════════════════════════════════════════════════════════════
 // embedding-utils.js — Local semantic embeddings via Transformers.js
-//
-// Loaded as <script type="module"> so it can use ES imports.
-// Exposes window.EmbeddingUtils for the rest of the (non-module) app.
+// Loaded as <script type="module">; exposes window.EmbeddingUtils globally.
 // ════════════════════════════════════════════════════════════════════════════
 
 import { pipeline, env }
@@ -27,19 +25,18 @@ async function _loadEmbedder() {
       window.dispatchEvent(new CustomEvent('embedder-ready'));
       console.log('[embedding-utils] Model ready');
 
-      // ── KEY FIX ──────────────────────────────────────────────────────────
-      // The module script runs after the regular scripts, so EmbeddingUtils
-      // wasn't on window when script.js called initEmbeddings(). We call it
-      // here now that both the model AND the app data are ready.
+      // Call initEmbeddings now that both the model and app data are available.
+      // The module loads after regular scripts, so EmbeddingUtils wasn't on
+      // window when script.js tried to call initEmbeddings() at startup.
       if (typeof initEmbeddings === 'function') {
-        console.log('[embedding-utils] Calling initEmbeddings() now model is ready');
+        console.log('[embedding-utils] Calling initEmbeddings()');
         initEmbeddings();
       }
 
       return model;
     })
     .catch(err => {
-      _loadPromise = null; // allow retry
+      _loadPromise = null;
       console.warn('[embedding-utils] Model load failed:', err);
       throw err;
     });
@@ -47,10 +44,14 @@ async function _loadEmbedder() {
   return _loadPromise;
 }
 
-// ── The swappable embedding abstraction ───────────────────────────────────────
+// ── Embedding (the only function to swap when changing providers) ─────────────
 async function getEmbedding(text) {
   const embedder = await _loadEmbedder();
-  const output   = await embedder(text, { pooling: 'mean', normalize: true });
+  // pipeline() returns a Tensor-like object; .data is the flat Float32Array
+  const output = await embedder(text, { pooling: 'mean', normalize: true });
+  if (!output || !output.data) {
+    throw new Error('[embedding-utils] getEmbedding: unexpected output shape — ' + JSON.stringify(output));
+  }
   return Array.from(output.data);
 }
 
@@ -67,8 +68,18 @@ function _hashText(str) {
 function _cacheGet(text) {
   try {
     const raw = localStorage.getItem(CACHE_PREFIX + _hashText(text));
-    return raw ? JSON.parse(raw) : null;
-  } catch { return null; }
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    // Validate: must be a non-empty array of numbers
+    if (!Array.isArray(parsed) || !parsed.length || typeof parsed[0] !== 'number') {
+      console.warn('[embedding-utils] Cache entry corrupt, ignoring');
+      return null;
+    }
+    return parsed;
+  } catch (e) {
+    console.warn('[embedding-utils] _cacheGet error:', e);
+    return null;
+  }
 }
 
 function _cacheSet(text, vector) {
@@ -84,14 +95,14 @@ function _cacheClear() {
   Object.keys(localStorage)
     .filter(k => k.startsWith(CACHE_PREFIX))
     .forEach(k => localStorage.removeItem(k));
-  console.log('[embedding-utils] Cache cleared (storage full)');
+  console.log('[embedding-utils] Cache cleared');
 }
 
 // ── Public: get embedding with caching ───────────────────────────────────────
 async function getCachedEmbedding(text) {
   const cached = _cacheGet(text);
   if (cached) return cached;
-  const vector = await getEmbedding(text);
+  const vector = await getEmbedding(text); // throws on failure — caller handles
   _cacheSet(text, vector);
   return vector;
 }
@@ -108,22 +119,39 @@ function cosineSimilarity(a, b) {
 async function embedAllRows(rows) {
   const vectors = new Map();
   const total   = rows.length;
+  let failures  = 0;
 
   for (let i = 0; i < total; i++) {
     const row  = rows[i];
-    const text = (row.cells || []).join(' ').trim();
+    // buildRowIndex() nests the sheet row under .row — cells live at row.row.cells
+    const cells = (row.row && row.row.cells) ? row.row.cells : (row.cells || []);
+    const text = cells.join(' ').trim();
     if (!text) continue;
 
     try {
       const vector = await getCachedEmbedding(text);
+      if (!vector || !vector.length) {
+        console.warn(`[embedding-utils] Row ${i} returned empty vector, skipping`);
+        failures++;
+        continue;
+      }
       vectors.set(row.tabIdx + ':' + row.rowIdx, vector);
     } catch (err) {
-      console.warn('[embedding-utils] Failed to embed row', row.tabIdx, row.rowIdx, err);
+      failures++;
+      // Log first 3 failures in full; after that just count them
+      if (failures <= 3) {
+        console.error(`[embedding-utils] Failed to embed row ${row.tabIdx}:${row.rowIdx}:`, err);
+        console.error('  text sample:', JSON.stringify(text.slice(0, 80)));
+      }
     }
 
     window.dispatchEvent(new CustomEvent('embedding-progress', {
       detail: { done: i + 1, total, pct: Math.round((i + 1) / total * 100) }
     }));
+  }
+
+  if (failures > 0) {
+    console.warn(`[embedding-utils] embedAllRows: ${failures}/${total} rows failed`);
   }
 
   window.dispatchEvent(new CustomEvent('embedding-complete', { detail: { total: vectors.size } }));
@@ -140,5 +168,5 @@ window.EmbeddingUtils = {
   clearCache: _cacheClear,
 };
 
-// Start downloading the model immediately in the background.
+// Start downloading the model in the background immediately.
 _loadEmbedder().catch(() => {/* already warned above */});
