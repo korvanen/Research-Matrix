@@ -1,15 +1,15 @@
 // ════════════════════════════════════════════════════════════════════════════
 // keyword-utils.js — Keyword extraction + hybrid semantic match finder
 // ════════════════════════════════════════════════════════════════════════════
-console.log("keywords disabled now actually");
+
 const PANEL_KW_MIN_WORD_LEN    = 2;
 const PANEL_KW_MIN_PHRASE_WORDS = 2;
 const PANEL_KW_NGRAM_SIZES     = [2];
 
 // ── Scoring weights ───────────────────────────────────────────────────────────
 // Adjust these to tune the balance between lexical and semantic matching.
-const KEYWORD_WEIGHT   = 0.00; // share of final score from keyword overlap. set tot 0.00 to disable keyword wighting
-const EMBEDDING_WEIGHT = 1.00; // share of final score from semantic similarity
+const KEYWORD_WEIGHT   = 0.35; // share of final score from keyword overlap
+const EMBEDDING_WEIGHT = 0.65; // share of final score from semantic similarity
 
 // Minimum cosine similarity to include a row that has no keyword overlap.
 // Rows below this AND below PANEL_MIN_SHARED keywords are excluded.
@@ -131,10 +131,17 @@ async function initEmbeddings() {
 }
 
 // ── Hybrid match finder ───────────────────────────────────────────────────────
-function findMatches(seedKws, seedTabIdx, seedRowIdx) {
+// excludeSet — optional Set of 'tabIdx:rowIdx' strings to exclude from results.
+// Always includes seedTabIdx:seedRowIdx automatically.
+function findMatches(seedKws, seedTabIdx, seedRowIdx, excludeSet) {
   const allRows  = buildRowIndex();
   const seedKey  = seedTabIdx + ':' + seedRowIdx;
   const seedVec  = _embeddingsReady ? _embeddingVectors.get(seedKey) : null;
+
+  // Build the full exclusion set — always skip the seed row plus any
+  // additional rows passed in (e.g. all rows in a selected category)
+  const excluded = new Set(excludeSet || []);
+  excluded.add(seedKey);
 
   // Global keyword frequency for IDF weighting
   const globalFreq = {};
@@ -145,7 +152,7 @@ function findMatches(seedKws, seedTabIdx, seedRowIdx) {
   const candidates = [];
 
   allRows.forEach(entry => {
-    if (entry.tabIdx === seedTabIdx && entry.rowIdx === seedRowIdx) return;
+    if (excluded.has(entry.tabIdx + ':' + entry.rowIdx)) return;
 
     // ── Keyword score (IDF-weighted overlap) ──────────────────────────────
     const shared = [...seedKws].filter(k => entry.kws.has(k));
