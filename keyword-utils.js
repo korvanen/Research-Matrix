@@ -1,7 +1,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 // keyword-utils.js — Keyword extraction + hybrid semantic match finder
 // ════════════════════════════════════════════════════════════════════════════
-
+console.log("keywords disabled");
 const PANEL_KW_MIN_WORD_LEN    = 2;
 const PANEL_KW_MIN_PHRASE_WORDS = 2;
 const PANEL_KW_NGRAM_SIZES     = [2];
