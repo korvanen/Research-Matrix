@@ -6,7 +6,7 @@
 // Themed scrollbars appear when content overflows a bounding box.
 // Bounding boxes are corner-drag resizable.
 // ════════════════════════════════════════════════════════════════════════════
-console.log('[sidepanel-clusters.js v6]');
+console.log('[sidepanel-clusters.js v7]');
 
 (function injectClusterStyles() {
   if (document.getElementById('pp-cluster-styles')) return;
@@ -307,9 +307,9 @@ function initClustersTool(paneEl, sidebarEl) {
           '<div class="pp-cl-slider-col">' +
             '<div class="pp-cl-group-label">Depth</div>' +
             '<div class="pp-cl-range-row"><span class="pp-cl-range-label">Lvl</span><input class="pp-cl-range pp-cl-depth" id="pp-cl-depth" type="range" min="1" max="4" value="2" step="1"><span class="pp-cl-range-val" id="pp-cl-depth-val">2</span></div>' +
-    '<button id="pp-cl-recluster">Re-cluster</button>' +      
-        '</div>' +  
-      '</div>' +
+          '</div>' +
+          '<button id="pp-cl-recluster">Re-cluster</button>' +
+        '</div>' +
     '</div>' +
     '<div id="pp-cl-canvas"><div id="pp-cl-empty">Clusters will appear<br>once embeddings finish</div></div>' +
     '<div class="pp-cl-tooltip" id="pp-cl-tooltip">' +
