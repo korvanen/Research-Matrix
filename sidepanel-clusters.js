@@ -355,9 +355,8 @@ function initClustersTool(paneEl, sidebarEl) {
     let active=false,sx=0,sy=0,bx=0,by=0;
     function getBxy(){const m=innerEl.style.transform.match(/translate\(([^,]+)px,([^)]+)px\)/)||[];return[parseFloat(m[1])||0,parseFloat(m[2])||0];}
     bodyEl.addEventListener('mousedown',ev=>{
-      // only pan if clicking directly on body or a card (not a sub-nest head)
       if(ev.button!==0||ev.target.closest('.pp-cl-nest[data-depth="1"] > .pp-cl-nest-head'))return;
-      if(ev.target.closest('.pp-cl-nest[data-depth="1"]'))return; // let sub-nest drag handle it
+      if(ev.target.closest('.pp-cl-nest[data-depth="1"]'))return;
       active=true;[bx,by]=getBxy();sx=ev.clientX;sy=ev.clientY;
       bodyEl.classList.add('pp-cl-body-panning');ev.stopPropagation();
     });
@@ -524,7 +523,6 @@ function initClustersTool(paneEl, sidebarEl) {
         const child=buildNestRecursive(members,depth+1,maxDepth,childPath);
         childNestW=Math.max(childNestW,parseInt(child.style.width)||180);
         contentEl.appendChild(child);
-        // Make depth-1 nests draggable via their head
         if(depth+1===1)makeNestDraggable(child);
         return child;
       });
@@ -600,9 +598,24 @@ function initClustersTool(paneEl, sidebarEl) {
     },20);
   }
 
+  // ── FIX 1: corrected event name ('embedder-ready') and target (window) ────
+  // Was: document.addEventListener('embeddings-ready', ...)
+  // embedding-utils.js dispatches 'embedder-ready' on window — both must match.
   if(window.EmbeddingUtils&&window.EmbeddingUtils.isReady())setTimeout(tryRender,120);
-  document.addEventListener('embeddings-ready',()=>setTimeout(tryRender,120));
+  window.addEventListener('embedder-ready',()=>setTimeout(tryRender,120));
+
+  // ── FIX 2: embedding-progress already used window correctly ───────────────
   window.addEventListener('embedding-progress',ev=>{if(!_rendered)setStatus('loading','Indexing\u2026 '+ev.detail.pct+'%');});
+
+  // ── FIX 3: wire embedding-complete so status updates when indexing finishes
+  // embedding-utils.js fires this after embedAllRows() — use it to kick off
+  // tryRender one more time in case embedder-ready fired before the pane existed.
+  window.addEventListener('embedding-complete',ev=>{
+    if(!_rendered){
+      subtitle.textContent='Indexed '+ev.detail.total+' entries \u2014 building clusters\u2026';
+      tryRender();
+    }
+  });
 
   return {
     reset(){
