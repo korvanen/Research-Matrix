@@ -7,8 +7,8 @@ const PANEL_KW_MIN_PHRASE_WORDS = 2;
 const PANEL_KW_NGRAM_SIZES      = [2];
 
 // ── Scoring weights ───────────────────────────────────────────────────────────
-const _DEFAULT_KEYWORD_WEIGHT   = 0.35;
-const _DEFAULT_EMBEDDING_WEIGHT = 0.65;
+const _DEFAULT_KEYWORD_WEIGHT   = 0.00;
+const _DEFAULT_EMBEDDING_WEIGHT = 1.00;
 
 let _activeKeywordWeight   = _DEFAULT_KEYWORD_WEIGHT;
 let _activeEmbeddingWeight = _DEFAULT_EMBEDDING_WEIGHT;
