@@ -1,11 +1,11 @@
 // ════════════════════════════════════════════════════════════════════════════
-// sidepanel-clusters.js — "Clusters" tool  v2
+// sidepanel-clusters.js — "Clusters" tool  v3
 //
 // Each cluster is a draggable NEST div. Cards live inside the nest and
 // are positioned relative to it — they cannot be dragged out.
 // Nests use the same push-apart collision logic as mindmap cards.
 // ════════════════════════════════════════════════════════════════════════════
-console.log('[sidepanel-clusters.js v2]');
+console.log('[sidepanel-clusters.js v3]');
 
 (function injectClusterStyles() {
   if (document.getElementById('pp-cluster-styles')) return;
@@ -179,6 +179,56 @@ console.log('[sidepanel-clusters.js v2]');
 }
 .pp-cl-tooltip-goto:hover { background: rgba(0,0,0,.06); }
 
+/* ── Cluster range controls ── */
+#pp-cl-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px 0 2px;
+}
+.pp-cl-range-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.pp-cl-range-label {
+  font-size: 8px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase;
+  color: rgba(0,0,0,.35); flex-shrink: 0; width: 26px;
+}
+.pp-cl-range-val {
+  font-size: 9px; font-weight: 700; letter-spacing: .04em;
+  color: rgba(0,0,0,.55); flex-shrink: 0; width: 14px; text-align: right;
+}
+.pp-cl-range {
+  -webkit-appearance: none; appearance: none;
+  flex: 1; height: 3px; border-radius: 2px;
+  background: rgba(0,0,0,.12); outline: none; cursor: pointer;
+}
+.pp-cl-range::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 12px; height: 12px; border-radius: 50%;
+  background: var(--color-topbar-sheet, #111);
+  box-shadow: 0 1px 4px rgba(0,0,0,.20);
+  cursor: pointer; transition: transform .12s ease;
+}
+.pp-cl-range::-webkit-slider-thumb:hover { transform: scale(1.2); }
+.pp-cl-range::-moz-range-thumb {
+  width: 12px; height: 12px; border-radius: 50%; border: none;
+  background: var(--color-topbar-sheet, #111);
+  box-shadow: 0 1px 4px rgba(0,0,0,.20); cursor: pointer;
+}
+#pp-cl-recluster {
+  margin-top: 2px;
+  align-self: flex-start;
+  border: none; border-radius: 5px;
+  padding: 3px 9px;
+  font-size: 8px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+  background: rgba(0,0,0,.07); color: rgba(0,0,0,.45);
+  cursor: pointer; transition: background .12s, color .12s;
+}
+#pp-cl-recluster:hover { background: rgba(0,0,0,.13); color: rgba(0,0,0,.75); }
+#pp-cl-recluster:disabled { opacity: .35; cursor: default; }
+
 /* ── Empty state ── */
 #pp-cl-empty {
   position: absolute; inset: 0;
@@ -202,6 +252,19 @@ function initClustersTool(paneEl, sidebarEl) {
         '<div class="pp-cl-dot"></div>' +
         '<span id="pp-cl-label">Embeddings loading\u2026</span>' +
       '</div>' +
+      '<div id="pp-cl-controls">' +
+        '<div class="pp-cl-range-row">' +
+          '<span class="pp-cl-range-label">Min</span>' +
+          '<input class="pp-cl-range" id="pp-cl-min" type="range" min="2" max="16" value="2" step="1">' +
+          '<span class="pp-cl-range-val" id="pp-cl-min-val">2</span>' +
+        '</div>' +
+        '<div class="pp-cl-range-row">' +
+          '<span class="pp-cl-range-label">Max</span>' +
+          '<input class="pp-cl-range" id="pp-cl-max" type="range" min="2" max="16" value="12" step="1">' +
+          '<span class="pp-cl-range-val" id="pp-cl-max-val">12</span>' +
+        '</div>' +
+        '<button id="pp-cl-recluster" disabled>Re-cluster</button>' +
+      '</div>' +
     '</div>' +
     '<div id="pp-cl-canvas">' +
       '<div id="pp-cl-empty">Clusters will appear<br>once embeddings finish</div>' +
@@ -223,6 +286,35 @@ function initClustersTool(paneEl, sidebarEl) {
   const ttText    = document.getElementById('pp-cl-tt-text');
   const ttGoto    = document.getElementById('pp-cl-tt-goto');
 
+  const minSlider  = paneEl.querySelector('#pp-cl-min');
+  const maxSlider  = paneEl.querySelector('#pp-cl-max');
+  const minVal     = paneEl.querySelector('#pp-cl-min-val');
+  const maxVal     = paneEl.querySelector('#pp-cl-max-val');
+  const reclusterBtn = paneEl.querySelector('#pp-cl-recluster');
+
+  // ── Range control state ───────────────────────────────────────────────────
+  let _clusterMin = 2;
+  let _clusterMax = 12;
+
+  function syncSliders() {
+    // Enforce min <= max
+    if (+minSlider.value > +maxSlider.value) maxSlider.value = minSlider.value;
+    if (+maxSlider.value < +minSlider.value) minSlider.value = maxSlider.value;
+    _clusterMin = +minSlider.value;
+    _clusterMax = +maxSlider.value;
+    minVal.textContent = _clusterMin;
+    maxVal.textContent = _clusterMax;
+  }
+
+  minSlider.addEventListener('input', () => { syncSliders(); if (_rendered) reclusterBtn.disabled = false; });
+  maxSlider.addEventListener('input', () => { syncSliders(); if (_rendered) reclusterBtn.disabled = false; });
+
+  reclusterBtn.addEventListener('click', () => {
+    reclusterBtn.disabled = true;
+    _rendered = false;
+    tryRender();
+  });
+
   const LETTERS  = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
   const CARD_W   = 80;
   const CARD_H   = 60;
@@ -233,6 +325,8 @@ function initClustersTool(paneEl, sidebarEl) {
 
   let _rendered = false;
   let _ttRow    = null;
+  let _cachedEmbedded = null;  // saved after first fetch so Re-cluster is instant
+  let _cachedVectors  = null;
 
   // ── Canvas size ───────────────────────────────────────────────────────────
   function cW() { return canvas.clientWidth  || 320; }
@@ -262,7 +356,7 @@ function initClustersTool(paneEl, sidebarEl) {
   }
 
   // ── k-Medoids with elbow auto-select ─────────────────────────────────────
-  function autoCluster(rows, vectors) {
+  function autoCluster(rows, vectors, clMin, clMax) {
     const n = rows.length;
     if (n === 0) return [];
 
@@ -277,7 +371,10 @@ function initClustersTool(paneEl, sidebarEl) {
       )
     );
 
-    const maxK = Math.min(12, Math.max(2, Math.round(Math.sqrt(n))));
+    // Respect user-supplied min/max, still cap at √n as a sanity ceiling
+    const sqrtN = Math.max(2, Math.round(Math.sqrt(n)));
+    const minK  = Math.max(2, clMin || 2);
+    const maxK  = Math.min(clMax || 12, sqrtN * 2); // allow up to 2×√n so user can push higher
 
     function kMedoids(k) {
       // k-means++ seed
@@ -317,7 +414,7 @@ function initClustersTool(paneEl, sidebarEl) {
     }
 
     const results = [];
-    for (let k = 2; k <= maxK; k++) {
+    for (let k = minK; k <= maxK; k++) {
       let best = null;
       for (let t = 0; t < 4; t++) { const r = kMedoids(k); if (!best || r.variance < best.variance) best = r; }
       results.push({ k, ...best });
@@ -329,6 +426,8 @@ function initClustersTool(paneEl, sidebarEl) {
       if ((vars[i - 1] - vars[i]) / range < 0.10) { ci = i - 1; break; }
       ci = i;
     }
+    // Never go below the user's minimum
+    ci = Math.max(ci, 0); // ci is index into results which starts at minK
     return results[ci].asgn;
   }
 
@@ -600,6 +699,22 @@ function initClustersTool(paneEl, sidebarEl) {
     if (!window.EmbeddingUtils || !window.EmbeddingUtils.isReady()) return;
     if (typeof buildRowIndex !== 'function') return;
 
+    // If we already have cached data (re-cluster triggered by slider), skip fetch
+    if (_cachedEmbedded && _cachedVectors) {
+      requestAnimationFrame(() => {
+        try {
+          const asgn = autoCluster(_cachedEmbedded, _cachedVectors, _clusterMin, _clusterMax);
+          render(_cachedEmbedded, _cachedVectors, asgn);
+          setStatus('ready', 'Clustered \u00b7 ' + (Math.max(...asgn) + 1) + ' groups');
+          reclusterBtn.disabled = false;
+        } catch (err) {
+          console.error('[clusters] re-cluster failed:', err);
+          setStatus('error', 'Clustering failed');
+        }
+      });
+      return;
+    }
+
     const rows = buildRowIndex();
     if (!rows.length) return;
 
@@ -626,11 +741,16 @@ function initClustersTool(paneEl, sidebarEl) {
       const embedded = rows.filter(r => vectors.has(r.tabIdx + ':' + r.rowIdx));
       if (embedded.length < 3) { setStatus('error', 'Not enough data to cluster'); return; }
 
+      // Cache for instant re-clustering
+      _cachedEmbedded = embedded;
+      _cachedVectors  = vectors;
+
       requestAnimationFrame(() => {
         try {
-          const asgn = autoCluster(embedded, vectors);
+          const asgn = autoCluster(embedded, vectors, _clusterMin, _clusterMax);
           render(embedded, vectors, asgn);
           setStatus('ready', 'Clustered \u00b7 ' + (Math.max(...asgn) + 1) + ' groups');
+          reclusterBtn.disabled = false;
         } catch (err) {
           console.error('[clusters] failed:', err);
           setStatus('error', 'Clustering failed');
