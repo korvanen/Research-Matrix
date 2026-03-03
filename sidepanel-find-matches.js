@@ -3,7 +3,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 console.log('[panel-find-matches.js is updated]');
 
-const PANEL_MIN_SHARED   = 2;
+const PANEL_MIN_SHARED   = 0;
 const PANEL_MM_PAD       = 10;
 const PANEL_MM_ITERS     = 20;
 const PANEL_CARD_W       = 160;
