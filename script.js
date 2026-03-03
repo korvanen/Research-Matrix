@@ -1013,6 +1013,7 @@ tabBar.innerHTML = '<div style="padding:8px 12px;color:#999;font-size:12px">Load
     buildTabBar();
     showTab(0);
     loadingOverlay.style.display = 'none';
+    if (typeof initEmbeddings === 'function') initEmbeddings(); // ← add this
   } catch (err) {
     console.error(err);
     loadingOverlay.style.cssText = 'display:flex;color:red;font-size:13px;padding:20px;text-align:center';
