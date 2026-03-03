@@ -1,13 +1,15 @@
 // ════════════════════════════════════════════════════════════════════════════
-// sidepanel-clusters.js — "Clusters" tool  v4
+// sidepanel-clusters.js — "Clusters" tool  v5
 //
 // Recursive N-level nesting. Depth slider controls how many layers.
 // Depth 1 = clusters containing cards directly.
 // Depth N = N levels of nested containers before cards appear.
 // Outer Min/Max controls top-level cluster count.
 // Inner Min/Max is shared across all deeper levels.
+// Sliders in 3 columns: Outer | Inner | Depth
+// Cluster bounding boxes are corner-draggable to resize.
 // ════════════════════════════════════════════════════════════════════════════
-console.log('[sidepanel-clusters.js v5]');
+console.log('[sidepanel-clusters.js v6]');
 
 (function injectClusterStyles() {
   if (document.getElementById('pp-cluster-styles')) return;
@@ -38,20 +40,31 @@ console.log('[sidepanel-clusters.js v5]');
 #pp-cl-status.cl-error .pp-cl-dot   { background:rgba(180,40,40,.85); }
 @keyframes pp-cl-pulse { 0%,100%{opacity:.25;transform:scale(.85);}50%{opacity:1;transform:scale(1.1);} }
 
-/* ── Controls ── */
-#pp-cl-controls { display:flex;flex-direction:row;align-items:stretch;gap:4px; }
-#pp-cl-sliders  { display:flex;flex-direction:column;gap:3px;width:75%; }
-.pp-cl-slider-group { display:flex;flex-direction:column;gap:2px; }
+/* ── Controls: 3-column slider grid + recluster button ── */
+#pp-cl-controls {
+  display: flex; flex-direction: column; gap: 4px;
+}
+#pp-cl-sliders {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 6px;
+  align-items: start;
+}
+.pp-cl-slider-col {
+  display: flex; flex-direction: column; gap: 2px;
+}
 .pp-cl-group-label {
   font-size:7px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;
-  color:rgba(0,0,0,.28);line-height:1;
+  color:rgba(0,0,0,.28);line-height:1;margin-bottom:1px;
 }
-.pp-cl-range-row { display:flex;align-items:center;gap:4px; }
+.pp-cl-range-row { display:flex;align-items:center;gap:3px; }
 .pp-cl-range-label {
   font-size:8px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
-  color:rgba(0,0,0,.35);flex-shrink:0;width:20px;
+  color:rgba(0,0,0,.35);flex-shrink:0;width:18px;
 }
-.pp-cl-range-val { font-size:9px;font-weight:700;color:rgba(0,0,0,.55);flex-shrink:0;width:12px;text-align:right; }
+.pp-cl-range-val {
+  font-size:9px;font-weight:700;color:rgba(0,0,0,.55);flex-shrink:0;width:12px;text-align:right;
+}
 .pp-cl-range {
   -webkit-appearance:none;appearance:none;flex:1;height:3px;border-radius:2px;
   background:rgba(0,0,0,.12);outline:none;cursor:pointer;min-width:0;
@@ -68,14 +81,18 @@ console.log('[sidepanel-clusters.js v5]');
   width:11px;height:11px;border-radius:50%;border:none;
   background:var(--color-topbar-sheet,#111);box-shadow:0 1px 3px rgba(0,0,0,.22);cursor:pointer;
 }
-.pp-cl-divider { height:1px;background:rgba(0,0,0,.08);margin:1px 0; }
+.pp-cl-col-divider {
+  width:1px; background:rgba(0,0,0,.08); align-self:stretch; margin:0 1px;
+  display:none; /* dividers handled by grid gap */
+}
 
 #pp-cl-recluster {
-  width:25%;border:none;border-radius:6px;
+  width:100%;border:none;border-radius:5px;padding:4px 8px;
   font-size:8px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;
   background:rgba(0,0,0,.07);color:rgba(0,0,0,.45);
   cursor:pointer;transition:background .15s,color .15s;
   display:flex;align-items:center;justify-content:center;text-align:center;line-height:1.2;
+  height:22px;
 }
 #pp-cl-recluster:hover { background:rgba(0,0,0,.13);color:rgba(0,0,0,.75); }
 #pp-cl-recluster.pp-cl-reclustering { background:rgba(0,0,0,.04);color:rgba(0,0,0,.25);cursor:default; }
@@ -88,6 +105,7 @@ console.log('[sidepanel-clusters.js v5]');
   position:absolute;box-sizing:border-box;user-select:none;cursor:grab;
   animation:pp-cl-nest-in .30s cubic-bezier(0.22,1,0.36,1) both;
   transition:box-shadow .18s ease;
+  overflow:hidden;
 }
 .pp-cl-nest:active,.pp-cl-nest.pp-cl-nest-dragging { cursor:grabbing; }
 .pp-cl-nest.pp-cl-nest-dragging { z-index:100; }
@@ -112,7 +130,7 @@ console.log('[sidepanel-clusters.js v5]');
 }
 
 .pp-cl-nest-head {
-  display:flex;align-items:center;gap:4px;
+  display:flex;align-items:center;gap:4px;flex-shrink:0;
   border-bottom:1px solid rgba(0,0,0,.08);
 }
 .pp-cl-nest[data-depth="0"] .pp-cl-nest-head { padding:5px 8px 4px;border-radius:14px 14px 0 0; }
@@ -138,11 +156,37 @@ console.log('[sidepanel-clusters.js v5]');
 
 .pp-cl-nest-body {
   position:relative;
+  overflow:auto;
 }
 .pp-cl-nest[data-depth="0"] .pp-cl-nest-body { padding:7px; }
 .pp-cl-nest[data-depth="1"] .pp-cl-nest-body { padding:5px; }
 .pp-cl-nest[data-depth="2"] .pp-cl-nest-body { padding:4px; }
 .pp-cl-nest[data-depth="3"] .pp-cl-nest-body { padding:3px; }
+
+/* ── Corner resize handles ── */
+.pp-cl-resize-handle {
+  position: absolute;
+  width: 14px; height: 14px;
+  z-index: 30;
+  opacity: 0;
+  transition: opacity .15s;
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+.pp-cl-nest:hover > .pp-cl-resize-handle { opacity: 1; }
+.pp-cl-resize-handle::after {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  background: rgba(0,0,0,.28);
+  border-radius: 3px;
+  transition: background .12s;
+}
+.pp-cl-resize-handle:hover::after { background: rgba(0,0,0,.55); }
+.pp-cl-rh-nw { top: -6px; left: -6px; cursor: nwse-resize; }
+.pp-cl-rh-ne { top: -6px; right: -6px; cursor: nesw-resize; }
+.pp-cl-rh-sw { bottom: -6px; left: -6px; cursor: nesw-resize; }
+.pp-cl-rh-se { bottom: -6px; right: -6px; cursor: nwse-resize; }
 
 /* ── Cards ── */
 .pp-cl-card {
@@ -211,25 +255,28 @@ function initClustersTool(paneEl, sidebarEl) {
       '<div id="pp-cl-subtitle">Waiting for embeddings\u2026</div>' +
       '<div id="pp-cl-status" class="cl-loading"><div class="pp-cl-dot"></div><span id="pp-cl-label">Embeddings loading\u2026</span></div>' +
       '<div id="pp-cl-controls">' +
+        // ── 3-column slider grid ──
         '<div id="pp-cl-sliders">' +
-          '<div class="pp-cl-slider-group">' +
-            '<div class="pp-cl-group-label">Outer clusters</div>' +
+          // Column 1: Outer clusters
+          '<div class="pp-cl-slider-col">' +
+            '<div class="pp-cl-group-label">Outer</div>' +
             '<div class="pp-cl-range-row"><span class="pp-cl-range-label">Min</span><input class="pp-cl-range" id="pp-cl-omin" type="range" min="2" max="16" value="2" step="1"><span class="pp-cl-range-val" id="pp-cl-omin-val">2</span></div>' +
             '<div class="pp-cl-range-row"><span class="pp-cl-range-label">Max</span><input class="pp-cl-range" id="pp-cl-omax" type="range" min="2" max="16" value="12" step="1"><span class="pp-cl-range-val" id="pp-cl-omax-val">12</span></div>' +
           '</div>' +
-          '<div class="pp-cl-divider"></div>' +
-          '<div class="pp-cl-slider-group">' +
-            '<div class="pp-cl-group-label">Inner sub-clusters</div>' +
+          // Column 2: Inner sub-clusters
+          '<div class="pp-cl-slider-col">' +
+            '<div class="pp-cl-group-label">Inner</div>' +
             '<div class="pp-cl-range-row"><span class="pp-cl-range-label">Min</span><input class="pp-cl-range pp-cl-inner" id="pp-cl-imin" type="range" min="2" max="8" value="2" step="1"><span class="pp-cl-range-val" id="pp-cl-imin-val">2</span></div>' +
             '<div class="pp-cl-range-row"><span class="pp-cl-range-label">Max</span><input class="pp-cl-range pp-cl-inner" id="pp-cl-imax" type="range" min="2" max="8" value="4" step="1"><span class="pp-cl-range-val" id="pp-cl-imax-val">4</span></div>' +
           '</div>' +
-          '<div class="pp-cl-divider"></div>' +
-          '<div class="pp-cl-slider-group">' +
+          // Column 3: Depth
+          '<div class="pp-cl-slider-col">' +
             '<div class="pp-cl-group-label">Depth</div>' +
-            '<div class="pp-cl-range-row"><span class="pp-cl-range-label">Lvls</span><input class="pp-cl-range pp-cl-depth" id="pp-cl-depth" type="range" min="1" max="4" value="2" step="1"><span class="pp-cl-range-val" id="pp-cl-depth-val">2</span></div>' +
+            '<div class="pp-cl-range-row"><span class="pp-cl-range-label">Lvl</span><input class="pp-cl-range pp-cl-depth" id="pp-cl-depth" type="range" min="1" max="4" value="2" step="1"><span class="pp-cl-range-val" id="pp-cl-depth-val">2</span></div>' +
           '</div>' +
         '</div>' +
-        '<button id="pp-cl-recluster">Re-\ncluster</button>' +
+        // ── Recluster button (full-width below grid) ──
+        '<button id="pp-cl-recluster">Re-cluster</button>' +
       '</div>' +
     '</div>' +
     '<div id="pp-cl-canvas"><div id="pp-cl-empty">Clusters will appear<br>once embeddings finish</div></div>' +
@@ -261,9 +308,13 @@ function initClustersTool(paneEl, sidebarEl) {
   const LETTERS  = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
   const CARD_W   = 78, CARD_H = 56;
   const CARD_PAD = 5, CARD_GAP = 4;
-  const BODY_PAD = [8, 6, 5, 4]; // padding inside body at each depth level
-  const BODY_GAP = [8, 6, 5, 4]; // gap between children at each depth
+  const BODY_PAD = [8, 6, 5, 4];
+  const BODY_GAP = [8, 6, 5, 4];
   const MM_PAD   = 12, MM_ITERS = 32;
+
+  // Minimum size for resized nests
+  const RESIZE_MIN_W = 90;
+  const RESIZE_MIN_H = 50;
 
   // ── State ─────────────────────────────────────────────────────────────────
   let _outerMin = 2, _outerMax = 12, _innerMin = 2, _innerMax = 4, _depth = 2;
@@ -415,16 +466,14 @@ function initClustersTool(paneEl, sidebarEl) {
   }
 
   // ── Colour for a path of cluster indices ─────────────────────────────────
-  // path = [outerIdx, innerIdx, ...] — we use outermost for hue, depth for lightness
   function colorForPath(path) {
     const outerIdx = path[0] || 0;
-    const depth    = path.length; // 1 = outer, 2 = inner, etc.
+    const depth    = path.length;
     const tname = (typeof TAB_THEMES!=='undefined' ? TAB_THEMES[outerIdx % TAB_THEMES.length] : 'default') || 'default';
     const theme = (typeof THEMES!=='undefined' ? (THEMES[tname]||THEMES.default) : {}) || {};
     const accent = theme['--tab-active-bg']    || '#888';
     const label  = theme['--tab-active-color'] || '#fff';
     const bg     = theme['--bg-data']          || '#f8f8f8';
-    // Fade accent with depth
     const alphaAccent = Math.max(0.35, 1 - (depth-1)*0.18);
     return {
       accent: accent + Math.round(alphaAccent*255).toString(16).padStart(2,'0'),
@@ -481,24 +530,111 @@ function initClustersTool(paneEl, sidebarEl) {
     return {w:tw,h:th};
   }
 
+  // ── Corner resize ─────────────────────────────────────────────────────────
+  // Adds 4 corner drag handles to a nest element.
+  // Resizing locks explicit width/height and makes the body scroll.
+  function makeResizable(nestEl, nestId, nestRects) {
+    const corners = [
+      { cls: 'nw', dw: -1, dh: -1, moveL: true,  moveT: true  },
+      { cls: 'ne', dw:  1, dh: -1, moveL: false, moveT: true  },
+      { cls: 'sw', dw: -1, dh:  1, moveL: true,  moveT: false },
+      { cls: 'se', dw:  1, dh:  1, moveL: false, moveT: false },
+    ];
+
+    corners.forEach(({ cls, dw, dh, moveL, moveT }) => {
+      const handle = document.createElement('div');
+      handle.className = `pp-cl-resize-handle pp-cl-rh-${cls}`;
+      nestEl.appendChild(handle);
+
+      let active = false;
+      let sx, sy, sw, sh, sl, st;
+
+      function onDown(cx, cy) {
+        active = true;
+        sx = cx; sy = cy;
+        sw = nestEl.offsetWidth;
+        sh = nestEl.offsetHeight;
+        const r = nestRects.get(nestId);
+        sl = r ? r.x : parseFloat(nestEl.style.left) || 0;
+        st = r ? r.y : parseFloat(nestEl.style.top)  || 0;
+      }
+
+      function onMove(cx, cy) {
+        if (!active) return;
+        const ddx = cx - sx;
+        const ddy = cy - sy;
+        let newW = Math.max(RESIZE_MIN_W, sw + dw * ddx);
+        let newH = Math.max(RESIZE_MIN_H, sh + dh * ddy);
+
+        // Adjust position for anchored corners (nw / sw move left; nw / ne move top)
+        let newL = moveL ? sl + sw - newW : sl;
+        let newT = moveT ? st + sh - newH : st;
+
+        nestEl.style.width   = newW + 'px';
+        nestEl.style.height  = newH + 'px';
+        nestEl.style.left    = newL + 'px';
+        nestEl.style.top     = newT + 'px';
+
+        // Make body fill remaining vertical space and scroll if content overflows
+        const headEl = nestEl.querySelector('.pp-cl-nest-head');
+        const bodyEl = nestEl.querySelector('.pp-cl-nest-body');
+        if (headEl && bodyEl) {
+          const headH = headEl.offsetHeight;
+          bodyEl.style.height   = Math.max(20, newH - headH) + 'px';
+          bodyEl.style.overflow = 'auto';
+          bodyEl.style.flexShrink = '0';
+        }
+
+        // Keep rect map in sync
+        const r = nestRects.get(nestId);
+        if (r) { r.x = newL; r.y = newT; r.w = newW; r.h = newH; }
+      }
+
+      function onUp() {
+        if (!active) return;
+        active = false;
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup',   onMouseUp);
+        document.removeEventListener('touchmove', onTouchMove);
+        document.removeEventListener('touchend',  onTouchEnd);
+      }
+
+      function onMouseMove(e) { onMove(e.clientX, e.clientY); }
+      function onMouseUp()    { onUp(); }
+      function onTouchMove(e) {
+        if (!active || !e.touches.length) return;
+        e.preventDefault();
+        onMove(e.touches[0].clientX, e.touches[0].clientY);
+      }
+      function onTouchEnd() { onUp(); }
+
+      handle.addEventListener('mousedown', e => {
+        if (e.button !== 0) return;
+        e.stopPropagation(); e.preventDefault();
+        onDown(e.clientX, e.clientY);
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup',   onMouseUp);
+      });
+
+      handle.addEventListener('touchstart', e => {
+        if (e.touches.length !== 1) return;
+        e.stopPropagation(); e.preventDefault();
+        onDown(e.touches[0].clientX, e.touches[0].clientY);
+        document.addEventListener('touchmove', onTouchMove, { passive: false });
+        document.addEventListener('touchend',  onTouchEnd);
+      }, { passive: false });
+    });
+  }
+
   // ── Recursive nest builder ────────────────────────────────────────────────
-  // rows     : array of row objects for this node
-  // depth    : current depth (0=outermost nest)
-  // maxDepth : total nesting levels - 1 (so maxDepth=0 means put cards directly)
-  // path     : array of cluster indices from root to here e.g. [2, 1]
-  // parentBody : DOM element to append into (null = canvas)
-  // parentRects: Map of sibling rects (for collision) — also null at root
-  // Returns { el, w, h } of the built container
   function buildNestRecursive(rows, depth, maxDepth, path, parentBody, siblings) {
     const col     = colorForPath(path);
     const pad     = BODY_PAD[Math.min(depth, BODY_PAD.length-1)];
     const gap     = BODY_GAP[Math.min(depth, BODY_GAP.length-1)];
     const headH   = depth===0?28:depth===1?22:18;
 
-    // ── Cluster this level's rows ──────────────────────────────────────────
-    let children; // array of { members, childPath }
+    let children;
     if (depth < maxDepth) {
-      // Cluster and recurse
       const minK = depth===0 ? _outerMin : _innerMin;
       const maxK = depth===0 ? _outerMax : _innerMax;
       const asgn = autoCluster(rows, minK, maxK);
@@ -507,18 +643,18 @@ function initClustersTool(paneEl, sidebarEl) {
       rows.forEach((r,i) => groups[asgn[i]].push(r));
       children = groups.map((members, ci) => ({ members, childPath:[...path, ci] }));
     } else {
-      // Leaf level — children are cards, not nests
       children = null;
     }
 
-    // ── Build the nest element ─────────────────────────────────────────────
-    const isRoot = (parentBody === null);
     const nest = document.createElement('div');
     nest.className = 'pp-cl-nest';
     nest.setAttribute('data-depth', String(depth));
     nest.style.setProperty('--nest-border', col.accentSolid + (depth===0?'44':'33'));
     nest.style.setProperty('--nest-bg',     col.accentSolid + (depth===0?'09':'06'));
     nest.style.animationDelay = (path[path.length-1]||0) * (depth===0?60:35) + 'ms';
+    // Border colour via inline style so it picks up the per-nest accent
+    nest.style.borderColor = col.accentSolid + (depth===0?'55':'33');
+    nest.style.background  = col.accentSolid + (depth===0?'0a':'07');
 
     const label = path.map((idx,d) => d===0?(LETTERS[idx]||idx):(idx+1)).join('.');
     const countLabel = rows.length + ' entr'+(rows.length===1?'y':'ies');
@@ -538,11 +674,9 @@ function initClustersTool(paneEl, sidebarEl) {
     body.className = 'pp-cl-nest-body';
     nest.appendChild(body);
 
-    // ── Fill body ─────────────────────────────────────────────────────────
     let bodyW = 0, bodyH = 0;
 
     if (children === null) {
-      // Leaf: build card grid
       const cardEls = rows.map(r => {
         const card = buildCard(r, path, col);
         body.appendChild(card);
@@ -551,7 +685,6 @@ function initClustersTool(paneEl, sidebarEl) {
       const {w,h} = layoutCardGrid(cardEls, body);
       bodyW = w; bodyH = h;
     } else {
-      // Non-leaf: build child nests, lay out with flow + collision
       const childEls   = new Map();
       const childRects = new Map();
       body.style.position = 'relative';
@@ -560,7 +693,6 @@ function initClustersTool(paneEl, sidebarEl) {
         if (!members.length) return;
         const {el, w, h} = buildNestRecursive(members, depth+1, maxDepth, childPath, body, childRects);
         const cid = 'c'+ci;
-        // Initial position: flow layout
         let startX=pad, startY=pad;
         childRects.forEach(r=>{ startX=Math.max(startX,r.x+r.w+gap); });
         el.style.position='absolute';
@@ -569,11 +701,10 @@ function initClustersTool(paneEl, sidebarEl) {
         childEls.set(cid, el);
         childRects.set(cid, {x:startX, y:pad, w, h});
         body.appendChild(el);
-        // Wire dragging for child nest (constrained to this body)
         makeConstrainedDraggable(el, cid, childEls, childRects, body, depth+1);
+        makeResizable(el, cid, childRects);
       });
 
-      // Compute body size from children
       let maxX=0, maxY=0;
       childRects.forEach(r=>{ maxX=Math.max(maxX,r.x+r.w); maxY=Math.max(maxY,r.y+r.h); });
       bodyW = maxX + pad;
@@ -590,12 +721,9 @@ function initClustersTool(paneEl, sidebarEl) {
   }
 
   // ── Dragging for any nest level ───────────────────────────────────────────
-  // For root-level (depth=0) nests, constraint is the canvas.
-  // For child nests, constraint is their parent body element.
   function makeConstrainedDraggable(nestEl, nestId, nestEls, nestRects, containerEl, depth) {
     let dragging=false, ox=0, oy=0, sl=0, st=0;
-    const isRoot = (containerEl === null);
-    const colPad = depth===0?4:2; // extra collision pad varies by depth
+    const colPad = depth===0?4:2;
 
     function getContainerSize() {
       if (!containerEl) return {w:cW(), h:cH()};
@@ -603,10 +731,11 @@ function initClustersTool(paneEl, sidebarEl) {
     }
 
     function start(cx, cy, tgt) {
-      // Don't start drag if clicking on a deeper nest or card
       if (tgt && tgt !== nestEl && (
         tgt.closest('.pp-cl-nest') !== nestEl ||
-        tgt.closest('.pp-cl-card')
+        tgt.closest('.pp-cl-card') ||
+        tgt.classList.contains('pp-cl-resize-handle') ||
+        tgt.closest('.pp-cl-resize-handle')
       )) return false;
       dragging=true; ox=cx; oy=cy;
       const r=nestRects.get(nestId); sl=r?r.x:0; st=r?r.y:0;
@@ -622,7 +751,6 @@ function initClustersTool(paneEl, sidebarEl) {
       nestEl.style.left=r.x+'px'; nestEl.style.top=r.y+'px';
       pushApart(nestRects, nestId, cw, ch, colPad);
       applyPos(nestEls, nestRects);
-      // Expand container if needed (for child nests)
       if (containerEl) {
         let maxX=0,maxY=0;
         nestRects.forEach(r2=>{maxX=Math.max(maxX,r2.x+r2.w);maxY=Math.max(maxY,r2.y+r2.h);});
@@ -660,10 +788,9 @@ function initClustersTool(paneEl, sidebarEl) {
     Array.from(canvas.children).forEach(c=>{if(c!==emptyEl)c.remove();});
     emptyEl.style.display='none';
 
-    const maxDepth = _depth - 1; // depth=1 → maxDepth=0 → cards at level 0
+    const maxDepth = _depth - 1;
     const W=cW(), H=cH();
 
-    // Top-level cluster
     const minK = _outerMin, maxK = _outerMax;
     const topAsgn = autoCluster(rows, minK, maxK);
     const numTop  = Math.max(...topAsgn, 0) + 1;
@@ -677,7 +804,6 @@ function initClustersTool(paneEl, sidebarEl) {
       if (!members.length) return;
       const {el, w, h} = buildNestRecursive(members, 0, maxDepth, [oi], null, rootRects);
 
-      // Initial ring position
       const angle = (2*Math.PI*oi/numTop) - Math.PI/2;
       const ringR = numTop===1 ? 0 : Math.min(W,H)*0.26;
       const nx = Math.max(0, Math.min(W-w, W/2+ringR*Math.cos(angle)-w/2));
@@ -688,9 +814,9 @@ function initClustersTool(paneEl, sidebarEl) {
       rootEls.set('r'+oi, el);
       rootRects.set('r'+oi, {x:nx, y:ny, w, h});
       makeConstrainedDraggable(el, 'r'+oi, rootEls, rootRects, null, 0);
+      makeResizable(el, 'r'+oi, rootRects);
     });
 
-    // Re-measure actual heights after paint and run collision
     requestAnimationFrame(()=>{
       rootEls.forEach((el,id)=>{
         const r=rootRects.get(id);
@@ -735,7 +861,7 @@ function initClustersTool(paneEl, sidebarEl) {
     catch(err) { console.error('[clusters]',err); setStatus('error','Clustering failed'); }
     setStatus('ready','Done');
     reclusterBtn.classList.remove('pp-cl-reclustering');
-    reclusterBtn.textContent='Re-\ncluster';
+    reclusterBtn.textContent='Re-cluster';
   }
 
   function tryRender() {
