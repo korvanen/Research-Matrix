@@ -1,6 +1,6 @@
 // ════════════════════════════════════════════════════════════════════════════
 // embedding-utils.js — Local semantic embeddings via Transformers.js
-// Loaded as <script type="module">; exposes window.EmbeddingUtils globally.
+// Loaded as <scriptlll type="module">; exposes window.EmbeddingUtils globally.
 // ════════════════════════════════════════════════════════════════════════════
 
 import { pipeline, env }
