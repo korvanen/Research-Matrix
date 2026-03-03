@@ -1,18 +1,14 @@
 // ════════════════════════════════════════════════════════════════════════════
-// panel.js — Sidebar shell
-//
-// Builds the tool navigation bar and delegates to per-tool init functions.
+// sidepanel-shell.js — Sidebar shell
 //
 // LOAD ORDER (in index.html):
-//   1. keyword-utils.js      — panelExtractKW, buildRowIndex, findMatches
-//   2. panel-utils.js        — panelEscH, panelHighlight, panelThemeVars,
-//                              buildPill, panelGoTo, attachGoTo,
-//                              parseCitation, citationPillHtml
-//   3. panel-find-matches.js — initFindMatchesTool()
-//   4. panel-keywords.js     — initKeywordsTool()
-//   5. panel.js              — this file
+//   1. keyword-utils.js
+//   2. sidepanel-utils.js
+//   3. sidepanel-find-matches.js  — initFindMatchesTool()
+//   4. sidepanel-clusters.js      — initClustersTool()
+//   5. sidepanel-shell.js         — this file
 // ════════════════════════════════════════════════════════════════════════════
-console.log('[panel.js v2]');
+console.log('[sidepanel-shell.js v2]');
 
 document.addEventListener('DOMContentLoaded', () => {
   const wait = setInterval(() => {
@@ -29,34 +25,31 @@ function initPanel(sidebarBox) {
   sidebarBox.style.display       = 'flex';
   sidebarBox.style.flexDirection = 'column';
 
-  // ── Build tool nav + pane scaffold ───────────────────────────────────────
   sidebarBox.innerHTML =
     '<div id="pp-tool-nav">' +
       '<button class="pp-tool-btn pp-tool-btn-active" data-tool="find-matches">Find Matches</button>' +
-      '<button class="pp-tool-btn" data-tool="keywords">Keywords</button>' +
+      '<button class="pp-tool-btn" data-tool="clusters">Clusters</button>' +
     '</div>' +
     '<div id="pp-tool-pane-find-matches" class="pp-tool-pane pp-tool-pane-active"></div>' +
-    '<div id="pp-tool-pane-keywords"     class="pp-tool-pane"></div>';
+    '<div id="pp-tool-pane-clusters"     class="pp-tool-pane"></div>';
 
   const sidebarEl = document.getElementById('sidebar');
 
-  // ── Init each tool into its pane ─────────────────────────────────────────
   const findMatchesAPI = initFindMatchesTool(
     document.getElementById('pp-tool-pane-find-matches'),
     sidebarEl
   );
-  const keywordsAPI = initKeywordsTool(
-    document.getElementById('pp-tool-pane-keywords'),
+
+  const clustersAPI = initClustersTool(
+    document.getElementById('pp-tool-pane-clusters'),
     sidebarEl
   );
 
-  // Map tool id → { reset } API returned by each tool's init
   const tools = {
     'find-matches': findMatchesAPI,
-    'keywords':     keywordsAPI,
+    'clusters':     clustersAPI,
   };
 
-  // ── Tool switching ────────────────────────────────────────────────────────
   let _activeTool = 'find-matches';
 
   document.getElementById('pp-tool-nav').addEventListener('click', e => {
@@ -65,12 +58,8 @@ function initPanel(sidebarBox) {
     const tool = btn.dataset.tool;
     if (tool === _activeTool) return;
 
-    // Deselect everything in the grid
     if (typeof clearSelection === 'function') clearSelection();
-
-    // Reset the tool we're leaving
     tools[_activeTool]?.reset?.();
-
     _activeTool = tool;
 
     document.querySelectorAll('.pp-tool-btn').forEach(b =>
