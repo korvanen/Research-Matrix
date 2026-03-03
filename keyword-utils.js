@@ -18,7 +18,7 @@ function setMatchWeights(kw, emb) {
   _activeEmbeddingWeight = emb;
 }
 
-const EMBEDDING_SIMILARITY_THRESHOLD = 0.45;
+const EMBEDDING_SIMILARITY_THRESHOLD = 0.65;
 
 // ── Stop words ────────────────────────────────────────────────────────────────
 const PANEL_STOP_WORDS = new Set([
