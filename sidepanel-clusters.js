@@ -1,11 +1,11 @@
 // ════════════════════════════════════════════════════════════════════════════
-// sidepanel-clusters.js — "Clusters" tool  v4
+// sidepanel-clusters.js — "Clusters" tool  v2
 //
 // Each cluster is a draggable NEST div. Cards live inside the nest and
 // are positioned relative to it — they cannot be dragged out.
 // Nests use the same push-apart collision logic as mindmap cards.
 // ════════════════════════════════════════════════════════════════════════════
-console.log('[sidepanel-clusters.js v4]');
+console.log('[sidepanel-clusters.js v5]');
 
 (function injectClusterStyles() {
   if (document.getElementById('pp-cluster-styles')) return;
@@ -182,27 +182,35 @@ console.log('[sidepanel-clusters.js v4]');
 /* ── Cluster range controls ── */
 #pp-cl-controls {
   display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  gap: 6px;
+  padding: 4px 0 2px;
+}
+#pp-cl-sliders {
+  display: flex;
   flex-direction: column;
   gap: 4px;
-  padding: 4px 0 2px;
+  width: 50%;
 }
 .pp-cl-range-row {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
 }
 .pp-cl-range-label {
   font-size: 8px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase;
-  color: rgba(0,0,0,.35); flex-shrink: 0; width: 26px;
+  color: rgba(0,0,0,.35); flex-shrink: 0; width: 22px;
 }
 .pp-cl-range-val {
   font-size: 9px; font-weight: 700; letter-spacing: .04em;
-  color: rgba(0,0,0,.55); flex-shrink: 0; width: 14px; text-align: right;
+  color: rgba(0,0,0,.55); flex-shrink: 0; width: 12px; text-align: right;
 }
 .pp-cl-range {
   -webkit-appearance: none; appearance: none;
   flex: 1; height: 3px; border-radius: 2px;
   background: rgba(0,0,0,.12); outline: none; cursor: pointer;
+  min-width: 0;
 }
 .pp-cl-range::-webkit-slider-thumb {
   -webkit-appearance: none; appearance: none;
@@ -218,16 +226,18 @@ console.log('[sidepanel-clusters.js v4]');
   box-shadow: 0 1px 4px rgba(0,0,0,.20); cursor: pointer;
 }
 #pp-cl-recluster {
-  margin-top: 2px;
-  align-self: flex-start;
-  border: none; border-radius: 5px;
-  padding: 3px 9px;
+  width: 50%;
+  border: none; border-radius: 6px;
   font-size: 8px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
   background: rgba(0,0,0,.07); color: rgba(0,0,0,.45);
-  cursor: pointer; transition: background .12s, color .12s;
+  cursor: pointer; transition: background .15s, color .15s;
+  display: flex; align-items: center; justify-content: center;
 }
 #pp-cl-recluster:hover { background: rgba(0,0,0,.13); color: rgba(0,0,0,.75); }
-#pp-cl-recluster:disabled { opacity: .35; cursor: default; }
+#pp-cl-recluster.pp-cl-reclustering {
+  background: rgba(0,0,0,.04); color: rgba(0,0,0,.25);
+  cursor: default;
+}
 
 /* ── Empty state ── */
 #pp-cl-empty {
@@ -253,17 +263,19 @@ function initClustersTool(paneEl, sidebarEl) {
         '<span id="pp-cl-label">Embeddings loading\u2026</span>' +
       '</div>' +
       '<div id="pp-cl-controls">' +
-        '<div class="pp-cl-range-row">' +
-          '<span class="pp-cl-range-label">Min</span>' +
-          '<input class="pp-cl-range" id="pp-cl-min" type="range" min="2" max="16" value="2" step="1">' +
-          '<span class="pp-cl-range-val" id="pp-cl-min-val">2</span>' +
+        '<div id="pp-cl-sliders">' +
+          '<div class="pp-cl-range-row">' +
+            '<span class="pp-cl-range-label">Min</span>' +
+            '<input class="pp-cl-range" id="pp-cl-min" type="range" min="2" max="16" value="2" step="1">' +
+            '<span class="pp-cl-range-val" id="pp-cl-min-val">2</span>' +
+          '</div>' +
+          '<div class="pp-cl-range-row">' +
+            '<span class="pp-cl-range-label">Max</span>' +
+            '<input class="pp-cl-range" id="pp-cl-max" type="range" min="2" max="16" value="12" step="1">' +
+            '<span class="pp-cl-range-val" id="pp-cl-max-val">12</span>' +
+          '</div>' +
         '</div>' +
-        '<div class="pp-cl-range-row">' +
-          '<span class="pp-cl-range-label">Max</span>' +
-          '<input class="pp-cl-range" id="pp-cl-max" type="range" min="2" max="16" value="12" step="1">' +
-          '<span class="pp-cl-range-val" id="pp-cl-max-val">12</span>' +
-        '</div>' +
-        '<button id="pp-cl-recluster" disabled>Re-cluster</button>' +
+        '<button id="pp-cl-recluster">Re-cluster</button>' +
       '</div>' +
     '</div>' +
     '<div id="pp-cl-canvas">' +
@@ -297,7 +309,6 @@ function initClustersTool(paneEl, sidebarEl) {
   let _clusterMax = 12;
 
   function syncSliders() {
-    // Enforce min <= max
     if (+minSlider.value > +maxSlider.value) maxSlider.value = minSlider.value;
     if (+maxSlider.value < +minSlider.value) minSlider.value = maxSlider.value;
     _clusterMin = +minSlider.value;
@@ -306,11 +317,24 @@ function initClustersTool(paneEl, sidebarEl) {
     maxVal.textContent = _clusterMax;
   }
 
-  minSlider.addEventListener('input', () => { syncSliders(); if (_rendered) reclusterBtn.disabled = false; });
-  maxSlider.addEventListener('input', () => { syncSliders(); if (_rendered) reclusterBtn.disabled = false; });
+  let _reclusterTimer = null;
+  function scheduleRecluster() {
+    syncSliders();
+    if (!_cachedEmbedded) return; // embeddings not ready yet, nothing to re-cluster
+    clearTimeout(_reclusterTimer);
+    reclusterBtn.classList.add('pp-cl-reclustering');
+    reclusterBtn.textContent = '\u2026';
+    _reclusterTimer = setTimeout(() => {
+      _rendered = false;
+      tryRender();
+    }, 400);
+  }
+
+  minSlider.addEventListener('input', scheduleRecluster);
+  maxSlider.addEventListener('input', scheduleRecluster);
 
   reclusterBtn.addEventListener('click', () => {
-    reclusterBtn.disabled = true;
+    clearTimeout(_reclusterTimer);
     _rendered = false;
     tryRender();
   });
@@ -707,10 +731,13 @@ function initClustersTool(paneEl, sidebarEl) {
           const asgn = autoCluster(_cachedEmbedded, _cachedVectors, _clusterMin, _clusterMax);
           render(_cachedEmbedded, _cachedVectors, asgn);
           setStatus('ready', 'Clustered \u00b7 ' + (Math.max(...asgn) + 1) + ' groups');
-          reclusterBtn.disabled = false;
+          reclusterBtn.classList.remove('pp-cl-reclustering');
+          reclusterBtn.textContent = 'Re-cluster';
         } catch (err) {
           console.error('[clusters] re-cluster failed:', err);
           setStatus('error', 'Clustering failed');
+          reclusterBtn.classList.remove('pp-cl-reclustering');
+          reclusterBtn.textContent = 'Re-cluster';
         }
       });
       return;
@@ -751,10 +778,13 @@ function initClustersTool(paneEl, sidebarEl) {
           const asgn = autoCluster(embedded, vectors, _clusterMin, _clusterMax);
           render(embedded, vectors, asgn);
           setStatus('ready', 'Clustered \u00b7 ' + (Math.max(...asgn) + 1) + ' groups');
-          reclusterBtn.disabled = false;
+          reclusterBtn.classList.remove('pp-cl-reclustering');
+          reclusterBtn.textContent = 'Re-cluster';
         } catch (err) {
           console.error('[clusters] failed:', err);
           setStatus('error', 'Clustering failed');
+          reclusterBtn.classList.remove('pp-cl-reclustering');
+          reclusterBtn.textContent = 'Re-cluster';
         }
       });
     });
