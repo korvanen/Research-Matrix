@@ -1,4 +1,4 @@
-// sidepanel-shell.js — Sidebar shell  v4
+// sidepanel-shell.js — Sidebar shell  v5
 //
 // LOAD ORDER (in index.html):
 //   1. keyword-utils.js
@@ -9,7 +9,7 @@
 //   6. sidepanel-shell.js         — this file
 //
 // ════════════════════════════════════════════════════════════════════════════
-console.log('[sidepanel-shell.js v4]');
+console.log('[sidepanel-shell.js v5]');
 
 document.addEventListener('DOMContentLoaded', () => {
   const wait = setInterval(() => {
@@ -74,15 +74,13 @@ function initPanel(sidebarBox) {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// Clusters tool  v12  (bug-fix release)
+// Clusters tool  v13
 //
-// Fixes vs shell v3 / clusters v10:
-//   1. _zoom state variable added; applyWorldTransform includes scale(_zoom)
-//   2. Wheel + pinch zoom wired up (were missing from shell copy entirely)
-//   3. buildCard: removed pp-cl-card-head (badge label + tab name) — content only
-//   4. Sub-cluster (depth-1) drag: uses CSS transform:translate instead of
-//      left/top which doesn't work on flex-positioned elements
-//   5. Drag deltas divided by _zoom so movement is 1:1 at any zoom level
+// Changes vs v12:
+//   • Aligned sub-clustering: sub-cluster indices are aligned across top-level
+//     clusters so A1 ~ B1 ~ C1 thematically, A2 ~ B2 ~ C2, etc.
+//   • Removed inner-body pan on depth-0 clusters — replaced with native
+//     scrollbars styled to match the app's --scrollbar-* CSS variables.
 // ════════════════════════════════════════════════════════════════════════════
 function initClustersTool(paneEl, sidebarEl) {
 
@@ -167,22 +165,23 @@ function initClustersTool(paneEl, sidebarEl) {
 /* ── Nests ── */
 .pp-cl-nest {
   position:relative; flex-shrink:0; display:flex; flex-direction:column;
-  overflow:hidden; box-sizing:border-box;
+  box-sizing:border-box;
   animation:pp-cl-nest-in .30s cubic-bezier(0.22,1,0.36,1) both;
   transition:box-shadow .18s ease;
 }
 @keyframes pp-cl-nest-in { from{opacity:0;transform:scale(.92);}to{opacity:1;transform:none;} }
 .pp-cl-nest[data-depth="0"] {
   position:absolute; border-radius:16px; border-width:2px; border-style:solid;
-  box-shadow:0 2px 14px rgba(0,0,0,.08);
+  box-shadow:0 2px 14px rgba(0,0,0,.08); overflow:hidden;
 }
 .pp-cl-nest[data-depth="0"].pp-cl-nest-lifted { box-shadow:0 10px 36px rgba(0,0,0,.20); }
-.pp-cl-nest[data-depth="1"] { border-radius:11px;border-width:1.5px;border-style:solid;box-shadow:0 1px 7px rgba(0,0,0,.07); }
-.pp-cl-nest[data-depth="2"] { border-radius:8px;border-width:1px;border-style:dashed;box-shadow:0 1px 4px rgba(0,0,0,.05); }
-.pp-cl-nest[data-depth="3"] { border-radius:6px;border-width:1px;border-style:dotted; }
-
-/* depth-1 dragging — lifted shadow */
+.pp-cl-nest[data-depth="1"] {
+  border-radius:11px; border-width:1.5px; border-style:solid;
+  box-shadow:0 1px 7px rgba(0,0,0,.07); overflow:hidden;
+}
 .pp-cl-nest[data-depth="1"].pp-cl-nest-lifted { box-shadow:0 6px 22px rgba(0,0,0,.18); z-index:50; }
+.pp-cl-nest[data-depth="2"] { border-radius:8px;border-width:1px;border-style:dashed;box-shadow:0 1px 4px rgba(0,0,0,.05);overflow:hidden; }
+.pp-cl-nest[data-depth="3"] { border-radius:6px;border-width:1px;border-style:dotted;overflow:hidden; }
 
 /* ── Nest head ── */
 .pp-cl-nest-head {
@@ -208,15 +207,23 @@ function initClustersTool(paneEl, sidebarEl) {
 .pp-cl-nest[data-depth="2"] .pp-cl-nest-count { font-size:7px; }
 .pp-cl-nest[data-depth="3"] .pp-cl-nest-count { font-size:6px; }
 
-/* ── Nest body ── */
+/* ── Nest body — scrollable, styled scrollbars matching app ── */
 .pp-cl-nest-body {
-  display:flex; flex-wrap:wrap; overflow:hidden; box-sizing:border-box;
+  display:flex; flex-wrap:wrap;
+  box-sizing:border-box;
+  overflow:auto;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+  scrollbar-width: thin;
 }
-.pp-cl-nest[data-depth="0"] > .pp-cl-nest-body { cursor:grab; overflow:hidden; }
-.pp-cl-nest[data-depth="0"] > .pp-cl-nest-body.pp-cl-body-panning { cursor:grabbing; }
-.pp-cl-body-inner { display:flex; flex-wrap:wrap; will-change:transform; }
+.pp-cl-nest-body::-webkit-scrollbar { width:6px; height:6px; }
+.pp-cl-nest-body::-webkit-scrollbar-track { background:var(--scrollbar-track,#f0f0f0); }
+.pp-cl-nest-body::-webkit-scrollbar-thumb { background:var(--scrollbar-thumb,#c0c0c8); border-radius:3px; }
+.pp-cl-nest-body::-webkit-scrollbar-thumb:hover { background:var(--scrollbar-thumb-hover,#9898aa); }
+.pp-cl-nest-body::-webkit-scrollbar-corner { background:var(--scrollbar-track,#f0f0f0); }
+/* depth-0 body: constrain height so it scrolls */
+.pp-cl-nest[data-depth="0"] > .pp-cl-nest-body { max-height:420px; }
 
-/* ── Cards: content only, no header row ── */
+/* ── Cards ── */
 .pp-cl-card {
   flex-shrink:0; border-radius:7px;
   border:1.5px solid var(--ppc-border,rgba(0,0,0,.18));
@@ -236,19 +243,18 @@ function initClustersTool(paneEl, sidebarEl) {
 }
 .pp-cl-nest[data-depth="0"]:hover .pp-cl-resize-handle,
 .pp-cl-nest[data-depth="1"]:hover .pp-cl-resize-handle { opacity:1; }
-.pp-cl-resize-handle.pp-cl-rh-nw { top:0; left:0; cursor:nw-resize; }
-.pp-cl-resize-handle.pp-cl-rh-ne { top:0; right:0; cursor:ne-resize; }
-.pp-cl-resize-handle.pp-cl-rh-sw { bottom:0; left:0; cursor:sw-resize; }
-.pp-cl-resize-handle.pp-cl-rh-se { bottom:0; right:0; cursor:se-resize; }
+.pp-cl-resize-handle.pp-cl-rh-nw { top:0;left:0;cursor:nw-resize; }
+.pp-cl-resize-handle.pp-cl-rh-ne { top:0;right:0;cursor:ne-resize; }
+.pp-cl-resize-handle.pp-cl-rh-sw { bottom:0;left:0;cursor:sw-resize; }
+.pp-cl-resize-handle.pp-cl-rh-se { bottom:0;right:0;cursor:se-resize; }
 .pp-cl-resize-handle::after {
   content:''; position:absolute; right:3px; bottom:3px;
   width:5px; height:5px;
-  border-right:2px solid rgba(0,0,0,.25); border-bottom:2px solid rgba(0,0,0,.25);
-  border-radius:1px;
+  border-right:2px solid rgba(0,0,0,.25); border-bottom:2px solid rgba(0,0,0,.25); border-radius:1px;
 }
-.pp-cl-rh-nw::after { right:auto; bottom:auto; left:3px; top:3px; border-right:none; border-bottom:none; border-left:2px solid rgba(0,0,0,.25); border-top:2px solid rgba(0,0,0,.25); }
-.pp-cl-rh-ne::after { right:3px; bottom:auto; top:3px; border-right:2px solid rgba(0,0,0,.25); border-bottom:none; border-top:2px solid rgba(0,0,0,.25); }
-.pp-cl-rh-sw::after { right:auto; bottom:3px; left:3px; border-right:none; border-left:2px solid rgba(0,0,0,.25); border-bottom:2px solid rgba(0,0,0,.25); }
+.pp-cl-rh-nw::after { right:auto;bottom:auto;left:3px;top:3px;border-right:none;border-bottom:none;border-left:2px solid rgba(0,0,0,.25);border-top:2px solid rgba(0,0,0,.25); }
+.pp-cl-rh-ne::after { right:3px;bottom:auto;top:3px;border-bottom:none;border-right:2px solid rgba(0,0,0,.25);border-top:2px solid rgba(0,0,0,.25); }
+.pp-cl-rh-sw::after { right:auto;bottom:3px;left:3px;border-right:none;border-left:2px solid rgba(0,0,0,.25);border-bottom:2px solid rgba(0,0,0,.25); }
 
 /* ── Tooltip ── */
 #pp-cl-tooltip {
@@ -338,11 +344,9 @@ function initClustersTool(paneEl, sidebarEl) {
   let _rendered = false, _ttRow = null;
   let _cachedEmbedded = null, _cachedVectors = null;
   let _reclusterTimer = null;
-  // FIX 1: _zoom added to state
   let _panX = 0, _panY = 0, _zoom = 1;
   let _topZ = 10;
 
-  // FIX 2: applyWorldTransform now includes scale(_zoom)
   function applyWorldTransform() {
     world.style.transform = `translate(${_panX}px,${_panY}px) scale(${_zoom})`;
   }
@@ -381,14 +385,14 @@ function initClustersTool(paneEl, sidebarEl) {
     clearTimeout(_reclusterTimer); _rendered = false; tryRender();
   });
 
-  // ── Canvas pan (drag on empty space) ────────────────────────────────────
+  // ── Canvas pan ───────────────────────────────────────────────────────────
   let _panActive = false, _panSX = 0, _panSY = 0, _panBaseX = 0, _panBaseY = 0;
 
   canvas.addEventListener('mousedown', ev => {
     if (ev.button !== 0 || ev.target.closest('.pp-cl-nest')) return;
     _panActive = true;
     _panSX = ev.clientX; _panSY = ev.clientY;
-    _panBaseX = _panX;   _panBaseY = _panY;
+    _panBaseX = _panX; _panBaseY = _panY;
     canvas.classList.add('pp-cl-panning');
     ev.preventDefault();
   });
@@ -418,7 +422,7 @@ function initClustersTool(paneEl, sidebarEl) {
   }, { passive: false });
   document.addEventListener('touchend', () => { _panActive = false; });
 
-  // FIX 3: Wheel + pinch zoom (was entirely missing from previous shell copy)
+  // ── Wheel + pinch zoom ───────────────────────────────────────────────────
   canvas.addEventListener('wheel', ev => {
     ev.preventDefault();
     const rect = canvas.getBoundingClientRect();
@@ -452,9 +456,6 @@ function initClustersTool(paneEl, sidebarEl) {
   canvas.addEventListener('touchend', () => { _pinchD = null; });
 
   // ── Nest drag ────────────────────────────────────────────────────────────
-  // FIX 4+5: depth-0 uses left/top (absolute), depth-1 uses CSS translate
-  // (left/top have no effect on flex-positioned elements).
-  // All deltas divided by _zoom for 1:1 feel at any zoom level.
   let _nestDrag = null;
 
   function makeNestDraggable(nestEl) {
@@ -463,23 +464,14 @@ function initClustersTool(paneEl, sidebarEl) {
     const depth = parseInt(nestEl.dataset.depth) || 0;
 
     function getPos() {
-      if (depth === 0) {
-        return [parseInt(nestEl.style.left) || 0, parseInt(nestEl.style.top) || 0];
-      }
-      // depth-1: read from existing transform
+      if (depth === 0) return [parseInt(nestEl.style.left) || 0, parseInt(nestEl.style.top) || 0];
       const m = (nestEl.style.transform || '').match(/translate\(([^,]+)px,\s*([^)]+)px\)/);
       return [parseFloat(m?.[1]) || 0, parseFloat(m?.[2]) || 0];
     }
-
     function setPos(x, y) {
-      if (depth === 0) {
-        nestEl.style.left = x + 'px';
-        nestEl.style.top  = y + 'px';
-      } else {
-        nestEl.style.transform = `translate(${x}px,${y}px)`;
-      }
+      if (depth === 0) { nestEl.style.left = x + 'px'; nestEl.style.top = y + 'px'; }
+      else nestEl.style.transform = `translate(${x}px,${y}px)`;
     }
-
     function beginDrag(cx, cy) {
       const [ex, ey] = getPos();
       _nestDrag = { el: nestEl, startElX: ex, startElY: ey, startCX: cx, startCY: cy, setPos };
@@ -487,11 +479,9 @@ function initClustersTool(paneEl, sidebarEl) {
       nestEl.classList.add('pp-cl-nest-lifted');
       hideTooltip();
     }
-
     head.addEventListener('mousedown', ev => {
       if (ev.button !== 0 || ev.target.closest('.pp-cl-resize-handle')) return;
-      ev.stopPropagation();
-      ev.preventDefault();
+      ev.stopPropagation(); ev.preventDefault();
       beginDrag(ev.clientX, ev.clientY);
     });
     head.addEventListener('touchstart', ev => {
@@ -527,42 +517,11 @@ function initClustersTool(paneEl, sidebarEl) {
     _nestDrag = null;
   });
 
-  // ── Inner body pan for depth-0 nests ─────────────────────────────────────
-  function makeBodyPannable(bodyEl, innerEl) {
-    let active = false, sx = 0, sy = 0, bx = 0, by = 0;
-    function getBxy() {
-      const m = (innerEl.style.transform || '').match(/translate\(([^,]+)px,([^)]+)px\)/) || [];
-      return [parseFloat(m[1]) || 0, parseFloat(m[2]) || 0];
-    }
-    bodyEl.addEventListener('mousedown', ev => {
-      if (ev.button !== 0 || ev.target.closest('.pp-cl-nest[data-depth="1"]')) return;
-      active = true; [bx, by] = getBxy(); sx = ev.clientX; sy = ev.clientY;
-      bodyEl.classList.add('pp-cl-body-panning'); ev.stopPropagation();
-    });
-    document.addEventListener('mousemove', ev => {
-      if (!active) return;
-      innerEl.style.transform = `translate(${bx + (ev.clientX - sx) / _zoom}px,${by + (ev.clientY - sy) / _zoom}px)`;
-    });
-    document.addEventListener('mouseup', () => {
-      if (!active) return; active = false; bodyEl.classList.remove('pp-cl-body-panning');
-    });
-    bodyEl.addEventListener('touchstart', ev => {
-      if (ev.touches.length !== 1 || ev.target.closest('.pp-cl-nest[data-depth="1"]')) return;
-      active = true; [bx, by] = getBxy(); sx = ev.touches[0].clientX; sy = ev.touches[0].clientY;
-      ev.stopPropagation();
-    }, { passive: true });
-    document.addEventListener('touchmove', ev => {
-      if (!active || ev.touches.length !== 1) return;
-      innerEl.style.transform = `translate(${bx + (ev.touches[0].clientX - sx) / _zoom}px,${by + (ev.touches[0].clientY - sy) / _zoom}px)`;
-    }, { passive: true });
-    document.addEventListener('touchend', () => { active = false; });
-  }
-
   // ── Corner resize ────────────────────────────────────────────────────────
   function makeResizable(nestEl) {
     const corners = [
-      { cls: 'nw', dw: -1, dh: -1 }, { cls: 'ne', dw:  1, dh: -1 },
-      { cls: 'sw', dw: -1, dh:  1 }, { cls: 'se', dw:  1, dh:  1 },
+      { cls: 'nw', dw: -1, dh: -1 }, { cls: 'ne', dw: 1, dh: -1 },
+      { cls: 'sw', dw: -1, dh: 1  }, { cls: 'se', dw: 1, dh: 1  },
     ];
     corners.forEach(({ cls, dw, dh }) => {
       const handle = document.createElement('div');
@@ -605,8 +564,7 @@ function initClustersTool(paneEl, sidebarEl) {
     });
   }
 
-  // FIX 3 (cards): removed pp-cl-card-head block (badge label + tab name)
-  // Cards now show content text only, with optional category row
+  // ── Card builder ─────────────────────────────────────────────────────────
   function buildCard(r, col, delay) {
     const cells  = r.row && r.row.cells ? r.row.cells : [];
     const cats   = r.row && r.row.cats  ? r.row.cats.filter(c => c.trim()) : [];
@@ -640,8 +598,233 @@ function initClustersTool(paneEl, sidebarEl) {
     return card;
   }
 
+  // ════════════════════════════════════════════════════════════════════════
+  // ── Clustering algorithms ────────────────────────────────────────────────
+  // ════════════════════════════════════════════════════════════════════════
+
+  function cosineSim(a, b) {
+    let d = 0, na = 0, nb = 0;
+    for (let i = 0; i < a.length; i++) { d += a[i] * b[i]; na += a[i] * a[i]; nb += b[i] * b[i]; }
+    return na && nb ? d / (Math.sqrt(na) * Math.sqrt(nb)) : 0;
+  }
+
+  function centroid(rows) {
+    if (!rows.length) return null;
+    const dim = rows[0].vec.length;
+    const sum = new Float32Array(dim);
+    rows.forEach(r => r.vec.forEach((x, i) => { sum[i] += x; }));
+    return Array.from(sum).map(x => x / rows.length);
+  }
+
+  // k-means with cosine similarity + k-means++ init
+  function kMeansCosine(rows, k, iters) {
+    iters = iters || 25;
+    const n = rows.length;
+    if (n <= k) return rows.map((_, i) => i % k);
+
+    // k-means++ seed
+    const centers = [rows[Math.floor(Math.random() * n)].vec.slice()];
+    while (centers.length < k) {
+      const dists = rows.map(r => Math.min(...centers.map(c => 1 - cosineSim(r.vec, c))));
+      const sum = dists.reduce((a, b) => a + b, 0);
+      let r = Math.random() * sum;
+      let picked = false;
+      for (let i = 0; i < n; i++) {
+        r -= dists[i];
+        if (r <= 0) { centers.push(rows[i].vec.slice()); picked = true; break; }
+      }
+      if (!picked) centers.push(rows[Math.floor(Math.random() * n)].vec.slice());
+    }
+
+    let asgn = new Array(n).fill(0);
+    for (let iter = 0; iter < iters; iter++) {
+      const na = rows.map(r => {
+        let best = 0, bs = -Infinity;
+        centers.forEach((c, ci) => { const s = cosineSim(r.vec, c); if (s > bs) { bs = s; best = ci; } });
+        return best;
+      });
+      centers.forEach((_, ci) => {
+        const members = rows.filter((_, i) => na[i] === ci);
+        if (!members.length) return;
+        const c = centroid(members);
+        if (c) centers[ci] = c;
+      });
+      if (na.every((a, i) => a === asgn[i])) break;
+      asgn = na;
+    }
+    return asgn;
+  }
+
+  // Run multiple trials, return best (lowest inertia) assignment
+  function bestKMeans(rows, k) {
+    const TRIALS = 3;
+    let bestAsgn = null, bestInertia = Infinity;
+    for (let t = 0; t < TRIALS; t++) {
+      const asgn = kMeansCosine(rows, k);
+      const groups = Array.from({ length: k }, () => []);
+      rows.forEach((r, i) => groups[asgn[i]].push(r));
+      const cents = groups.map(g => g.length ? centroid(g) : null);
+      const inertia = rows.reduce((s, r, i) => {
+        const c = cents[asgn[i]];
+        return s + (c ? 1 - cosineSim(r.vec, c) : 0);
+      }, 0);
+      if (inertia < bestInertia) { bestInertia = inertia; bestAsgn = asgn; }
+    }
+    return { asgn: bestAsgn, inertia: bestInertia };
+  }
+
+  // Elbow-based k selection
+  function autoClusterSimple(rows, minK, maxK) {
+    const n = rows.length;
+    if (n === 0) return [];
+    if (n <= 2) return rows.map((_, i) => i);
+    minK = Math.max(2, minK);
+    maxK = Math.min(maxK, Math.floor(Math.sqrt(n) * 2), n - 1);
+    if (maxK < minK) return new Array(n).fill(0);
+    if (minK === maxK) return bestKMeans(rows, minK).asgn;
+
+    const results = [];
+    for (let k = minK; k <= maxK; k++) results.push({ k, ...bestKMeans(rows, k) });
+    const inertias = results.map(r => r.inertia);
+    const totalDrop = (inertias[0] - inertias[inertias.length - 1]) || 1;
+    let chosenK = results[0].k;
+    for (let i = 1; i < results.length; i++) {
+      if ((inertias[i - 1] - inertias[i]) / totalDrop < 0.10) { chosenK = results[i - 1].k; break; }
+      chosenK = results[i].k;
+    }
+    return (results.find(r => r.k === chosenK) || results[results.length - 1]).asgn;
+  }
+
+  // ── Aligned sub-clustering ───────────────────────────────────────────────
+  //
+  // Clusters each top-level group independently, then reorders sub-cluster
+  // indices so that slot 0 across all top clusters is thematically closest,
+  // slot 1 is the next closest match, and so on.
+  //
+  // Algorithm:
+  //   1. Cluster each group independently → get K sub-clusters + their centroids.
+  //   2. Majority-vote on canonical K; re-cluster groups that diverged.
+  //   3. Use greedy max-similarity matching between ref group's centroids and
+  //      each subsequent group's centroids to produce a permutation mapping.
+  //   4. Apply the permutation to each group's assignment array.
+  function alignedSubCluster(topGroups, minK, maxK) {
+    if (topGroups.length < 2) {
+      // Single group: just cluster normally, no alignment needed
+      if (!topGroups.length) return [];
+      return [autoClusterSimple(topGroups[0], minK, maxK)];
+    }
+
+    // Step 1: cluster each group
+    const perGroup = topGroups.map(members => {
+      if (members.length < 2) return { asgn: members.map(() => 0), k: 1 };
+      const asgn = autoClusterSimple(members, minK, maxK);
+      const k = Math.max(...asgn) + 1;
+      return { asgn, k };
+    });
+
+    // Step 2: canonical K = most common k across groups
+    const kCounts = {};
+    perGroup.forEach(g => { kCounts[g.k] = (kCounts[g.k] || 0) + 1; });
+    const canonicalK = parseInt(
+      Object.entries(kCounts).sort((a, b) => b[1] - a[1])[0][0]
+    );
+
+    // Re-cluster groups that didn't land on canonicalK
+    const refined = perGroup.map((g, gi) => {
+      if (g.k === canonicalK || canonicalK < 2) return g;
+      const members = topGroups[gi];
+      if (members.length < canonicalK) return g;
+      const asgn = bestKMeans(members, canonicalK).asgn;
+      return { asgn, k: canonicalK };
+    });
+
+    // Step 3: compute centroids per sub-cluster per group
+    const groupCentroids = refined.map((g, gi) => {
+      const members = topGroups[gi];
+      const buckets = Array.from({ length: g.k }, () => []);
+      members.forEach((r, i) => buckets[g.asgn[i]].push(r));
+      return buckets.map(b => b.length ? centroid(b) : null);
+    });
+
+    // Step 4: align all groups to group-0 as reference via greedy matching
+    const refCents = groupCentroids[0];
+    const alignedAsgns = [refined[0].asgn];
+
+    for (let gi = 1; gi < refined.length; gi++) {
+      const cents = groupCentroids[gi];
+      const rk = refCents.length;
+      const ck = cents.length;
+
+      if (rk <= 1 || ck <= 1) { alignedAsgns.push(refined[gi].asgn); continue; }
+
+      // Build similarity matrix [refSlot][curSlot]
+      const sim = Array.from({ length: rk }, (_, ri) =>
+        Array.from({ length: ck }, (_, ci) =>
+          (refCents[ri] && cents[ci]) ? cosineSim(refCents[ri], cents[ci]) : 0
+        )
+      );
+
+      // Greedy: pick highest sim pair, mark both used, repeat
+      const usedRef = new Set(), usedCur = new Set();
+      const mapping = new Array(ck).fill(-1); // mapping[curIdx] → refSlot
+      const pairs = [];
+      for (let ri = 0; ri < rk; ri++)
+        for (let ci = 0; ci < ck; ci++)
+          pairs.push({ ri, ci, s: sim[ri][ci] });
+      pairs.sort((a, b) => b.s - a.s);
+
+      for (const { ri, ci } of pairs) {
+        if (usedRef.has(ri) || usedCur.has(ci)) continue;
+        mapping[ci] = ri;
+        usedRef.add(ri); usedCur.add(ci);
+        if (usedRef.size === Math.min(rk, ck)) break;
+      }
+
+      // Fill any unmapped cur slots with leftover ref slots
+      let nextSlot = 0;
+      for (let ci = 0; ci < ck; ci++) {
+        if (mapping[ci] !== -1) continue;
+        while (usedRef.has(nextSlot)) nextSlot++;
+        mapping[ci] = nextSlot < rk ? nextSlot : nextSlot % rk;
+        usedRef.add(mapping[ci]);
+        nextSlot++;
+      }
+
+      alignedAsgns.push(refined[gi].asgn.map(ci => mapping[ci] !== undefined && mapping[ci] !== -1 ? mapping[ci] : ci));
+    }
+
+    return alignedAsgns;
+  }
+
+  // ── Colour per path ──────────────────────────────────────────────────────
+  function colorForPath(path) {
+    const outerIdx = path[0] || 0;
+    const depth    = path.length;
+    const tname = (typeof TAB_THEMES !== 'undefined' ?
+      TAB_THEMES[outerIdx % TAB_THEMES.length] : 'default') || 'default';
+    const theme  = (typeof THEMES !== 'undefined' ? (THEMES[tname] || THEMES.default) : {}) || {};
+    const accent = theme['--tab-active-bg']    || '#888';
+    const label  = theme['--tab-active-color'] || '#fff';
+    const bg     = theme['--bg-data']          || '#f8f8f8';
+    const alphaAccent = Math.max(0.35, 1 - (depth - 1) * 0.18);
+    return {
+      accent:      accent + Math.round(alphaAccent * 255).toString(16).padStart(2, '0'),
+      accentSolid: accent, label, bg
+    };
+  }
+
+  function nestInitialWidth(depth, childCount, isLeaf, childWidth) {
+    const gap  = BODY_GAP[Math.min(depth, BODY_GAP.length - 1)];
+    const pad  = BODY_PAD[Math.min(depth, BODY_PAD.length - 1)];
+    const cw   = isLeaf ? CARD_W : (childWidth || 180);
+    const cols = Math.min(TILE_COLS, Math.max(1, Math.ceil(Math.sqrt(Math.max(1, childCount)))));
+    return cols * cw + (cols - 1) * gap + pad * 2;
+  }
+
   // ── Recursive nest builder ───────────────────────────────────────────────
-  function buildNestRecursive(rows, depth, maxDepth, path) {
+  // alignedAsgn: pre-computed assignment array for this nest's children.
+  //              Only provided at depth-0 (from render()). Null elsewhere.
+  function buildNestRecursive(rows, depth, maxDepth, path, alignedAsgn) {
     const col    = colorForPath(path);
     const isLeaf = (depth >= maxDepth);
     const gap    = BODY_GAP[Math.min(depth, BODY_GAP.length - 1)];
@@ -649,9 +832,11 @@ function initClustersTool(paneEl, sidebarEl) {
 
     let children = null;
     if (!isLeaf) {
-      const minK = depth === 0 ? _outerMin : _innerMin;
-      const maxK = depth === 0 ? _outerMax : _innerMax;
-      const asgn = autoCluster(rows, minK, maxK);
+      const asgn = alignedAsgn || autoClusterSimple(
+        rows,
+        depth === 0 ? _outerMin : _innerMin,
+        depth === 0 ? _outerMax : _innerMax
+      );
       const numC = Math.max(...asgn, 0) + 1;
       const groups = Array.from({ length: numC }, () => []);
       rows.forEach((r, i) => groups[asgn[i]].push(r));
@@ -665,51 +850,36 @@ function initClustersTool(paneEl, sidebarEl) {
     nest.style.background  = col.accentSolid + (depth === 0 ? '0a' : '07');
     if (depth > 0) nest.style.animationDelay = ((path[path.length - 1] || 0) * 30) + 'ms';
 
-    // Head: coloured dot + count only (no alphanumeric label)
+    // Head: dot + count
     const countLabel = rows.length + ' entr' + (rows.length === 1 ? 'y' : 'ies');
     const subLabel   = children ? ' \u00b7 ' + children.length + ' group' + (children.length === 1 ? '' : 's') : '';
     const head = document.createElement('div');
     head.className = 'pp-cl-nest-head';
     head.style.background = col.accentSolid + (depth === 0 ? '18' : '10');
-    const dot = document.createElement('span');
-    dot.className = 'pp-cl-nest-dot';
-    dot.style.background = col.accentSolid;
-    const cnt = document.createElement('span');
-    cnt.className = 'pp-cl-nest-count';
-    cnt.textContent = countLabel + subLabel;
-    head.appendChild(dot);
-    head.appendChild(cnt);
+    const dot = document.createElement('span'); dot.className = 'pp-cl-nest-dot'; dot.style.background = col.accentSolid;
+    const cnt = document.createElement('span'); cnt.className = 'pp-cl-nest-count'; cnt.textContent = countLabel + subLabel;
+    head.appendChild(dot); head.appendChild(cnt);
     nest.appendChild(head);
 
+    // Body — plain scrollable, no inner pan wrapper
     const body = document.createElement('div');
     body.className = 'pp-cl-nest-body';
     body.style.gap = gap + 'px';
     body.style.padding = pad + 'px';
     nest.appendChild(body);
 
-    // depth-0: wrap content in inner div for inner pan
-    let contentEl = body;
-    if (depth === 0) {
-      const inner = document.createElement('div');
-      inner.className = 'pp-cl-body-inner';
-      inner.style.gap = gap + 'px';
-      body.appendChild(inner);
-      contentEl = inner;
-      makeBodyPannable(body, inner);
-    }
-
     if (isLeaf) {
-      rows.forEach((r, ri) => contentEl.appendChild(buildCard(r, col, ri * 14)));
+      rows.forEach((r, ri) => body.appendChild(buildCard(r, col, ri * 14)));
       nest.style.width = nestInitialWidth(depth, rows.length, true) + 'px';
     } else {
       let childNestW = 0;
       const childEls = (children || [])
         .filter(c => c.members.length > 0)
         .map(({ members, childPath }) => {
-          const child = buildNestRecursive(members, depth + 1, maxDepth, childPath);
+          // Deeper levels: no alignment passed (only 1 level of alignment)
+          const child = buildNestRecursive(members, depth + 1, maxDepth, childPath, null);
           childNestW = Math.max(childNestW, parseInt(child.style.width) || 180);
-          contentEl.appendChild(child);
-          // FIX 4: depth-1 nests are now draggable via makeNestDraggable
+          body.appendChild(child);
           if (depth + 1 === 1) makeNestDraggable(child);
           return child;
         });
@@ -728,16 +898,28 @@ function initClustersTool(paneEl, sidebarEl) {
     _panX = 0; _panY = 0; _zoom = 1; applyWorldTransform();
     _topZ = 10;
 
-    const maxDepth  = _depth - 1;
-    const topAsgn   = autoCluster(rows, _outerMin, _outerMax);
+    const maxDepth = _depth - 1;
+
+    // Top-level clustering
+    const topAsgn   = autoClusterSimple(rows, _outerMin, _outerMax);
     const numTop    = Math.max(...topAsgn, 0) + 1;
     const topGroups = Array.from({ length: numTop }, () => []);
     rows.forEach((r, i) => topGroups[topAsgn[i]].push(r));
 
+    // Pre-compute aligned sub-cluster assignments for depth-1
+    // (only meaningful when depth > 1 and there are multiple top groups)
+    let alignedAsgns = null;
+    const nonEmptyGroups = topGroups.filter(g => g.length > 0);
+    if (maxDepth >= 1 && nonEmptyGroups.length > 1) {
+      alignedAsgns = alignedSubCluster(nonEmptyGroups, _innerMin, _innerMax);
+    }
+
     const nestEls = [];
+    let alignIdx = 0;
     topGroups.forEach((members, oi) => {
       if (!members.length) return;
-      const nest = buildNestRecursive(members, 0, maxDepth, [oi]);
+      const asgn = (alignedAsgns && maxDepth >= 1) ? alignedAsgns[alignIdx++] : null;
+      const nest = buildNestRecursive(members, 0, maxDepth, [oi], asgn);
       nest.style.animationDelay = (oi * 55) + 'ms';
       world.appendChild(nest);
       nestEls.push(nest);
@@ -781,8 +963,7 @@ function initClustersTool(paneEl, sidebarEl) {
     let lx = ev.clientX + pad, ly = ev.clientY + pad;
     if (lx + tw > window.innerWidth)  lx = ev.clientX - tw - pad;
     if (ly + th > window.innerHeight) ly = ev.clientY - th - pad;
-    tooltip.style.left = lx + 'px';
-    tooltip.style.top  = ly + 'px';
+    tooltip.style.left = lx + 'px'; tooltip.style.top = ly + 'px';
   }
   function hideTooltip() { tooltip.classList.remove('pp-cl-tt-visible'); _ttRow = null; }
 
@@ -792,117 +973,6 @@ function initClustersTool(paneEl, sidebarEl) {
     if (typeof panelGoTo === 'function')
       panelGoTo({ tabIdx: _ttRow.tabIdx, rowIdx: _ttRow.rowIdx, row: _ttRow.row, shared: new Set() }, 0);
   });
-
-  // ── Clustering (k-medoids on dim-fingerprint Jaccard distance) ───────────
-  function topDims(vec, n) {
-    return vec.map((v, i) => ({ i, v: Math.abs(v) }))
-      .sort((a, b) => b.v - a.v).slice(0, n || 5).map(d => d.i);
-  }
-  function dimJaccard(a, b) {
-    const sa = new Set(a); let inter = 0;
-    b.forEach(d => { if (sa.has(d)) inter++; });
-    const u = new Set([...a, ...b]).size;
-    return u === 0 ? 0 : inter / u;
-  }
-  function buildDist(rows) {
-    const n = rows.length;
-    const fps = rows.map(r => {
-      const v = _cachedVectors.get(r.tabIdx + ':' + r.rowIdx);
-      return v ? topDims(v, 5) : [];
-    });
-    return Array.from({ length: n }, (_, i) =>
-      Array.from({ length: n }, (_, j) => i === j ? 0 : 1 - dimJaccard(fps[i], fps[j])));
-  }
-  function kMedoids(dist, n, k) {
-    const meds = [Math.floor(Math.random() * n)];
-    while (meds.length < k) {
-      const md = Array.from({ length: n }, (_, i) => Math.min(...meds.map(m => dist[i][m])));
-      const tot = md.reduce((a, b) => a + b, 0);
-      let r = Math.random() * tot, cum = 0, added = false;
-      for (let i = 0; i < n; i++) { cum += md[i]; if (cum >= r) { meds.push(i); added = true; break; } }
-      if (!added) meds.push(Math.floor(Math.random() * n));
-    }
-    let asgn = new Array(n).fill(0);
-    for (let iter = 0; iter < 30; iter++) {
-      let changed = false;
-      for (let i = 0; i < n; i++) {
-        let best = 0, bd = Infinity;
-        meds.forEach((m, ci) => { if (dist[i][m] < bd) { bd = dist[i][m]; best = ci; } });
-        if (asgn[i] !== best) { asgn[i] = best; changed = true; }
-      }
-      if (!changed) break;
-      for (let ci = 0; ci < k; ci++) {
-        const mb = asgn.map((a, i) => a === ci ? i : -1).filter(x => x >= 0);
-        if (!mb.length) continue;
-        let bm = mb[0], bs = Infinity;
-        mb.forEach(m => { const s = mb.reduce((a, o) => a + dist[m][o], 0); if (s < bs) { bs = s; bm = m; } });
-        meds[ci] = bm;
-      }
-    }
-    let variance = 0;
-    for (let ci = 0; ci < k; ci++) {
-      const mb = asgn.map((a, i) => a === ci ? i : -1).filter(x => x >= 0);
-      if (mb.length < 2) continue;
-      mb.forEach(m => mb.forEach(o => { variance += dist[m][o]; }));
-    }
-    return { asgn, variance: variance / (n * n) };
-  }
-  function autoCluster(rows, minK, maxK) {
-    const n = rows.length;
-    if (n === 0) return [];
-    if (n <= 2) return new Array(n).fill(0).map((_, i) => i);
-    const dist  = buildDist(rows);
-    const sqrtN = Math.max(2, Math.round(Math.sqrt(n)));
-    minK = Math.max(2, minK || 2);
-    maxK = Math.min(Math.max(minK, maxK || 6), sqrtN * 2, n - 1);
-    if (maxK < minK) return new Array(n).fill(0);
-    if (minK === maxK) {
-      let best = null;
-      for (let t = 0; t < 4; t++) { const r = kMedoids(dist, n, minK); if (!best || r.variance < best.variance) best = r; }
-      return best.asgn;
-    }
-    const results = [];
-    for (let k = minK; k <= maxK; k++) {
-      let best = null;
-      for (let t = 0; t < 4; t++) { const r = kMedoids(dist, n, k); if (!best || r.variance < best.variance) best = r; }
-      results.push({ k, ...best });
-    }
-    const vars  = results.map(r => r.variance);
-    const range = (vars[0] - vars[vars.length - 1]) || 1;
-    let chosenK = results[0].k;
-    for (let i = 1; i < results.length; i++) {
-      if ((vars[i - 1] - vars[i]) / range < 0.10) { chosenK = results[i - 1].k; break; }
-      chosenK = results[i].k;
-    }
-    chosenK = Math.max(minK, Math.min(maxK, chosenK));
-    return (results.find(r => r.k === chosenK) || results[results.length - 1]).asgn;
-  }
-
-  // ── Colour per path ──────────────────────────────────────────────────────
-  function colorForPath(path) {
-    const outerIdx = path[0] || 0;
-    const depth    = path.length;
-    const tname = (typeof TAB_THEMES !== 'undefined' ?
-      TAB_THEMES[outerIdx % TAB_THEMES.length] : 'default') || 'default';
-    const theme  = (typeof THEMES !== 'undefined' ? (THEMES[tname] || THEMES.default) : {}) || {};
-    const accent = theme['--tab-active-bg']    || '#888';
-    const label  = theme['--tab-active-color'] || '#fff';
-    const bg     = theme['--bg-data']          || '#f8f8f8';
-    const alphaAccent = Math.max(0.35, 1 - (depth - 1) * 0.18);
-    return {
-      accent:      accent + Math.round(alphaAccent * 255).toString(16).padStart(2, '0'),
-      accentSolid: accent, label, bg
-    };
-  }
-
-  // ── Initial width calculation ────────────────────────────────────────────
-  function nestInitialWidth(depth, childCount, isLeaf, childWidth) {
-    const gap  = BODY_GAP[Math.min(depth, BODY_GAP.length - 1)];
-    const pad  = BODY_PAD[Math.min(depth, BODY_PAD.length - 1)];
-    const cw   = isLeaf ? CARD_W : (childWidth || 180);
-    const cols = Math.min(TILE_COLS, Math.max(1, Math.ceil(Math.sqrt(Math.max(1, childCount)))));
-    return cols * cw + (cols - 1) * gap + pad * 2;
-  }
 
   // ── Fetch + render pipeline ──────────────────────────────────────────────
   function finishRender(embedded) {
