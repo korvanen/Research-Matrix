@@ -1,7 +1,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 // panel-find-matches.js — "Find Matches" sidebar tool
 // ════════════════════════════════════════════════════════════════════════════
-console.log('[panel-find-matches.js v.2]');
+console.log('[panel-find-matches.js v. 3]');
 
 const PANEL_MIN_SHARED   = 2;
 const PANEL_MM_PAD       = 10;
@@ -43,7 +43,7 @@ const LAYER_OPACITY = [1, 0.58, 0.38, 0.24, 0.14];
 #pp-layers-wrap .pp-pill,
 #pp-view-wrap   .pp-pill { width: 100%; }
 
-/* KW toggle button */
+/* KW / ML toggle buttons */
 .pp-kw-toggle {
   border: none;
   border-radius: 20px;
@@ -63,6 +63,48 @@ const LAYER_OPACITY = [1, 0.58, 0.38, 0.24, 0.14];
   background: rgba(0,0,0,.74);
   color: #fff;
   box-shadow: 0 1px 4px rgba(0,0,0,.18);
+}
+
+/* Score explanation */
+.pp-score-why {
+  margin: 0 8px 7px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.pp-score-track {
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(0,0,0,.07);
+  overflow: hidden;
+  display: flex;
+  gap: 1px;
+}
+.pp-score-seg {
+  height: 100%;
+  border-radius: 2px;
+  transition: width .3s ease;
+  flex-shrink: 0;
+}
+.pp-score-seg-kw  { background: rgba(0,0,0,.30); }
+.pp-score-seg-ml  { background: var(--ppc-border, #888); opacity: .75; }
+.pp-score-rows    { display: flex; flex-direction: column; gap: 2px; }
+.pp-score-row {
+  display: flex; align-items: baseline; gap: 4px;
+  font-size: 9px; color: rgba(0,0,0,.4);
+  letter-spacing: .03em; line-height: 1.3;
+  overflow: hidden;
+}
+.pp-score-tag {
+  font-size: 8px; font-weight: 700; letter-spacing: .08em;
+  text-transform: uppercase; flex-shrink: 0; border-radius: 3px;
+  padding: 0px 3px; line-height: 1.5;
+}
+.pp-score-tag-kw { background: rgba(0,0,0,.09); color: rgba(0,0,0,.45); }
+.pp-score-tag-ml { background: var(--ppc-border, #888); color: #fff; opacity: .80; }
+.pp-score-row-text {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  flex: 1; min-width: 0;
 }
 
 #pp-body-wrap {
@@ -383,6 +425,83 @@ function initFindMatchesTool(paneEl, sidebarEl) {
     );
   }
 
+  // ── Weight + refresh helper ───────────────────────────────────────────────────
+  let kwEnabled = true;
+  let mlEnabled = true;
+
+  function applyWeightsAndRefresh() {
+    if (typeof setMatchWeights === 'function') {
+      if (!kwEnabled)      setMatchWeights(0,   1);
+      else if (!mlEnabled) setMatchWeights(1,   0);
+      else                 setMatchWeights(0.35, 0.65);
+    }
+    if (_hasContent) refreshFromSelection();
+  }
+
+  // ── Score explanation builder ─────────────────────────────────────────────────
+  // Builds the "why this match" section shown at the bottom of each card.
+  // Uses kwContrib / embContrib baked into the match object by findMatches.
+  function buildScoreWhy(m) {
+    const kw   = m.kwContrib  || 0;
+    const ml   = m.embContrib || 0;
+    const total = kw + ml || 1;
+    const kwBarPct = Math.round(kw / total * 100);
+    const mlBarPct = Math.round(ml / total * 100);
+
+    const wrap = document.createElement('div');
+    wrap.className = 'pp-score-why';
+
+    // Proportional bar
+    const track = document.createElement('div');
+    track.className = 'pp-score-track';
+    if (kwBarPct > 0) {
+      const seg = document.createElement('div');
+      seg.className = 'pp-score-seg pp-score-seg-kw';
+      seg.style.width = kwBarPct + '%';
+      track.appendChild(seg);
+    }
+    if (mlBarPct > 0) {
+      const seg = document.createElement('div');
+      seg.className = 'pp-score-seg pp-score-seg-ml';
+      seg.style.width = mlBarPct + '%';
+      track.appendChild(seg);
+    }
+    wrap.appendChild(track);
+
+    // Label rows
+    const rows = document.createElement('div');
+    rows.className = 'pp-score-rows';
+
+    if (m.shared && m.shared.size > 0) {
+      const row = document.createElement('div');
+      row.className = 'pp-score-row';
+      const phrases = [...m.shared].slice(0, 4).join(', ');
+      row.innerHTML = `<span class="pp-score-tag pp-score-tag-kw">KW</span><span class="pp-score-row-text">${panelEscH(phrases)}</span>`;
+      rows.appendChild(row);
+    } else if (kwEnabled) {
+      const row = document.createElement('div');
+      row.className = 'pp-score-row';
+      row.innerHTML = `<span class="pp-score-tag pp-score-tag-kw">KW</span><span class="pp-score-row-text" style="opacity:.5">no phrase match</span>`;
+      rows.appendChild(row);
+    }
+
+    if (m.embScore > 0) {
+      const row = document.createElement('div');
+      row.className = 'pp-score-row';
+      const pct = Math.round(m.embScore * 100);
+      row.innerHTML = `<span class="pp-score-tag pp-score-tag-ml">ML</span><span class="pp-score-row-text">${pct}% semantic similarity</span>`;
+      rows.appendChild(row);
+    } else if (mlEnabled) {
+      const row = document.createElement('div');
+      row.className = 'pp-score-row';
+      row.innerHTML = `<span class="pp-score-tag pp-score-tag-ml">ML</span><span class="pp-score-row-text" style="opacity:.5">model not ready</span>`;
+      rows.appendChild(row);
+    }
+
+    wrap.appendChild(rows);
+    return wrap;
+  }
+
   // ── Model status indicator ────────────────────────────────────────────────────
   const ppModelStatus = paneEl.querySelector('#pp-model-status');
   const ppModelLabel  = paneEl.querySelector('#pp-model-label');
@@ -427,13 +546,30 @@ function initFindMatchesTool(paneEl, sidebarEl) {
   const hlBtn = document.createElement('button');
   hlBtn.className = 'pp-kw-toggle pp-kw-on';
   hlBtn.textContent = 'KW';
-  hlBtn.title = 'Toggle keyword highlights';
+  hlBtn.title = 'Toggle keyword matching + highlights';
   ppHlWrap.appendChild(hlBtn);
   hlBtn.addEventListener('click', () => {
-    hlOn = !hlOn;
-    hlBtn.classList.toggle('pp-kw-on',  hlOn);
-    hlBtn.classList.toggle('pp-kw-off', !hlOn);
+    // Prevent disabling both
+    if (kwEnabled && !mlEnabled) { mlEnabled = true; mlBtn.classList.add('pp-kw-on'); }
+    kwEnabled = !kwEnabled;
+    hlOn = kwEnabled;
+    hlBtn.classList.toggle('pp-kw-on', kwEnabled);
     applyHlState();
+    applyWeightsAndRefresh();
+  });
+
+  // ── ML toggle button ──────────────────────────────────────────────────────────
+  const mlBtn = document.createElement('button');
+  mlBtn.className = 'pp-kw-toggle pp-kw-on';
+  mlBtn.textContent = 'ML';
+  mlBtn.title = 'Toggle semantic model matching';
+  ppHlWrap.appendChild(mlBtn);
+  mlBtn.addEventListener('click', () => {
+    // Prevent disabling both
+    if (mlEnabled && !kwEnabled) { kwEnabled = true; hlOn = true; hlBtn.classList.add('pp-kw-on'); applyHlState(); }
+    mlEnabled = !mlEnabled;
+    mlBtn.classList.toggle('pp-kw-on', mlEnabled);
+    applyWeightsAndRefresh();
   });
 
   // ── Layers pill (1–5) ─────────────────────────────────────────────────────────
@@ -713,8 +849,8 @@ function initFindMatchesTool(paneEl, sidebarEl) {
     const layerStr = _numLayers > 1 ? ` \u00b7 ${_numLayers} layers` : '';
     ppSubtitle.textContent = `${matches.length} match${matches.length === 1 ? '' : 'es'}${layerStr} \u00b7 ${[...kws].slice(0, 4).join(', ')}`;
     ppToolrow.style.display = 'flex';
-    hlOn = true;
-    hlBtn.classList.add('pp-kw-on'); hlBtn.classList.remove('pp-kw-off');
+    hlOn = kwEnabled;
+    hlBtn.classList.toggle('pp-kw-on', kwEnabled);
 
     const byTab = new Map();
     matches.forEach(m => {
@@ -772,13 +908,9 @@ function initFindMatchesTool(paneEl, sidebarEl) {
           body.appendChild(f);
         });
 
-        const sharedPill = document.createElement('div');
-        sharedPill.className = 'pp-shared-pill';
-        sharedPill.textContent = `${m.shared.size} shared: ${[...m.shared].slice(0, 3).join(', ')}`;
-
         card.appendChild(head);
         card.appendChild(body);
-        card.appendChild(sharedPill);
+        card.appendChild(buildScoreWhy(m));
         frag.appendChild(card);
         attachGoTo(card, m, accentColor);
       });
@@ -1102,14 +1234,20 @@ function initFindMatchesTool(paneEl, sidebarEl) {
         const _mcc = parseCitation(text);
         bodyHtml =
           (cats && cats.length ? `<div class="pp-mm-cat">${cats.map(panelEscH).join(' \u00b7 ')}</div>` : '') +
-          `<div class="pp-mm-field"><span class="pp-flabel">${panelEscH(header)}</span>${panelHighlight(_mcc.body, kwsHL)}${citationPillHtml(_mcc.citation, accentColor, labelColor)}</div>`;
-      }
+          `<div class="pp-mm-field"><span class="pp-flabel">${panelEscH(header)}</span>${panelHighlight(_mcc.body, kwsHL)}${citationPillHtml(_mcc.citation, accentColor, labelColor)}</div>`;      }
 
       const cardBody = document.createElement('div');
       cardBody.className = 'pp-mm-card-body';
       cardBody.innerHTML = bodyHtml;
       card.appendChild(cardHead);
       card.appendChild(cardBody);
+
+      // Score explanation — appended after body for non-seed cards
+      if (!isSeed && matchObj) {
+        const scoreEl = buildScoreWhy(matchObj);
+        scoreEl.style.cssText = 'margin:0 6px 6px;';
+        card.appendChild(scoreEl);
+      }
 
       if (!isSeed && matchObj) {
         const gotoBtn = document.createElement('button');
