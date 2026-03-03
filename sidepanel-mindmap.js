@@ -666,17 +666,13 @@ function initConceptMapTool(paneEl, sidebarEl) {
     });
 
     // ── SVG arrows ─────────────────────────────────────────────────────────────
+    // SVGs live inside `world` which is already scaled — so we read world-space
+    // coordinates directly from the `rects` map.  No getBoundingClientRect needed.
     function getR(id) {
-      const el = cardEls.get(id), r = rects.get(id); if (!r) return null;
-      if (!el) return { ...r };
-      const wr = world.getBoundingClientRect(), cr = el.getBoundingClientRect();
-      // convert from screen to world coordinates (account for zoom + pan)
-      return {
-        x: (cr.left - wr.left) / _zoom,
-        y: (cr.top  - wr.top)  / _zoom,
-        w: r.w,
-        h: cr.height / _zoom
-      };
+      const r = rects.get(id); if (!r) return null;
+      // Use actual rendered height if card element is available
+      const el = cardEls.get(id);
+      return { x: r.x, y: r.y, w: r.w, h: el ? el.offsetHeight || r.h : r.h };
     }
     function cpts(id) {
       const r = getR(id); if (!r) return [];
@@ -687,28 +683,48 @@ function initConceptMapTool(paneEl, sidebarEl) {
         {x,y:y+H/3},{x,y:y+H*2/3},{x:x+W,y:y+H/3},{x:x+W,y:y+H*2/3}
       ];
     }
+    function tan(pt, id) {
+      const r = getR(id); if (!r) return { dx: 0, dy: 1 };
+      const t = 3;
+      if (Math.abs(pt.y - r.y)        < t) return { dx:  0, dy: -1 };
+      if (Math.abs(pt.y - (r.y+r.h))  < t) return { dx:  0, dy:  1 };
+      if (Math.abs(pt.x - r.x)        < t) return { dx: -1, dy:  0 };
+      if (Math.abs(pt.x - (r.x+r.w))  < t) return { dx:  1, dy:  0 };
+      return { dx: 0, dy: 1 };
+    }
     function closest(pA, pB) {
       let best = null, bd = Infinity;
       pA.forEach(a => pB.forEach(b => { const d = Math.hypot(a.x-b.x,a.y-b.y); if (d<bd){bd=d;best={a,b};}}));
       return best;
     }
     function redrawArrows() {
-      [svgBot, svgTop].forEach(s => { while (s.firstChild) s.removeChild(s.firstChild); });
+      while (svgBot.firstChild) svgBot.removeChild(svgBot.firstChild);
+      while (svgTop.firstChild) svgTop.removeChild(svgTop.firstChild);
       const ns2 = 'http://www.w3.org/2000/svg';
       arrows.forEach(({ fromId, toId, color, depth }) => {
         const pA = cpts(fromId), pB = cpts(toId);
         const pts = closest(pA, pB); if (!pts) return;
         const { a, b } = pts;
-        const dx = b.x - a.x, dy = b.y - a.y, L = Math.hypot(dx, dy) * 0.4;
-        const svgEl = depth <= 1 ? svgBot : svgTop;
+        const dist = Math.hypot(b.x-a.x, b.y-a.y), off = Math.min(dist*0.45, 90);
+        const tA = tan(a, fromId), tB = tan(b, toId);
         const p = document.createElementNS(ns2, 'path');
-        p.setAttribute('d', `M${a.x},${a.y} C${a.x},${a.y+L} ${b.x},${b.y-L} ${b.x},${b.y}`);
-        p.setAttribute('stroke', color);
-        p.setAttribute('stroke-width', depth === 0 ? '2' : '1.2');
-        p.setAttribute('stroke-opacity', depth === 0 ? '0.55' : '0.3');
+        p.setAttribute('d', `M${a.x},${a.y} C${a.x+tA.dx*off},${a.y+tA.dy*off} ${b.x+tB.dx*off},${b.y+tB.dy*off} ${b.x},${b.y}`);
         p.setAttribute('fill', 'none');
-        p.setAttribute('stroke-dasharray', depth >= 2 ? '4,3' : 'none');
-        svgEl.appendChild(p);
+        p.setAttribute('stroke', color);
+        p.setAttribute('stroke-width', depth === 0 ? '2' : depth === 1 ? '1.5' : '1');
+        p.setAttribute('stroke-opacity', String(depth === 0 ? 0.55 : depth === 1 ? 0.38 : 0.22));
+        if (depth > 1) p.setAttribute('stroke-dasharray', '5,4');
+        svgBot.appendChild(p);
+        // Connection dot circles at both endpoints
+        [[a, fromId], [b, toId]].forEach(([pt, id]) => {
+          const cc = colors.get(id) || { border: color, bg: '#fff' };
+          const c = document.createElementNS(ns2, 'circle');
+          c.setAttribute('cx', pt.x); c.setAttribute('cy', pt.y); c.setAttribute('r', '4');
+          c.setAttribute('fill', cc.bg); c.setAttribute('stroke', cc.border);
+          c.setAttribute('stroke-width', '1.5');
+          c.setAttribute('opacity', depth === 0 ? '0.7' : '0.45');
+          svgTop.appendChild(c);
+        });
       });
     }
   }
