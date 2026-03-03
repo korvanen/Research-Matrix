@@ -9,7 +9,7 @@
 //   6. sidepanel-shell.js         — this file
 //
 // ════════════════════════════════════════════════════════════════════════════
-console.log('[sidepanel-shell.js hhhhh]');
+console.log('[sidepanel-shell.js 99999]');
 
 document.addEventListener('DOMContentLoaded', () => {
   const wait = setInterval(() => {
@@ -616,13 +616,11 @@ function initClustersTool(paneEl, sidebarEl) {
     return Array.from(sum).map(x => x / rows.length);
   }
 
-  // k-means with cosine similarity + k-means++ init
   function kMeansCosine(rows, k, iters) {
     iters = iters || 25;
     const n = rows.length;
     if (n <= k) return rows.map((_, i) => i % k);
 
-    // k-means++ seed
     const centers = [rows[Math.floor(Math.random() * n)].vec.slice()];
     while (centers.length < k) {
       const dists = rows.map(r => Math.min(...centers.map(c => 1 - cosineSim(r.vec, c))));
@@ -655,7 +653,6 @@ function initClustersTool(paneEl, sidebarEl) {
     return asgn;
   }
 
-  // Run multiple trials, return best (lowest inertia) assignment
   function bestKMeans(rows, k) {
     const TRIALS = 3;
     let bestAsgn = null, bestInertia = Infinity;
@@ -673,7 +670,6 @@ function initClustersTool(paneEl, sidebarEl) {
     return { asgn: bestAsgn, inertia: bestInertia };
   }
 
-  // Elbow-based k selection
   function autoClusterSimple(rows, minK, maxK) {
     const n = rows.length;
     if (n === 0) return [];
@@ -696,25 +692,12 @@ function initClustersTool(paneEl, sidebarEl) {
   }
 
   // ── Aligned sub-clustering ───────────────────────────────────────────────
-  //
-  // Clusters each top-level group independently, then reorders sub-cluster
-  // indices so that slot 0 across all top clusters is thematically closest,
-  // slot 1 is the next closest match, and so on.
-  //
-  // Algorithm:
-  //   1. Cluster each group independently → get K sub-clusters + their centroids.
-  //   2. Majority-vote on canonical K; re-cluster groups that diverged.
-  //   3. Use greedy max-similarity matching between ref group's centroids and
-  //      each subsequent group's centroids to produce a permutation mapping.
-  //   4. Apply the permutation to each group's assignment array.
   function alignedSubCluster(topGroups, minK, maxK) {
     if (topGroups.length < 2) {
-      // Single group: just cluster normally, no alignment needed
       if (!topGroups.length) return [];
       return [autoClusterSimple(topGroups[0], minK, maxK)];
     }
 
-    // Step 1: cluster each group
     const perGroup = topGroups.map(members => {
       if (members.length < 2) return { asgn: members.map(() => 0), k: 1 };
       const asgn = autoClusterSimple(members, minK, maxK);
@@ -722,14 +705,12 @@ function initClustersTool(paneEl, sidebarEl) {
       return { asgn, k };
     });
 
-    // Step 2: canonical K = most common k across groups
     const kCounts = {};
     perGroup.forEach(g => { kCounts[g.k] = (kCounts[g.k] || 0) + 1; });
     const canonicalK = parseInt(
       Object.entries(kCounts).sort((a, b) => b[1] - a[1])[0][0]
     );
 
-    // Re-cluster groups that didn't land on canonicalK
     const refined = perGroup.map((g, gi) => {
       if (g.k === canonicalK || canonicalK < 2) return g;
       const members = topGroups[gi];
@@ -738,7 +719,6 @@ function initClustersTool(paneEl, sidebarEl) {
       return { asgn, k: canonicalK };
     });
 
-    // Step 3: compute centroids per sub-cluster per group
     const groupCentroids = refined.map((g, gi) => {
       const members = topGroups[gi];
       const buckets = Array.from({ length: g.k }, () => []);
@@ -746,7 +726,6 @@ function initClustersTool(paneEl, sidebarEl) {
       return buckets.map(b => b.length ? centroid(b) : null);
     });
 
-    // Step 4: align all groups to group-0 as reference via greedy matching
     const refCents = groupCentroids[0];
     const alignedAsgns = [refined[0].asgn];
 
@@ -757,16 +736,14 @@ function initClustersTool(paneEl, sidebarEl) {
 
       if (rk <= 1 || ck <= 1) { alignedAsgns.push(refined[gi].asgn); continue; }
 
-      // Build similarity matrix [refSlot][curSlot]
       const sim = Array.from({ length: rk }, (_, ri) =>
         Array.from({ length: ck }, (_, ci) =>
           (refCents[ri] && cents[ci]) ? cosineSim(refCents[ri], cents[ci]) : 0
         )
       );
 
-      // Greedy: pick highest sim pair, mark both used, repeat
       const usedRef = new Set(), usedCur = new Set();
-      const mapping = new Array(ck).fill(-1); // mapping[curIdx] → refSlot
+      const mapping = new Array(ck).fill(-1);
       const pairs = [];
       for (let ri = 0; ri < rk; ri++)
         for (let ci = 0; ci < ck; ci++)
@@ -780,7 +757,6 @@ function initClustersTool(paneEl, sidebarEl) {
         if (usedRef.size === Math.min(rk, ck)) break;
       }
 
-      // Fill any unmapped cur slots with leftover ref slots
       let nextSlot = 0;
       for (let ci = 0; ci < ck; ci++) {
         if (mapping[ci] !== -1) continue;
@@ -822,8 +798,6 @@ function initClustersTool(paneEl, sidebarEl) {
   }
 
   // ── Recursive nest builder ───────────────────────────────────────────────
-  // alignedAsgn: pre-computed assignment array for this nest's children.
-  //              Only provided at depth-0 (from render()). Null elsewhere.
   function buildNestRecursive(rows, depth, maxDepth, path, alignedAsgn) {
     const col    = colorForPath(path);
     const isLeaf = (depth >= maxDepth);
@@ -850,7 +824,6 @@ function initClustersTool(paneEl, sidebarEl) {
     nest.style.background  = col.accentSolid + (depth === 0 ? '0a' : '07');
     if (depth > 0) nest.style.animationDelay = ((path[path.length - 1] || 0) * 30) + 'ms';
 
-    // Head: dot + count
     const countLabel = rows.length + ' entr' + (rows.length === 1 ? 'y' : 'ies');
     const subLabel   = children ? ' \u00b7 ' + children.length + ' group' + (children.length === 1 ? '' : 's') : '';
     const head = document.createElement('div');
@@ -861,7 +834,6 @@ function initClustersTool(paneEl, sidebarEl) {
     head.appendChild(dot); head.appendChild(cnt);
     nest.appendChild(head);
 
-    // Body — plain scrollable, no inner pan wrapper
     const body = document.createElement('div');
     body.className = 'pp-cl-nest-body';
     body.style.gap = gap + 'px';
@@ -876,7 +848,6 @@ function initClustersTool(paneEl, sidebarEl) {
       const childEls = (children || [])
         .filter(c => c.members.length > 0)
         .map(({ members, childPath }) => {
-          // Deeper levels: no alignment passed (only 1 level of alignment)
           const child = buildNestRecursive(members, depth + 1, maxDepth, childPath, null);
           childNestW = Math.max(childNestW, parseInt(child.style.width) || 180);
           body.appendChild(child);
@@ -900,14 +871,11 @@ function initClustersTool(paneEl, sidebarEl) {
 
     const maxDepth = _depth - 1;
 
-    // Top-level clustering
     const topAsgn   = autoClusterSimple(rows, _outerMin, _outerMax);
     const numTop    = Math.max(...topAsgn, 0) + 1;
     const topGroups = Array.from({ length: numTop }, () => []);
     rows.forEach((r, i) => topGroups[topAsgn[i]].push(r));
 
-    // Pre-compute aligned sub-cluster assignments for depth-1
-    // (only meaningful when depth > 1 and there are multiple top groups)
     let alignedAsgns = null;
     const nonEmptyGroups = topGroups.filter(g => g.length > 0);
     if (maxDepth >= 1 && nonEmptyGroups.length > 1) {
@@ -1008,6 +976,10 @@ function initClustersTool(paneEl, sidebarEl) {
       }
       const embedded = rows.filter(r => vectors.has(r.tabIdx + ':' + r.rowIdx));
       if (embedded.length < 3) { setStatus('error', 'Not enough data'); return; }
+      // ── FIX: attach the fetched vector onto each row object so that
+      //         kMeansCosine / centroid can access row.vec during clustering.
+      //         Without this, row.vec is undefined and .slice() crashes.
+      embedded.forEach(r => { r.vec = vectors.get(r.tabIdx + ':' + r.rowIdx); });
       _cachedEmbedded = embedded; _cachedVectors = vectors;
       requestAnimationFrame(() => finishRender(embedded));
     });
