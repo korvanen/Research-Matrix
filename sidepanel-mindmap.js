@@ -7,7 +7,7 @@
 //   • Level labels: "1st level concept", "2nd level concept", etc.
 //   • Tab/entity label removed from card body
 //   • Full pushApart collision on drag
-console.log('[sidepanel-mindmap.js v3]');
+console.log('[sidepanel-mindmap.js v4]');
 
 (function injectCmapStyles() {
   if (document.getElementById('pp-cmap-styles')) return;
