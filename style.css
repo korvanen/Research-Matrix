@@ -587,7 +587,7 @@ td.selected-group, th.selected-group { background: var(--selected-group) !import
   background: white;
   border-radius: 16px;
   box-shadow: 0 1px 4px rgba(0,0,0,.15);
-  transition: left .18s ease, width .18s ease;
+  transition: left .6s ease, width .6s ease;
   pointer-events: none;
 }
 .pp-btn {
