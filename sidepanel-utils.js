@@ -210,3 +210,61 @@ function attachGoTo(card, match, accentColor) {
     hideBtn();
   });
 }
+
+// ── Bounce-animated range slider ──────────────────────────────────────────────
+// Wraps a native <input type="range"> with a custom-drawn thumb that animates
+// with a bounce/ease on each step. The native input stays in the DOM (hidden)
+// so all existing event listeners, IDs, and accessibility work unchanged.
+//
+// Call upgradeSlider(inputEl) after the input is in the DOM.
+function upgradeSlider(input) {
+  var variant = input.classList.contains('pp-range--accent') ? 'accent'
+              : input.classList.contains('pp-range--muted')  ? 'muted'
+              : '';
+
+  var wrap  = document.createElement('div');
+  wrap.className = 'pp-range-wrap' + (variant ? ' pp-range-wrap--' + variant : '');
+
+  var track = document.createElement('div');
+  track.className = 'pp-range-track';
+
+  var fill  = document.createElement('div');
+  fill.className = 'pp-range-fill';
+
+  var thumb = document.createElement('div');
+  thumb.className = 'pp-range-thumb';
+
+  track.appendChild(fill);
+  wrap.appendChild(track);
+  wrap.appendChild(thumb);
+
+  // Insert wrap before input, then move input inside wrap
+  input.parentNode.insertBefore(wrap, input);
+  wrap.appendChild(input);
+
+  function update() {
+    var min = +input.min || 0;
+    var max = +input.max || 100;
+    var val = +input.value;
+    var pct = (val - min) / (max - min) * 100;
+    thumb.style.left = pct + '%';
+    fill.style.width = pct + '%';
+  }
+
+  // Initial position without animation
+  thumb.style.transition = 'none';
+  fill.style.transition  = 'none';
+  update();
+  requestAnimationFrame(function() {
+    thumb.style.transition = '';
+    fill.style.transition  = '';
+  });
+
+  input.addEventListener('input', update);
+
+  // While dragging: disable bounce so thumb tracks finger exactly
+  input.addEventListener('mousedown',  function() { wrap.classList.add('pp-range-dragging'); });
+  input.addEventListener('touchstart', function() { wrap.classList.add('pp-range-dragging'); }, { passive: true });
+  document.addEventListener('mouseup',   function() { wrap.classList.remove('pp-range-dragging'); });
+  document.addEventListener('touchend',  function() { wrap.classList.remove('pp-range-dragging'); });
+}
