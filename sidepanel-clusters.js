@@ -1,12 +1,15 @@
-// sidepanel-clusters.js — Clusters tool v12
-// Changes vs v11:
-//   • Semantically-aligned sub-clustering: sub-cluster index N in cluster A
-//     and sub-cluster index N in cluster B will share the same semantic "theme".
-//     This is achieved by computing a shared set of global theme centroids from
-//     all entries combined, then mapping each top-level cluster's own sub-clusters
-//     to those global themes via greedy cosine-similarity matching (Hungarian-lite).
-//     Result: A1 ≈ B1 ≈ C1, A2 ≈ B2 ≈ C2, etc.
-console.log('[sidepanel-clusters.js v12]');
+// sidepanel-clusters.js — Clusters tool v13
+// Changes vs v12:
+//   • Collision resolution for top-level nests: after initial flow layout,
+//     runs 60 iterations of overlap-repulsion so nests never overlap each other.
+//   • Collision resolution for sub-cluster nests (depth-1) inside each depth-0
+//     nest: after building sub-nests, positions them with the same repulsion loop
+//     so they don't overlap inside their parent.
+//   • Both levels use absolute positioning inside their container so sizes are
+//     respected precisely, replacing the old CSS flex-wrap approach for depth-1.
+//   • depth-0 nest height is now set explicitly after sub-nest layout so the
+//     container actually encloses all children.
+console.log('[sidepanel-clusters.js v13]');
 
 (function injectClusterStyles() {
   if (document.getElementById('pp-cluster-styles')) return;
@@ -102,19 +105,26 @@ console.log('[sidepanel-clusters.js v12]');
 .pp-cl-nest-head:active { cursor:grabbing; }
 .pp-cl-nest-dot { width:7px;height:7px;border-radius:50%;flex-shrink:0; }
 .pp-cl-nest-count { font-size:8px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:rgba(0,0,0,.45);white-space:nowrap; }
+
+/* depth-0 body uses absolute positioning for sub-nests */
 .pp-cl-nest-body {
-  display:flex; flex-wrap:wrap; flex:1; overflow:auto;
+  position:relative; flex:1; overflow:auto;
   scrollbar-width:thin; scrollbar-color:var(--scrollbar-thumb,rgba(0,0,0,.18)) transparent;
 }
 .pp-cl-nest-body::-webkit-scrollbar { width:5px;height:5px; }
 .pp-cl-nest-body::-webkit-scrollbar-thumb { background:var(--scrollbar-thumb,rgba(0,0,0,.18));border-radius:3px; }
 .pp-cl-nest-body::-webkit-scrollbar-track { background:transparent; }
-.pp-cl-body-inner { display:flex; flex-wrap:wrap; }
+
+/* leaf body: flex-wrap for cards */
+.pp-cl-nest-body.pp-cl-body-leaf {
+  display:flex; flex-wrap:wrap; align-content:flex-start;
+}
+.pp-cl-body-inner { display:flex; flex-wrap:wrap; position:absolute; }
 .pp-cl-body-panning { cursor:grabbing !important; }
 .pp-cl-resize-handle {
   position:absolute; bottom:0; right:0; width:14px; height:14px; cursor:nwse-resize;
   background:linear-gradient(135deg,transparent 50%,rgba(0,0,0,.15) 50%);
-  border-radius:0 0 8px 0;
+  border-radius:0 0 8px 0; z-index:5;
 }
 
 /* ── Cards ── */
@@ -203,7 +213,8 @@ function initClustersTool(paneEl, sidebarEl) {
   const BODY_PAD     = [7, 5, 4, 3];
   const RESIZE_MIN_W = 90;
   const RESIZE_MIN_H = 50;
-  const NEST_GAP     = 16;
+  const NEST_GAP     = 16;   // gap between top-level nests
+  const SUB_GAP      = 8;    // gap between sub-nests inside a depth-0 nest
 
   let _outerMin=2, _outerMax=12, _innerMin=2, _innerMax=4, _depth=2;
   let _rendered=false, _ttRow=null;
@@ -215,7 +226,6 @@ function initClustersTool(paneEl, sidebarEl) {
   function applyWorldTransform() {
     world.style.transform = `translate(${_panX}px,${_panY}px) scale(${_zoom})`;
   }
-  function e(t) { return typeof panelEscH === 'function' ? panelEscH(t) : String(t); }
   function setStatus(state, text) {
     statusEl.className = 'cl-' + state; labelEl.textContent = text; statusEl.style.opacity = '1';
     if (state === 'ready') setTimeout(() => { statusEl.style.opacity = '0'; }, 3200);
@@ -275,9 +285,8 @@ function initClustersTool(paneEl, sidebarEl) {
   }, { passive: false });
   let _pinchD = null;
   canvas.addEventListener('touchstart', ev => {
-    if (ev.touches.length === 2) {
+    if (ev.touches.length === 2)
       _pinchD = Math.hypot(ev.touches[0].clientX - ev.touches[1].clientX, ev.touches[0].clientY - ev.touches[1].clientY);
-    }
   }, { passive: true });
   canvas.addEventListener('touchmove', ev => {
     if (ev.touches.length !== 2 || !_pinchD) return;
@@ -318,32 +327,6 @@ function initClustersTool(paneEl, sidebarEl) {
   }, { passive: false });
   document.addEventListener('touchend', () => { if (!_nestDrag) return; _nestDrag.el.classList.remove('pp-cl-nest-lifted'); _nestDrag = null; });
 
-  // ── Inner body pan for depth-0 nests ─────────────────────────────────────
-  function makeBodyPannable(bodyEl, innerEl) {
-    let active=false, sx=0, sy=0, bx=0, by=0;
-    function getBxy() { const m=(innerEl.style.transform||'').match(/translate\(([^,]+)px,([^)]+)px\)/)||[]; return [parseFloat(m[1])||0, parseFloat(m[2])||0]; }
-    bodyEl.addEventListener('mousedown', ev => {
-      if (ev.button !== 0 || ev.target.closest('.pp-cl-nest[data-depth="1"] > .pp-cl-nest-head')) return;
-      if (ev.target.closest('.pp-cl-nest[data-depth="1"]')) return;
-      active=true; [bx,by]=getBxy(); sx=ev.clientX; sy=ev.clientY;
-      bodyEl.classList.add('pp-cl-body-panning'); ev.stopPropagation();
-    });
-    document.addEventListener('mousemove', ev => {
-      if (!active) return;
-      innerEl.style.transform = `translate(${bx+(ev.clientX-sx)/_zoom}px,${by+(ev.clientY-sy)/_zoom}px)`;
-    });
-    document.addEventListener('mouseup', () => { if (!active) return; active=false; bodyEl.classList.remove('pp-cl-body-panning'); });
-    bodyEl.addEventListener('touchstart', ev => {
-      if (ev.touches.length !== 1 || ev.target.closest('.pp-cl-nest[data-depth="1"]')) return;
-      active=true; [bx,by]=getBxy(); sx=ev.touches[0].clientX; sy=ev.touches[0].clientY; ev.stopPropagation();
-    }, { passive: true });
-    document.addEventListener('touchmove', ev => {
-      if (!active || ev.touches.length !== 1) return;
-      innerEl.style.transform = `translate(${bx+(ev.touches[0].clientX-sx)/_zoom}px,${by+(ev.touches[0].clientY-sy)/_zoom}px)`;
-    }, { passive: true });
-    document.addEventListener('touchend', () => { active = false; });
-  }
-
   // ── Resize ───────────────────────────────────────────────────────────────
   function makeResizable(nestEl) {
     const handle = document.createElement('div'); handle.className = 'pp-cl-resize-handle'; nestEl.appendChild(handle);
@@ -371,6 +354,48 @@ function initClustersTool(paneEl, sidebarEl) {
   ttGoto.addEventListener('click', () => { if (_ttRow && typeof panelGoTo === 'function') panelGoTo(_ttRow, 0); hideTooltip(); });
 
   // ════════════════════════════════════════════════════════════════════════
+  // ── Collision resolution ─────────────────────────────────────────────────
+  // ════════════════════════════════════════════════════════════════════════
+
+  // Given an array of {x, y, w, h} rects, run overlap-repulsion until no
+  // overlaps remain (or maxPasses exhausted). Modifies rects in place.
+  // gap = minimum clear space between any two rects.
+  function resolveCollisions(rects, gap, maxPasses) {
+    gap = gap || 0;
+    maxPasses = maxPasses || 80;
+    for (let pass = 0; pass < maxPasses; pass++) {
+      let moved = false;
+      for (let a = 0; a < rects.length; a++) {
+        for (let b = a + 1; b < rects.length; b++) {
+          const ra = rects[a], rb = rects[b];
+          // Check overlap including gap
+          const overlapX = (ra.x + ra.w + gap) - rb.x;
+          const overlapY = (ra.y + ra.h + gap) - rb.y;
+          const overlapX2 = (rb.x + rb.w + gap) - ra.x;
+          const overlapY2 = (rb.y + rb.h + gap) - ra.y;
+          if (overlapX <= 0 || overlapX2 <= 0 || overlapY <= 0 || overlapY2 <= 0) continue;
+          // Push along the axis of least overlap
+          const pushX = Math.min(overlapX, overlapX2);
+          const pushY = Math.min(overlapY, overlapY2);
+          if (pushX <= pushY) {
+            // Push horizontally
+            const half = pushX / 2;
+            if (overlapX < overlapX2) { ra.x -= half; rb.x += half; }
+            else                      { ra.x += half; rb.x -= half; }
+          } else {
+            // Push vertically
+            const half = pushY / 2;
+            if (overlapY < overlapY2) { ra.y -= half; rb.y += half; }
+            else                      { ra.y += half; rb.y -= half; }
+          }
+          moved = true;
+        }
+      }
+      if (!moved) break;
+    }
+  }
+
+  // ════════════════════════════════════════════════════════════════════════
   // ── Clustering algorithms ────────────────────────────────────────────────
   // ════════════════════════════════════════════════════════════════════════
 
@@ -388,33 +413,22 @@ function initClustersTool(paneEl, sidebarEl) {
     return Array.from(sum).map(x => x / rows.length);
   }
 
-  // k-means++ initialisation + cosine distance, multiple trials
   function kMeansCosine(rows, k, iters) {
     iters = iters || 25;
     const n = rows.length;
     if (n <= k) return rows.map((_, i) => i % k);
-    // k-means++ seed
     const centers = [rows[Math.floor(Math.random() * n)].vec.slice()];
     while (centers.length < k) {
       const dists = rows.map(r => Math.min(...centers.map(c => 1 - cosineSim(r.vec, c))));
       const sum = dists.reduce((a, b) => a + b, 0);
-      let r = Math.random() * sum;
-      let picked = false;
+      let r = Math.random() * sum; let picked = false;
       for (let i = 0; i < n; i++) { r -= dists[i]; if (r <= 0) { centers.push(rows[i].vec.slice()); picked=true; break; } }
       if (!picked) centers.push(rows[Math.floor(Math.random() * n)].vec.slice());
     }
     let asgn = new Array(n).fill(0);
     for (let iter = 0; iter < iters; iter++) {
-      const na = rows.map(r => {
-        let best=0, bs=-Infinity;
-        centers.forEach((c, ci) => { const s=cosineSim(r.vec, c); if (s > bs) { bs=s; best=ci; } });
-        return best;
-      });
-      centers.forEach((_, ci) => {
-        const members = rows.filter((_, i) => na[i] === ci);
-        if (!members.length) return;
-        const c = centroid(members); if (c) centers[ci] = c;
-      });
+      const na = rows.map(r => { let best=0, bs=-Infinity; centers.forEach((c, ci) => { const s=cosineSim(r.vec, c); if (s > bs) { bs=s; best=ci; } }); return best; });
+      centers.forEach((_, ci) => { const members = rows.filter((_, i) => na[i] === ci); if (!members.length) return; const c = centroid(members); if (c) centers[ci] = c; });
       if (na.every((a, i) => a === asgn[i])) break;
       asgn = na;
     }
@@ -422,8 +436,7 @@ function initClustersTool(paneEl, sidebarEl) {
   }
 
   function bestKMeans(rows, k, trials) {
-    trials = trials || 3;
-    let bestAsgn = null, bestInertia = Infinity;
+    trials = trials || 3; let bestAsgn = null, bestInertia = Infinity;
     for (let t = 0; t < trials; t++) {
       const asgn = kMeansCosine(rows, k);
       const groups = Array.from({ length: k }, () => []);
@@ -455,86 +468,31 @@ function initClustersTool(paneEl, sidebarEl) {
     return (results.find(r => r.k === chosenK) || results[results.length-1]).asgn;
   }
 
-  // ── Semantically aligned sub-clustering ──────────────────────────────────
-  // Strategy: compute K global "theme centroids" from ALL entries together
-  // (not just one group), then for each top-level group independently cluster
-  // it into K sub-clusters, and remap those sub-cluster indices so that each
-  // one aligns to its closest global theme centroid.
-  // This ensures A1 ≈ B1 ≈ C1 thematically, regardless of how many groups exist.
+  // ── Semantically aligned sub-clustering (unchanged from v12) ─────────────
   function alignedSubCluster(topGroups, minK, maxK) {
     const numGroups = topGroups.length;
-    if (numGroups < 2) {
-      return numGroups === 0 ? [] : [autoCluster(topGroups[0], minK, maxK)];
-    }
-
-    // 1. Decide on a canonical K: run elbow selection on each group individually,
-    //    take the most common K (mode) as the canonical sub-cluster count.
-    const perGroupK = topGroups.map(members => {
-      if (members.length < 2) return 1;
-      const asgn = autoCluster(members, minK, maxK);
-      return Math.max(...asgn) + 1;
-    });
-    const kCounts = {};
-    perGroupK.forEach(k => { kCounts[k] = (kCounts[k] || 0) + 1; });
+    if (numGroups < 2) return numGroups === 0 ? [] : [autoCluster(topGroups[0], minK, maxK)];
+    const perGroupK = topGroups.map(members => { if (members.length < 2) return 1; const asgn = autoCluster(members, minK, maxK); return Math.max(...asgn) + 1; });
+    const kCounts = {}; perGroupK.forEach(k => { kCounts[k] = (kCounts[k] || 0) + 1; });
     const canonicalK = parseInt(Object.entries(kCounts).sort((a, b) => b[1] - a[1])[0][0]);
     if (canonicalK < 2) return topGroups.map(g => new Array(g.length).fill(0));
-
-    // 2. Compute GLOBAL theme centroids: cluster ALL entries from ALL groups
-    //    together into canonicalK themes. These become the shared reference.
     const allRows = topGroups.flat();
     const globalAsgn = bestKMeans(allRows, canonicalK, 5).asgn;
     const globalBuckets = Array.from({ length: canonicalK }, () => []);
     allRows.forEach((r, i) => globalBuckets[globalAsgn[i]].push(r));
     const globalCentroids = globalBuckets.map(b => b.length ? centroid(b) : null);
-
-    // 3. For each top-level group: cluster it into canonicalK sub-clusters,
-    //    then build a similarity matrix between its sub-cluster centroids and
-    //    the global theme centroids, and use greedy matching to align them.
     return topGroups.map(members => {
       if (members.length < 2) return new Array(members.length).fill(0);
-
-      // Force exactly canonicalK sub-clusters for this group
-      const localAsgn = members.length < canonicalK
-        ? members.map((_, i) => i % canonicalK)
-        : bestKMeans(members, canonicalK, 3).asgn;
-
+      const localAsgn = members.length < canonicalK ? members.map((_, i) => i % canonicalK) : bestKMeans(members, canonicalK, 3).asgn;
       const localBuckets = Array.from({ length: canonicalK }, () => []);
       members.forEach((r, i) => localBuckets[localAsgn[i]].push(r));
       const localCentroids = localBuckets.map(b => b.length ? centroid(b) : null);
-
-      // Build cosine similarity matrix: localCluster ci → globalTheme gi
-      const sim = Array.from({ length: canonicalK }, (_, ci) =>
-        Array.from({ length: canonicalK }, (_, gi) =>
-          (localCentroids[ci] && globalCentroids[gi])
-            ? cosineSim(localCentroids[ci], globalCentroids[gi]) : 0
-        )
-      );
-
-      // Greedy assignment: match each local cluster to its closest unused global theme
-      const usedGlobal = new Set();
-      const mapping = new Array(canonicalK).fill(-1); // localIdx → globalIdx
-      const pairs = [];
-      for (let ci = 0; ci < canonicalK; ci++)
-        for (let gi = 0; gi < canonicalK; gi++)
-          pairs.push({ ci, gi, s: sim[ci][gi] });
+      const sim = Array.from({ length: canonicalK }, (_, ci) => Array.from({ length: canonicalK }, (_, gi) => (localCentroids[ci] && globalCentroids[gi]) ? cosineSim(localCentroids[ci], globalCentroids[gi]) : 0));
+      const usedGlobal = new Set(); const mapping = new Array(canonicalK).fill(-1);
+      const pairs = []; for (let ci = 0; ci < canonicalK; ci++) for (let gi = 0; gi < canonicalK; gi++) pairs.push({ ci, gi, s: sim[ci][gi] });
       pairs.sort((a, b) => b.s - a.s);
-
-      for (const { ci, gi } of pairs) {
-        if (mapping[ci] !== -1 || usedGlobal.has(gi)) continue;
-        mapping[ci] = gi;
-        usedGlobal.add(gi);
-        if (usedGlobal.size === canonicalK) break;
-      }
-      // Fill any unmatched (shouldn't happen, but defensive)
-      for (let ci = 0; ci < canonicalK; ci++) {
-        if (mapping[ci] !== -1) continue;
-        for (let gi = 0; gi < canonicalK; gi++) {
-          if (!usedGlobal.has(gi)) { mapping[ci] = gi; usedGlobal.add(gi); break; }
-        }
-        if (mapping[ci] === -1) mapping[ci] = ci; // last resort
-      }
-
-      // Remap the assignment array from local indices to global theme indices
+      for (const { ci, gi } of pairs) { if (mapping[ci] !== -1 || usedGlobal.has(gi)) continue; mapping[ci] = gi; usedGlobal.add(gi); if (usedGlobal.size === canonicalK) break; }
+      for (let ci = 0; ci < canonicalK; ci++) { if (mapping[ci] !== -1) continue; for (let gi = 0; gi < canonicalK; gi++) { if (!usedGlobal.has(gi)) { mapping[ci] = gi; usedGlobal.add(gi); break; } } if (mapping[ci] === -1) mapping[ci] = ci; }
       return localAsgn.map(ci => mapping[ci]);
     });
   }
@@ -547,13 +505,6 @@ function initClustersTool(paneEl, sidebarEl) {
     { accent: '#d4700a', bg: '#fff6ed' }, { accent: '#6aab3e', bg: '#f2fbec' },
   ];
   function colForPath(path) { return PALETTE[(path[0] || 0) % PALETTE.length]; }
-
-  function nestInitialWidth(depth, count, isLeaf, childW) {
-    const pad = (BODY_PAD[Math.min(depth, BODY_PAD.length-1)] || 7) * 2;
-    const gap = BODY_GAP[Math.min(depth, BODY_GAP.length-1)] || 7;
-    if (isLeaf) { const cols = Math.min(count, 3); return pad + cols*CARD_W + (cols-1)*gap; }
-    return pad + Math.min(count, 3) * (childW || 140) + Math.min(count-1, 2) * gap;
-  }
 
   // ── Card builder ──────────────────────────────────────────────────────────
   function buildCard(r, col, delay) {
@@ -577,20 +528,21 @@ function initClustersTool(paneEl, sidebarEl) {
     return card;
   }
 
-  // ── Recursive nest builder ────────────────────────────────────────────────
-  // alignedAsgn: pre-computed aligned assignment array for depth-1 children
-  // (passed in from render() which called alignedSubCluster).
-  // At deeper levels we just run autoCluster normally — alignment only applies
-  // at the first sub-level (depth 1) since that's where cross-cluster comparison matters.
+  // ════════════════════════════════════════════════════════════════════════
+  // ── Recursive nest builder ───────────────────────────────────────────────
+  // Key change from v12: sub-nests inside a depth-0 container are positioned
+  // absolutely and collision-resolved, instead of relying on CSS flex-wrap.
+  // ════════════════════════════════════════════════════════════════════════
+
   function buildNestRecursive(rows, depth, maxDepth, path, alignedAsgn) {
     const col    = colForPath(path);
     const isLeaf = depth >= maxDepth;
     const gap    = BODY_GAP[Math.min(depth, BODY_GAP.length-1)];
     const pad    = BODY_PAD[Math.min(depth, BODY_PAD.length-1)];
 
+    // Compute children groupings
     let children = null;
     if (!isLeaf) {
-      // Use aligned assignment at depth 0 (first sub-level), autoCluster below
       const asgn = alignedAsgn || autoCluster(rows,
         depth === 0 ? _outerMin : _innerMin,
         depth === 0 ? _outerMax : _innerMax
@@ -617,30 +569,59 @@ function initClustersTool(paneEl, sidebarEl) {
     head.appendChild(dot); head.appendChild(cnt); nest.appendChild(head);
 
     const body = document.createElement('div'); body.className = 'pp-cl-nest-body';
-    body.style.gap = gap + 'px'; body.style.padding = pad + 'px';
     nest.appendChild(body);
 
-    let contentEl = body;
-    if (depth === 0) {
-      const inner = document.createElement('div'); inner.className = 'pp-cl-body-inner';
-      inner.style.gap = gap + 'px';
-      body.appendChild(inner); contentEl = inner;
-      makeBodyPannable(body, inner);
-    }
-
     if (isLeaf) {
-      rows.forEach((r, ri) => contentEl.appendChild(buildCard(r, col, ri * 14)));
-      nest.style.width = nestInitialWidth(depth, rows.length, true) + 'px';
+      // ── Leaf: flex-wrap cards ──────────────────────────────────────────
+      body.classList.add('pp-cl-body-leaf');
+      body.style.gap = gap + 'px'; body.style.padding = pad + 'px';
+      rows.forEach((r, ri) => body.appendChild(buildCard(r, col, ri * 14)));
+
+      // Estimate dimensions for initial width (height will be determined by flex-wrap)
+      const cols = Math.min(rows.length, 3);
+      const w = pad * 2 + cols * CARD_W + (cols - 1) * gap;
+      nest.style.width = w + 'px';
+
     } else {
-      let childNestW = 0;
-      const childEls = (children || []).filter(c => c.members.length > 0).map(({ members, childPath }) => {
+      // ── Non-leaf: build child nests, then collision-resolve their positions ──
+      const validChildren = (children || []).filter(c => c.members.length > 0);
+      const childEls = validChildren.map(({ members, childPath }) => {
         const child = buildNestRecursive(members, depth + 1, maxDepth, childPath, null);
-        childNestW = Math.max(childNestW, parseInt(child.style.width) || 180);
-        contentEl.appendChild(child);
-        if (depth + 1 === 1) makeNestDraggable(child);
+        body.appendChild(child);
+        if (depth + 1 < maxDepth || depth === 0) makeNestDraggable(child);
         return child;
       });
-      nest.style.width = nestInitialWidth(depth, childEls.length, false, childNestW + gap) + 'px';
+
+      // Give the browser a chance to measure child sizes, then layout.
+      // We store a callback on the nest element and run it in a post-render pass.
+      nest._layoutChildren = function() {
+        const headH = head.offsetHeight || 28;
+
+        // Collect measured sizes
+        const rects = childEls.map((el, i) => ({
+          x: pad + i * (CARD_W + SUB_GAP),   // initial naive position
+          y: pad,
+          w: el.offsetWidth  || parseInt(el.style.width)  || 140,
+          h: el.offsetHeight || parseInt(el.style.height) || 100,
+          el
+        }));
+
+        // Run collision resolution
+        resolveCollisions(rects, SUB_GAP);
+
+        // Clamp so nothing goes above pad
+        rects.forEach(r => { r.x = Math.max(pad, r.x); r.y = Math.max(pad, r.y); });
+
+        // Apply positions
+        rects.forEach(r => { r.el.style.left = r.x + 'px'; r.el.style.top  = r.y + 'px'; });
+
+        // Size the parent to exactly contain all children
+        const maxRight  = Math.max(...rects.map(r => r.x + r.w)) + pad;
+        const maxBottom = Math.max(...rects.map(r => r.y + r.h)) + pad;
+        nest.style.width  = Math.max(RESIZE_MIN_W, maxRight) + 'px';
+        nest.style.height = Math.max(RESIZE_MIN_H, headH + maxBottom) + 'px';
+        body.style.height = maxBottom + 'px';
+      };
     }
 
     makeResizable(nest);
@@ -657,21 +638,19 @@ function initClustersTool(paneEl, sidebarEl) {
     const maxDepth = _depth - 1;
 
     // Step 1: top-level clustering
-    const topAsgn  = autoCluster(rows, _outerMin, _outerMax);
-    const numTop   = Math.max(...topAsgn, 0) + 1;
+    const topAsgn   = autoCluster(rows, _outerMin, _outerMax);
+    const numTop    = Math.max(...topAsgn, 0) + 1;
     const topGroups = Array.from({ length: numTop }, () => []);
     rows.forEach((r, i) => topGroups[topAsgn[i]].push(r));
 
-    // Step 2: compute semantically-aligned sub-cluster assignments for all
-    // top-level groups in one pass, so every group gets the same canonical K
-    // and each sub-cluster index maps to the same global semantic theme.
+    // Step 2: aligned sub-cluster assignments
     let alignedAsgns = null;
     const nonEmpty = topGroups.filter(g => g.length > 0);
     if (maxDepth >= 1 && nonEmpty.length > 1) {
       alignedAsgns = alignedSubCluster(nonEmpty, _innerMin, _innerMax);
     }
 
-    // Step 3: build nests, passing the aligned assignment into each depth-0 nest
+    // Step 3: build nests
     const nestEls = [];
     let alignIdx = 0;
     topGroups.forEach((members, oi) => {
@@ -682,18 +661,44 @@ function initClustersTool(paneEl, sidebarEl) {
       world.appendChild(nest); nestEls.push(nest);
     });
 
+    // Step 4: two-pass layout in rAF
+    // Pass A: run all _layoutChildren callbacks (sub-nest collision resolution)
+    // Pass B: collect final nest sizes, resolve top-level collisions, apply positions
     requestAnimationFrame(() => {
-      const canvasW = canvas.offsetWidth || 400;
-      let curX = NEST_GAP, curY = NEST_GAP, rowH = 0;
-      nestEls.forEach(n => {
-        const nw = n.offsetWidth || parseInt(n.style.width) || 200, nh = n.offsetHeight || 200;
-        if (curX + nw > canvasW - NEST_GAP && curX > NEST_GAP) { curX = NEST_GAP; curY += rowH + NEST_GAP; rowH = 0; }
-        n.style.left = curX + 'px'; n.style.top = curY + 'px';
-        curX += nw + NEST_GAP; rowH = Math.max(rowH, nh);
+      // Pass A — layout sub-nests inside each depth-0 nest
+      nestEls.forEach(n => { if (typeof n._layoutChildren === 'function') n._layoutChildren(); });
+
+      requestAnimationFrame(() => {
+        // Pass B — resolve top-level nest collisions
+        const canvasW = canvas.offsetWidth || 800;
+        const canvasH = canvas.offsetHeight || 600;
+
+        // Initial grid placement (simple flow, just to seed positions)
+        const rects = nestEls.map((n, i) => ({
+          x: NEST_GAP + (i % 4) * (200 + NEST_GAP),
+          y: NEST_GAP + Math.floor(i / 4) * (200 + NEST_GAP),
+          w: n.offsetWidth  || parseInt(n.style.width)  || 200,
+          h: n.offsetHeight || parseInt(n.style.height) || 200,
+          el: n
+        }));
+
+        // Resolve all overlaps between top-level nests
+        resolveCollisions(rects, NEST_GAP, 120);
+
+        // Shift so no nest has negative coords
+        const minX = Math.min(...rects.map(r => r.x));
+        const minY = Math.min(...rects.map(r => r.y));
+        const offX = minX < NEST_GAP ? NEST_GAP - minX : 0;
+        const offY = minY < NEST_GAP ? NEST_GAP - minY : 0;
+
+        rects.forEach(r => {
+          r.el.style.left = (r.x + offX) + 'px';
+          r.el.style.top  = (r.y + offY) + 'px';
+        });
+
+        subtitle.textContent = numTop + ' cluster' + (numTop === 1 ? '' : 's') + ' \u00b7 ' + rows.length + ' entries';
       });
     });
-
-    subtitle.textContent = numTop + ' cluster' + (numTop === 1 ? '' : 's') + ' \u00b7 ' + rows.length + ' entries';
   }
 
   // ── Embedding pipeline ────────────────────────────────────────────────────
