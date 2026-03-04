@@ -39,7 +39,7 @@ const LANDSCAPE = {
   sidebarDefault:            0.60,
   sidebarSnapClose:          0.30,
   sidebarOverlapThreshold:   0.50,
-  sidebarFullscreenThreshold:0.80,
+  sidebarFullscreenThreshold:0.70,
   sidebarTwoPosition:        false,
   arrowSize:                 28,
   arrowOffset:               12,
