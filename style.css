@@ -460,8 +460,9 @@ th, td {
   color: var(--color-data);
   font-weight: 500;
   letter-spacing: .05em;
-  z-index: 100;
+  z-index: 5;
   pointer-events: none;
+  border-radius: 8px; /* matches .grid-area so it sits cleanly inside */
 }
 
 /* ── Category cell rotation ── */
