@@ -683,7 +683,7 @@ mark.pkw {
   text-align: right;
   /* smooth number transitions */
   font-variant-numeric: tabular-nums;
-  transition: color .18s ease;
+  transition: color .6s ease;
 }
 
 /* ── Base track ── */
