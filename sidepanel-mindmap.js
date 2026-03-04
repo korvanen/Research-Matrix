@@ -5,7 +5,7 @@
 //   • Non-leaf cards now show ALL their entries as a compact bulleted list (up to 8)
 //     instead of showing only the single most-representative entry, making sub-concept
 //     count visually obvious at a glance
-console.log('[sidepanel-mindmap.js v11]');
+console.log('[sidepanel-mindmap.js v10]');
 
 // ── Global tuning constants ──────────────────────────────────────────────────
 // Minimum number of sub-concepts any non-leaf card will try to produce.
@@ -171,26 +171,8 @@ const CMAP_CHILD_K_MIN = 3;
   color:rgba(0,0,0,.38); padding:0 9px 7px;
   border-top:1px solid rgba(0,0,0,.06); margin-top:4px; padding-top:5px;
 }
-/* Non-leaf card entry list: compact rows so you can see all entries at a glance */
-.pp-cmap-card-nonleaf .pp-mm-card-body { padding:4px 9px 6px; }
-.pp-cmap-card-nonleaf .pp-mm-field {
-  font-size:9px !important;
-  line-height:1.25 !important;
-  color:rgba(0,0,0,.52) !important;
-  padding:2px 0 2px 10px;
-  border-bottom:1px solid rgba(0,0,0,.05);
-  position:relative;
-}
-.pp-cmap-card-nonleaf .pp-mm-field:last-child { border-bottom:none; }
-.pp-cmap-card-nonleaf .pp-mm-field::before {
-  content:'';
-  position:absolute; left:2px; top:50%; transform:translateY(-50%);
-  width:4px; height:4px; border-radius:50%;
-  background:currentColor; opacity:0.35;
-}
-.pp-cmap-card-nonleaf .pp-mm-cat {
-  font-size:8px !important; padding:1px 0 1px 10px;
-}
+/* Non-leaf cards have no body — header + footer only */
+.pp-cmap-card-nonleaf .pp-mm-card-body { display: none; }
 `;
   document.head.appendChild(s);
 })();
@@ -742,38 +724,32 @@ function initConceptMapTool(paneEl, sidebarEl) {
       card.appendChild(head);
 
       // ── Body ─────────────────────────────────────────────────────────────
-      // Leaf: show up to 5 entries (full text).
-      // Non-leaf: show ALL entries up to 8 as a compact list so the number of
-      //           items feeding into this concept is immediately visible.
-      const body = document.createElement('div');
-      body.className = 'pp-mm-card-body';
-      const rowsToShow = isLeaf ? node.rows.slice(0, 5) : node.rows.slice(0, 8);
-      rowsToShow.forEach(r => {
-        if (!r) return;
-        const cells  = r.row?.cells || r.cells || [];
-        const cats   = r.row?.cats  ? r.row.cats.filter(c => c.trim()) : [];
-        const best   = cells.reduce((b, c) => c.length > b.length ? c : b, '');
-        const parsed = typeof parseCitation === 'function' ? parseCitation(best) : { body: best };
-        if (cats.length) {
-          const ce = document.createElement('div');
-          ce.className = 'pp-mm-cat';
-          ce.textContent = cats.join(' · ');
-          body.appendChild(ce);
-        }
-        const fe = document.createElement('div');
-        fe.className = 'pp-mm-field';
-        fe.textContent = parsed.body;
-        body.appendChild(fe);
-      });
-      // If non-leaf has more than 8 entries, show a "+N more" hint
-      if (!isLeaf && node.rows.length > 8) {
-        const more = document.createElement('div');
-        more.className = 'pp-mm-field';
-        more.style.cssText = 'font-style:italic;opacity:0.5;';
-        more.textContent = '+' + (node.rows.length - 8) + ' more…';
-        body.appendChild(more);
+      // Leaf cards show up to 5 entries.
+      // Non-leaf cards show NO entries — their content is fully represented by
+      // their child concept cards, so repeating it here is redundant and bloats
+      // the card height unnecessarily.
+      if (isLeaf) {
+        const body = document.createElement('div');
+        body.className = 'pp-mm-card-body';
+        node.rows.slice(0, 5).forEach(r => {
+          if (!r) return;
+          const cells  = r.row?.cells || r.cells || [];
+          const cats   = r.row?.cats  ? r.row.cats.filter(c => c.trim()) : [];
+          const best   = cells.reduce((b, c) => c.length > b.length ? c : b, '');
+          const parsed = typeof parseCitation === 'function' ? parseCitation(best) : { body: best };
+          if (cats.length) {
+            const ce = document.createElement('div');
+            ce.className = 'pp-mm-cat';
+            ce.textContent = cats.join(' · ');
+            body.appendChild(ce);
+          }
+          const fe = document.createElement('div');
+          fe.className = 'pp-mm-field';
+          fe.textContent = parsed.body;
+          body.appendChild(fe);
+        });
+        card.appendChild(body);
       }
-      card.appendChild(body);
 
       // ── Footer: entry count + sub-concept count ──────────────────────────
       const footer = document.createElement('div');
