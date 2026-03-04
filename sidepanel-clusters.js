@@ -1,4 +1,4 @@
-// sidepanel-clusters.js — Clusters tool v13
+// sidepanel-clusters.js — Clusters tool v14
 // Changes vs v12:
 //   • Collision resolution for top-level nests: after initial flow layout,
 //     runs 60 iterations of overlap-repulsion so nests never overlap each other.
@@ -9,7 +9,7 @@
 //     respected precisely, replacing the old CSS flex-wrap approach for depth-1.
 //   • depth-0 nest height is now set explicitly after sub-nest layout so the
 //     container actually encloses all children.
-console.log('[sidepanel-clusters.js v22]');
+console.log('[sidepanel-clusters.js v14]');
 
 (function injectClusterStyles() {
   if (document.getElementById('pp-cluster-styles')) return;
@@ -94,10 +94,11 @@ console.log('[sidepanel-clusters.js v22]');
 /* ── Nests ── */
 .pp-cl-nest {
   position:absolute; border-radius:10px; border:1.5px solid transparent;
-  display:flex; flex-direction:column; overflow:hidden;
-  box-shadow:0 2px 12px rgba(0,0,0,.08); transition:box-shadow .18s;
+  display:block; overflow:hidden;
+  box-shadow:0 2px 12px rgba(0,0,0,.08); transition:box-shadow .18s, left .28s cubic-bezier(0.22,1,0.36,1), top .28s cubic-bezier(0.22,1,0.36,1), width .28s cubic-bezier(0.22,1,0.36,1), height .28s cubic-bezier(0.22,1,0.36,1);
 }
 .pp-cl-nest.pp-cl-nest-lifted { box-shadow:0 8px 28px rgba(0,0,0,.18); }
+.pp-cl-nest.pp-cl-no-transition { transition:box-shadow .18s !important; }
 .pp-cl-nest-head {
   display:flex; align-items:center; gap:6px; padding:5px 8px;
   cursor:grab; flex-shrink:0; user-select:none;
@@ -106,9 +107,9 @@ console.log('[sidepanel-clusters.js v22]');
 .pp-cl-nest-dot { width:7px;height:7px;border-radius:50%;flex-shrink:0; }
 .pp-cl-nest-count { font-size:8px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:rgba(0,0,0,.45);white-space:nowrap; }
 
-/* depth-0 body uses absolute positioning for sub-nests */
+/* nest body — height set explicitly in JS */
 .pp-cl-nest-body {
-  position:relative; flex:1; overflow:auto;
+  position:relative; overflow:hidden;
   scrollbar-width:thin; scrollbar-color:var(--scrollbar-thumb,rgba(0,0,0,.18)) transparent;
 }
 .pp-cl-nest-body::-webkit-scrollbar { width:5px;height:5px; }
@@ -238,15 +239,38 @@ function initClustersTool(paneEl, sidebarEl) {
     _outerMin = +oMinSlider.value; _outerMax = +oMaxSlider.value;
     _innerMin = +iMinSlider.value; _innerMax = +iMaxSlider.value;
     _depth    = +depthSlider.value;
-    oMinVal.textContent = _outerMin; oMaxVal.textContent = _outerMax;
-    iMinVal.textContent = _innerMin; iMaxVal.textContent = _innerMax;
-    depthVal.textContent = _depth;
+    smoothSliderVal(oMinSlider, oMinVal, _outerMin);
+    smoothSliderVal(oMaxSlider, oMaxVal, _outerMax);
+    smoothSliderVal(iMinSlider, iMinVal, _innerMin);
+    smoothSliderVal(iMaxSlider, iMaxVal, _innerMax);
+    smoothSliderVal(depthSlider, depthVal, _depth);
   }
+  // Smooth slider: visually animate the value label with lerp while the
+  // actual discrete integer snaps. Rebuild fires only after user stops.
+  const _sliderTargets = new Map(); // slider el -> { target, current, raf }
+  function smoothSliderVal(slider, valEl, intVal) {
+    let state = _sliderTargets.get(slider);
+    if (!state) { state = { current: intVal, raf: null }; _sliderTargets.set(slider, state); }
+    state.target = intVal;
+    if (state.raf) return; // already animating
+    function step() {
+      state.current += (state.target - state.current) * 0.28;
+      if (Math.abs(state.target - state.current) < 0.05) {
+        state.current = state.target;
+        valEl.textContent = state.target;
+        state.raf = null; return;
+      }
+      valEl.textContent = Math.round(state.current);
+      state.raf = requestAnimationFrame(step);
+    }
+    state.raf = requestAnimationFrame(step);
+  }
+
   function scheduleRecluster() {
     syncSliders(); if (!_cachedEmbedded) return;
     clearTimeout(_reclusterTimer);
     reclusterBtn.classList.add('pp-cl-reclustering'); reclusterBtn.textContent = '\u2026';
-    _reclusterTimer = setTimeout(() => { _rendered = false; tryRender(); }, 420);
+    _reclusterTimer = setTimeout(() => { _rendered = false; tryRender(); }, 520);
   }
   [oMinSlider, oMaxSlider, iMinSlider, iMaxSlider, depthSlider].forEach(s => s.addEventListener('input', scheduleRecluster));
   reclusterBtn.addEventListener('click', () => { clearTimeout(_reclusterTimer); _rendered = false; tryRender(); });
@@ -318,14 +342,14 @@ function initClustersTool(paneEl, sidebarEl) {
     _nestDrag.el.style.left = (_nestDrag.sx + (ev.clientX - _nestDrag.cx) / _zoom) + 'px';
     _nestDrag.el.style.top  = (_nestDrag.sy + (ev.clientY - _nestDrag.cy) / _zoom) + 'px';
   });
-  document.addEventListener('mouseup', () => { if (!_nestDrag) return; _nestDrag.el.classList.remove('pp-cl-nest-lifted'); _nestDrag = null; });
+  document.addEventListener('mouseup', () => { if (!_nestDrag) return; _nestDrag.el.classList.remove('pp-cl-nest-lifted'); _nestDrag.el.classList.remove('pp-cl-no-transition'); _nestDrag = null; });
   document.addEventListener('touchmove', ev => {
     if (!_nestDrag || ev.touches.length !== 1) return;
     _nestDrag.el.style.left = (_nestDrag.sx + (ev.touches[0].clientX - _nestDrag.cx) / _zoom) + 'px';
     _nestDrag.el.style.top  = (_nestDrag.sy + (ev.touches[0].clientY - _nestDrag.cy) / _zoom) + 'px';
     ev.preventDefault();
   }, { passive: false });
-  document.addEventListener('touchend', () => { if (!_nestDrag) return; _nestDrag.el.classList.remove('pp-cl-nest-lifted'); _nestDrag = null; });
+  document.addEventListener('touchend', () => { if (!_nestDrag) return; _nestDrag.el.classList.remove('pp-cl-nest-lifted'); _nestDrag.el.classList.remove('pp-cl-no-transition'); _nestDrag = null; });
 
   // ── Resize ───────────────────────────────────────────────────────────────
   function makeResizable(nestEl) {
@@ -573,7 +597,14 @@ function initClustersTool(paneEl, sidebarEl) {
 
     // Size constants — estimated from known card/layout metrics, no DOM reads
     const HEAD_H = 28;
-    const CARD_H = 58; // average rendered card height
+    const CARD_H = 68; // average rendered card height (accounts for text wrap)
+    // Per-row height estimator: short text = 1 line, longer = 2 lines
+    function estCardH(r) {
+      const cells = r.row && r.row.cells ? r.row.cells : r.cells || [];
+      const best = cells.reduce((b,c)=>c.length>b.length?c:b,'');
+      const lines = Math.min(4, Math.ceil(best.length / 38));
+      return 28 + lines * 13; // base padding + lines
+    }
 
     if (isLeaf) {
       // ── Leaf: flex-wrap cards ──────────────────────────────────────────
@@ -582,11 +613,17 @@ function initClustersTool(paneEl, sidebarEl) {
       rows.forEach((r, ri) => body.appendChild(buildCard(r, col, ri * 14)));
 
       const cols_  = Math.min(rows.length, 3);
-      const rows_  = Math.ceil(rows.length / cols_);
+      const numRowsGrid = Math.ceil(rows.length / cols_);
+      // Estimate total card height using per-row text lengths
+      const totalCardH = rows.reduce((s,r)=>s+estCardH(r),0);
+      const avgCardH = Math.max(CARD_H, totalCardH / Math.max(rows.length,1));
       const estW   = Math.max(RESIZE_MIN_W, pad * 2 + cols_ * CARD_W + (cols_ - 1) * gap);
-      const estH   = Math.max(RESIZE_MIN_H, HEAD_H + pad * 2 + rows_ * CARD_H + (rows_ - 1) * gap);
+      const estH   = Math.max(RESIZE_MIN_H, HEAD_H + pad * 2 + numRowsGrid * avgCardH + (numRowsGrid - 1) * gap);
+      const bodyH = estH - HEAD_H;
       nest.style.width  = estW + 'px';
       nest.style.height = estH + 'px';
+      body.style.height = bodyH + 'px';
+      body.style.minHeight = bodyH + 'px';
       nest._estW = estW; nest._estH = estH;
 
     } else {
@@ -628,6 +665,8 @@ function initClustersTool(paneEl, sidebarEl) {
       nest.style.width  = nestW + 'px';
       nest.style.height = nestH + 'px';
       body.style.height = maxBottom + 'px';
+      body.style.minHeight = maxBottom + 'px';
+      body.style.flexShrink = '0';
       nest._estW = nestW; nest._estH = nestH;
     }
 
