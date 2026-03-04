@@ -1,15 +1,13 @@
-// sidepanel-clusters.js — Clusters tool v14
-// Changes vs v12:
-//   • Collision resolution for top-level nests: after initial flow layout,
-//     runs 60 iterations of overlap-repulsion so nests never overlap each other.
-//   • Collision resolution for sub-cluster nests (depth-1) inside each depth-0
-//     nest: after building sub-nests, positions them with the same repulsion loop
-//     so they don't overlap inside their parent.
-//   • Both levels use absolute positioning inside their container so sizes are
-//     respected precisely, replacing the old CSS flex-wrap approach for depth-1.
-//   • depth-0 nest height is now set explicitly after sub-nest layout so the
-//     container actually encloses all children.
-console.log('[sidepanel-clusters.js v14]');
+// sidepanel-clusters.js — Clusters tool v15
+// v14 → v15 changes:
+//   • Card stacking fix: added align-items:flex-start to .pp-cl-body-leaf so
+//     cards don't stretch to full row height when rows are uneven.
+//   • Global slider classes: all .pp-cl-range* replaced with .pp-range*
+//     (defined once in style-slider-additions.css). Slider CSS removed from
+//     the injected <style> block.
+//   • Collision passes increased to 160 for top-level and sub-nests.
+//   • Initial grid spread uses NEST_GAP=20 / SUB_GAP=10 for sparser start.
+console.log('[sidepanel-clusters.js uuuuu]');
 
 (function injectClusterStyles() {
   if (document.getElementById('pp-cluster-styles')) return;
@@ -43,22 +41,6 @@ console.log('[sidepanel-clusters.js v14]');
 #pp-cl-controls { display:flex; flex-direction:column; gap:4px; }
 #pp-cl-sliders { display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:6px; align-items:center; }
 .pp-cl-slider-col { display:flex; flex-direction:column; gap:2px; }
-.pp-cl-group-label { font-size:7px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:rgba(0,0,0,.28);line-height:1;margin-bottom:1px; }
-.pp-cl-range-row { display:flex;align-items:center;gap:3px; }
-.pp-cl-range-label { font-size:8px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:rgba(0,0,0,.35);flex-shrink:0;width:18px; }
-.pp-cl-range-val { font-size:9px;font-weight:700;color:rgba(0,0,0,.55);flex-shrink:0;width:12px;text-align:right; }
-.pp-cl-range {
-  -webkit-appearance:none;appearance:none;flex:1;height:3px;border-radius:2px;
-  background:rgba(0,0,0,.12);outline:none;cursor:pointer;min-width:0;
-}
-.pp-cl-range::-webkit-slider-thumb {
-  -webkit-appearance:none;appearance:none;width:11px;height:11px;border-radius:50%;
-  background:var(--color-topbar-sheet,#111);box-shadow:0 1px 3px rgba(0,0,0,.22);cursor:pointer;transition:transform .12s;
-}
-.pp-cl-range.pp-cl-inner::-webkit-slider-thumb { background:rgba(0,0,0,.38); }
-.pp-cl-range.pp-cl-depth::-webkit-slider-thumb { background:rgba(100,80,200,.75); }
-.pp-cl-range::-webkit-slider-thumb:hover { transform:scale(1.2); }
-.pp-cl-range::-moz-range-thumb { width:11px;height:11px;border-radius:50%;border:none;background:var(--color-topbar-sheet,#111);box-shadow:0 1px 3px rgba(0,0,0,.22);cursor:pointer; }
 .pp-cl-btn-col { display:flex;align-items:stretch;justify-content:stretch;align-self:stretch;height:100%; }
 #pp-cl-recluster {
   flex:1;border:none;border-radius:5px;padding:4px 6px;
@@ -95,7 +77,12 @@ console.log('[sidepanel-clusters.js v14]');
 .pp-cl-nest {
   position:absolute; border-radius:10px; border:1.5px solid transparent;
   display:block; overflow:hidden;
-  box-shadow:0 2px 12px rgba(0,0,0,.08); transition:box-shadow .18s, left .28s cubic-bezier(0.22,1,0.36,1), top .28s cubic-bezier(0.22,1,0.36,1), width .28s cubic-bezier(0.22,1,0.36,1), height .28s cubic-bezier(0.22,1,0.36,1);
+  box-shadow:0 2px 12px rgba(0,0,0,.08);
+  transition:box-shadow .18s,
+    left .28s cubic-bezier(0.22,1,0.36,1),
+    top  .28s cubic-bezier(0.22,1,0.36,1),
+    width  .28s cubic-bezier(0.22,1,0.36,1),
+    height .28s cubic-bezier(0.22,1,0.36,1);
 }
 .pp-cl-nest.pp-cl-nest-lifted { box-shadow:0 8px 28px rgba(0,0,0,.18); }
 .pp-cl-nest.pp-cl-no-transition { transition:box-shadow .18s !important; }
@@ -107,7 +94,7 @@ console.log('[sidepanel-clusters.js v14]');
 .pp-cl-nest-dot { width:7px;height:7px;border-radius:50%;flex-shrink:0; }
 .pp-cl-nest-count { font-size:8px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:rgba(0,0,0,.45);white-space:nowrap; }
 
-/* nest body — height set explicitly in JS */
+/* nest body */
 .pp-cl-nest-body {
   position:relative; overflow:hidden;
   scrollbar-width:thin; scrollbar-color:var(--scrollbar-thumb,rgba(0,0,0,.18)) transparent;
@@ -116,9 +103,13 @@ console.log('[sidepanel-clusters.js v14]');
 .pp-cl-nest-body::-webkit-scrollbar-thumb { background:var(--scrollbar-thumb,rgba(0,0,0,.18));border-radius:3px; }
 .pp-cl-nest-body::-webkit-scrollbar-track { background:transparent; }
 
-/* leaf body: flex-wrap for cards */
+/* leaf body: flex-wrap cards
+   align-items:flex-start is the KEY FIX — prevents cards from stretching
+   to the height of the tallest card in each row. */
 .pp-cl-nest-body.pp-cl-body-leaf {
-  display:flex; flex-wrap:wrap; align-content:flex-start;
+  display:flex; flex-wrap:wrap;
+  align-content:flex-start;
+  align-items:flex-start;
 }
 .pp-cl-body-inner { display:flex; flex-wrap:wrap; position:absolute; }
 .pp-cl-body-panning { cursor:grabbing !important; }
@@ -162,21 +153,22 @@ console.log('[sidepanel-clusters.js v14]');
 // ════════════════════════════════════════════════════════════════════════════
 function initClustersTool(paneEl, sidebarEl) {
 
+  // Uses .pp-range / .pp-range--muted / .pp-range--accent from style-slider-additions.css
   paneEl.innerHTML =
     '<div id="pp-cl-head">' +
       '<div id="pp-cl-subtitle">Waiting for embeddings\u2026</div>' +
       '<div id="pp-cl-status" class="cl-loading"><div class="pp-cl-dot"></div><span id="pp-cl-label">Embeddings loading\u2026</span></div>' +
       '<div id="pp-cl-controls"><div id="pp-cl-sliders">' +
-        '<div class="pp-cl-slider-col"><div class="pp-cl-group-label">Outer</div>' +
-          '<div class="pp-cl-range-row"><span class="pp-cl-range-label">Min</span><input class="pp-cl-range" id="pp-cl-omin" type="range" min="2" max="20" value="2" step="1"><span class="pp-cl-range-val" id="pp-cl-omin-val">2</span></div>' +
-          '<div class="pp-cl-range-row"><span class="pp-cl-range-label">Max</span><input class="pp-cl-range" id="pp-cl-omax" type="range" min="2" max="20" value="12" step="1"><span class="pp-cl-range-val" id="pp-cl-omax-val">12</span></div>' +
+        '<div class="pp-cl-slider-col"><div class="pp-group-label">Outer</div>' +
+          '<div class="pp-range-row"><span class="pp-range-label">Min</span><input class="pp-range" id="pp-cl-omin" type="range" min="2" max="20" value="2" step="1"><span class="pp-range-val" id="pp-cl-omin-val">2</span></div>' +
+          '<div class="pp-range-row"><span class="pp-range-label">Max</span><input class="pp-range" id="pp-cl-omax" type="range" min="2" max="20" value="12" step="1"><span class="pp-range-val" id="pp-cl-omax-val">12</span></div>' +
         '</div>' +
-        '<div class="pp-cl-slider-col"><div class="pp-cl-group-label">Inner</div>' +
-          '<div class="pp-cl-range-row"><span class="pp-cl-range-label pp-cl-inner">Min</span><input class="pp-cl-range pp-cl-inner" id="pp-cl-imin" type="range" min="2" max="12" value="2" step="1"><span class="pp-cl-range-val" id="pp-cl-imin-val">2</span></div>' +
-          '<div class="pp-cl-range-row"><span class="pp-cl-range-label pp-cl-inner">Max</span><input class="pp-cl-range pp-cl-inner" id="pp-cl-imax" type="range" min="2" max="12" value="4" step="1"><span class="pp-cl-range-val" id="pp-cl-imax-val">4</span></div>' +
+        '<div class="pp-cl-slider-col"><div class="pp-group-label">Inner</div>' +
+          '<div class="pp-range-row"><span class="pp-range-label">Min</span><input class="pp-range pp-range--muted" id="pp-cl-imin" type="range" min="2" max="12" value="2" step="1"><span class="pp-range-val" id="pp-cl-imin-val">2</span></div>' +
+          '<div class="pp-range-row"><span class="pp-range-label">Max</span><input class="pp-range pp-range--muted" id="pp-cl-imax" type="range" min="2" max="12" value="4" step="1"><span class="pp-range-val" id="pp-cl-imax-val">4</span></div>' +
         '</div>' +
-        '<div class="pp-cl-slider-col"><div class="pp-cl-group-label">Depth</div>' +
-          '<div class="pp-cl-range-row"><span class="pp-cl-range-label pp-cl-depth">Lvl</span><input class="pp-cl-range pp-cl-depth" id="pp-cl-depth" type="range" min="1" max="4" value="2" step="1"><span class="pp-cl-range-val" id="pp-cl-depth-val">2</span></div>' +
+        '<div class="pp-cl-slider-col"><div class="pp-group-label">Depth</div>' +
+          '<div class="pp-range-row"><span class="pp-range-label">Lvl</span><input class="pp-range pp-range--accent" id="pp-cl-depth" type="range" min="1" max="4" value="2" step="1"><span class="pp-range-val" id="pp-cl-depth-val">2</span></div>' +
         '</div>' +
         '<div class="pp-cl-btn-col"><button id="pp-cl-recluster">Re-cluster</button></div>' +
       '</div></div>' +
@@ -214,8 +206,8 @@ function initClustersTool(paneEl, sidebarEl) {
   const BODY_PAD     = [7, 5, 4, 3];
   const RESIZE_MIN_W = 90;
   const RESIZE_MIN_H = 50;
-  const NEST_GAP     = 16;   // gap between top-level nests
-  const SUB_GAP      = 8;    // gap between sub-nests inside a depth-0 nest
+  const NEST_GAP     = 20;   // gap between top-level nests
+  const SUB_GAP      = 10;   // gap between sub-nests inside a depth-0 nest
 
   let _outerMin=2, _outerMax=12, _innerMin=2, _innerMax=4, _depth=2;
   let _rendered=false, _ttRow=null;
@@ -245,14 +237,14 @@ function initClustersTool(paneEl, sidebarEl) {
     smoothSliderVal(iMaxSlider, iMaxVal, _innerMax);
     smoothSliderVal(depthSlider, depthVal, _depth);
   }
-  // Smooth slider: visually animate the value label with lerp while the
-  // actual discrete integer snaps. Rebuild fires only after user stops.
-  const _sliderTargets = new Map(); // slider el -> { target, current, raf }
+
+  // Smooth value label animation
+  const _sliderTargets = new Map();
   function smoothSliderVal(slider, valEl, intVal) {
     let state = _sliderTargets.get(slider);
     if (!state) { state = { current: intVal, raf: null }; _sliderTargets.set(slider, state); }
     state.target = intVal;
-    if (state.raf) return; // already animating
+    if (state.raf) return;
     function step() {
       state.current += (state.target - state.current) * 0.28;
       if (Math.abs(state.target - state.current) < 0.05) {
@@ -380,34 +372,26 @@ function initClustersTool(paneEl, sidebarEl) {
   // ════════════════════════════════════════════════════════════════════════
   // ── Collision resolution ─────────────────────────────────────────────────
   // ════════════════════════════════════════════════════════════════════════
-
-  // Given an array of {x, y, w, h} rects, run overlap-repulsion until no
-  // overlaps remain (or maxPasses exhausted). Modifies rects in place.
-  // gap = minimum clear space between any two rects.
   function resolveCollisions(rects, gap, maxPasses) {
     gap = gap || 0;
-    maxPasses = maxPasses || 80;
+    maxPasses = maxPasses || 160;
     for (let pass = 0; pass < maxPasses; pass++) {
       let moved = false;
       for (let a = 0; a < rects.length; a++) {
         for (let b = a + 1; b < rects.length; b++) {
           const ra = rects[a], rb = rects[b];
-          // Check overlap including gap
-          const overlapX = (ra.x + ra.w + gap) - rb.x;
-          const overlapY = (ra.y + ra.h + gap) - rb.y;
+          const overlapX  = (ra.x + ra.w + gap) - rb.x;
+          const overlapY  = (ra.y + ra.h + gap) - rb.y;
           const overlapX2 = (rb.x + rb.w + gap) - ra.x;
           const overlapY2 = (rb.y + rb.h + gap) - ra.y;
           if (overlapX <= 0 || overlapX2 <= 0 || overlapY <= 0 || overlapY2 <= 0) continue;
-          // Push along the axis of least overlap
           const pushX = Math.min(overlapX, overlapX2);
           const pushY = Math.min(overlapY, overlapY2);
           if (pushX <= pushY) {
-            // Push horizontally
             const half = pushX / 2;
             if (overlapX < overlapX2) { ra.x -= half; rb.x += half; }
             else                      { ra.x += half; rb.x -= half; }
           } else {
-            // Push vertically
             const half = pushY / 2;
             if (overlapY < overlapY2) { ra.y -= half; rb.y += half; }
             else                      { ra.y += half; rb.y -= half; }
@@ -422,13 +406,11 @@ function initClustersTool(paneEl, sidebarEl) {
   // ════════════════════════════════════════════════════════════════════════
   // ── Clustering algorithms ────────────────────────────────────────────────
   // ════════════════════════════════════════════════════════════════════════
-
   function cosineSim(a, b) {
     let d=0, na=0, nb=0;
     for (let i=0; i<a.length; i++) { d+=a[i]*b[i]; na+=a[i]*a[i]; nb+=b[i]*b[i]; }
     return na && nb ? d / (Math.sqrt(na) * Math.sqrt(nb)) : 0;
   }
-
   function centroid(rows) {
     if (!rows.length) return null;
     const dim = rows[0].vec.length;
@@ -436,7 +418,6 @@ function initClustersTool(paneEl, sidebarEl) {
     rows.forEach(r => r.vec.forEach((x, i) => { sum[i] += x; }));
     return Array.from(sum).map(x => x / rows.length);
   }
-
   function kMeansCosine(rows, k, iters) {
     iters = iters || 25;
     const n = rows.length;
@@ -458,7 +439,6 @@ function initClustersTool(paneEl, sidebarEl) {
     }
     return asgn;
   }
-
   function bestKMeans(rows, k, trials) {
     trials = trials || 3; let bestAsgn = null, bestInertia = Infinity;
     for (let t = 0; t < trials; t++) {
@@ -471,7 +451,6 @@ function initClustersTool(paneEl, sidebarEl) {
     }
     return { asgn: bestAsgn, inertia: bestInertia };
   }
-
   function autoCluster(rows, minK, maxK) {
     const n = rows.length;
     if (n === 0) return [];
@@ -492,7 +471,7 @@ function initClustersTool(paneEl, sidebarEl) {
     return (results.find(r => r.k === chosenK) || results[results.length-1]).asgn;
   }
 
-  // ── Semantically aligned sub-clustering (unchanged from v12) ─────────────
+  // ── Aligned sub-clustering ───────────────────────────────────────────────
   function alignedSubCluster(topGroups, minK, maxK) {
     const numGroups = topGroups.length;
     if (numGroups < 2) return numGroups === 0 ? [] : [autoCluster(topGroups[0], minK, maxK)];
@@ -554,17 +533,13 @@ function initClustersTool(paneEl, sidebarEl) {
 
   // ════════════════════════════════════════════════════════════════════════
   // ── Recursive nest builder ───────────────────────────────────────────────
-  // Key change from v12: sub-nests inside a depth-0 container are positioned
-  // absolutely and collision-resolved, instead of relying on CSS flex-wrap.
   // ════════════════════════════════════════════════════════════════════════
-
   function buildNestRecursive(rows, depth, maxDepth, path, alignedAsgn) {
     const col    = colForPath(path);
     const isLeaf = depth >= maxDepth;
     const gap    = BODY_GAP[Math.min(depth, BODY_GAP.length-1)];
     const pad    = BODY_PAD[Math.min(depth, BODY_PAD.length-1)];
 
-    // Compute children groupings
     let children = null;
     if (!isLeaf) {
       const asgn = alignedAsgn || autoCluster(rows,
@@ -595,39 +570,34 @@ function initClustersTool(paneEl, sidebarEl) {
     const body = document.createElement('div'); body.className = 'pp-cl-nest-body';
     nest.appendChild(body);
 
-    // Size constants — estimated from known card/layout metrics, no DOM reads
     const HEAD_H = 28;
-    const CARD_H = 68; // average rendered card height (accounts for text wrap)
-    // Per-row height estimator: short text = 1 line, longer = 2 lines
     function estCardH(r) {
       const cells = r.row && r.row.cells ? r.row.cells : r.cells || [];
       const best = cells.reduce((b,c)=>c.length>b.length?c:b,'');
       const lines = Math.min(4, Math.ceil(best.length / 38));
-      return 28 + lines * 13; // base padding + lines
+      return 28 + lines * 13;
     }
 
     if (isLeaf) {
-      // ── Leaf: flex-wrap cards ──────────────────────────────────────────
+      // ── Leaf: flex-wrap cards (align-items:flex-start applied via CSS) ──
       body.classList.add('pp-cl-body-leaf');
-      body.style.gap = gap + 'px'; body.style.padding = pad + 'px';
+      body.style.gap     = gap + 'px';
+      body.style.padding = pad + 'px';
       rows.forEach((r, ri) => body.appendChild(buildCard(r, col, ri * 14)));
 
-      const cols_  = Math.min(rows.length, 3);
-      const numRowsGrid = Math.ceil(rows.length / cols_);
-      // Estimate total card height using per-row text lengths
-      const totalCardH = rows.reduce((s,r)=>s+estCardH(r),0);
-      const avgCardH = Math.max(CARD_H, totalCardH / Math.max(rows.length,1));
-      const estW   = Math.max(RESIZE_MIN_W, pad * 2 + cols_ * CARD_W + (cols_ - 1) * gap);
-      const estH   = Math.max(RESIZE_MIN_H, HEAD_H + pad * 2 + numRowsGrid * avgCardH + (numRowsGrid - 1) * gap);
-      const bodyH = estH - HEAD_H;
+      const cols_        = Math.min(rows.length, 3);
+      const numRowsGrid  = Math.ceil(rows.length / cols_);
+      const totalCardH   = rows.reduce((s,r)=>s+estCardH(r),0);
+      const avgCardH     = Math.max(60, totalCardH / Math.max(rows.length,1));
+      const estW = Math.max(RESIZE_MIN_W, pad * 2 + cols_ * CARD_W + (cols_ - 1) * gap);
+      const estH = Math.max(RESIZE_MIN_H, HEAD_H + pad * 2 + numRowsGrid * avgCardH + (numRowsGrid - 1) * gap);
       nest.style.width  = estW + 'px';
       nest.style.height = estH + 'px';
-      body.style.height = bodyH + 'px';
-      body.style.minHeight = bodyH + 'px';
+      body.style.height = (estH - HEAD_H) + 'px';
       nest._estW = estW; nest._estH = estH;
 
     } else {
-      // ── Non-leaf: build children, collision-resolve synchronously ─────
+      // ── Non-leaf: absolute-position children + collision-resolve ─────
       const validChildren = (children || []).filter(c => c.members.length > 0);
       const childEls = validChildren.map(({ members, childPath }) => {
         const child = buildNestRecursive(members, depth + 1, maxDepth, childPath, null);
@@ -635,38 +605,35 @@ function initClustersTool(paneEl, sidebarEl) {
         return child;
       });
 
-      // Use sizes already set by recursive calls (_estW / _estH) — no DOM reads
-      const rects = childEls.map((el, i) => ({
-        x: pad + i * ((el._estW || 140) + SUB_GAP),
-        y: pad,
-        w: el._estW || 140,
-        h: el._estH || 100,
-        el
-      }));
+      // Initial grid spread — well-spaced so fewer collision passes needed
+      const rects = childEls.map((el, i) => {
+        const cols = Math.max(1, Math.ceil(Math.sqrt(childEls.length)));
+        const col_ = i % cols, row_ = Math.floor(i / cols);
+        return {
+          x: pad + col_ * ((el._estW || 140) + SUB_GAP * 2),
+          y: pad + row_ * ((el._estH || 100) + SUB_GAP * 2),
+          w: el._estW || 140,
+          h: el._estH || 100,
+          el
+        };
+      });
 
-      // Fully synchronous collision resolution
-      resolveCollisions(rects, SUB_GAP, 120);
-
-      // Clamp to padding boundary
+      resolveCollisions(rects, SUB_GAP, 160);
       rects.forEach(r => { r.x = Math.max(pad, r.x); r.y = Math.max(pad, r.y); });
-
-      // Apply positions and append to body
       rects.forEach(r => {
         r.el.style.left = r.x + 'px';
         r.el.style.top  = r.y + 'px';
         body.appendChild(r.el);
       });
 
-      // Size this nest to exactly contain all children
       const maxRight  = Math.max(...rects.map(r => r.x + r.w)) + pad;
       const maxBottom = Math.max(...rects.map(r => r.y + r.h)) + pad;
       const nestW = Math.max(RESIZE_MIN_W, maxRight);
       const nestH = Math.max(RESIZE_MIN_H, HEAD_H + maxBottom);
-      nest.style.width  = nestW + 'px';
-      nest.style.height = nestH + 'px';
-      body.style.height = maxBottom + 'px';
-      body.style.minHeight = maxBottom + 'px';
-      body.style.flexShrink = '0';
+      nest.style.width    = nestW + 'px';
+      nest.style.height   = nestH + 'px';
+      body.style.height   = maxBottom + 'px';
+      body.style.position = 'relative';
       nest._estW = nestW; nest._estH = nestH;
     }
 
@@ -682,21 +649,17 @@ function initClustersTool(paneEl, sidebarEl) {
     _panX = 0; _panY = 0; _zoom = 1; applyWorldTransform(); _topZ = 10;
 
     const maxDepth = _depth - 1;
-
-    // Step 1: top-level clustering
     const topAsgn   = autoCluster(rows, _outerMin, _outerMax);
     const numTop    = Math.max(...topAsgn, 0) + 1;
     const topGroups = Array.from({ length: numTop }, () => []);
     rows.forEach((r, i) => topGroups[topAsgn[i]].push(r));
 
-    // Step 2: aligned sub-cluster assignments
     let alignedAsgns = null;
     const nonEmpty = topGroups.filter(g => g.length > 0);
     if (maxDepth >= 1 && nonEmpty.length > 1) {
       alignedAsgns = alignedSubCluster(nonEmpty, _innerMin, _innerMax);
     }
 
-    // Step 3: build nests
     const nestEls = [];
     let alignIdx = 0;
     topGroups.forEach((members, oi) => {
@@ -707,19 +670,18 @@ function initClustersTool(paneEl, sidebarEl) {
       world.appendChild(nest); nestEls.push(nest);
     });
 
-    // Step 4: synchronous top-level collision resolution using estimated sizes
-    // No rAF or DOM measurement needed — _estW/_estH set during buildNestRecursive.
+    // Top-level collision resolution using estimated sizes
+    const cols = Math.max(1, Math.ceil(Math.sqrt(nestEls.length)));
     const topRects = nestEls.map((n, i) => ({
-      x: NEST_GAP + (i % 4) * ((n._estW || 200) + NEST_GAP),
-      y: NEST_GAP + Math.floor(i / 4) * ((n._estH || 200) + NEST_GAP),
+      x: NEST_GAP + (i % cols) * ((n._estW || 200) + NEST_GAP * 2),
+      y: NEST_GAP + Math.floor(i / cols) * ((n._estH || 200) + NEST_GAP * 2),
       w: n._estW || 200,
       h: n._estH || 200,
       el: n
     }));
 
-    resolveCollisions(topRects, NEST_GAP, 120);
+    resolveCollisions(topRects, NEST_GAP, 160);
 
-    // Shift so nothing is off the top-left edge
     const minX = Math.min(...topRects.map(r => r.x));
     const minY = Math.min(...topRects.map(r => r.y));
     const offX = minX < NEST_GAP ? NEST_GAP - minX : 0;
