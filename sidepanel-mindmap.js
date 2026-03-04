@@ -1,13 +1,10 @@
-// sidepanel-mindmap.js — Concept Map tool v3
-// Based directly on working v1 architecture.
-// Changes vs v1:
-//   • Pan (drag empty canvas) + wheel/pinch zoom via a single #pp-cmap-world transform
-//   • Cards & SVGs both inside world so coordinate space is consistent
-//   • getR() reads from rects map (world-space) — no getBoundingClientRect needed
-//   • Level labels: "1st level concept", "2nd level concept", etc.
-//   • Tab/entity label removed from card body
-//   • Full pushApart collision on drag
-console.log('[sidepanel-mindmap.js v4]');
+// sidepanel-mindmap.js — Concept Map tool v5
+// Changes vs v4:
+//   • Infinite canvas — cards no longer clamped to visible bounds, matching clusters tool
+//   • Fit-all button in bottom-right corner (frames all cards)
+//   • Depth slider preserves existing card positions; only new cards are placed via radial layout
+//   • K / rebuild still do a full reset (new cluster structure)
+console.log('[sidepanel-mindmap.js v666]');
 
 (function injectCmapStyles() {
   if (document.getElementById('pp-cmap-styles')) return;
@@ -94,6 +91,15 @@ console.log('[sidepanel-mindmap.js v4]');
   position:absolute; bottom:7px; right:9px; font-size:9px; font-weight:600;
   letter-spacing:.05em; color:rgba(0,0,0,.22); pointer-events:none; z-index:20;
 }
+/* Fit-all button */
+#pp-cmap-fit {
+  position:absolute; bottom:28px; right:9px; z-index:25;
+  width:24px; height:24px; border:none; border-radius:5px; padding:0;
+  background:rgba(0,0,0,.07); color:rgba(0,0,0,.4); cursor:pointer;
+  display:grid; place-items:center;
+  transition:background .15s, color .15s;
+}
+#pp-cmap-fit:hover { background:rgba(0,0,0,.14); color:rgba(0,0,0,.75); }
 .pp-cmap-d0 { opacity:1; }
 .pp-cmap-d1 { opacity:0.82; }
 .pp-cmap-d2 { opacity:0.65; }
@@ -135,6 +141,12 @@ function initConceptMapTool(paneEl, sidebarEl) {
     '<div id="pp-cmap-canvas">' +
       '<div id="pp-cmap-world"></div>' +
       '<div id="pp-cmap-empty">Concept map will appear<br>once embeddings finish</div>' +
+      '<button id="pp-cmap-fit" title="Fit all cards into view">' +
+        '<svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">' +
+          '<path d="M1 5V2h3M12 2h3v3M15 11v3h-3M4 14H1v-3"/>' +
+          '<rect x="4" y="4" width="8" height="8" rx="1" opacity=".4"/>' +
+        '</svg>' +
+      '</button>' +
       '<div id="pp-cmap-zoom-hint">scroll / pinch to zoom</div>' +
     '</div>';
 
@@ -145,6 +157,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
   const world       = paneEl.querySelector('#pp-cmap-world');
   const emptyEl     = paneEl.querySelector('#pp-cmap-empty');
   const rebuildBtn  = paneEl.querySelector('#pp-cmap-rebuild');
+  const fitBtn      = paneEl.querySelector('#pp-cmap-fit');
   const depthSlider = paneEl.querySelector('#pp-cmap-depth');
   const depthValEl  = paneEl.querySelector('#pp-cmap-depth-val');
   const kSlider     = paneEl.querySelector('#pp-cmap-k');
@@ -161,6 +174,17 @@ function initConceptMapTool(paneEl, sidebarEl) {
   let _rebuildTimer = null, _topZ = 10;
   let _panX = 0, _panY = 0, _zoom = 1;
 
+  // ── Position cache: preserves card positions when depth slider changes ───
+  let _posCache = new Map();    // stableKey -> {x,y}
+  let _preservePan = false;     // if true, keep current pan/zoom on re-render
+  // Live state exposed so fitAll & scheduleRebuild can read them:
+  let _liveRects     = new Map(); // cid -> {x,y,w,h}
+  let _liveCidToNode = new Map(); // cid -> node
+
+  function nodeStableKey(node) {
+    return node.rows.map(r => (r.tabIdx||0)+':'+(r.rowIdx||0)).sort().join(',');
+  }
+
   const esc = t => typeof panelEscH === 'function' ? panelEscH(t) : String(t);
   const tv  = i => typeof panelThemeVars === 'function' ? panelThemeVars(i) : {};
 
@@ -172,6 +196,29 @@ function initConceptMapTool(paneEl, sidebarEl) {
   function applyTransform() {
     world.style.transform = `translate(${_panX}px,${_panY}px) scale(${_zoom})`;
   }
+
+  // ── Fit all ──────────────────────────────────────────────────────────────
+  function fitAll() {
+    if (!_liveRects.size) return;
+    let minX=Infinity, minY=Infinity, maxX=-Infinity, maxY=-Infinity;
+    _liveRects.forEach(r => {
+      minX = Math.min(minX, r.x);
+      minY = Math.min(minY, r.y);
+      maxX = Math.max(maxX, r.x + (r.w || CARD_W));
+      maxY = Math.max(maxY, r.y + (r.h || 80));
+    });
+    if (!isFinite(minX)) return;
+    const W = canvas.clientWidth || 400;
+    const H = canvas.clientHeight || 400;
+    const pad = 24;
+    const scaleX = (W - pad * 2) / Math.max(maxX - minX, 1);
+    const scaleY = (H - pad * 2) / Math.max(maxY - minY, 1);
+    _zoom = Math.min(scaleX, scaleY, 2);
+    _panX = pad - minX * _zoom + (W - pad * 2 - (maxX - minX) * _zoom) / 2;
+    _panY = pad - minY * _zoom + (H - pad * 2 - (maxY - minY) * _zoom) / 2;
+    applyTransform();
+  }
+  fitBtn.addEventListener('click', fitAll);
 
   // ── Pan: drag on empty canvas ────────────────────────────────────────────
   let _panning = false, _panSX = 0, _panSY = 0, _panBX = 0, _panBY = 0;
@@ -238,11 +285,34 @@ function initConceptMapTool(paneEl, sidebarEl) {
   }
 
   // ── Sliders ──────────────────────────────────────────────────────────────
-  depthSlider.addEventListener('input', () => { _depth = +depthSlider.value; depthValEl.textContent = _depth; scheduleRebuild(); });
-  kSlider.addEventListener('input',     () => { _topK  = +kSlider.value;     kValEl.textContent = _topK;     scheduleRebuild(); });
-  rebuildBtn.addEventListener('click', () => { clearTimeout(_rebuildTimer); _rendered = false; tryRender(); });
-  function scheduleRebuild() {
+  depthSlider.addEventListener('input', () => {
+    _depth = +depthSlider.value; depthValEl.textContent = _depth;
+    scheduleRebuild(true); // depth-only: preserve positions
+  });
+  kSlider.addEventListener('input', () => {
+    _topK = +kSlider.value; kValEl.textContent = _topK;
+    scheduleRebuild(false); // K change: full reset
+  });
+  rebuildBtn.addEventListener('click', () => {
     clearTimeout(_rebuildTimer);
+    _posCache.clear(); _preservePan = false;
+    _rendered = false; tryRender();
+  });
+
+  function scheduleRebuild(depthOnly) {
+    clearTimeout(_rebuildTimer);
+    if (depthOnly && _rendered) {
+      // Save current positions keyed by stable node identity
+      _posCache = new Map();
+      _liveRects.forEach((rect, cid) => {
+        const node = _liveCidToNode.get(cid);
+        if (node) _posCache.set(nodeStableKey(node), { x: rect.x, y: rect.y });
+      });
+      _preservePan = true;
+    } else {
+      _posCache.clear();
+      _preservePan = false;
+    }
     rebuildBtn.classList.add('pp-cmap-busy'); rebuildBtn.textContent = '\u2026';
     _rebuildTimer = setTimeout(() => { _rendered = false; tryRender(); }, 420);
   }
@@ -306,10 +376,14 @@ function initConceptMapTool(paneEl, sidebarEl) {
   function renderConceptMap(root) {
     world.innerHTML = '';
     emptyEl.style.display = 'none';
-    _topZ = 10; _panX = 0; _panY = 0; _zoom = 1; applyTransform();
+    _topZ = 10;
+    // Only reset pan/zoom on a full rebuild; depth-only changes preserve view
+    if (!_preservePan) { _panX = 0; _panY = 0; _zoom = 1; }
+    applyTransform();
+    _preservePan = false; // consumed
     if (!root) { emptyEl.style.display = 'flex'; return; }
 
-    // ── SVGs first inside world (z-index handled by insertion order) ─────────
+    // ── SVGs first inside world ──────────────────────────────────────────────
     const ns = 'http://www.w3.org/2000/svg';
     const svgLines = document.createElementNS(ns,'svg');
     svgLines.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:1';
@@ -318,15 +392,23 @@ function initConceptMapTool(paneEl, sidebarEl) {
     svgDots.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:2';
     world.appendChild(svgDots);
 
-    const cardEls = new Map(); // cid -> el
-    const rects   = new Map(); // cid -> {x,y,w,h}
-    const colors  = new Map(); // cid -> {border,bg}
+    const cardEls = new Map();
+    const rects   = new Map();
+    const colors  = new Map();
     const collH   = new Map();
     const locked  = new Set();
     const arrows  = [];
     let _nid = 0;
 
-    function setId(node) { if(node._cid==null)node._cid=_nid++; if(node.children)node.children.forEach(setId); }
+    // Keep live refs accessible from outer scope (for fitAll + position saving)
+    _liveRects     = rects;
+    _liveCidToNode = new Map();
+
+    function setId(node) {
+      if (node._cid == null) node._cid = _nid++;
+      _liveCidToNode.set(node._cid, node);
+      if (node.children) node.children.forEach(setId);
+    }
     setId(root);
 
     const toRender = [];
@@ -343,104 +425,62 @@ function initConceptMapTool(paneEl, sidebarEl) {
       arrows.push({fromId:pid, toId:node._cid, color:t['--tab-active-bg']||'#aaa', depth:d});
     });
 
-    // ── Arrow drawing — reads directly from rects (world-space) ─────────────
+    // ── Arrow drawing ────────────────────────────────────────────────────────
     function getR(id) {
       const r=rects.get(id); if(!r) return null;
       const el=cardEls.get(id);
-      return {x:r.x, y:r.y, w:r.w, h: el ? (el.offsetHeight||r.h) : r.h};
+      return {x:r.x, y:r.y, w:r.w, h: el ? (el.offsetHeight||r.h||80) : (r.h||80)};
     }
-    function cpts(id) {
-      const r=getR(id); if(!r) return [];
-      const {x,y,w:W,h:H}=r;
-      return [{x:x+W*.25,y},{x:x+W*.5,y},{x:x+W*.75,y},
-              {x:x+W*.25,y:y+H},{x:x+W*.5,y:y+H},{x:x+W*.75,y:y+H},
-              {x,y:y+H/3},{x,y:y+H*2/3},{x:x+W,y:y+H/3},{x:x+W,y:y+H*2/3}];
-    }
-    function closest(pA,pB) {
-      let best=null,bd=Infinity;
-      pA.forEach(a=>pB.forEach(b=>{const d=Math.hypot(a.x-b.x,a.y-b.y);if(d<bd){bd=d;best={a,b};}}));
-      return best;
-    }
-    function tanDir(pt,id) {
-      const r=getR(id); if(!r) return{dx:0,dy:1}; const t=3;
-      if(Math.abs(pt.y-r.y)<t)          return{dx:0,dy:-1};
-      if(Math.abs(pt.y-(r.y+r.h))<t)   return{dx:0,dy:1};
-      if(Math.abs(pt.x-r.x)<t)          return{dx:-1,dy:0};
-      if(Math.abs(pt.x-(r.x+r.w))<t)   return{dx:1,dy:0};
-      return{dx:0,dy:1};
-    }
+
     function redrawArrows() {
-      while(svgLines.firstChild) svgLines.removeChild(svgLines.firstChild);
-      while(svgDots.firstChild)  svgDots.removeChild(svgDots.firstChild);
-      arrows.forEach(def => {
-        const pA=cpts(def.fromId), pB=cpts(def.toId);
-        if(!pA.length||!pB.length) return;
-        const pair=closest(pA,pB); if(!pair) return;
-        const {a,b}=pair;
-        const dist=Math.hypot(b.x-a.x,b.y-a.y), off=Math.min(dist*.45,90);
-        const tA=tanDir(a,def.fromId), tB=tanDir(b,def.toId);
+      svgLines.innerHTML=''; svgDots.innerHTML='';
+      arrows.forEach(({fromId,toId,color}) => {
+        const fr=getR(fromId), tr=getR(toId);
+        if(!fr||!tr) return;
+        const x1=fr.x+fr.w/2, y1=fr.y+fr.h;
+        const x2=tr.x+tr.w/2, y2=tr.y;
+        const cy1=y1+(y2-y1)*0.5, cy2=y1+(y2-y1)*0.5;
         const path=document.createElementNS(ns,'path');
-        path.setAttribute('d',`M${a.x},${a.y} C${a.x+tA.dx*off},${a.y+tA.dy*off} ${b.x+tB.dx*off},${b.y+tB.dy*off} ${b.x},${b.y}`);
+        path.setAttribute('d',`M${x1},${y1} C${x1},${cy1} ${x2},${cy2} ${x2},${y2}`);
         path.setAttribute('fill','none');
-        path.setAttribute('stroke',def.color);
-        path.setAttribute('stroke-width', def.depth===0?'2':def.depth===1?'1.5':'1');
-        path.setAttribute('stroke-opacity', String(def.depth===0?.55:def.depth===1?.38:.22));
-        if(def.depth>1) path.setAttribute('stroke-dasharray','5,4');
+        path.setAttribute('stroke',color);
+        path.setAttribute('stroke-width','1.5');
+        path.setAttribute('opacity','0.35');
         svgLines.appendChild(path);
-        [[a,def.fromId],[b,def.toId]].forEach(([pt,cid])=>{
-          const cc=colors.get(cid)||{border:def.color,bg:'#fff'};
-          const circ=document.createElementNS(ns,'circle');
-          circ.setAttribute('cx',String(pt.x)); circ.setAttribute('cy',String(pt.y)); circ.setAttribute('r','4');
-          circ.setAttribute('fill',cc.bg); circ.setAttribute('stroke',cc.border); circ.setAttribute('stroke-width','1.5');
-          circ.setAttribute('opacity',def.depth===0?'0.7':'0.45');
-          svgDots.appendChild(circ);
-        });
+        const dot=document.createElementNS(ns,'circle');
+        dot.setAttribute('cx',String(x2)); dot.setAttribute('cy',String(y2));
+        dot.setAttribute('r','3'); dot.setAttribute('fill',color); dot.setAttribute('opacity','0.55');
+        svgDots.appendChild(dot);
       });
     }
 
-    // ── Expand / collapse ────────────────────────────────────────────────────
-    function expand(cardEl, open, id) {
-      clearTimeout(cardEl._exTimer);
-      if (open) {
-        if(cardEl._exState==='open') return;
-        cardEl._exState='open'; cardEl.style.zIndex=String(++_topZ);
-        if(!collH.has(id)) collH.set(id, cardEl.offsetHeight);
-        const ch=collH.get(id);
-        cardEl.classList.add('pp-mm-expanded');
-        cardEl.style.transition='none'; cardEl.style.height=''; void cardEl.offsetHeight;
-        let tot=0;
-        Array.from(cardEl.children).forEach(c=>{if(!c.classList.contains('pp-goto-btn'))tot+=c.scrollHeight;});
-        const cs=getComputedStyle(cardEl);
-        tot+=parseFloat(cs.borderTopWidth||0)+parseFloat(cs.borderBottomWidth||0);
-        cardEl.style.height=ch+'px'; void cardEl.offsetHeight;
-        cardEl.style.transition=`height ${EXP_MS}ms cubic-bezier(0.22,1,0.36,1)`;
-        cardEl.style.height=Math.max(ch,tot)+'px';
-        cardEl._exTimer=setTimeout(()=>{cardEl.style.height='';redrawArrows();},EXP_MS+20);
-      } else {
-        if(cardEl._exState!=='open') return;
-        cardEl._exState='closed';
-        const ch=collH.get(id)||cardEl.offsetHeight;
-        cardEl.style.height=cardEl.offsetHeight+'px'; void cardEl.offsetHeight;
-        cardEl.style.transition=`height ${EXP_MS}ms cubic-bezier(0.22,1,0.36,1)`;
-        cardEl.style.height=ch+'px';
-        cardEl._exTimer=setTimeout(()=>{cardEl.classList.remove('pp-mm-expanded');cardEl.style.height='';redrawArrows();},EXP_MS+20);
-      }
+    // ── Card expand / collapse ────────────────────────────────────────────────
+    function expand(card, on, id) {
+      card.classList.toggle('pp-mm-expanded', on);
+      requestAnimationFrame(() => {
+        const h = card.offsetHeight || 80;
+        if (on) collH.set(id, h); else collH.delete(id);
+        redrawArrows();
+      });
     }
 
-    // ── Collision pushApart ─────────────────────────────────────────────────
+    // ── Collision push-apart — NO position clamping (infinite canvas) ────────
     function pushApart(movedId) {
-      const W=world.clientWidth||400, H=world.clientHeight||500;
-      for (let pass=0;pass<MM_ITERS;pass++) {
+      for(let pass=0;pass<MM_ITERS;pass++){
         let moved=false;
         rects.forEach((ra,ka)=>{
           if(ka===movedId) return;
           rects.forEach((rb,kb)=>{
             if(ka===kb) return;
-            if(ra.x<rb.x+rb.w+MM_PAD && ra.x+ra.w+MM_PAD>rb.x && ra.y<rb.y+rb.h+MM_PAD && ra.y+ra.h+MM_PAD>rb.y) {
+            const raH=collH.get(ka)||ra.h||80;
+            const rbH=collH.get(kb)||rb.h||80;
+            if(ra.x<rb.x+rb.w+MM_PAD && ra.x+ra.w+MM_PAD>rb.x &&
+               ra.y<rb.y+rbH+MM_PAD  && ra.y+raH+MM_PAD>rb.y) {
               const dR=rb.x+rb.w+MM_PAD-ra.x, dL=ra.x+ra.w+MM_PAD-rb.x;
-              const dD=rb.y+rb.h+MM_PAD-ra.y, dU=ra.y+ra.h+MM_PAD-rb.y;
-              if(Math.min(dR,dL)<=Math.min(dD,dU)) ra.x+=dR<dL?dR:-dL; else ra.y+=dD<dU?dD:-dU;
-              ra.x=Math.max(0,Math.min(W-ra.w,ra.x)); ra.y=Math.max(0,Math.min(H-ra.h,ra.y));
+              const dD=rb.y+rbH+MM_PAD-ra.y,  dU=ra.y+raH+MM_PAD-rb.y;
+              if(Math.min(dR,dL)<=Math.min(dD,dU)) ra.x+=dR<dL?dR:-dL;
+              else ra.y+=dD<dU?dD:-dU;
+              // No clamping — infinite canvas
               const el=cardEls.get(ka); if(el){el.style.left=ra.x+'px';el.style.top=ra.y+'px';}
               moved=true;
             }
@@ -450,12 +490,9 @@ function initConceptMapTool(paneEl, sidebarEl) {
       }
     }
 
-    // ── Drag — operates in world-space; no zoom conversion needed because
-    //    mouse events give screen px and world has transform; we track the
-    //    card's own left/top (world-space) and convert mouse delta by _zoom ──
+    // ── Drag — world-space, no clamping ──────────────────────────────────────
     function drag(el, id) {
       let on=false,ox=0,oy=0,sl=0,st=0;
-      const W=()=>world.clientWidth||400, H=()=>world.clientHeight||500;
       const start=(cx,cy)=>{
         on=true; el._dragging=true;
         const r=rects.get(id)||{x:0,y:0}; sl=r.x; st=r.y; ox=cx; oy=cy;
@@ -464,23 +501,34 @@ function initConceptMapTool(paneEl, sidebarEl) {
       const move=(cx,cy)=>{
         if(!on) return;
         const r=rects.get(id)||{w:CARD_W,h:80};
-        const nx=Math.max(0,Math.min(W()-r.w, sl+(cx-ox)/_zoom));
-        const ny=Math.max(0,Math.min(H()-r.h, st+(cy-oy)/_zoom));
+        // Infinite canvas: no clamping
+        const nx=sl+(cx-ox)/_zoom;
+        const ny=st+(cy-oy)/_zoom;
         el.style.left=nx+'px'; el.style.top=ny+'px';
         rects.set(id,{x:nx,y:ny,w:r.w,h:r.h});
         pushApart(id); redrawArrows();
       };
       const end=()=>{ if(!on)return; on=false; el._dragging=false; redrawArrows(); };
-      el.addEventListener('mousedown',e=>{if(e.button!==0||e.target.closest('.pp-mm-lock,.pp-goto-btn'))return;start(e.clientX,e.clientY);e.preventDefault();e.stopPropagation();});
+      el.addEventListener('mousedown',e=>{
+        if(e.button!==0||e.target.closest('.pp-mm-lock,.pp-goto-btn'))return;
+        start(e.clientX,e.clientY); e.preventDefault(); e.stopPropagation();
+      });
       document.addEventListener('mousemove',e=>move(e.clientX,e.clientY));
       document.addEventListener('mouseup',end);
       let _tx=0,_ty=0;
-      el.addEventListener('touchstart',e=>{if(e.touches.length!==1||e.target.closest('.pp-mm-lock,.pp-goto-btn'))return;_tx=e.touches[0].clientX;_ty=e.touches[0].clientY;start(_tx,_ty);e.preventDefault();},{passive:false});
-      el.addEventListener('touchmove',e=>{if(e.touches.length!==1)return;move(e.touches[0].clientX,e.touches[0].clientY);e.preventDefault();},{passive:false});
+      el.addEventListener('touchstart',e=>{
+        if(e.touches.length!==1||e.target.closest('.pp-mm-lock,.pp-goto-btn'))return;
+        _tx=e.touches[0].clientX;_ty=e.touches[0].clientY;
+        start(_tx,_ty); e.preventDefault();
+      },{passive:false});
+      el.addEventListener('touchmove',e=>{
+        if(e.touches.length!==1)return;
+        move(e.touches[0].clientX,e.touches[0].clientY); e.preventDefault();
+      },{passive:false});
       el.addEventListener('touchend',end);
     }
 
-    // ── makeCard ────────────────────────────────────────────────────────────
+    // ── makeCard ──────────────────────────────────────────────────────────────
     function makeCard(node, depth) {
       const isLeaf = node.children.length===0 || depth>=_depth-1;
       const tabIdx = node.rows[0]?.tabIdx||0;
@@ -497,7 +545,6 @@ function initConceptMapTool(paneEl, sidebarEl) {
       card.style.setProperty('--ppc-border',accent);
       card.style.setProperty('--ppc-bg',bg);
 
-      // ── Header: ordinal level label ────────────────────────────────────
       const head=document.createElement('div');
       head.className='pp-mm-card-head';
       head.style.background=accent; head.style.color=lc;
@@ -517,7 +564,6 @@ function initConceptMapTool(paneEl, sidebarEl) {
       head.appendChild(lockBtn);
       card.appendChild(head);
 
-      // ── Body: content only, no tab label ──────────────────────────────
       const body=document.createElement('div');
       body.className='pp-mm-card-body';
       (isLeaf?node.rows.slice(0,3):[node.rows[0]]).forEach(r=>{
@@ -548,7 +594,6 @@ function initConceptMapTool(paneEl, sidebarEl) {
       card.addEventListener('mouseenter',()=>{if(card._dragging)return;clearTimeout(_hvt);_hvt=setTimeout(()=>expand(card,true,id),HOVER_MS);});
       card.addEventListener('mouseleave',()=>{clearTimeout(_hvt);if(locked.has(id))return;expand(card,false,id);});
 
-      // Cards go into world (z-index above SVGs which are z:1,2)
       world.appendChild(card);
       card._cid=id;
       drag(card,id);
@@ -559,26 +604,46 @@ function initConceptMapTool(paneEl, sidebarEl) {
 
     toRender.forEach(({node,d})=>makeCard(node,d));
 
-    // ── Radial layout + initial collision pass ───────────────────────────────
+    // ── Layout: radial, with position cache restore for existing nodes ────────
     requestAnimationFrame(()=>{
       const W=world.clientWidth||400, H=world.clientHeight||500;
       const cx=W/2, cy=H/2;
       const byD=new Map();
       toRender.forEach(({node,d})=>{if(!byD.has(d))byD.set(d,[]);byD.get(d).push(node._cid);});
       const maxD=Math.max(...byD.keys(),0);
+
       byD.forEach((ids,d)=>{
         ids.forEach((id,idx)=>{
           const el=cardEls.get(id); if(!el) return;
           const cH=el.offsetHeight||80;
-          let x,y;
-          if(d===0&&ids.length===1){x=cx-CARD_W/2;y=cy-cH/2;}
-          else{const R=(maxD===0?.28:.13+.19*d)*Math.min(W,H);const a=(2*Math.PI*idx/ids.length)-Math.PI/2;x=cx+R*Math.cos(a)-CARD_W/2;y=cy+R*Math.sin(a)-cH/2;}
-          x=Math.max(0,Math.min(W-CARD_W,x)); y=Math.max(0,Math.min(H-cH,y));
+
+          // Check if we have a saved position from before the depth slider moved
+          const node = _liveCidToNode.get(id);
+          const sk = node ? nodeStableKey(node) : null;
+          let x, y;
+
+          if (sk && _posCache.has(sk)) {
+            // Restore previous position — card stays where it was
+            const saved = _posCache.get(sk);
+            x = saved.x; y = saved.y;
+          } else {
+            // New card: place via radial layout (no clamping — infinite canvas)
+            if(d===0&&ids.length===1){x=cx-CARD_W/2;y=cy-cH/2;}
+            else{
+              const R=(maxD===0?.28:.13+.19*d)*Math.min(W,H);
+              const a=(2*Math.PI*idx/ids.length)-Math.PI/2;
+              x=cx+R*Math.cos(a)-CARD_W/2;
+              y=cy+R*Math.sin(a)-cH/2;
+            }
+            // No Math.max/min clamping — allow infinite canvas
+          }
+
           el.style.left=x+'px'; el.style.top=y+'px';
           rects.set(id,{x,y,w:CARD_W,h:cH});
         });
       });
-      // Initial collision nudge
+
+      // Initial collision nudge only for newly placed cards (not restored ones)
       for(let pass=0;pass<MM_ITERS;pass++){
         let moved=false;
         rects.forEach((ra,ka)=>{rects.forEach((rb,kb)=>{
@@ -587,7 +652,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
             const dR=rb.x+rb.w+MM_PAD-ra.x,dL=ra.x+ra.w+MM_PAD-rb.x;
             const dD=rb.y+rb.h+MM_PAD-ra.y,dU=ra.y+ra.h+MM_PAD-rb.y;
             if(Math.min(dR,dL)<=Math.min(dD,dU))ra.x+=dR<dL?dR:-dL;else ra.y+=dD<dU?dD:-dU;
-            ra.x=Math.max(0,Math.min(W-ra.w,ra.x));ra.y=Math.max(0,Math.min(H-ra.h,ra.y));
+            // No clamping
             const el=cardEls.get(ka);if(el){el.style.left=ra.x+'px';el.style.top=ra.y+'px';}
             moved=true;
           }
@@ -643,6 +708,8 @@ function initConceptMapTool(paneEl, sidebarEl) {
   return {
     reset(){
       _rendered=false;_vectors=null;_rows=null;
+      _posCache.clear(); _preservePan=false;
+      _liveRects=new Map(); _liveCidToNode=new Map();
       world.innerHTML='';
       emptyEl.style.display='flex';
       _panX=0;_panY=0;_zoom=1;applyTransform();
