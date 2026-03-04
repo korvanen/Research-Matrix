@@ -1,5 +1,12 @@
-// sidepanel-concept-map.js — Concept Map v15
-// v14 → v15 changes:
+// sidepanel-concept-map.js — Concept Map v16
+// v15 → v16 changes:
+//   • Slider CSS migrated to global style-slider-additions.css.
+//     Classes renamed: pp-cmap-range* → pp-range*, pp-cmap-group-label →
+//     pp-group-label, pp-cmap-range-row → pp-range-row, etc.
+//     Max-Parents slider gets pp-range--accent for purple thumb.
+//   • No behavioural changes.
+//
+// v15 notes:
 //   • Dual similarity indicators on each card footer:
 //       ↑ X% to parent  — how similar THIS node is to its parent(s) (avg)
 //       ↓ X% to children — how similar THIS node's children are to it (avg)
@@ -7,8 +14,7 @@
 //   • Leaf nodes show only the upward (↑) indicator.
 //   • Middle nodes (both parent and child) show both indicators side-by-side.
 //   • simToParents[] added to hierarchy output (avg sim to own parent nodes).
-//   • All v14 behaviour preserved.
-console.log('[sidepanel-concept-map.js v15]');
+console.log('[sidepanel-concept-map.js aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa]');
 
 const CMAP_PARENT_CHILD_THRESHOLD = 0.50;
 const CMAP_MIN_SPLIT_LENGTH = 60;
@@ -43,38 +49,15 @@ const ORPHAN_RECOVERY_THRESHOLD = 0.85;
 #pp-cmap-status.cmap-error .pp-cmap-dot   { background:rgba(180,40,40,.85); }
 @keyframes pp-cmap-pulse { 0%,100%{opacity:.25;transform:scale(.85);}50%{opacity:1;transform:scale(1.1);} }
 
+/* ── Controls grid ── */
 #pp-cmap-controls {
   display:grid; grid-template-columns:1fr 1fr 1fr auto auto; gap:6px; align-items:end;
 }
 .pp-cmap-ctrl-col { display:flex; flex-direction:column; gap:2px; }
-.pp-cmap-group-label {
-  font-size:7px; font-weight:800; letter-spacing:.12em; text-transform:uppercase;
-  color:rgba(0,0,0,.28); line-height:1; margin-bottom:1px;
-}
-.pp-cmap-range-row { display:flex; align-items:center; gap:3px; }
-.pp-cmap-range-label {
-  font-size:8px; font-weight:700; letter-spacing:.08em; text-transform:uppercase;
-  color:rgba(0,0,0,.35); flex-shrink:0; width:18px;
-}
-.pp-cmap-range-val {
-  font-size:9px; font-weight:700; color:rgba(0,0,0,.55); flex-shrink:0; width:22px; text-align:right;
-}
-.pp-cmap-range {
-  -webkit-appearance:none; appearance:none; flex:1; height:3px; border-radius:2px;
-  background:rgba(0,0,0,.12); outline:none; cursor:pointer; min-width:0;
-}
-.pp-cmap-range::-webkit-slider-thumb {
-  -webkit-appearance:none; appearance:none; width:11px; height:11px; border-radius:50%;
-  background:var(--color-topbar-sheet,#111); box-shadow:0 1px 3px rgba(0,0,0,.22);
-  cursor:pointer; transition:transform .12s;
-}
-.pp-cmap-range::-webkit-slider-thumb:hover { transform:scale(1.2); }
-.pp-cmap-range::-moz-range-thumb {
-  width:11px; height:11px; border-radius:50%; border:none;
-  background:var(--color-topbar-sheet,#111); box-shadow:0 1px 3px rgba(0,0,0,.22);
-}
-#pp-cmap-maxpar::-webkit-slider-thumb { background:#7c5cbf; }
-#pp-cmap-maxpar::-moz-range-thumb     { background:#7c5cbf; }
+
+/* Slider styles now live in style-slider-additions.css:
+   .pp-group-label / .pp-range-row / .pp-range-label / .pp-range-val
+   .pp-range / .pp-range--accent / .pp-range--muted             */
 
 #pp-cmap-rebuild {
   border:none; border-radius:5px; padding:4px 8px; align-self:stretch;
@@ -154,7 +137,6 @@ const ORPHAN_RECOVERY_THRESHOLD = 0.85;
   font-size:9px; font-weight:900; letter-spacing:.04em; opacity:.8; flex-shrink:0;
   align-self:center; padding:1px 6px; border-radius:8px;
 }
-/* Purple badge shown on nodes with more than one parent */
 .pp-cmap-parent-count {
   font-size:8px; font-weight:700; letter-spacing:.06em; padding:1px 5px;
   border-radius:8px; flex-shrink:0; align-self:center;
@@ -193,6 +175,8 @@ const ORPHAN_RECOVERY_THRESHOLD = 0.85;
 // ════════════════════════════════════════════════════════════════════════════
 function initConceptMapTool(paneEl, sidebarEl) {
 
+  // Slider classes use the global pp-range* system from style-slider-additions.css.
+  // pp-range--accent (purple thumb) is applied to the Max Parents slider.
   paneEl.innerHTML =
     '<div id="pp-cmap-head">' +
       '<div id="pp-cmap-subtitle">Waiting for embeddings\u2026</div>' +
@@ -201,27 +185,27 @@ function initConceptMapTool(paneEl, sidebarEl) {
       '</div>' +
       '<div id="pp-cmap-controls">' +
         '<div class="pp-cmap-ctrl-col">' +
-          '<div class="pp-cmap-group-label">Max Depth</div>' +
-          '<div class="pp-cmap-range-row">' +
-            '<span class="pp-cmap-range-label">Lvl</span>' +
-            '<input class="pp-cmap-range" id="pp-cmap-depth" type="range" min="1" max="8" value="5" step="1">' +
-            '<span class="pp-cmap-range-val" id="pp-cmap-depth-val">5</span>' +
+          '<div class="pp-group-label">Max Depth</div>' +
+          '<div class="pp-range-row">' +
+            '<span class="pp-range-label">Lvl</span>' +
+            '<input class="pp-range" id="pp-cmap-depth" type="range" min="1" max="8" value="5" step="1">' +
+            '<span class="pp-range-val" id="pp-cmap-depth-val">5</span>' +
           '</div>' +
         '</div>' +
         '<div class="pp-cmap-ctrl-col">' +
-          '<div class="pp-cmap-group-label">Link Threshold</div>' +
-          '<div class="pp-cmap-range-row">' +
-            '<span class="pp-cmap-range-label">Min</span>' +
-            '<input class="pp-cmap-range" id="pp-cmap-thresh" type="range" min="20" max="90" value="50" step="5">' +
-            '<span class="pp-cmap-range-val" id="pp-cmap-thresh-val">50%</span>' +
+          '<div class="pp-group-label">Link Threshold</div>' +
+          '<div class="pp-range-row">' +
+            '<span class="pp-range-label">Min</span>' +
+            '<input class="pp-range" id="pp-cmap-thresh" type="range" min="20" max="90" value="50" step="5">' +
+            '<span class="pp-range-val" id="pp-cmap-thresh-val">50%</span>' +
           '</div>' +
         '</div>' +
         '<div class="pp-cmap-ctrl-col">' +
-          '<div class="pp-cmap-group-label" style="color:#7c5cbf">Max Parents</div>' +
-          '<div class="pp-cmap-range-row">' +
-            '<span class="pp-cmap-range-label" style="color:#7c5cbf">Par</span>' +
-            '<input class="pp-cmap-range" id="pp-cmap-maxpar" type="range" min="1" max="6" value="1" step="1">' +
-            '<span class="pp-cmap-range-val" id="pp-cmap-maxpar-val" style="color:#7c5cbf">1</span>' +
+          '<div class="pp-group-label" style="color:#7c5cbf">Max Parents</div>' +
+          '<div class="pp-range-row">' +
+            '<span class="pp-range-label" style="color:#7c5cbf">Par</span>' +
+            '<input class="pp-range pp-range--accent" id="pp-cmap-maxpar" type="range" min="1" max="6" value="1" step="1">' +
+            '<span class="pp-range-val" id="pp-cmap-maxpar-val" style="color:#7c5cbf">1</span>' +
           '</div>' +
         '</div>' +
         '<div id="pp-cmap-layout-wrap">' +
@@ -385,7 +369,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
     return Array.from(sum).map(x=>x/valid.length);
   }
 
-  // ── Intra-cell splitting (unchanged from v13) ─────────────────────────────
+  // ── Intra-cell splitting ──────────────────────────────────────────────────
   function sentenceSplit(text) {
     return text.replace(/([.!?;])\s+/g,'$1\n').split('\n').map(s=>s.trim()).filter(s=>s.length>=CMAP_MIN_SPLIT_LENGTH);
   }
@@ -435,10 +419,8 @@ function initConceptMapTool(paneEl, sidebarEl) {
     rankOrder.forEach((ri,rank)=>{ levels[ri]=Math.max(1,Math.min(_depth,Math.floor(rank*_depth/n)+1)); });
 
     // 3. Multi-parent assignment
-    // For each node collect all candidates one level above that meet the
-    // threshold, sort by similarity desc, keep up to _maxParents.
-    const parentsOf    = new Map();   // nodeIdx → nodeIdx[]
-    const parentSimsOf = new Map();   // nodeIdx → number[]
+    const parentsOf    = new Map();
+    const parentSimsOf = new Map();
 
     for (let i=0;i<n;i++) {
       parentsOf.set(i,[]); parentSimsOf.set(i,[]);
@@ -476,7 +458,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
     const simToChildren=new Float32Array(n);
     for (let i=0;i<n;i++) { if (!childrenOf[i].length) continue; let sum=0; childrenOf[i].forEach(c=>{sum+=cosineSim(rows[i].vec,rows[c].vec);}); simToChildren[i]=sum/childrenOf[i].length; }
 
-    // 6b. Avg similarity to own parents (for upward footer indicator)
+    // 6b. Avg similarity to own parents
     const simToParents=new Float32Array(n);
     for (let i=0;i<n;i++) { const pars=parentsOf.get(i)||[]; if (!pars.length) continue; let sum=0; pars.forEach(p=>{sum+=cosineSim(rows[i].vec,rows[p].vec);}); simToParents[i]=sum/pars.length; }
 
@@ -568,7 +550,6 @@ function initConceptMapTool(paneEl, sidebarEl) {
         const badge=document.createElement('span'); badge.className='pp-cmap-level-badge'; badge.textContent='Level '+level; head.appendChild(badge);
       }
 
-      // Show multi-parent badge when this node has more than one parent
       const numParents=(parentsOf.get(i)||[]).length;
       if (numParents>1) {
         const pb=document.createElement('span'); pb.className='pp-cmap-parent-count'; pb.title=numParents+' parent connections'; pb.textContent=numParents+' parents'; head.appendChild(pb);
@@ -607,11 +588,9 @@ function initConceptMapTool(paneEl, sidebarEl) {
           return row;
         }
 
-        // ↑ to parent (dimmed bar, child's own accent)
         if (hasParents) {
           footer.appendChild(makeSimRow('↑', simToParents[i], 'to parent', accent+'88'));
         }
-        // ↓ to children (solid bar, full accent)
         if (hasChildren) {
           footer.appendChild(makeSimRow('↓', simToChildren[i], 'to children', accent+'cc'));
         }
@@ -626,7 +605,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
       if (window.ResizeObserver) { new ResizeObserver(()=>{ const r=_liveRects.get(i); if(r){r.h=card.offsetHeight;redrawConnectors();} }).observe(card); }
     }
 
-    // Draw one connector edge per (parent, child) pair from parentsOf
+    // Draw one connector edge per (parent, child) pair
     for (let i=0;i<n;i++) {
       if (absorbedInto[i]!==-1) continue;
       (parentsOf.get(i)||[]).forEach(par=>{
@@ -645,7 +624,6 @@ function initConceptMapTool(paneEl, sidebarEl) {
       nodeIds.forEach(id=>{ const lv=levels[id]; if(!byLevel.has(lv)) byLevel.set(lv,[]); byLevel.get(lv).push(id); });
       const maxLevel=Math.max(...byLevel.keys(),1);
 
-      // For tree/flow layouts use first-listed parent for position only
       const primaryParentOf=new Map(), childrenOfPrimary=new Map();
       nodeIds.forEach(id=>{ childrenOfPrimary.set(id,[]); });
       _connEdges.forEach(({fromId,toId})=>{
@@ -728,7 +706,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
     rebuildBtn.classList.remove('pp-cmap-busy'); rebuildBtn.textContent='Rebuild';
     setStatus('loading','Splitting cells\u2026');
     let workRows;
-    try { workRows=await splitAllRows(_rows); } catch(e){ console.warn('[concept-map v14] split error:',e); workRows=_rows; }
+    try { workRows=await splitAllRows(_rows); } catch(e){ console.warn('[concept-map v16] split error:',e); workRows=_rows; }
     const splitCount=workRows.length-_rows.length;
     setStatus('loading','Building hierarchy for '+workRows.length+' concepts\u2026');
     setTimeout(()=>{
@@ -748,7 +726,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
         renderConceptMap(hier);
         subtitleEl.textContent=visibleCount+' cards · '+levelStr+splitStr+mpStr;
         setStatus('ready','Done'); _rendered=true;
-      } catch(err){ console.error('[concept-map v14]',err); setStatus('error','Failed: '+err.message); }
+      } catch(err){ console.error('[concept-map v16]',err); setStatus('error','Failed: '+err.message); }
     },20);
   }
 
