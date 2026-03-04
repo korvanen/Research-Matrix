@@ -77,6 +77,34 @@
   <script src="sidepanel-clusters.js"></script>
   <script src="sidepanel-shell.js"></script>
   <script src="sidepanel-concept-map.js"></script>
+  <script src="embedding-bridge.js"></script>
   <script type="module" src="embedding-utils.js"></script>
+  <script>
+    // ── Start the embedding bridge host ───────────────────────────────────
+    // Runs after all scripts are loaded. Broadcasts embeddings to any open
+    // clusters.html or concept-map.html tabs over BroadcastChannel.
+    EmbeddingBridge.host();
+
+    // ── Handle #goto= deep links from tool pages ──────────────────────────
+    // clusters.html and concept-map.html open index.html#goto=tab:row:col
+    // when the user clicks "Go to ↗" on a card.
+    (function () {
+      var hash = window.location.hash;
+      if (!hash.startsWith('#goto=')) return;
+      var parts = hash.slice(6).split(':');
+      var tabIdx = +parts[0], rowIdx = +parts[1], colIdx = +(parts[2] || 0);
+      // Clear the hash so a refresh doesn't re-trigger
+      window.history.replaceState(null, '', window.location.pathname);
+      // Wait for the sheet to finish rendering before navigating
+      setTimeout(function () {
+        if (typeof panelGoTo === 'function') {
+          panelGoTo(
+            { tabIdx: tabIdx, rowIdx: rowIdx, row: null, shared: new Set() },
+            colIdx
+          );
+        }
+      }, 400);
+    })();
+  </script>
 </body>
 </html>
