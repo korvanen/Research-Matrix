@@ -1,10 +1,17 @@
-// sidepanel-mindmap.js — Concept Map tool v9
-// Changes vs v8:
-//   • Cards always fully expanded — no hover expand/contract, full text always visible
-//   • Entry count removed from card header (already in footer)
-//   • Footer shows correct dynamic sub-concept count (not hardcoded binary "2 sub-groups")
-//   • Card colours cycle through TAB_THEMES by depth level, not by which tab data belongs to
-console.log('[sidepanel-mindmap.js v9]');
+// sidepanel-mindmap.js — Concept Map tool v10
+// Changes vs v9:
+//   • CMAP_CHILD_K_MIN global constant (default 3) — raises the floor for sub-concept splitting
+//   • "Sub-concepts" slider added to controls — live override of the minimum childK per card
+//   • Non-leaf cards now show ALL their entries as a compact bulleted list (up to 8)
+//     instead of showing only the single most-representative entry, making sub-concept
+//     count visually obvious at a glance
+console.log('[sidepanel-mindmap.js v10]');
+
+// ── Global tuning constants ──────────────────────────────────────────────────
+// Minimum number of sub-concepts any non-leaf card will try to produce.
+// Raise this value here if lower levels default to 2 too often
+// (a natural artefact of the binary Ward dendrogram).
+const CMAP_CHILD_K_MIN = 3;
 
 (function injectCmapStyles() {
   if (document.getElementById('pp-cmap-styles')) return;
@@ -34,7 +41,10 @@ console.log('[sidepanel-mindmap.js v9]');
 #pp-cmap-status.cmap-ready   .pp-cmap-dot { background:rgba(40,160,80,.9); }
 #pp-cmap-status.cmap-error   .pp-cmap-dot { background:rgba(180,40,40,.85); }
 @keyframes pp-cmap-pulse { 0%,100%{opacity:.25;transform:scale(.85);}50%{opacity:1;transform:scale(1.1);} }
-/* (grid overridden below with layout column) */
+/* Controls grid: depth | top-k | sub-k | layout-btn | rebuild */
+#pp-cmap-controls {
+  display:grid; grid-template-columns:1fr 1fr 1fr auto auto; gap:6px; align-items:end;
+}
 .pp-cmap-ctrl-col { display:flex; flex-direction:column; gap:2px; }
 .pp-cmap-group-label {
   font-size:7px; font-weight:800; letter-spacing:.12em; text-transform:uppercase;
@@ -68,10 +78,6 @@ console.log('[sidepanel-mindmap.js v9]');
 }
 #pp-cmap-rebuild:hover { background:rgba(0,0,0,.13); color:rgba(0,0,0,.75); }
 #pp-cmap-rebuild.pp-cmap-busy { background:rgba(0,0,0,.04);color:rgba(0,0,0,.25);cursor:default; }
-/* Controls row: depth | k | layout-btn | rebuild */
-#pp-cmap-controls {
-  display:grid; grid-template-columns:1fr 1fr auto auto; gap:6px; align-items:end;
-}
 /* Layout dropdown */
 #pp-cmap-layout-wrap { position:relative; align-self:stretch; }
 #pp-cmap-layout-btn {
@@ -120,7 +126,6 @@ console.log('[sidepanel-mindmap.js v9]');
   cursor:default; user-select:none;
 }
 #pp-cmap-canvas.pp-cmap-panning { cursor:grabbing !important; }
-/* World: all cards + SVGs live here; gets translate+scale */
 #pp-cmap-world {
   position:absolute; top:0; left:0; width:100%; height:100%;
   transform-origin:0 0;
@@ -135,7 +140,6 @@ console.log('[sidepanel-mindmap.js v9]');
   position:absolute; bottom:7px; right:9px; font-size:9px; font-weight:600;
   letter-spacing:.05em; color:rgba(0,0,0,.22); pointer-events:none; z-index:20;
 }
-/* Fit-all button */
 #pp-cmap-fit {
   position:absolute; bottom:28px; right:9px; z-index:25;
   width:24px; height:24px; border:none; border-radius:5px; padding:0;
@@ -167,6 +171,26 @@ console.log('[sidepanel-mindmap.js v9]');
   color:rgba(0,0,0,.38); padding:0 9px 7px;
   border-top:1px solid rgba(0,0,0,.06); margin-top:4px; padding-top:5px;
 }
+/* Non-leaf card entry list: compact rows so you can see all entries at a glance */
+.pp-cmap-card-nonleaf .pp-mm-card-body { padding:4px 9px 6px; }
+.pp-cmap-card-nonleaf .pp-mm-field {
+  font-size:9px !important;
+  line-height:1.25 !important;
+  color:rgba(0,0,0,.52) !important;
+  padding:2px 0 2px 10px;
+  border-bottom:1px solid rgba(0,0,0,.05);
+  position:relative;
+}
+.pp-cmap-card-nonleaf .pp-mm-field:last-child { border-bottom:none; }
+.pp-cmap-card-nonleaf .pp-mm-field::before {
+  content:'';
+  position:absolute; left:2px; top:50%; transform:translateY(-50%);
+  width:4px; height:4px; border-radius:50%;
+  background:currentColor; opacity:0.35;
+}
+.pp-cmap-card-nonleaf .pp-mm-cat {
+  font-size:8px !important; padding:1px 0 1px 10px;
+}
 `;
   document.head.appendChild(s);
 })();
@@ -195,6 +219,14 @@ function initConceptMapTool(paneEl, sidebarEl) {
             '<span class="pp-cmap-range-label">K</span>' +
             '<input class="pp-cmap-range" id="pp-cmap-k" type="range" min="2" max="12" value="5" step="1">' +
             '<span class="pp-cmap-range-val" id="pp-cmap-k-val">5</span>' +
+          '</div>' +
+        '</div>' +
+        '<div class="pp-cmap-ctrl-col">' +
+          '<div class="pp-cmap-group-label">Sub-concepts</div>' +
+          '<div class="pp-cmap-range-row">' +
+            '<span class="pp-cmap-range-label">Min</span>' +
+            '<input class="pp-cmap-range" id="pp-cmap-subk" type="range" min="2" max="8" value="3" step="1">' +
+            '<span class="pp-cmap-range-val" id="pp-cmap-subk-val">3</span>' +
           '</div>' +
         '</div>' +
         '<button id="pp-cmap-rebuild">Rebuild</button>' +
@@ -252,16 +284,18 @@ function initConceptMapTool(paneEl, sidebarEl) {
   const canvas      = paneEl.querySelector('#pp-cmap-canvas');
   const world       = paneEl.querySelector('#pp-cmap-world');
   const emptyEl     = paneEl.querySelector('#pp-cmap-empty');
-  const rebuildBtn   = paneEl.querySelector('#pp-cmap-rebuild');
-  const fitBtn       = paneEl.querySelector('#pp-cmap-fit');
-  const layoutBtn    = paneEl.querySelector('#pp-cmap-layout-btn');
-  const layoutMenu   = paneEl.querySelector('#pp-cmap-layout-menu');
-  const layoutLabel  = paneEl.querySelector('#pp-cmap-layout-label');
-  const layoutOpts   = paneEl.querySelectorAll('.pp-cmap-layout-opt');
-  const depthSlider  = paneEl.querySelector('#pp-cmap-depth');
+  const rebuildBtn  = paneEl.querySelector('#pp-cmap-rebuild');
+  const fitBtn      = paneEl.querySelector('#pp-cmap-fit');
+  const layoutBtn   = paneEl.querySelector('#pp-cmap-layout-btn');
+  const layoutMenu  = paneEl.querySelector('#pp-cmap-layout-menu');
+  const layoutLabel = paneEl.querySelector('#pp-cmap-layout-label');
+  const layoutOpts  = paneEl.querySelectorAll('.pp-cmap-layout-opt');
+  const depthSlider = paneEl.querySelector('#pp-cmap-depth');
   const depthValEl  = paneEl.querySelector('#pp-cmap-depth-val');
   const kSlider     = paneEl.querySelector('#pp-cmap-k');
   const kValEl      = paneEl.querySelector('#pp-cmap-k-val');
+  const subKSlider  = paneEl.querySelector('#pp-cmap-subk');
+  const subKValEl   = paneEl.querySelector('#pp-cmap-subk-val');
 
   const CARD_W   = 160;
   const MM_PAD   = 12;
@@ -270,6 +304,8 @@ function initConceptMapTool(paneEl, sidebarEl) {
   const EXP_MS   = 260;
 
   let _depth = 3, _topK = 5, _layout = 'radial';
+  // _subKMin starts at the global constant; the slider can override it at runtime
+  let _subKMin = CMAP_CHILD_K_MIN;
   let _vectors = null, _rows = null, _rendered = false;
   let _rebuildTimer = null, _topZ = 10;
   let _panX = 0, _panY = 0, _zoom = 1;
@@ -339,7 +375,6 @@ function initConceptMapTool(paneEl, sidebarEl) {
       layoutLabel.textContent = LAYOUT_LABELS[l] || l;
       layoutOpts.forEach(o => o.classList.toggle('active', o.dataset.layout === l));
       layoutMenu.classList.remove('open'); layoutBtn.classList.remove('open');
-      // Reapply layout to existing cards without full rebuild
       if (_rendered && _liveRects.size) { _posCache.clear(); _preservePan=true; _rendered=false; tryRender(); }
     });
   });
@@ -350,34 +385,38 @@ function initConceptMapTool(paneEl, sidebarEl) {
     if (ev.button !== 0 || ev.target.closest('.pp-mm-card')) return;
     _panning = true; _panSX = ev.clientX; _panSY = ev.clientY;
     _panBX = _panX; _panBY = _panY;
-    canvas.classList.add('pp-cmap-panning'); ev.preventDefault();
+    canvas.classList.add('pp-cmap-panning');
   });
   document.addEventListener('mousemove', ev => {
     if (!_panning) return;
-    _panX = _panBX + ev.clientX - _panSX;
-    _panY = _panBY + ev.clientY - _panSY;
+    _panX = _panBX + (ev.clientX - _panSX);
+    _panY = _panBY + (ev.clientY - _panSY);
     applyTransform();
   });
-  document.addEventListener('mouseup', () => { _panning = false; canvas.classList.remove('pp-cmap-panning'); });
+  document.addEventListener('mouseup', () => {
+    if (!_panning) return; _panning = false;
+    canvas.classList.remove('pp-cmap-panning');
+  });
+  // Touch pan
+  let _tpanning = false, _tpSX=0, _tpSY=0, _tpBX=0, _tpBY=0;
   canvas.addEventListener('touchstart', ev => {
     if (ev.touches.length !== 1 || ev.target.closest('.pp-mm-card')) return;
-    _panning = true; _panSX = ev.touches[0].clientX; _panSY = ev.touches[0].clientY;
-    _panBX = _panX; _panBY = _panY;
-  }, { passive: true });
-  document.addEventListener('touchmove', ev => {
-    if (!_panning || ev.touches.length !== 1) return;
-    _panX = _panBX + ev.touches[0].clientX - _panSX;
-    _panY = _panBY + ev.touches[0].clientY - _panSY;
+    _tpanning=true; _tpSX=ev.touches[0].clientX; _tpSY=ev.touches[0].clientY;
+    _tpBX=_panX; _tpBY=_panY;
+  }, { passive:true });
+  canvas.addEventListener('touchmove', ev => {
+    if (!_tpanning || ev.touches.length !== 1) return;
+    _panX = _tpBX + (ev.touches[0].clientX - _tpSX);
+    _panY = _tpBY + (ev.touches[0].clientY - _tpSY);
     applyTransform(); ev.preventDefault();
-  }, { passive: false });
-  document.addEventListener('touchend', () => { _panning = false; });
-
-  // ── Zoom: wheel + pinch ──────────────────────────────────────────────────
+  }, { passive:false });
+  canvas.addEventListener('touchend', () => { _tpanning = false; });
+  // Wheel zoom
   canvas.addEventListener('wheel', ev => {
     ev.preventDefault();
     const rect = canvas.getBoundingClientRect();
     const mx = ev.clientX - rect.left, my = ev.clientY - rect.top;
-    const dz = ev.deltaY > 0 ? 0.9 : 1.1;
+    const dz = ev.deltaY < 0 ? 1.1 : 0.9;
     const nz = Math.max(0.15, Math.min(4, _zoom * dz));
     _panX = mx - (mx - _panX) * nz / _zoom;
     _panY = my - (my - _panY) * nz / _zoom;
@@ -415,7 +454,11 @@ function initConceptMapTool(paneEl, sidebarEl) {
   });
   kSlider.addEventListener('input', () => {
     _topK = +kSlider.value; kValEl.textContent = _topK;
-    scheduleRebuild(false); // K change: full reset
+    scheduleRebuild(false);
+  });
+  subKSlider.addEventListener('input', () => {
+    _subKMin = +subKSlider.value; subKValEl.textContent = _subKMin;
+    scheduleRebuild(true); // preserve positions — only branching factor changes
   });
   rebuildBtn.addEventListener('click', () => {
     clearTimeout(_rebuildTimer);
@@ -426,7 +469,6 @@ function initConceptMapTool(paneEl, sidebarEl) {
   function scheduleRebuild(depthOnly) {
     clearTimeout(_rebuildTimer);
     if (depthOnly && _rendered) {
-      // Save current positions keyed by stable node identity
       _posCache = new Map();
       _liveRects.forEach((rect, cid) => {
         const node = _liveCidToNode.get(cid);
@@ -501,13 +543,11 @@ function initConceptMapTool(paneEl, sidebarEl) {
     world.innerHTML = '';
     emptyEl.style.display = 'none';
     _topZ = 10;
-    // Only reset pan/zoom on a full rebuild; depth-only changes preserve view
     if (!_preservePan) { _panX = 0; _panY = 0; _zoom = 1; }
     applyTransform();
-    _preservePan = false; // consumed
+    _preservePan = false;
     if (!root) { emptyEl.style.display = 'flex'; return; }
 
-    // ── SVGs first inside world ──────────────────────────────────────────────
     const ns = 'http://www.w3.org/2000/svg';
     const svgLines = document.createElementNS(ns,'svg');
     svgLines.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:1';
@@ -524,7 +564,6 @@ function initConceptMapTool(paneEl, sidebarEl) {
     const arrows  = [];
     let _nid = 0;
 
-    // Keep live refs accessible from outer scope (for fitAll + position saving)
     _liveRects     = rects;
     _liveCidToNode = new Map();
 
@@ -538,15 +577,13 @@ function initConceptMapTool(paneEl, sidebarEl) {
     const toRender = [];
     const topRoots = getTopClusters(root, _topK);
 
-    // Dynamic children: instead of walking the binary dendrogram directly
-    // (which always gives exactly 2 children), we re-split each node's subtree
-    // into a natural number of sub-clusters proportional to sqrt(entries).
+    // Dynamic children: re-split each node's subtree into a natural number
+    // of sub-clusters proportional to sqrt(entries), floored at _subKMin.
     function collect(node, d, pid) {
       toRender.push({node, d, pid});
       if (d < _depth - 1 && node.rows.length > 1 && node.children.length) {
-        const childK = Math.max(2, Math.min(7, Math.round(Math.sqrt(node.rows.length))));
+        const childK = Math.max(_subKMin, Math.min(7, Math.round(Math.sqrt(node.rows.length))));
         const subs   = getTopClusters(node, childK);
-        // getTopClusters returns [node] if it can't split — guard against self-loops
         subs.filter(s => s !== node).forEach(c => collect(c, d + 1, node._cid));
       }
     }
@@ -558,13 +595,12 @@ function initConceptMapTool(paneEl, sidebarEl) {
       arrows.push({fromId:pid, toId:node._cid, color:t['--tab-active-bg']||'#aaa', depth:d});
     });
 
-    // ── Arrow drawing — 10-point anchor system, picks closest pair ──────────
+    // ── Arrow drawing — 10-point anchor system ───────────────────────────
     function getR(id) {
       const r=rects.get(id); if(!r) return null;
       const el=cardEls.get(id);
       return {x:r.x, y:r.y, w:r.w, h: el ? (el.offsetHeight||r.h||80) : (r.h||80)};
     }
-    // 10 connection anchors per card: 3 top, 3 bottom, 2 left side, 2 right side
     function cpts(id) {
       const r=getR(id); if(!r) return [];
       const {x,y,w:W,h:H}=r;
@@ -580,7 +616,6 @@ function initConceptMapTool(paneEl, sidebarEl) {
       pA.forEach(a=>pB.forEach(b=>{const d=Math.hypot(a.x-b.x,a.y-b.y);if(d<bd){bd=d;best={a,b};}}));
       return best;
     }
-    // Outgoing tangent at an anchor point — perpendicular to whichever edge it's on
     function tanDir(pt, id) {
       const r=getR(id); if(!r) return{dx:0,dy:1}; const t=3;
       if(Math.abs(pt.y-r.y)<t)         return{dx:0,dy:-1};
@@ -605,61 +640,18 @@ function initConceptMapTool(paneEl, sidebarEl) {
         path.setAttribute('fill','none');
         path.setAttribute('stroke',color);
         path.setAttribute('stroke-width', d===0?'2':d===1?'1.5':'1');
-        path.setAttribute('stroke-opacity', String(d===0?.55:d===1?.38:.22));
-        if(d>1) path.setAttribute('stroke-dasharray','5,4');
+        path.setAttribute('stroke-opacity', d===0?'0.55':d===1?'0.4':'0.28');
+        path.setAttribute('stroke-dasharray', d===0?'none':'4 3');
         svgLines.appendChild(path);
 
-        // Draw a filled dot ringed with the card's own border/bg colour at each endpoint
-        [[a,fromId],[b,toId]].forEach(([pt,cid])=>{
-          const cc=colors.get(cid)||{border:color,bg:'#fff'};
-          const circ=document.createElementNS(ns,'circle');
-          circ.setAttribute('cx',String(pt.x)); circ.setAttribute('cy',String(pt.y)); circ.setAttribute('r','4');
-          circ.setAttribute('fill',cc.bg);
-          circ.setAttribute('stroke',cc.border);
-          circ.setAttribute('stroke-width','1.5');
-          circ.setAttribute('opacity', String(d===0?.9:.7));
-          svgDots.appendChild(circ);
-        });
+        const dot=document.createElementNS(ns,'circle');
+        dot.setAttribute('cx',String(b.x)); dot.setAttribute('cy',String(b.y)); dot.setAttribute('r','3');
+        dot.setAttribute('fill',color); dot.setAttribute('opacity', d===0?'0.7':'0.45');
+        svgDots.appendChild(dot);
       });
     }
 
-    // ── Card expand / collapse ────────────────────────────────────────────────
-    function expand(card, on, id) {
-      card.classList.toggle('pp-mm-expanded', on);
-      requestAnimationFrame(() => {
-        const h = card.offsetHeight || 80;
-        if (on) collH.set(id, h); else collH.delete(id);
-        redrawArrows();
-      });
-    }
-
-    // ── Collision push-apart — NO position clamping (infinite canvas) ────────
-    function pushApart(movedId) {
-      for(let pass=0;pass<MM_ITERS;pass++){
-        let moved=false;
-        rects.forEach((ra,ka)=>{
-          if(ka===movedId) return;
-          rects.forEach((rb,kb)=>{
-            if(ka===kb) return;
-            const raH=collH.get(ka)||ra.h||80;
-            const rbH=collH.get(kb)||rb.h||80;
-            if(ra.x<rb.x+rb.w+MM_PAD && ra.x+ra.w+MM_PAD>rb.x &&
-               ra.y<rb.y+rbH+MM_PAD  && ra.y+raH+MM_PAD>rb.y) {
-              const dR=rb.x+rb.w+MM_PAD-ra.x, dL=ra.x+ra.w+MM_PAD-rb.x;
-              const dD=rb.y+rbH+MM_PAD-ra.y,  dU=ra.y+raH+MM_PAD-rb.y;
-              if(Math.min(dR,dL)<=Math.min(dD,dU)) ra.x+=dR<dL?dR:-dL;
-              else ra.y+=dD<dU?dD:-dU;
-              // No clamping — infinite canvas
-              const el=cardEls.get(ka); if(el){el.style.left=ra.x+'px';el.style.top=ra.y+'px';}
-              moved=true;
-            }
-          });
-        });
-        if(!moved) break;
-      }
-    }
-
-    // ── Drag — world-space, no clamping ──────────────────────────────────────
+    // ── Drag — world-space, no clamping ─────────────────────────────────
     function drag(el, id) {
       let on=false,ox=0,oy=0,sl=0,st=0;
       const start=(cx,cy)=>{
@@ -670,7 +662,6 @@ function initConceptMapTool(paneEl, sidebarEl) {
       const move=(cx,cy)=>{
         if(!on) return;
         const r=rects.get(id)||{w:CARD_W,h:80};
-        // Infinite canvas: no clamping
         const nx=sl+(cx-ox)/_zoom;
         const ny=st+(cy-oy)/_zoom;
         el.style.left=nx+'px'; el.style.top=ny+'px';
@@ -697,7 +688,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
       el.addEventListener('touchend',end);
     }
 
-    // ── depthColor — cycles through TAB_THEMES by depth, not by tab ────────────
+    // ── depthColor — cycles through TAB_THEMES by depth ─────────────────
     function depthColor(depth) {
       if (typeof TAB_THEMES !== 'undefined' && typeof THEMES !== 'undefined') {
         const tname = TAB_THEMES[depth % TAB_THEMES.length] || 'default';
@@ -708,12 +699,11 @@ function initConceptMapTool(paneEl, sidebarEl) {
           bg:     theme['--bg-data']          || '#f8f8f8'
         };
       }
-      // Fallback palette if THEMES unavailable
       const P = ['#5b7fa6','#7a6e9e','#5a9e7a','#9e7a5a','#9e5a7a','#7a9e5a'];
       return { accent: P[depth % P.length], lc: '#fff', bg: '#f8f8f8' };
     }
 
-    // ── makeCard ──────────────────────────────────────────────────────────────
+    // ── makeCard ─────────────────────────────────────────────────────────
     function makeCard(node, depth) {
       const isLeaf = node.children.length === 0 || depth >= _depth - 1;
       const id     = node._cid;
@@ -726,17 +716,24 @@ function initConceptMapTool(paneEl, sidebarEl) {
       card.style.setProperty('--ppc-border', accent);
       card.style.setProperty('--ppc-bg', bg);
 
-      // ── Header: level label only (no entry count — shown in footer) ──────
+      // Non-leaf cards get compact multi-entry style
+      if (!isLeaf) card.classList.add('pp-cmap-card-nonleaf');
+
+      // ── Header ───────────────────────────────────────────────────────────
       const head = document.createElement('div');
       head.className = 'pp-mm-card-head';
       head.style.cssText = `background:${accent};color:${lc};padding:5px 9px`;
       head.innerHTML = '<span class="pp-mm-badge">' + esc(ordinal(depth + 1) + ' level concept') + '</span>';
       card.appendChild(head);
 
-      // ── Body: full text, no truncation ────────────────────────────────────
+      // ── Body ─────────────────────────────────────────────────────────────
+      // Leaf: show up to 5 entries (full text).
+      // Non-leaf: show ALL entries up to 8 as a compact list so the number of
+      //           items feeding into this concept is immediately visible.
       const body = document.createElement('div');
       body.className = 'pp-mm-card-body';
-      (isLeaf ? node.rows.slice(0, 5) : [node.rows[0]]).forEach(r => {
+      const rowsToShow = isLeaf ? node.rows.slice(0, 5) : node.rows.slice(0, 8);
+      rowsToShow.forEach(r => {
         if (!r) return;
         const cells  = r.row?.cells || r.cells || [];
         const cats   = r.row?.cats  ? r.row.cats.filter(c => c.trim()) : [];
@@ -750,26 +747,34 @@ function initConceptMapTool(paneEl, sidebarEl) {
         }
         const fe = document.createElement('div');
         fe.className = 'pp-mm-field';
-        fe.textContent = parsed.body; // full text — no slice
+        fe.textContent = parsed.body;
         body.appendChild(fe);
       });
+      // If non-leaf has more than 8 entries, show a "+N more" hint
+      if (!isLeaf && node.rows.length > 8) {
+        const more = document.createElement('div');
+        more.className = 'pp-mm-field';
+        more.style.cssText = 'font-style:italic;opacity:0.5;';
+        more.textContent = '+' + (node.rows.length - 8) + ' more…';
+        body.appendChild(more);
+      }
       card.appendChild(body);
 
-      // ── Footer: entry count + sub-concept count ───────────────────────────
+      // ── Footer: entry count + sub-concept count ──────────────────────────
       const footer = document.createElement('div');
       footer.className = 'pp-cmap-footer';
       const entryStr = node.rows.length + ' entr' + (node.rows.length === 1 ? 'y' : 'ies');
       if (!isLeaf) {
-        // Compute actual dynamic child count the same way collect() does
-        const childK    = Math.max(2, Math.min(7, Math.round(Math.sqrt(node.rows.length))));
-        const subCount  = getTopClusters(node, childK).filter(s => s !== node).length;
+        // Use _subKMin so the footer count matches what collect() actually produced
+        const childK   = Math.max(_subKMin, Math.min(7, Math.round(Math.sqrt(node.rows.length))));
+        const subCount = getTopClusters(node, childK).filter(s => s !== node).length;
         footer.textContent = entryStr + ' · ' + subCount + ' sub-concept' + (subCount === 1 ? '' : 's');
       } else {
         footer.textContent = entryStr;
       }
       card.appendChild(footer);
 
-      // ── Go-to button for single-entry leaf cards ──────────────────────────
+      // ── Go-to button for single-entry leaf cards ─────────────────────────
       if (isLeaf && node.rows.length === 1 && node.rows[0]) {
         const r  = node.rows[0];
         const gb = document.createElement('button');
@@ -790,14 +795,13 @@ function initConceptMapTool(paneEl, sidebarEl) {
 
     toRender.forEach(({node,d})=>makeCard(node,d));
 
-    // ── Layout engine — 7 algorithms ─────────────────────────────────────────
+    // ── Layout engine — 7 algorithms ────────────────────────────────────────
     requestAnimationFrame(()=>{
       const W = world.clientWidth  || 400;
       const H = world.clientHeight || 500;
 
-      // Build parent map: cid -> pid
-      const parentOf = new Map(); // cid -> pid
-      const childrenOf = new Map(); // cid -> [cid]
+      const parentOf   = new Map();
+      const childrenOf = new Map();
       toRender.forEach(({node,pid}) => {
         parentOf.set(node._cid, pid);
         if(pid!=null){ if(!childrenOf.has(pid)) childrenOf.set(pid,[]); childrenOf.get(pid).push(node._cid); }
@@ -808,14 +812,11 @@ function initConceptMapTool(paneEl, sidebarEl) {
       const GAP_X = MM_PAD + 8;
       const GAP_Y = MM_PAD + 14;
 
-      // Helper: get measured card height
       const cH = id => { const el=cardEls.get(id); return el?(el.offsetHeight||80):80; };
 
-      // Helper: apply positions from a map and nudge collisions
       function applyPositions(posMap) {
         const SLIDE_MS = 420;
         const easing = 'cubic-bezier(0.25,1,0.5,1)';
-        // Enable transitions on all cards before moving
         cardEls.forEach(el => {
           el.style.transition = `left ${SLIDE_MS}ms ${easing}, top ${SLIDE_MS}ms ${easing}`;
         });
@@ -825,10 +826,8 @@ function initConceptMapTool(paneEl, sidebarEl) {
           el.style.left = pos.x + 'px'; el.style.top = pos.y + 'px';
           rects.set(id, {x:pos.x, y:pos.y, w:CARD_W, h});
         });
-        // Clear transitions after animation finishes, then nudge collisions
         setTimeout(() => {
           cardEls.forEach(el => { el.style.transition = ''; });
-          // Collision nudge (after animation)
           for(let pass=0;pass<MM_ITERS;pass++){
             let moved=false;
             rects.forEach((ra,ka)=>{rects.forEach((rb,kb)=>{
@@ -845,7 +844,6 @@ function initConceptMapTool(paneEl, sidebarEl) {
           }
           redrawArrows();
         }, SLIDE_MS + 20);
-        // Also keep arrows in sync during the animation
         const start = performance.now();
         (function raf(now) {
           redrawArrows();
@@ -853,7 +851,6 @@ function initConceptMapTool(paneEl, sidebarEl) {
         })(performance.now());
       }
 
-      // Check position cache (for depth-slider preserve)
       function restoreOrPlace(id, fallbackFn) {
         const node = _liveCidToNode.get(id);
         const sk   = node ? nodeStableKey(node) : null;
@@ -861,7 +858,20 @@ function initConceptMapTool(paneEl, sidebarEl) {
         return fallbackFn();
       }
 
-      // ── 1. RADIAL ─────────────────────────────────────────────────────────
+      function pushApart(movedId) {
+        const ra=rects.get(movedId); if(!ra) return;
+        rects.forEach((rb,kb)=>{
+          if(kb===movedId)return;
+          if(ra.x<rb.x+rb.w+MM_PAD&&ra.x+ra.w+MM_PAD>rb.x&&ra.y<rb.y+rb.h+MM_PAD&&ra.y+ra.h+MM_PAD>rb.y){
+            const dR=rb.x+rb.w+MM_PAD-ra.x,dL=ra.x+ra.w+MM_PAD-rb.x;
+            const dD=rb.y+rb.h+MM_PAD-ra.y,dU=ra.y+ra.h+MM_PAD-rb.y;
+            if(Math.min(dR,dL)<=Math.min(dD,dU))rb.x+=dR<dL?-dR:dL;else rb.y+=dD<dU?-dD:dU;
+            const el=cardEls.get(kb);if(el){el.style.left=rb.x+'px';el.style.top=rb.y+'px';}
+          }
+        });
+      }
+
+      // ── 1. RADIAL ───────────────────────────────────────────────────────
       function layoutRadial() {
         const byD = new Map();
         toRender.forEach(({node,d})=>{if(!byD.has(d))byD.set(d,[]);byD.get(d).push(node._cid);});
@@ -882,23 +892,21 @@ function initConceptMapTool(paneEl, sidebarEl) {
         applyPositions(pos);
       }
 
-      // ── 2 & 3. TREE (vertical or horizontal) — Reingold-Tilford ──────────
+      // ── 2 & 3. TREE ─────────────────────────────────────────────────────
       function layoutTree(vertical) {
-        // Compute subtree widths first
         function subtreeSize(id) {
           const kids = childrenOf.get(id)||[];
           if(!kids.length) return CARD_W;
           const childWidths = kids.map(subtreeSize);
           return childWidths.reduce((s,w)=>s+w,0) + GAP_X*(kids.length-1);
         }
-        // Recursive position assignment
         const pos = new Map();
         function place(id, left, depth) {
           const kids = childrenOf.get(id)||[];
           const h=cH(id);
           const myW = subtreeSize(id);
           const cx  = left + myW/2;
-          const rowY = depth*(80+GAP_Y*2); // approximate row spacing
+          const rowY = depth*(80+GAP_Y*2);
           if(vertical){
             pos.set(id,{x:cx-CARD_W/2, y:rowY});
           } else {
@@ -911,19 +919,14 @@ function initConceptMapTool(paneEl, sidebarEl) {
             childLeft+=kw+GAP_X;
           });
         }
-        // Place all roots side-by-side
         let totalW = roots.map(subtreeSize).reduce((s,w)=>s+w,0)+GAP_X*(roots.length-1);
         let curX = -totalW/2 + W/2;
         roots.forEach(rid=>{ const w=subtreeSize(rid); place(rid,curX,0); curX+=w+GAP_X; });
         applyPositions(pos);
       }
 
-      // ── 4 & 5. FLOW (vertical or horizontal) — layered DAG ───────────────
+      // ── 4 & 5. FLOW ─────────────────────────────────────────────────────
       function layoutFlow(vertical) {
-        // Assign depth levels
-        const depthOf = new Map();
-        toRender.forEach(({node,d})=>depthOf.set(node._cid,d));
-        // Group by depth
         const byD = new Map();
         toRender.forEach(({node,d})=>{if(!byD.has(d))byD.set(d,[]);byD.get(d).push(node._cid);});
         const pos = new Map();
@@ -941,7 +944,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
         applyPositions(pos);
       }
 
-      // ── 6. CIRCLE — all nodes on a single circle ─────────────────────────
+      // ── 6. CIRCLE ───────────────────────────────────────────────────────
       function layoutCircle() {
         const allIds = toRender.map(({node})=>node._cid);
         const n = allIds.length;
@@ -956,12 +959,10 @@ function initConceptMapTool(paneEl, sidebarEl) {
         applyPositions(pos);
       }
 
-      // ── 7. ORGANIC — force-directed (Fruchterman–Reingold) ───────────────
+      // ── 7. ORGANIC (Fruchterman–Reingold) ───────────────────────────────
       function layoutOrganic() {
         const allIds = toRender.map(({node})=>node._cid);
-        // Build edge set from arrows
         const edges = arrows.map(a=>({u:a.fromId,v:a.toId}));
-        // Init positions: current rects or radial seed
         const px={}, py={};
         allIds.forEach((id,i)=>{
           const ex=rects.get(id); if(ex){px[id]=ex.x+CARD_W/2;py[id]=ex.y+cH(id)/2;return;}
@@ -975,7 +976,6 @@ function initConceptMapTool(paneEl, sidebarEl) {
         for(let it=0;it<ITERS;it++){
           const dx={}, dy={};
           allIds.forEach(id=>{dx[id]=0;dy[id]=0;});
-          // Repulsion
           for(let i=0;i<allIds.length;i++) for(let j=i+1;j<allIds.length;j++){
             const u=allIds[i],v=allIds[j];
             let ddx=px[u]-px[v], ddy=py[u]-py[v];
@@ -985,9 +985,8 @@ function initConceptMapTool(paneEl, sidebarEl) {
             dx[u]+=ddx*f; dy[u]+=ddy*f;
             dx[v]-=ddx*f; dy[v]-=ddy*f;
           }
-          // Attraction
           edges.forEach(({u,v})=>{
-            if(!px.hasOwnProperty(u)||!px.hasOwnProperty(v))return;
+            if(!px.hasOwnProperty(u)||!px.hasOwnProperty(v)) return;
             let ddx=px[v]-px[u], ddy=py[v]-py[u];
             const d=Math.sqrt(ddx*ddx+ddy*ddy)||0.01;
             const f=d*d/k;
@@ -995,20 +994,19 @@ function initConceptMapTool(paneEl, sidebarEl) {
             dx[u]+=ddx*f; dy[u]+=ddy*f;
             dx[v]-=ddx*f; dy[v]-=ddy*f;
           });
-          // Apply displacements capped by temperature
           allIds.forEach(id=>{
             const d=Math.sqrt(dx[id]*dx[id]+dy[id]*dy[id])||0.01;
             const disp=Math.min(d,temp);
             px[id]+=dx[id]/d*disp; py[id]+=dy[id]/d*disp;
           });
-          temp*=0.93; // cool
+          temp*=0.93;
         }
         const pos=new Map();
         allIds.forEach(id=>{const h=cH(id);pos.set(id,{x:px[id]-CARD_W/2,y:py[id]-h/2});});
         applyPositions(pos);
       }
 
-      // ── Dispatch ─────────────────────────────────────────────────────────
+      // ── Dispatch ────────────────────────────────────────────────────────
       switch(_layout){
         case 'vtree':   layoutTree(true);    break;
         case 'htree':   layoutTree(false);   break;
