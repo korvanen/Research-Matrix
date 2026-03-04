@@ -1,20 +1,28 @@
-// sidepanel-concept-map.js — Concept Map v12
-// Rewritten: individual spreadsheet cells → cards; hierarchy levels assigned
-// purely by embedding-based generality score (not by spreadsheet structure).
-// Categories / columns are ignored for hierarchy — only semantic content matters.
-// Cards are connected by semantic parent-child relationships.
-// Merge rule: two cells at the SAME level with the EXACT SAME set of children
-// are collapsed into one combined card.
-console.log('[sidepanel-concept-map.js v12]');
+// sidepanel-concept-map.js — Concept Map v13
+// v12 → v13 changes:
+//   • Intra-cell splitting: if a cell's text contains segments that are
+//     semantically dissimilar to each other (below threshold), those segments
+//     are split into separate virtual cards rather than staying as one card.
+//   • Global constant CMAP_MIN_SPLIT_LENGTH (chars): a split segment shorter
+//     than this is not created — prevents single-word / trivial fragments.
+//   • Split card headers read: "Split from '[category]' n/t" where
+//     t = total number of splits from that original cell,
+//     n = 1-based index of this particular split.
+//   • All other v12 behaviour preserved: generality-based hierarchy,
+//     parent-child threshold, merge rule, similarity % footer.
+console.log('[sidepanel-concept-map.js v13]');
 
 // ════════════════════════════════════════════════════════════════════════════
-// ── Tuning constants ─────────────────────────────────────────────────────────
+// ── Global tuning constants ──────────────────────────────────────────────────
 // ════════════════════════════════════════════════════════════════════════════
 
-// Minimum cosine similarity (0–1) required to link a cell to a parent.
-// Raise for a sparser, cleaner tree; lower to connect more cells.
-// This value is also exposed as a slider in the UI.
+// Default parent-child link threshold (0–1). Also exposed as a UI slider.
 const CMAP_PARENT_CHILD_THRESHOLD = 0.50;
+
+// A split segment must be at least this many characters long.
+// Raise to allow only substantial paragraphs to be split;
+// lower to allow shorter phrases.  Never set below ~15.
+const CMAP_MIN_SPLIT_LENGTH = 60;
 
 // ════════════════════════════════════════════════════════════════════════════
 // ── Styles ───────────────────────────────────────────────────────────────────
@@ -55,7 +63,7 @@ const CMAP_PARENT_CHILD_THRESHOLD = 0.50;
   0%,100%{opacity:.25;transform:scale(.85);}50%{opacity:1;transform:scale(1.1);}
 }
 
-/* ── Controls row ── */
+/* ── Controls ── */
 #pp-cmap-controls {
   display:grid; grid-template-columns:1fr 1fr auto auto; gap:6px; align-items:end;
 }
@@ -162,7 +170,7 @@ const CMAP_PARENT_CHILD_THRESHOLD = 0.50;
 }
 #pp-cmap-fit:hover { background:rgba(0,0,0,.14); color:rgba(0,0,0,.75); }
 
-/* ── Concept-map cards ── */
+/* ── Cards ── */
 .pp-cmap-card {
   position:absolute; border-radius:9px;
   border:1.5px solid var(--ppc-border,#aaa);
@@ -173,14 +181,36 @@ const CMAP_PARENT_CHILD_THRESHOLD = 0.50;
 }
 .pp-cmap-card:active { cursor:grabbing; }
 .pp-cmap-card:hover  { box-shadow:0 4px 18px rgba(0,0,0,.16); }
+
+/* Header */
 .pp-cmap-card-head {
   padding:5px 9px 4px;
-  display:flex; align-items:center; gap:5px;
+  display:flex; align-items:flex-start; gap:5px; flex-wrap:wrap;
 }
 .pp-cmap-level-badge {
   font-size:8px; font-weight:800; letter-spacing:.10em; text-transform:uppercase;
-  opacity:.9; flex-shrink:0;
+  opacity:.9; flex:1; min-width:0; line-height:1.4;
 }
+
+/* Split card header text */
+.pp-cmap-split-badge {
+  font-size:8px; font-weight:800; letter-spacing:.06em;
+  opacity:.9; flex:1; min-width:0; line-height:1.4;
+}
+/* n/t fraction pill */
+.pp-cmap-split-fraction {
+  font-size:9px; font-weight:900; letter-spacing:.04em;
+  opacity:.8; flex-shrink:0; align-self:center;
+  padding:1px 6px; border-radius:8px;
+}
+
+/* Merged badge */
+.pp-cmap-merged-count {
+  font-size:8px; font-weight:700; letter-spacing:.07em;
+  padding:1px 6px; border-radius:10px; margin-left:auto; opacity:.7; flex-shrink:0;
+}
+
+/* Body */
 .pp-cmap-card-body {
   padding:6px 9px 4px; display:flex; flex-direction:column; gap:4px;
 }
@@ -195,7 +225,8 @@ const CMAP_PARENT_CHILD_THRESHOLD = 0.50;
 .pp-cmap-merge-sep {
   border-top:1px solid rgba(0,0,0,.07); margin:3px 0;
 }
-/* Footer: similarity % */
+
+/* Footer */
 .pp-cmap-card-footer {
   padding:4px 9px 7px;
   border-top:1px solid rgba(0,0,0,.06); margin-top:2px;
@@ -209,15 +240,9 @@ const CMAP_PARENT_CHILD_THRESHOLD = 0.50;
   font-size:9px; font-weight:700; letter-spacing:.04em; flex-shrink:0;
   color:rgba(0,0,0,.45);
 }
-/* Leaf */
 .pp-cmap-leaf-badge {
   font-size:8px; font-weight:600; letter-spacing:.06em; text-transform:uppercase;
   color:rgba(0,0,0,.28); padding:4px 9px 7px; display:block;
-}
-/* Merged-cell count badge */
-.pp-cmap-merged-count {
-  font-size:8px; font-weight:700; letter-spacing:.07em;
-  padding:1px 6px; border-radius:10px; margin-left:auto; opacity:.7;
 }
 `;
   document.head.appendChild(s);
@@ -226,7 +251,7 @@ const CMAP_PARENT_CHILD_THRESHOLD = 0.50;
 // ════════════════════════════════════════════════════════════════════════════
 function initConceptMapTool(paneEl, sidebarEl) {
 
-  // ── HTML ─────────────────────────────────────────────────────────────────
+  // ── HTML ──────────────────────────────────────────────────────────────────
   paneEl.innerHTML =
     '<div id="pp-cmap-head">' +
       '<div id="pp-cmap-subtitle">Waiting for embeddings\u2026</div>' +
@@ -234,7 +259,6 @@ function initConceptMapTool(paneEl, sidebarEl) {
         '<div class="pp-cmap-dot"></div><span id="pp-cmap-label">Embeddings loading\u2026</span>' +
       '</div>' +
       '<div id="pp-cmap-controls">' +
-        // Col 1: depth
         '<div class="pp-cmap-ctrl-col">' +
           '<div class="pp-cmap-group-label">Max Depth</div>' +
           '<div class="pp-cmap-range-row">' +
@@ -243,7 +267,6 @@ function initConceptMapTool(paneEl, sidebarEl) {
             '<span class="pp-cmap-range-val" id="pp-cmap-depth-val">5</span>' +
           '</div>' +
         '</div>' +
-        // Col 2: link threshold
         '<div class="pp-cmap-ctrl-col">' +
           '<div class="pp-cmap-group-label">Link Threshold</div>' +
           '<div class="pp-cmap-range-row">' +
@@ -252,7 +275,6 @@ function initConceptMapTool(paneEl, sidebarEl) {
             '<span class="pp-cmap-range-val" id="pp-cmap-thresh-val">50%</span>' +
           '</div>' +
         '</div>' +
-        // Col 3: layout button
         '<div id="pp-cmap-layout-wrap">' +
           '<button id="pp-cmap-layout-btn" title="Change layout">' +
             '<svg viewBox="0 0 12 12" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="6" cy="6" r="2"/><circle cx="6" cy="6" r="5" stroke-dasharray="2 2"/></svg>' +
@@ -268,7 +290,6 @@ function initConceptMapTool(paneEl, sidebarEl) {
             '<button class="pp-cmap-layout-opt" data-layout="organic">Organic</button>' +
           '</div>' +
         '</div>' +
-        // Col 4: rebuild
         '<button id="pp-cmap-rebuild">Rebuild</button>' +
       '</div>' +
     '</div>' +
@@ -284,7 +305,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
       '<div id="pp-cmap-zoom-hint">scroll / pinch to zoom</div>' +
     '</div>';
 
-  // ── Refs ─────────────────────────────────────────────────────────────────
+  // ── Refs ──────────────────────────────────────────────────────────────────
   const subtitleEl  = paneEl.querySelector('#pp-cmap-subtitle');
   const statusEl    = paneEl.querySelector('#pp-cmap-status');
   const labelEl     = paneEl.querySelector('#pp-cmap-label');
@@ -302,18 +323,18 @@ function initConceptMapTool(paneEl, sidebarEl) {
   const threshSlider= paneEl.querySelector('#pp-cmap-thresh');
   const threshValEl = paneEl.querySelector('#pp-cmap-thresh-val');
 
-  const CARD_W      = 170;
-  const MM_PAD      = 16;
+  const CARD_W = 170;
+  const MM_PAD = 16;
 
   let _depth     = 5;
-  let _threshold = CMAP_PARENT_CHILD_THRESHOLD;  // 0–1 float
+  let _threshold = CMAP_PARENT_CHILD_THRESHOLD;
   let _layout    = 'radial';
-  let _rows      = null;
+  let _rows      = null;   // raw embedded rows (pre-split)
   let _rendered  = false;
   let _rebuildTimer = null;
   let _topZ      = 10;
   let _panX = 0, _panY = 0, _zoom = 1;
-  let _liveRects = new Map(); // cardId -> {x,y,w,h}
+  let _liveRects = new Map();
 
   function applyTransform() {
     world.style.transform = `translate(${_panX}px,${_panY}px) scale(${_zoom})`;
@@ -346,12 +367,14 @@ function initConceptMapTool(paneEl, sidebarEl) {
     clearTimeout(_rebuildTimer);
     rebuildBtn.classList.add('pp-cmap-busy');
     rebuildBtn.textContent = '\u2026';
-    _rebuildTimer = setTimeout(() => { _rendered = false; tryRender(); }, 480);
+    _rebuildTimer = setTimeout(() => { _rendered = false; tryRender(); }, 500);
   }
 
   // ── Layout dropdown ───────────────────────────────────────────────────────
-  const LAYOUT_LABELS = { radial:'Radial', vtree:'Vertical Tree', htree:'Horizontal Tree',
-                          vflow:'Vertical Flow', organic:'Organic' };
+  const LAYOUT_LABELS = {
+    radial:'Radial', vtree:'Vertical Tree', htree:'Horizontal Tree',
+    vflow:'Vertical Flow', organic:'Organic'
+  };
   layoutBtn.addEventListener('click', e => {
     e.stopPropagation();
     layoutMenu.classList.toggle('open');
@@ -372,30 +395,29 @@ function initConceptMapTool(paneEl, sidebarEl) {
     });
   });
 
-  // ── Fit all ───────────────────────────────────────────────────────────────
+  // ── Fit-all ───────────────────────────────────────────────────────────────
   function fitAll() {
     if (!_liveRects.size) return;
     let minX=Infinity, minY=Infinity, maxX=-Infinity, maxY=-Infinity;
     _liveRects.forEach(r => {
-      minX = Math.min(minX, r.x); minY = Math.min(minY, r.y);
-      maxX = Math.max(maxX, r.x + (r.w || CARD_W));
-      maxY = Math.max(maxY, r.y + (r.h || 80));
+      minX=Math.min(minX,r.x); minY=Math.min(minY,r.y);
+      maxX=Math.max(maxX,r.x+(r.w||CARD_W)); maxY=Math.max(maxY,r.y+(r.h||80));
     });
     if (!isFinite(minX)) return;
-    const W = canvas.clientWidth || 400, H = canvas.clientHeight || 400, pad = 32;
-    const scaleX = (W - pad*2) / Math.max(maxX - minX, 1);
-    const scaleY = (H - pad*2) / Math.max(maxY - minY, 1);
-    _zoom = Math.min(scaleX, scaleY, 2.5);
-    _panX = pad - minX*_zoom + (W - pad*2 - (maxX-minX)*_zoom) / 2;
-    _panY = pad - minY*_zoom + (H - pad*2 - (maxY-minY)*_zoom) / 2;
+    const W=canvas.clientWidth||400, H=canvas.clientHeight||400, pad=32;
+    const scaleX=(W-pad*2)/Math.max(maxX-minX,1);
+    const scaleY=(H-pad*2)/Math.max(maxY-minY,1);
+    _zoom=Math.min(scaleX,scaleY,2.5);
+    _panX=pad-minX*_zoom+(W-pad*2-(maxX-minX)*_zoom)/2;
+    _panY=pad-minY*_zoom+(H-pad*2-(maxY-minY)*_zoom)/2;
     applyTransform();
   }
   fitBtn.addEventListener('click', fitAll);
 
-  // ── Pan ───────────────────────────────────────────────────────────────────
+  // ── Pan & zoom ────────────────────────────────────────────────────────────
   let _panning=false, _panSX=0, _panSY=0, _panBX=0, _panBY=0;
   canvas.addEventListener('mousedown', ev => {
-    if (ev.button !== 0 || ev.target.closest('.pp-cmap-card')) return;
+    if (ev.button!==0||ev.target.closest('.pp-cmap-card')) return;
     _panning=true; _panSX=ev.clientX; _panSY=ev.clientY; _panBX=_panX; _panBY=_panY;
     canvas.classList.add('pp-cmap-panning');
   });
@@ -406,30 +428,28 @@ function initConceptMapTool(paneEl, sidebarEl) {
   document.addEventListener('mouseup', () => {
     if (_panning) { _panning=false; canvas.classList.remove('pp-cmap-panning'); }
   });
-
-  // ── Zoom ──────────────────────────────────────────────────────────────────
   canvas.addEventListener('wheel', ev => {
     ev.preventDefault();
-    const rect = canvas.getBoundingClientRect();
-    const mx = ev.clientX - rect.left, my = ev.clientY - rect.top;
-    const dz = ev.deltaY < 0 ? 1.1 : 0.9;
-    const nz = Math.max(0.15, Math.min(4, _zoom*dz));
-    _panX = mx - (mx-_panX)*nz/_zoom; _panY = my - (my-_panY)*nz/_zoom;
-    _zoom = nz; applyTransform();
-  }, { passive:false });
+    const rect=canvas.getBoundingClientRect();
+    const mx=ev.clientX-rect.left, my=ev.clientY-rect.top;
+    const dz=ev.deltaY<0?1.1:0.9;
+    const nz=Math.max(0.15,Math.min(4,_zoom*dz));
+    _panX=mx-(mx-_panX)*nz/_zoom; _panY=my-(my-_panY)*nz/_zoom;
+    _zoom=nz; applyTransform();
+  }, {passive:false});
   let _pinchD=null;
-  canvas.addEventListener('touchstart', ev => {
-    if (ev.touches.length===2) _pinchD=Math.hypot(
+  canvas.addEventListener('touchstart', ev=>{
+    if(ev.touches.length===2) _pinchD=Math.hypot(
       ev.touches[0].clientX-ev.touches[1].clientX,
       ev.touches[0].clientY-ev.touches[1].clientY);
-  }, {passive:true});
-  canvas.addEventListener('touchmove', ev => {
-    if (ev.touches.length!==2||!_pinchD) return;
+  },{passive:true});
+  canvas.addEventListener('touchmove', ev=>{
+    if(ev.touches.length!==2||!_pinchD) return;
     const d=Math.hypot(ev.touches[0].clientX-ev.touches[1].clientX,
                        ev.touches[0].clientY-ev.touches[1].clientY);
     _zoom=Math.max(.15,Math.min(4,_zoom*d/_pinchD)); _pinchD=d; applyTransform(); ev.preventDefault();
-  }, {passive:false});
-  canvas.addEventListener('touchend', ()=>{ _pinchD=null; });
+  },{passive:false});
+  canvas.addEventListener('touchend',()=>{_pinchD=null;});
 
   // ── Card drag ─────────────────────────────────────────────────────────────
   function makeDraggable(el, cid) {
@@ -448,11 +468,11 @@ function initConceptMapTool(paneEl, sidebarEl) {
       _liveRects.set(cid,{x:nx,y:ny,w:r.w,h:r.h});
       redrawConnectors();
     });
-    document.addEventListener('mouseup', () => { on=false; });
+    document.addEventListener('mouseup', ()=>{ on=false; });
   }
 
   // ════════════════════════════════════════════════════════════════════════
-  // ── Core cosine similarity ──────────────────────────────────────────────
+  // ── Cosine similarity helpers ───────────────────────────────────────────
   // ════════════════════════════════════════════════════════════════════════
 
   function cosineSim(a, b) {
@@ -462,52 +482,166 @@ function initConceptMapTool(paneEl, sidebarEl) {
     return (na&&nb) ? Math.max(0, Math.min(1, dot/(Math.sqrt(na)*Math.sqrt(nb)))) : 0;
   }
 
+  function avgVec(vecs) {
+    const valid = vecs.filter(Boolean);
+    if (!valid.length) return null;
+    const dim=valid[0].length;
+    const sum=new Float32Array(dim);
+    valid.forEach(v=>v.forEach((x,i)=>{ sum[i]+=x; }));
+    return Array.from(sum).map(x=>x/valid.length);
+  }
+
+  // ════════════════════════════════════════════════════════════════════════
+  // ── Intra-cell splitting ────────────────────────────────────────────────
+  //
+  // Strategy:
+  //  1. Sentence-split the cell's longest text field.
+  //  2. Drop segments < CMAP_MIN_SPLIT_LENGTH characters.
+  //  3. Embed each segment via EmbeddingUtils cache (fast on rebuild).
+  //  4. Single-linkage grouping: segment j joins group g if sim(j, any
+  //     existing member of g) ≥ _threshold.  Otherwise new group.
+  //  5. numGroups ≤ 1  →  no split, return original row.
+  //  6. numGroups ≥ 2  →  produce one virtual row per group carrying
+  //     _splitFrom, _splitN (1-based), _splitT (total groups).
+  //     Each virtual row's .vec is the mean of its segments' vectors.
+  // ════════════════════════════════════════════════════════════════════════
+
+  function sentenceSplit(text) {
+    // Split on sentence-ending punctuation followed by whitespace.
+    // Avoids lookbehind for compatibility.
+    return text
+      .replace(/([.!?;])\s+/g, '$1\n')
+      .split('\n')
+      .map(s => s.trim())
+      .filter(s => s.length >= CMAP_MIN_SPLIT_LENGTH);
+  }
+
+  async function maybeSplitRow(row) {
+    const cells  = row.row?.cells || row.cells || [];
+    const cats   = row.row?.cats  ? row.row.cats.filter(c => c.trim()) : [];
+    const catStr = cats.join(' · ') || 'Cell';
+
+    // Find the longest non-empty cell text
+    let bestText = '', bestIdx = 0;
+    cells.forEach((c, i) => {
+      if (c.trim().length > bestText.length) { bestText = c.trim(); bestIdx = i; }
+    });
+
+    // Need at least 2× CMAP_MIN_SPLIT_LENGTH to consider splitting
+    if (bestText.length < CMAP_MIN_SPLIT_LENGTH * 2) return [row];
+
+    const segments = sentenceSplit(bestText);
+    if (segments.length <= 1) return [row];
+
+    // Embed each segment; reuses cache so fast on re-render
+    let segVecs;
+    try {
+      segVecs = await Promise.all(
+        segments.map(s => window.EmbeddingUtils.getCachedEmbedding(s))
+      );
+    } catch (e) { return [row]; }
+
+    const valid = segments
+      .map((s, i) => ({ text: s, vec: segVecs[i] }))
+      .filter(x => x.vec && x.vec.length);
+
+    if (valid.length <= 1) return [row];
+
+    const n = valid.length;
+
+    // Pairwise cosine-similarity matrix
+    const sim = Array.from({length:n}, (_, i) =>
+      Array.from({length:n}, (_, j) =>
+        i === j ? 1 : cosineSim(valid[i].vec, valid[j].vec)
+      )
+    );
+
+    // Single-linkage greedy grouping
+    const groupOf = new Array(n).fill(-1);
+    let numGroups = 0;
+
+    for (let i = 0; i < n; i++) {
+      if (groupOf[i] !== -1) continue;
+      const g = numGroups++;
+      groupOf[i] = g;
+      for (let j = i + 1; j < n; j++) {
+        if (groupOf[j] !== -1) continue;
+        // j links to group g if it is similar to ANY current member of g
+        let linked = false;
+        for (let k = 0; k < j; k++) {
+          if (groupOf[k] === g && sim[k][j] >= _threshold) { linked = true; break; }
+        }
+        if (linked) groupOf[j] = g;
+      }
+    }
+
+    if (numGroups <= 1) return [row];   // fully coherent cell — no split
+
+    const t = numGroups;
+    const groups = Array.from({length: t}, () => []);
+    valid.forEach((seg, i) => groups[groupOf[i]].push(seg));
+
+    return groups.map((segs, ni) => {
+      const combinedText = segs.map(s => s.text).join(' ');
+      const combinedVec  = avgVec(segs.map(s => s.vec));
+      const newCells     = cells.map((c, ci) => ci === bestIdx ? combinedText : '');
+
+      return {
+        tabIdx:     row.tabIdx,
+        rowIdx:     row.rowIdx,
+        headers:    row.headers || [],
+        title:      row.title   || '',
+        kws:        row.kws     || new Set(),
+        // ── Split metadata (read by card renderer) ──
+        _splitFrom: catStr,
+        _splitN:    ni + 1,
+        _splitT:    t,
+        vec:        combinedVec,
+        row: {
+          cells: newCells,
+          cats:  cats,
+        }
+      };
+    });
+  }
+
+  // Expand all rows through the splitter
+  async function splitAllRows(rows) {
+    const result = [];
+    for (const row of rows) {
+      const parts = await maybeSplitRow(row);
+      parts.forEach(r => result.push(r));
+    }
+    return result;
+  }
+
   // ════════════════════════════════════════════════════════════════════════
   // ── Hierarchy builder ───────────────────────────────────────────────────
-  //
-  // Algorithm:
-  //  1. Generality score = average cosine similarity to all other cells.
-  //     Cells that are semantically central (high avg sim) are "general"
-  //     concepts → assigned to level 1 (root).
-  //     Cells that are peripheral (low avg sim) are "specific" → deep levels.
-  //  2. Levels 1..depth are assigned by ranking cells on generality score
-  //     and splitting into equal-sized buckets.
-  //  3. Each non-root cell's parent = the highest-similarity cell exactly
-  //     one level above it, provided that similarity ≥ _threshold.
-  //  4. Orphans (no parent above threshold) are attached to the nearest
-  //     ancestor at any higher level (relaxed threshold), or promoted to 1.
-  //  5. Merge rule: cells at the same level with the identical set of
-  //     direct children are combined into one card.
-  //  6. simToChildren = avg cosine sim between a cell and its direct
-  //     children → displayed as a % on each card.
   // ════════════════════════════════════════════════════════════════════════
 
   function buildHierarchy(rows) {
     const n = rows.length;
     if (n < 2) return null;
 
-    // ── 1. Generality scores ────────────────────────────────────────────
+    // 1. Generality score = average cosine similarity to all other cells
     const scores = new Float32Array(n);
     for (let i = 0; i < n; i++) {
       let sum = 0;
-      for (let j = 0; j < n; j++) {
-        if (i !== j) sum += cosineSim(rows[i].vec, rows[j].vec);
-      }
+      for (let j = 0; j < n; j++) { if (i !== j) sum += cosineSim(rows[i].vec, rows[j].vec); }
       scores[i] = sum / (n - 1);
     }
 
-    // ── 2. Level assignment (most general = level 1) ─────────────────────
-    const rankOrder = Array.from({length:n}, (_,i)=>i)
-      .sort((a,b) => scores[b] - scores[a]); // descending generality
+    // 2. Rank → level (top = most general = level 1)
+    const rankOrder = Array.from({length:n}, (_, i) => i)
+      .sort((a, b) => scores[b] - scores[a]);
     const levels = new Int32Array(n);
-    rankOrder.forEach((rowIdx, rank) => {
-      levels[rowIdx] = Math.max(1, Math.min(_depth, Math.floor(rank * _depth / n) + 1));
+    rankOrder.forEach((ri, rank) => {
+      levels[ri] = Math.max(1, Math.min(_depth, Math.floor(rank * _depth / n) + 1));
     });
 
-    // ── 3. Parent assignment (nearest level-1-above, above threshold) ────
+    // 3. Parent assignment (best match exactly one level above, ≥ threshold)
     const parents    = new Int32Array(n).fill(-1);
     const parentSims = new Float32Array(n);
-
     for (let i = 0; i < n; i++) {
       if (levels[i] === 1) continue;
       let bestJ = -1, bestSim = _threshold;
@@ -519,7 +653,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
       if (bestJ !== -1) { parents[i] = bestJ; parentSims[i] = bestSim; }
     }
 
-    // ── 4. Orphan recovery (any higher level, relaxed threshold 0.7×) ───
+    // 4. Orphan recovery (relaxed threshold)
     const relaxed = _threshold * 0.70;
     for (let i = 0; i < n; i++) {
       if (levels[i] <= 1 || parents[i] !== -1) continue;
@@ -530,40 +664,34 @@ function initConceptMapTool(paneEl, sidebarEl) {
         if (s > bestSim) { bestSim = s; bestJ = j; }
       }
       if (bestJ !== -1) {
-        // Re-assign level to be exactly one below its new parent
         levels[i] = levels[bestJ] + 1;
         parents[i] = bestJ;
         parentSims[i] = bestSim;
       } else {
-        levels[i] = 1; // promote to root
+        levels[i] = 1;
       }
     }
 
-    // ── 5. Build children lists ──────────────────────────────────────────
-    const children = Array.from({length:n}, ()=>[]);
-    for (let i = 0; i < n; i++) {
-      if (parents[i] !== -1) children[parents[i]].push(i);
-    }
+    // 5. Children lists
+    const children = Array.from({length:n}, () => []);
+    for (let i = 0; i < n; i++) { if (parents[i] !== -1) children[parents[i]].push(i); }
 
-    // ── 6. Compute avg similarity to children ────────────────────────────
+    // 6. Avg similarity to direct children (footer %)
     const simToChildren = new Float32Array(n);
     for (let i = 0; i < n; i++) {
-      if (!children[i].length) { simToChildren[i] = 0; continue; }
+      if (!children[i].length) continue;
       let sum = 0;
       children[i].forEach(c => { sum += cosineSim(rows[i].vec, rows[c].vec); });
       simToChildren[i] = sum / children[i].length;
     }
 
-    // ── 7. Merge: same level + identical children set → one card ─────────
-    // Build merge groups keyed by "level:sortedChildIndices"
-    const absorbedInto = new Int32Array(n).fill(-1); // -1 = not absorbed
-    const mergeExtras  = new Map();                  // primary idx → extra row indices
-
+    // 7. Merge: same level + identical children set → one card
+    const absorbedInto = new Int32Array(n).fill(-1);
+    const mergeExtras  = new Map();
     const mkKey = i => levels[i] + ':' + children[i].slice().sort((a,b)=>a-b).join(',');
-    const seenKeys = new Map(); // key → first (primary) index
-
+    const seenKeys = new Map();
     for (let i = 0; i < n; i++) {
-      if (children[i].length === 0) continue; // leaf → don't merge
+      if (!children[i].length) continue;
       const k = mkKey(i);
       if (seenKeys.has(k)) {
         const primary = seenKeys.get(k);
@@ -575,31 +703,15 @@ function initConceptMapTool(paneEl, sidebarEl) {
       }
     }
 
-    return {
-      rows, n, levels, parents, parentSims, children,
-      simToChildren, absorbedInto, mergeExtras
-    };
+    return { rows, n, levels, parents, parentSims, children, simToChildren, absorbedInto, mergeExtras };
   }
 
   // ════════════════════════════════════════════════════════════════════════
-  // ── Render ──────────────────────────────────────────────────────────────
+  // ── Connectors ──────────────────────────────────────────────────────────
   // ════════════════════════════════════════════════════════════════════════
 
-  function depthColor(level) {
-    if (typeof TAB_THEMES !== 'undefined' && typeof THEMES !== 'undefined') {
-      const tname = TAB_THEMES[(level - 1) % TAB_THEMES.length] || 'default';
-      const theme = THEMES[tname] || THEMES.default || {};
-      return {
-        accent: theme['--tab-active-bg']    || '#5b7fa6',
-        label:  theme['--tab-active-color'] || '#fff',
-        bg:     theme['--bg-data']          || '#f8f8f8',
-      };
-    }
-    const P = ['#5b7fa6','#7a6e9e','#5a9e7a','#9e7a5a','#9e5a7a'];
-    return { accent: P[(level-1) % P.length], label:'#fff', bg:'#f8f8f8' };
-  }
-
-  let _connSvg = null;
+  let _connSvg  = null;
+  let _connEdges = [];
 
   function redrawConnectors() {
     if (!_connSvg) return;
@@ -608,49 +720,67 @@ function initConceptMapTool(paneEl, sidebarEl) {
     _connEdges.forEach(({fromId, toId, color, depth}) => {
       const ra = _liveRects.get(fromId), rb = _liveRects.get(toId);
       if (!ra || !rb) return;
-
-      // 10-point anchors
       function pts(r) {
         const {x,y,w,h} = r;
         return [
-          {x:x+w*.25,y},{x:x+w*.5,y},{x:x+w*.75,y},
-          {x:x+w*.25,y:y+h},{x:x+w*.5,y:y+h},{x:x+w*.75,y:y+h},
-          {x,y:y+h*.33},{x,y:y+h*.67},{x:x+w,y:y+h*.33},{x:x+w,y:y+h*.67}
+          {x:x+w*.25,y}, {x:x+w*.5,y}, {x:x+w*.75,y},
+          {x:x+w*.25,y:y+h}, {x:x+w*.5,y:y+h}, {x:x+w*.75,y:y+h},
+          {x,y:y+h*.33}, {x,y:y+h*.67}, {x:x+w,y:y+h*.33}, {x:x+w,y:y+h*.67}
         ];
       }
-      const pA=pts(ra), pB=pts(rb);
-      let best=null, bd=Infinity;
-      pA.forEach(a=>pB.forEach(b=>{const d=Math.hypot(a.x-b.x,a.y-b.y);if(d<bd){bd=d;best={a,b};}}));
+      const pA = pts(ra), pB = pts(rb);
+      let best = null, bd = Infinity;
+      pA.forEach(a => pB.forEach(b => {
+        const d = Math.hypot(a.x-b.x, a.y-b.y);
+        if (d < bd) { bd = d; best = {a, b}; }
+      }));
       if (!best) return;
-
-      const {a,b}=best;
-      const dist=Math.hypot(b.x-a.x,b.y-a.y), off=Math.min(dist*.4,80);
+      const {a, b} = best;
+      const dist = Math.hypot(b.x-a.x, b.y-a.y), off = Math.min(dist*.4, 80);
       function tang(pt, r) {
-        const t=3;
-        if (Math.abs(pt.y-r.y)<t)       return{dx:0,dy:-1};
-        if (Math.abs(pt.y-(r.y+r.h))<t) return{dx:0,dy:1};
-        if (Math.abs(pt.x-r.x)<t)       return{dx:-1,dy:0};
-        if (Math.abs(pt.x-(r.x+r.w))<t) return{dx:1,dy:0};
-        return{dx:0,dy:1};
+        const t = 3;
+        if (Math.abs(pt.y - r.y) < t)       return {dx:0, dy:-1};
+        if (Math.abs(pt.y - (r.y+r.h)) < t) return {dx:0, dy:1};
+        if (Math.abs(pt.x - r.x) < t)       return {dx:-1, dy:0};
+        if (Math.abs(pt.x - (r.x+r.w)) < t) return {dx:1, dy:0};
+        return {dx:0, dy:1};
       }
-      const tA=tang(a,ra), tB=tang(b,rb);
-      const path=document.createElementNS(ns,'path');
-      path.setAttribute('d', `M${a.x},${a.y} C${a.x+tA.dx*off},${a.y+tA.dy*off} ${b.x+tB.dx*off},${b.y+tB.dy*off} ${b.x},${b.y}`);
-      path.setAttribute('fill','none');
+      const tA = tang(a,ra), tB = tang(b,rb);
+      const path = document.createElementNS(ns, 'path');
+      path.setAttribute('d',
+        `M${a.x},${a.y} C${a.x+tA.dx*off},${a.y+tA.dy*off} ${b.x+tB.dx*off},${b.y+tB.dy*off} ${b.x},${b.y}`
+      );
+      path.setAttribute('fill', 'none');
       path.setAttribute('stroke', color);
-      path.setAttribute('stroke-width', depth===0?'2':'1.5');
-      path.setAttribute('stroke-opacity', depth===0?'0.55':'0.38');
-      path.setAttribute('stroke-dasharray', depth===0?'none':'5 3');
+      path.setAttribute('stroke-width', depth===0 ? '2' : '1.5');
+      path.setAttribute('stroke-opacity', depth===0 ? '0.55' : '0.38');
+      path.setAttribute('stroke-dasharray', depth===0 ? 'none' : '5 3');
       _connSvg.appendChild(path);
-
-      const dot=document.createElementNS(ns,'circle');
-      dot.setAttribute('cx',String(b.x)); dot.setAttribute('cy',String(b.y)); dot.setAttribute('r','3.5');
-      dot.setAttribute('fill',color); dot.setAttribute('opacity','0.6');
+      const dot = document.createElementNS(ns, 'circle');
+      dot.setAttribute('cx', String(b.x)); dot.setAttribute('cy', String(b.y));
+      dot.setAttribute('r', '3.5');
+      dot.setAttribute('fill', color); dot.setAttribute('opacity', '0.6');
       _connSvg.appendChild(dot);
     });
   }
 
-  let _connEdges = [];
+  // ════════════════════════════════════════════════════════════════════════
+  // ── Render ──────────────────────────────────────────────────────────────
+  // ════════════════════════════════════════════════════════════════════════
+
+  function depthColor(level) {
+    if (typeof TAB_THEMES !== 'undefined' && typeof THEMES !== 'undefined') {
+      const tname = TAB_THEMES[(level-1) % TAB_THEMES.length] || 'default';
+      const theme = THEMES[tname] || THEMES.default || {};
+      return {
+        accent: theme['--tab-active-bg']  || '#5b7fa6',
+        label:  theme['--tab-active-color']|| '#fff',
+        bg:     theme['--bg-data']         || '#f8f8f8'
+      };
+    }
+    const P = ['#5b7fa6','#7a6e9e','#5a9e7a','#9e7a5a','#9e5a7a'];
+    return { accent: P[(level-1)%P.length], label: '#fff', bg: '#f8f8f8' };
+  }
 
   function renderConceptMap(hier) {
     world.innerHTML = '';
@@ -659,29 +789,29 @@ function initConceptMapTool(paneEl, sidebarEl) {
     _connEdges = [];
     _topZ = 10;
     _panX = 0; _panY = 0; _zoom = 1; applyTransform();
-
     if (!hier) { emptyEl.style.display = 'flex'; return; }
 
     const ns = 'http://www.w3.org/2000/svg';
-    _connSvg = document.createElementNS(ns,'svg');
-    _connSvg.style.cssText='position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:1';
+    _connSvg = document.createElementNS(ns, 'svg');
+    _connSvg.style.cssText =
+      'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:1';
     world.appendChild(_connSvg);
 
-    const { rows, n, levels, parents, simToChildren, absorbedInto, mergeExtras } = hier;
-    const cardEls = new Map(); // rowIdx → card element (only primary/non-absorbed)
+    const {rows, n, levels, parents, simToChildren, absorbedInto, mergeExtras} = hier;
+    const cardEls = new Map();
 
-    // ── Build cards (skip absorbed cells) ──────────────────────────────────
+    // ── Build each card ──────────────────────────────────────────────────
     for (let i = 0; i < n; i++) {
-      if (absorbedInto[i] !== -1) continue; // absorbed into another card
+      if (absorbedInto[i] !== -1) continue;
 
-      const level   = levels[i];
-      const { accent, label: lc, bg } = depthColor(level);
-      const extras  = mergeExtras.get(i) || []; // extra rows merged into this card
+      const level = levels[i];
+      const {accent, label:lc, bg} = depthColor(level);
+      const extras = mergeExtras.get(i) || [];
       const allRows = [i, ...extras];
 
       const card = document.createElement('div');
       card.className = 'pp-cmap-card';
-      card.style.cssText = `width:${CARD_W}px; position:absolute; z-index:${++_topZ}`;
+      card.style.cssText = `width:${CARD_W}px;position:absolute;z-index:${++_topZ}`;
       card.style.setProperty('--ppc-border', accent);
       card.style.setProperty('--ppc-bg', bg);
 
@@ -691,78 +821,83 @@ function initConceptMapTool(paneEl, sidebarEl) {
       head.style.background = accent;
       head.style.color = lc;
 
-      const badge = document.createElement('span');
-      badge.className = 'pp-cmap-level-badge';
-      badge.textContent = 'Level ' + level;
-      head.appendChild(badge);
+      const primaryRow = rows[i];
+      const isSplit    = !!primaryRow._splitFrom;
+
+      if (isSplit) {
+        // "Split from 'Category' n/t"
+        const badge = document.createElement('span');
+        badge.className = 'pp-cmap-split-badge';
+        badge.textContent = `Split from \u2018${primaryRow._splitFrom}\u2019`;
+        head.appendChild(badge);
+
+        const frac = document.createElement('span');
+        frac.className = 'pp-cmap-split-fraction';
+        frac.style.cssText = `background:${lc}28;color:${lc}`;
+        frac.textContent = `${primaryRow._splitN}\u2009/\u2009${primaryRow._splitT}`;
+        head.appendChild(frac);
+      } else {
+        const badge = document.createElement('span');
+        badge.className = 'pp-cmap-level-badge';
+        badge.textContent = 'Level ' + level;
+        head.appendChild(badge);
+      }
 
       if (extras.length > 0) {
         const mc = document.createElement('span');
         mc.className = 'pp-cmap-merged-count';
-        mc.style.cssText = `background:${lc}33; color:${lc}`;
+        mc.style.cssText = `background:${lc}28;color:${lc}`;
         mc.textContent = '\u00d7' + allRows.length;
         head.appendChild(mc);
       }
       card.appendChild(head);
 
-      // ── Body: one cell-block per row in the merge group ─────────────────
+      // ── Body ────────────────────────────────────────────────────────────
       const body = document.createElement('div');
       body.className = 'pp-cmap-card-body';
 
       allRows.forEach((ri, idx) => {
         if (idx > 0) {
-          const sep = document.createElement('div');
-          sep.className = 'pp-cmap-merge-sep';
+          const sep = document.createElement('div'); sep.className = 'pp-cmap-merge-sep';
           body.appendChild(sep);
         }
-        const r = rows[ri];
-        const cells = r.row?.cells || r.cells || [];
-        const cats  = r.row?.cats  ? r.row.cats.filter(c => c.trim()) : [];
-
-        // Pick the longest non-empty cell text to show as the concept
+        const r    = rows[ri];
+        const cells= r.row?.cells || r.cells || [];
+        const cats = r.row?.cats  ? r.row.cats.filter(c => c.trim()) : [];
         const best = cells.reduce((b, c) => c.trim().length > b.length ? c.trim() : b, '');
-        const parsed = typeof parseCitation === 'function' ? parseCitation(best) : { body: best };
+        const parsed = typeof parseCitation === 'function' ? parseCitation(best) : {body: best};
 
         if (cats.length) {
-          const ce = document.createElement('div');
-          ce.className = 'pp-cmap-cell-cat';
-          ce.textContent = cats.join(' · ');
-          body.appendChild(ce);
+          const ce = document.createElement('div'); ce.className = 'pp-cmap-cell-cat';
+          ce.textContent = cats.join(' · '); body.appendChild(ce);
         }
-        const te = document.createElement('div');
-        te.className = 'pp-cmap-cell-text';
-        te.textContent = parsed.body;
-        body.appendChild(te);
+        const te = document.createElement('div'); te.className = 'pp-cmap-cell-text';
+        te.textContent = parsed.body; body.appendChild(te);
       });
       card.appendChild(body);
 
-      // ── Footer: similarity % or leaf badge ──────────────────────────────
+      // ── Footer (similarity % or leaf badge) ─────────────────────────────
       const hasChildren = hier.children[i].length > 0;
       if (hasChildren) {
         const sim = simToChildren[i];
         const pct = Math.round(sim * 100);
-        const footer = document.createElement('div');
-        footer.className = 'pp-cmap-card-footer';
-        const bar = document.createElement('div'); bar.className = 'pp-cmap-sim-bar';
+        const footer = document.createElement('div'); footer.className = 'pp-cmap-card-footer';
+        const bar  = document.createElement('div'); bar.className = 'pp-cmap-sim-bar';
         const fill = document.createElement('div'); fill.className = 'pp-cmap-sim-fill';
         fill.style.width = pct + '%'; fill.style.background = accent + 'cc';
         bar.appendChild(fill); footer.appendChild(bar);
         const lbl = document.createElement('span'); lbl.className = 'pp-cmap-sim-label';
-        lbl.textContent = pct + '% match';
-        footer.appendChild(lbl);
+        lbl.textContent = pct + '% match'; footer.appendChild(lbl);
         card.appendChild(footer);
       } else {
-        const leaf = document.createElement('span');
-        leaf.className = 'pp-cmap-leaf-badge';
-        leaf.textContent = 'Terminal concept';
-        card.appendChild(leaf);
+        const leaf = document.createElement('span'); leaf.className = 'pp-cmap-leaf-badge';
+        leaf.textContent = 'Terminal concept'; card.appendChild(leaf);
       }
 
       world.appendChild(card);
       cardEls.set(i, card);
-      _liveRects.set(i, { x: 0, y: 0, w: CARD_W, h: 80 });
+      _liveRects.set(i, {x:0, y:0, w:CARD_W, h:80});
       makeDraggable(card, i);
-
       if (window.ResizeObserver) {
         new ResizeObserver(() => {
           const r = _liveRects.get(i);
@@ -771,26 +906,21 @@ function initConceptMapTool(paneEl, sidebarEl) {
       }
     }
 
-    // ── Build connector edges ────────────────────────────────────────────
+    // ── Connector edges ───────────────────────────────────────────────────
     for (let i = 0; i < n; i++) {
       if (absorbedInto[i] !== -1) continue;
-      const par = parents[i];
-      if (par === -1) continue;
-      // Parent might be absorbed — resolve to its primary
+      const par = parents[i]; if (par === -1) continue;
       const parPrimary = absorbedInto[par] !== -1 ? absorbedInto[par] : par;
       if (!cardEls.has(i) || !cardEls.has(parPrimary)) continue;
-      const { accent } = depthColor(levels[parPrimary]);
-      _connEdges.push({ fromId: parPrimary, toId: i, color: accent, depth: levels[parPrimary]-1 });
+      const {accent} = depthColor(levels[parPrimary]);
+      _connEdges.push({fromId:parPrimary, toId:i, color:accent, depth:levels[parPrimary]-1});
     }
 
     // ── Layout ────────────────────────────────────────────────────────────
     requestAnimationFrame(() => {
-      const W = canvas.clientWidth || 500, H = canvas.clientHeight || 500;
-
-      // Collect card ids and their levels for layout
+      const W = canvas.clientWidth||500, H = canvas.clientHeight||500;
       const nodeIds = [];
       cardEls.forEach((_, id) => nodeIds.push(id));
-
       const byLevel = new Map();
       nodeIds.forEach(id => {
         const lv = levels[id];
@@ -799,27 +929,23 @@ function initConceptMapTool(paneEl, sidebarEl) {
       });
       const maxLevel = Math.max(...byLevel.keys(), 1);
 
-      // Build parent map for tree layouts
-      const parentOf = new Map();
-      const childrenOf = new Map();
+      const parentOf   = new Map(), childrenOf = new Map();
       nodeIds.forEach(id => { childrenOf.set(id, []); });
       _connEdges.forEach(({fromId, toId}) => {
         parentOf.set(toId, fromId);
         if (childrenOf.has(fromId)) childrenOf.get(fromId).push(toId);
       });
       const roots = nodeIds.filter(id => !parentOf.has(id));
-
-      const cH = id => { const el = cardEls.get(id); return el ? (el.offsetHeight || 80) : 80; };
-      const GAP_X = MM_PAD + 10, GAP_Y = MM_PAD + 20;
+      const cH = id => { const el = cardEls.get(id); return el ? (el.offsetHeight||80) : 80; };
+      const GAP_X = MM_PAD+10, GAP_Y = MM_PAD+20;
 
       function applyPositions(posMap) {
         posMap.forEach((pos, id) => {
           const el = cardEls.get(id); if (!el) return;
-          el.style.left = pos.x + 'px'; el.style.top = pos.y + 'px';
-          const h = cH(id);
-          _liveRects.set(id, { x: pos.x, y: pos.y, w: CARD_W, h });
+          el.style.left = pos.x+'px'; el.style.top = pos.y+'px';
+          _liveRects.set(id, {x:pos.x, y:pos.y, w:CARD_W, h:cH(id)});
         });
-        // Overlap resolution
+        // Overlap resolution (30 passes)
         for (let pass = 0; pass < 30; pass++) {
           let moved = false;
           _liveRects.forEach((ra, ka) => {
@@ -827,12 +953,13 @@ function initConceptMapTool(paneEl, sidebarEl) {
               if (ka === kb) return;
               if (ra.x < rb.x+rb.w+MM_PAD && ra.x+ra.w+MM_PAD > rb.x &&
                   ra.y < rb.y+rb.h+MM_PAD && ra.y+ra.h+MM_PAD > rb.y) {
-                const dR=rb.x+rb.w+MM_PAD-ra.x, dL=ra.x+ra.w+MM_PAD-rb.x;
-                const dD=rb.y+rb.h+MM_PAD-ra.y, dU=ra.y+ra.h+MM_PAD-rb.y;
-                if (Math.min(dR,dL)<=Math.min(dD,dU)) ra.x += dR<dL?dR:-dL;
-                else ra.y += dD<dU?dD:-dU;
-                const el=cardEls.get(ka); if(el){el.style.left=ra.x+'px'; el.style.top=ra.y+'px';}
-                moved=true;
+                const dR = rb.x+rb.w+MM_PAD-ra.x, dL = ra.x+ra.w+MM_PAD-rb.x;
+                const dD = rb.y+rb.h+MM_PAD-ra.y, dU = ra.y+ra.h+MM_PAD-rb.y;
+                if (Math.min(dR,dL) <= Math.min(dD,dU)) ra.x += dR<dL ? dR : -dL;
+                else                                     ra.y += dD<dU ? dD : -dU;
+                const el = cardEls.get(ka);
+                if (el) { el.style.left = ra.x+'px'; el.style.top = ra.y+'px'; }
+                moved = true;
               }
             });
           });
@@ -841,122 +968,113 @@ function initConceptMapTool(paneEl, sidebarEl) {
         redrawConnectors();
       }
 
-      // ── 1. Radial ──────────────────────────────────────────────────────
+      /* ─ Radial ─ */
       function layoutRadial() {
-        const pos = new Map();
-        const cx = W/2, cy = H/2;
+        const pos = new Map(), cx = W/2, cy = H/2;
         byLevel.forEach((ids, lv) => {
-          const R = maxLevel === 1 ? 0 : (0.12 + 0.20 * (lv-1)) * Math.min(W, H);
+          const R = maxLevel===1 ? 0 : (0.12 + 0.20*(lv-1)) * Math.min(W, H);
           ids.forEach((id, idx) => {
             const h = cH(id);
-            if (lv === 1 && ids.length === 1) {
-              pos.set(id, { x: cx - CARD_W/2, y: cy - h/2 });
-              return;
-            }
+            if (lv===1 && ids.length===1) { pos.set(id, {x:cx-CARD_W/2, y:cy-h/2}); return; }
             const a = (2*Math.PI*idx/ids.length) - Math.PI/2;
-            pos.set(id, { x: cx + R*Math.cos(a) - CARD_W/2, y: cy + R*Math.sin(a) - h/2 });
+            pos.set(id, {x:cx+R*Math.cos(a)-CARD_W/2, y:cy+R*Math.sin(a)-h/2});
           });
         });
         applyPositions(pos);
       }
 
-      // ── 2. Vertical tree ───────────────────────────────────────────────
+      /* ─ Tree (vertical or horizontal) ─ */
       function subtreeW(id) {
-        const kids = childrenOf.get(id) || [];
+        const kids = childrenOf.get(id)||[];
         if (!kids.length) return CARD_W;
-        return kids.reduce((s,k)=>s+subtreeW(k),0) + GAP_X*(kids.length-1);
+        return kids.reduce((s, k) => s+subtreeW(k), 0) + GAP_X*(kids.length-1);
       }
       function layoutTree(vertical) {
         const pos = new Map();
         function place(id, left, depth) {
-          const kids = childrenOf.get(id) || [];
-          const myW = subtreeW(id);
-          const cx = left + myW/2;
-          const h = cH(id);
-          const rowY = depth * (90 + GAP_Y);
-          if (vertical) pos.set(id, { x: cx - CARD_W/2, y: rowY });
-          else          pos.set(id, { x: rowY, y: cx - h/2 });
+          const kids = childrenOf.get(id)||[], myW = subtreeW(id), cx = left+myW/2, h = cH(id);
+          const rowY = depth * (90+GAP_Y);
+          if (vertical) pos.set(id, {x:cx-CARD_W/2, y:rowY});
+          else          pos.set(id, {x:rowY, y:cx-h/2});
           let childLeft = left;
-          kids.forEach(kid => { place(kid, childLeft, depth+1); childLeft += subtreeW(kid) + GAP_X; });
+          kids.forEach(kid => { place(kid, childLeft, depth+1); childLeft += subtreeW(kid)+GAP_X; });
         }
-        const totalW = roots.reduce((s,r)=>s+subtreeW(r),0) + GAP_X*(roots.length-1);
+        const totalW = roots.reduce((s,r)=>s+subtreeW(r), 0) + GAP_X*(roots.length-1);
         let curX = W/2 - totalW/2;
-        roots.forEach(r => { place(r, curX, 0); curX += subtreeW(r) + GAP_X; });
+        roots.forEach(r => { place(r, curX, 0); curX += subtreeW(r)+GAP_X; });
         applyPositions(pos);
       }
 
-      // ── 3. Vertical flow (by level, rows of cards) ─────────────────────
+      /* ─ Flow (vertical or horizontal) ─ */
       function layoutFlow(vertical) {
         const pos = new Map();
         byLevel.forEach((ids, lv) => {
           const layerH = Math.max(...ids.map(cH), 80);
-          const totalW = ids.length * (CARD_W + GAP_X) - GAP_X;
-          const startX = W/2 - totalW/2;
-          const rowY   = (lv-1) * (layerH + GAP_Y*2);
+          const totalW = ids.length*(CARD_W+GAP_X) - GAP_X;
+          const startX = W/2 - totalW/2, rowY = (lv-1)*(layerH+GAP_Y*2);
           ids.forEach((id, idx) => {
             const h = cH(id);
-            if (vertical) pos.set(id, { x: startX + idx*(CARD_W+GAP_X), y: rowY+(layerH-h)/2 });
-            else          pos.set(id, { x: rowY, y: startX + idx*(CARD_W+GAP_X) });
+            if (vertical) pos.set(id, {x:startX + idx*(CARD_W+GAP_X), y:rowY + (layerH-h)/2});
+            else          pos.set(id, {x:rowY, y:startX + idx*(CARD_W+GAP_X)});
           });
         });
         applyPositions(pos);
       }
 
-      // ── 4. Organic (Fruchterman-Reingold) ─────────────────────────────
+      /* ─ Organic (Fruchterman-Reingold) ─ */
       function layoutOrganic() {
         const px = {}, py = {};
         nodeIds.forEach((id, i) => {
-          const a = (2*Math.PI*i/nodeIds.length) - Math.PI/2;
-          const R = Math.min(W,H)*.35;
-          px[id] = W/2 + R*Math.cos(a);
-          py[id] = H/2 + R*Math.sin(a);
+          const a = (2*Math.PI*i/nodeIds.length) - Math.PI/2, R = Math.min(W,H)*.35;
+          px[id] = W/2 + R*Math.cos(a); py[id] = H/2 + R*Math.sin(a);
         });
-        const AREA = W*H, k = Math.sqrt(AREA/Math.max(nodeIds.length,1)) * 0.9;
-        let temp = Math.min(W,H)*.25;
+        const AREA = W*H, k = Math.sqrt(AREA/Math.max(nodeIds.length,1)) * .9;
+        let temp = Math.min(W,H) * .25;
         for (let it = 0; it < 80; it++) {
           const dx = {}, dy = {};
-          nodeIds.forEach(id=>{dx[id]=0;dy[id]=0;});
-          for (let i=0;i<nodeIds.length;i++) for (let j=i+1;j<nodeIds.length;j++) {
-            const u=nodeIds[i],v=nodeIds[j];
-            let ddx=px[u]-px[v], ddy=py[u]-py[v];
-            const d=Math.sqrt(ddx*ddx+ddy*ddy)||.01;
-            const f=k*k/d; ddx/=d; ddy/=d;
-            dx[u]+=ddx*f; dy[u]+=ddy*f; dx[v]-=ddx*f; dy[v]-=ddy*f;
-          }
-          _connEdges.forEach(({fromId:u,toId:v})=>{
-            if(!px.hasOwnProperty(u)||!px.hasOwnProperty(v)) return;
-            let ddx=px[v]-px[u], ddy=py[v]-py[u];
-            const d=Math.sqrt(ddx*ddx+ddy*ddy)||.01;
-            const f=d*d/k; ddx/=d; ddy/=d;
+          nodeIds.forEach(id => { dx[id]=0; dy[id]=0; });
+          for (let i = 0; i < nodeIds.length; i++)
+            for (let j = i+1; j < nodeIds.length; j++) {
+              const u = nodeIds[i], v = nodeIds[j];
+              let ddx = px[u]-px[v], ddy = py[u]-py[v];
+              const d = Math.sqrt(ddx*ddx+ddy*ddy)||.01, f = k*k/d;
+              ddx/=d; ddy/=d;
+              dx[u]+=ddx*f; dy[u]+=ddy*f; dx[v]-=ddx*f; dy[v]-=ddy*f;
+            }
+          _connEdges.forEach(({fromId:u, toId:v}) => {
+            if (!px.hasOwnProperty(u)||!px.hasOwnProperty(v)) return;
+            let ddx = px[v]-px[u], ddy = py[v]-py[u];
+            const d = Math.sqrt(ddx*ddx+ddy*ddy)||.01, f = d*d/k;
+            ddx/=d; ddy/=d;
             dx[u]+=ddx*f; dy[u]+=ddy*f; dx[v]-=ddx*f; dy[v]-=ddy*f;
           });
-          nodeIds.forEach(id=>{
-            const d=Math.sqrt(dx[id]*dx[id]+dy[id]*dy[id])||.01;
-            const disp=Math.min(d,temp);
-            px[id]+=dx[id]/d*disp; py[id]+=dy[id]/d*disp;
+          nodeIds.forEach(id => {
+            const d = Math.sqrt(dx[id]*dx[id]+dy[id]*dy[id])||.01;
+            const disp = Math.min(d, temp);
+            px[id] += dx[id]/d*disp; py[id] += dy[id]/d*disp;
           });
-          temp*=0.93;
+          temp *= .93;
         }
-        const pos=new Map();
-        nodeIds.forEach(id=>{const h=cH(id);pos.set(id,{x:px[id]-CARD_W/2,y:py[id]-h/2});});
+        const pos = new Map();
+        nodeIds.forEach(id => { const h = cH(id); pos.set(id, {x:px[id]-CARD_W/2, y:py[id]-h/2}); });
         applyPositions(pos);
       }
 
-      // ── Dispatch ────────────────────────────────────────────────────────
       switch (_layout) {
         case 'vtree':   layoutTree(true);   break;
         case 'htree':   layoutTree(false);  break;
         case 'vflow':   layoutFlow(true);   break;
-        case 'hflow':   layoutFlow(false);  break;
         case 'organic': layoutOrganic();    break;
         default:        layoutRadial();     break;
       }
-
       setTimeout(fitAll, 80);
     });
   }
 
-  // ── Data / render pipeline ───────────────────────────────────────────────
+  // ════════════════════════════════════════════════════════════════════════
+  // ── Data pipeline ───────────────────────────────────────────────────────
+  // ════════════════════════════════════════════════════════════════════════
+
   function tryRender() {
     if (_rendered) return;
     if (!window.EmbeddingUtils || !window.EmbeddingUtils.isReady()) return;
@@ -965,54 +1083,70 @@ function initConceptMapTool(paneEl, sidebarEl) {
 
     const rawRows = buildRowIndex();
     if (!rawRows.length) return;
-    setStatus('loading', 'Building hierarchy for ' + rawRows.length + ' cells\u2026');
+    setStatus('loading', 'Embedding ' + rawRows.length + ' cells\u2026');
     emptyEl.style.display = 'none';
 
     Promise.all(rawRows.map(r => {
       const text = (r.row?.cells || r.cells || []).join(' ').trim();
       if (!text) return Promise.resolve(null);
       return window.EmbeddingUtils.getCachedEmbedding(text)
-        .then(vec => ({ key: r.tabIdx + ':' + r.rowIdx, vec }))
+        .then(vec => ({key: r.tabIdx+':'+r.rowIdx, vec}))
         .catch(() => null);
     })).then(results => {
       const vectors = new Map();
       results.forEach(res => { if (res?.vec) vectors.set(res.key, res.vec); });
       if (!vectors.size) { setStatus('error', 'No vectors available'); return; }
-      const embedded = rawRows.filter(r => vectors.has(r.tabIdx + ':' + r.rowIdx));
-      if (embedded.length < 3) { setStatus('error', 'Not enough data (need ≥ 3 cells)'); return; }
-      embedded.forEach(r => { r.vec = vectors.get(r.tabIdx + ':' + r.rowIdx); });
+      const embedded = rawRows.filter(r => vectors.has(r.tabIdx+':'+r.rowIdx));
+      if (embedded.length < 3) { setStatus('error', 'Not enough data (\u22653 cells needed)'); return; }
+      embedded.forEach(r => { r.vec = vectors.get(r.tabIdx+':'+r.rowIdx); });
       _rows = embedded;
-      requestAnimationFrame(doRender);
+      doRender();
     });
   }
 
-  function doRender() {
+  // Async so we can await splitAllRows
+  async function doRender() {
     rebuildBtn.classList.remove('pp-cmap-busy');
     rebuildBtn.textContent = 'Rebuild';
-    setStatus('loading', 'Mapping ' + _rows.length + ' cells\u2026');
+    setStatus('loading', 'Splitting cells\u2026');
+
+    let workRows;
+    try {
+      workRows = await splitAllRows(_rows);
+    } catch (e) {
+      console.warn('[concept-map v13] split error, using unsplit rows:', e);
+      workRows = _rows;
+    }
+
+    const splitCount = workRows.length - _rows.length;
+    setStatus('loading', 'Building hierarchy for ' + workRows.length + ' concepts\u2026');
+
+    // Defer the CPU-heavy hierarchy build so status text renders first
     setTimeout(() => {
       try {
-        const hier = buildHierarchy(_rows);
+        const hier = buildHierarchy(workRows);
         if (!hier) { setStatus('error', 'Not enough data'); return; }
 
-        // Count visible (non-absorbed) nodes per level
         let visibleCount = 0;
         const levelCounts = new Map();
         for (let i = 0; i < hier.n; i++) {
           if (hier.absorbedInto[i] !== -1) continue;
           visibleCount++;
           const lv = hier.levels[i];
-          levelCounts.set(lv, (levelCounts.get(lv) || 0) + 1);
+          levelCounts.set(lv, (levelCounts.get(lv)||0) + 1);
         }
         const levelStr = [...levelCounts.keys()].sort((a,b)=>a-b)
-          .map(l => 'L' + l + ': ' + levelCounts.get(l)).join(' · ');
+          .map(l => 'L'+l+': '+levelCounts.get(l)).join(' · ');
+        const splitStr = splitCount > 0
+          ? ' · ' + splitCount + ' split' + (splitCount===1?'':'s')
+          : '';
 
         renderConceptMap(hier);
-        subtitleEl.textContent = visibleCount + ' cards · ' + levelStr;
+        subtitleEl.textContent = visibleCount + ' cards · ' + levelStr + splitStr;
         setStatus('ready', 'Done');
         _rendered = true;
       } catch (err) {
-        console.error('[concept-map v12]', err);
+        console.error('[concept-map v13]', err);
         setStatus('error', 'Failed: ' + err.message);
       }
     }, 20);
