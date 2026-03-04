@@ -1,10 +1,10 @@
-// sidepanel-mindmap.js — Concept Map tool v7
-// Changes vs v6:
-//   • 7 automatic layout algorithms (draw.io parity): Radial, Vertical Tree,
-//     Horizontal Tree, Circle, Organic (force-directed), Vertical Flow, Horizontal Flow
-//   • Layout dropdown button inserted between Top Concepts slider and Rebuild button
-//   • Layouts respect depth hierarchy and parent→child edges
-console.log('[sidepanel-mindmap.js huhaaa]');
+// sidepanel-mindmap.js — Concept Map tool v8
+// Changes vs v7:
+//   • Cards animate smoothly into position when layout changes (420ms ease)
+//   • Arrows stay in sync during animation via rAF loop
+//   • Layout dropdown now opens downward (was upward, cutting off items)
+//   • Dropdown opens with a subtle scale+fade animation
+console.log('[sidepanel-mindmap.js v8]');
 
 (function injectCmapStyles() {
   if (document.getElementById('pp-cmap-styles')) return;
@@ -85,10 +85,16 @@ console.log('[sidepanel-mindmap.js huhaaa]');
 #pp-cmap-layout-btn.open { background:rgba(0,0,0,.13); color:rgba(0,0,0,.75); }
 #pp-cmap-layout-btn svg { flex-shrink:0; }
 #pp-cmap-layout-menu {
-  position:absolute; bottom:calc(100% + 5px); right:0; z-index:300;
+  position:absolute; top:calc(100% + 5px); right:0; z-index:300;
   background:#fff; border:1px solid rgba(0,0,0,.13); border-radius:9px;
   box-shadow:0 6px 22px rgba(0,0,0,.18); padding:5px; min-width:148px;
   display:none; flex-direction:column; gap:1px;
+  transform-origin:top right;
+  animation:pp-cmap-menu-in .15s cubic-bezier(0.22,1,0.36,1) both;
+}
+@keyframes pp-cmap-menu-in {
+  from { opacity:0; transform:scale(.92) translateY(-6px); }
+  to   { opacity:1; transform:scale(1)   translateY(0);    }
 }
 #pp-cmap-layout-menu.open { display:flex; }
 .pp-cmap-layout-sep {
@@ -772,27 +778,44 @@ function initConceptMapTool(paneEl, sidebarEl) {
 
       // Helper: apply positions from a map and nudge collisions
       function applyPositions(posMap) {
+        const SLIDE_MS = 420;
+        const easing = 'cubic-bezier(0.25,1,0.5,1)';
+        // Enable transitions on all cards before moving
+        cardEls.forEach(el => {
+          el.style.transition = `left ${SLIDE_MS}ms ${easing}, top ${SLIDE_MS}ms ${easing}`;
+        });
         posMap.forEach((pos, id) => {
           const el = cardEls.get(id); if(!el) return;
           const h = cH(id);
           el.style.left = pos.x + 'px'; el.style.top = pos.y + 'px';
           rects.set(id, {x:pos.x, y:pos.y, w:CARD_W, h});
         });
-        // Collision nudge
-        for(let pass=0;pass<MM_ITERS;pass++){
-          let moved=false;
-          rects.forEach((ra,ka)=>{rects.forEach((rb,kb)=>{
-            if(ka===kb)return;
-            if(ra.x<rb.x+rb.w+MM_PAD&&ra.x+ra.w+MM_PAD>rb.x&&ra.y<rb.y+rb.h+MM_PAD&&ra.y+ra.h+MM_PAD>rb.y){
-              const dR=rb.x+rb.w+MM_PAD-ra.x,dL=ra.x+ra.w+MM_PAD-rb.x;
-              const dD=rb.y+rb.h+MM_PAD-ra.y,dU=ra.y+ra.h+MM_PAD-rb.y;
-              if(Math.min(dR,dL)<=Math.min(dD,dU))ra.x+=dR<dL?dR:-dL;else ra.y+=dD<dU?dD:-dU;
-              const el=cardEls.get(ka);if(el){el.style.left=ra.x+'px';el.style.top=ra.y+'px';}
-              moved=true;
-            }
-          });});
-          if(!moved)break;
-        }
+        // Clear transitions after animation finishes, then nudge collisions
+        setTimeout(() => {
+          cardEls.forEach(el => { el.style.transition = ''; });
+          // Collision nudge (after animation)
+          for(let pass=0;pass<MM_ITERS;pass++){
+            let moved=false;
+            rects.forEach((ra,ka)=>{rects.forEach((rb,kb)=>{
+              if(ka===kb)return;
+              if(ra.x<rb.x+rb.w+MM_PAD&&ra.x+ra.w+MM_PAD>rb.x&&ra.y<rb.y+rb.h+MM_PAD&&ra.y+ra.h+MM_PAD>rb.y){
+                const dR=rb.x+rb.w+MM_PAD-ra.x,dL=ra.x+ra.w+MM_PAD-rb.x;
+                const dD=rb.y+rb.h+MM_PAD-ra.y,dU=ra.y+ra.h+MM_PAD-rb.y;
+                if(Math.min(dR,dL)<=Math.min(dD,dU))ra.x+=dR<dL?dR:-dL;else ra.y+=dD<dU?dD:-dU;
+                const el=cardEls.get(ka);if(el){el.style.left=ra.x+'px';el.style.top=ra.y+'px';}
+                moved=true;
+              }
+            });});
+            if(!moved)break;
+          }
+          redrawArrows();
+        }, SLIDE_MS + 20);
+        // Also keep arrows in sync during the animation
+        const start = performance.now();
+        (function raf(now) {
+          redrawArrows();
+          if(now - start < SLIDE_MS + 20) requestAnimationFrame(raf);
+        })(performance.now());
       }
 
       // Check position cache (for depth-slider preserve)
