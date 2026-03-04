@@ -36,7 +36,7 @@ const LANDSCAPE = {
   sidebarBoxMargin:          0.012,
   sidebarMin:                0.00,
   sidebarMax:                1.00,
-  sidebarDefault:            0.40,
+  sidebarDefault:            0.60,
   sidebarSnapClose:          0.30,
   sidebarOverlapThreshold:   0.50,
   sidebarFullscreenThreshold:0.80,
