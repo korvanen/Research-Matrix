@@ -1,151 +1,172 @@
-// embedding-bridge.js — sessionStorage bridge for sharing embeddings
-// Reads vectors from the same localStorage cache that embedding-utils.js writes,
-// then saves complete rows+vecs to sessionStorage for tool pages to consume.
-// ─────────────────────────────────────────────────────────────────────────────
+// ════════════════════════════════════════════════════════════════════════════
+// embedding-utils.js — Local semantic embeddings via Transformers.js
+// Loaded as <scriptlll type="module">; exposes window.EmbeddingUtils globally.
+// ════════════════════════════════════════════════════════════════════════════
 
-window.EmbeddingBridge = (function () {
-  var STORAGE_KEY  = 'pp-embeddings';
-  var CACHE_PREFIX = 'pp_emb_v1_';   // must match embedding-utils.js
+import { pipeline, env }
+  from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2';
 
-  // ── Same hash function as embedding-utils.js ─────────────────────────────
-  function hashText(str) {
-    var h = 0;
-    for (var i = 0; i < str.length; i++) {
-      h = (Math.imul(31, h) + str.charCodeAt(i)) | 0;
-    }
-    return (h >>> 0).toString(36);
+env.allowLocalModels = false;
+
+const EMBEDDING_MODEL = 'Xenova/all-MiniLM-L6-v2';
+const CACHE_PREFIX    = 'pp_emb_v1_';
+
+// ── Model loader ──────────────────────────────────────────────────────────────
+let _embedder    = null;
+let _loadPromise = null;
+
+async function _loadEmbedder() {
+  if (_embedder) return _embedder;
+  if (_loadPromise) return _loadPromise;
+
+  _loadPromise = pipeline('feature-extraction', EMBEDDING_MODEL, { quantized: true })
+    .then(model => {
+      _embedder = model;
+      window.dispatchEvent(new CustomEvent('embedder-ready'));
+      console.log('[embedding-utils] Model ready');
+
+      // Call initEmbeddings now that both the model and app data are available.
+      // The module loads after regular scripts, so EmbeddingUtils wasn't on
+      // window when script.js tried to call initEmbeddings() at startup.
+      if (typeof initEmbeddings === 'function') {
+        console.log('[embedding-utils] Calling initEmbeddings()');
+        initEmbeddings();
+      }
+
+      return model;
+    })
+    .catch(err => {
+      _loadPromise = null;
+      console.warn('[embedding-utils] Model load failed:', err);
+      throw err;
+    });
+
+  return _loadPromise;
+}
+
+// ── Embedding (the only function to swap when changing providers) ─────────────
+async function getEmbedding(text) {
+  const embedder = await _loadEmbedder();
+  // pipeline() returns a Tensor-like object; .data is the flat Float32Array
+  const output = await embedder(text, { pooling: 'mean', normalize: true });
+  if (!output || !output.data) {
+    throw new Error('[embedding-utils] getEmbedding: unexpected output shape — ' + JSON.stringify(output));
   }
+  return Array.from(output.data);
+}
 
-  // ── Look up a cached vector from localStorage by cell text ───────────────
-  function getVecFromCache(text) {
-    try {
-      var raw = localStorage.getItem(CACHE_PREFIX + hashText(text));
-      if (!raw) return null;
-      var parsed = JSON.parse(raw);
-      if (!Array.isArray(parsed) || !parsed.length) return null;
-      return new Float32Array(parsed);
-    } catch (e) {
+// ── Stable hash for cache keys ────────────────────────────────────────────────
+function _hashText(str) {
+  let h = 0;
+  for (let i = 0; i < str.length; i++) {
+    h = (Math.imul(31, h) + str.charCodeAt(i)) | 0;
+  }
+  return (h >>> 0).toString(36);
+}
+
+// ── localStorage cache ────────────────────────────────────────────────────────
+function _cacheGet(text) {
+  try {
+    const raw = localStorage.getItem(CACHE_PREFIX + _hashText(text));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    // Validate: must be a non-empty array of numbers
+    if (!Array.isArray(parsed) || !parsed.length || typeof parsed[0] !== 'number') {
+      console.warn('[embedding-utils] Cache entry corrupt, ignoring');
       return null;
     }
+    return parsed;
+  } catch (e) {
+    console.warn('[embedding-utils] _cacheGet error:', e);
+    return null;
   }
+}
 
-  // ── Serialise for sessionStorage ─────────────────────────────────────────
-  function serialize(rows) {
-    return rows.map(function (r) {
-      return {
-        tabIdx:  r.tabIdx,
-        rowIdx:  r.rowIdx,
-        row:     r.row,
-        headers: r.headers || [],
-        title:   r.title   || '',
-        vec:     r.vec ? Array.from(r.vec) : null,
-      };
-    });
+function _cacheSet(text, vector) {
+  try {
+    localStorage.setItem(CACHE_PREFIX + _hashText(text), JSON.stringify(vector));
+  } catch {
+    _cacheClear();
+    try { localStorage.setItem(CACHE_PREFIX + _hashText(text), JSON.stringify(vector)); } catch {}
   }
+}
 
-  // ── Deserialise from sessionStorage ──────────────────────────────────────
-  function deserialize(rows) {
-    return rows.map(function (r) {
-      return Object.assign({}, r, {
-        vec: r.vec ? new Float32Array(r.vec) : null,
-      });
-    });
-  }
+function _cacheClear() {
+  Object.keys(localStorage)
+    .filter(k => k.startsWith(CACHE_PREFIX))
+    .forEach(k => localStorage.removeItem(k));
+  console.log('[embedding-utils] Cache cleared');
+}
 
-  // ── Build embedded rows from buildRowIndex() + localStorage cache ─────────
-  function buildEmbeddedRows() {
-    if (typeof buildRowIndex !== 'function') return [];
-    var rows = buildRowIndex();
-    var embedded = [];
-    rows.forEach(function (r) {
-      var cells = (r.row && r.row.cells) ? r.row.cells : (r.cells || []);
-      var text  = cells.join(' ').trim();
-      if (!text) return;
-      var vec = getVecFromCache(text);
-      if (vec) embedded.push(Object.assign({}, r, { vec: vec }));
-    });
-    return embedded;
-  }
+// ── Public: get embedding with caching ───────────────────────────────────────
+async function getCachedEmbedding(text) {
+  const cached = _cacheGet(text);
+  if (cached) return cached;
+  const vector = await getEmbedding(text); // throws on failure — caller handles
+  _cacheSet(text, vector);
+  return vector;
+}
 
-  // ── Save to sessionStorage ────────────────────────────────────────────────
-  function save(rows) {
+// ── Cosine similarity ─────────────────────────────────────────────────────────
+function cosineSimilarity(a, b) {
+  if (!a || !b || a.length !== b.length) return 0;
+  let dot = 0;
+  for (let i = 0; i < a.length; i++) dot += a[i] * b[i];
+  return Math.max(0, Math.min(1, dot));
+}
+
+// ── Embed all rows incrementally ──────────────────────────────────────────────
+async function embedAllRows(rows) {
+  const vectors = new Map();
+  const total   = rows.length;
+  let failures  = 0;
+
+  for (let i = 0; i < total; i++) {
+    const row  = rows[i];
+    // buildRowIndex() nests the sheet row under .row — cells live at row.row.cells
+    const cells = (row.row && row.row.cells) ? row.row.cells : (row.cells || []);
+    const text = cells.join(' ').trim();
+    if (!text) continue;
+
     try {
-      var json = JSON.stringify(serialize(rows));
-      sessionStorage.setItem(STORAGE_KEY, json);
-      console.log('[EmbeddingBridge] saved ' + rows.length + ' rows (' + (json.length / 1024).toFixed(1) + ' KB)');
-    } catch (e) {
-      // Quota exceeded — try saving without vectors
-      console.warn('[EmbeddingBridge] quota exceeded, saving without vectors');
-      try {
-        var slim = serialize(rows).map(function (r) {
-          return Object.assign({}, r, { vec: null });
-        });
-        sessionStorage.setItem(STORAGE_KEY, JSON.stringify(slim));
-      } catch (e2) {
-        console.error('[EmbeddingBridge] sessionStorage full:', e2.message);
+      const vector = await getCachedEmbedding(text);
+      if (!vector || !vector.length) {
+        console.warn(`[embedding-utils] Row ${i} returned empty vector, skipping`);
+        failures++;
+        continue;
       }
-    }
-  }
-
-  // ══════════════════════════════════════════════════════════════════════════
-  // HOST — call once on index.html
-  // ══════════════════════════════════════════════════════════════════════════
-  function host() {
-    function buildAndSave() {
-      var rows = buildEmbeddedRows();
-      if (rows.length) save(rows);
-    }
-
-    // Save when embeddings finish
-    window.addEventListener('embedding-complete', function () {
-      setTimeout(buildAndSave, 150);
-    });
-
-    // Also save when the embedder becomes ready (handles page reloads where
-    // all vectors were already cached in localStorage)
-    window.addEventListener('embedder-ready', function () {
-      setTimeout(buildAndSave, 300);
-    });
-
-    // Try immediately in case everything was already cached
-    setTimeout(buildAndSave, 400);
-
-    console.log('[EmbeddingBridge] host ready');
-  }
-
-  // ══════════════════════════════════════════════════════════════════════════
-  // GUEST — call on clusters.html / concept-map.html
-  // ══════════════════════════════════════════════════════════════════════════
-  function guest(onRows) {
-    function tryLoad() {
-      var raw = sessionStorage.getItem(STORAGE_KEY);
-      if (!raw) return false;
-      try {
-        var rows = deserialize(JSON.parse(raw));
-        if (!rows.length) return false;
-        console.log('[EmbeddingBridge] loaded ' + rows.length + ' rows from sessionStorage');
-        onRows(rows);
-        return true;
-      } catch (e) {
-        console.warn('[EmbeddingBridge] failed to parse sessionStorage data:', e);
-        return false;
+      vectors.set(row.tabIdx + ':' + row.rowIdx, vector);
+    } catch (err) {
+      failures++;
+      // Log first 3 failures in full; after that just count them
+      if (failures <= 3) {
+        console.error(`[embedding-utils] Failed to embed row ${row.tabIdx}:${row.rowIdx}:`, err);
+        console.error('  text sample:', JSON.stringify(text.slice(0, 80)));
       }
     }
 
-    if (tryLoad()) return;
-
-    var attempts = 0;
-    var retry = setInterval(function () {
-      attempts++;
-      if (tryLoad() || attempts >= 8) {
-        clearInterval(retry);
-        if (attempts >= 8) {
-          console.warn('[EmbeddingBridge] no data found in sessionStorage');
-          window.dispatchEvent(new CustomEvent('bridge-no-host'));
-        }
-      }
-    }, 500);
+    window.dispatchEvent(new CustomEvent('embedding-progress', {
+      detail: { done: i + 1, total, pct: Math.round((i + 1) / total * 100) }
+    }));
   }
 
-  return { host: host, guest: guest };
-})();
+  if (failures > 0) {
+    console.warn(`[embedding-utils] embedAllRows: ${failures}/${total} rows failed`);
+  }
+
+  window.dispatchEvent(new CustomEvent('embedding-complete', { detail: { total: vectors.size } }));
+  return vectors;
+}
+
+// ── Expose to global scope ────────────────────────────────────────────────────
+window.EmbeddingUtils = {
+  getEmbedding,
+  getCachedEmbedding,
+  cosineSimilarity,
+  embedAllRows,
+  isReady: () => !!_embedder,
+  clearCache: _cacheClear,
+};
+
+// Start downloading the model in the background immediately.
+_loadEmbedder().catch(() => {/* already warned above */});
