@@ -1,4 +1,4 @@
-// sidepanel-clusters.js — Clusters tool v14
+// sidepanel-clusters.js — Clusters tool v13
 // Changes vs v12:
 //   • Collision resolution for top-level nests: after initial flow layout,
 //     runs 60 iterations of overlap-repulsion so nests never overlap each other.
@@ -9,7 +9,7 @@
 //     respected precisely, replacing the old CSS flex-wrap approach for depth-1.
 //   • depth-0 nest height is now set explicitly after sub-nest layout so the
 //     container actually encloses all children.
-console.log('[sidepanel-clusters.js v14]');
+console.log('[sidepanel-clusters.js v22]');
 
 (function injectClusterStyles() {
   if (document.getElementById('pp-cluster-styles')) return;
