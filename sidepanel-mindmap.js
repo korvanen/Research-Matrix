@@ -1,11 +1,10 @@
-// sidepanel-mindmap.js — Concept Map tool v10
-// Changes vs v9:
-//   • CMAP_CHILD_K_MIN global constant (default 3) — raises the floor for sub-concept splitting
-//   • "Sub-concepts" slider added to controls — live override of the minimum childK per card
-//   • Non-leaf cards now show ALL their entries as a compact bulleted list (up to 8)
-//     instead of showing only the single most-representative entry, making sub-concept
-//     count visually obvious at a glance
-console.log('[sidepanel-mindmap.js v10]');
+// sidepanel-mindmap.js — Concept Map tool v11
+// Changes vs v10:
+//   • Non-leaf cards show NO body entries (content visible via child cards — no redundancy)
+//   • Top-level K is now auto-derived from sqrt(n) instead of a manual slider
+//   • Sub-concepts slider removed; CMAP_CHILD_K_MIN constant still controls the floor
+//   • All stale _topK / _subKMin / _vectors references cleaned up
+console.log('[sidepanel-mindmap.js v13]');
 
 // ── Global tuning constants ──────────────────────────────────────────────────
 // Minimum number of sub-concepts any non-leaf card will try to produce.
@@ -41,9 +40,9 @@ const CMAP_CHILD_K_MIN = 3;
 #pp-cmap-status.cmap-ready   .pp-cmap-dot { background:rgba(40,160,80,.9); }
 #pp-cmap-status.cmap-error   .pp-cmap-dot { background:rgba(180,40,40,.85); }
 @keyframes pp-cmap-pulse { 0%,100%{opacity:.25;transform:scale(.85);}50%{opacity:1;transform:scale(1.1);} }
-/* Controls grid: depth | top-k | sub-k | layout-btn | rebuild */
+/* Controls row: depth | layout-btn | rebuild */
 #pp-cmap-controls {
-  display:grid; grid-template-columns:1fr 1fr 1fr auto auto; gap:6px; align-items:end;
+  display:grid; grid-template-columns:1fr auto auto; gap:6px; align-items:end;
 }
 .pp-cmap-ctrl-col { display:flex; flex-direction:column; gap:2px; }
 .pp-cmap-group-label {
@@ -188,27 +187,11 @@ function initConceptMapTool(paneEl, sidebarEl) {
       '</div>' +
       '<div id="pp-cmap-controls">' +
         '<div class="pp-cmap-ctrl-col">' +
-          '<div class="pp-cmap-group-label">Depth</div>' +
+          '<div class="pp-cmap-group-label">Max Depth</div>' +
           '<div class="pp-cmap-range-row">' +
             '<span class="pp-cmap-range-label">Lvl</span>' +
-            '<input class="pp-cmap-range" id="pp-cmap-depth" type="range" min="1" max="5" value="3" step="1">' +
-            '<span class="pp-cmap-range-val" id="pp-cmap-depth-val">3</span>' +
-          '</div>' +
-        '</div>' +
-        '<div class="pp-cmap-ctrl-col">' +
-          '<div class="pp-cmap-group-label">Top Concepts</div>' +
-          '<div class="pp-cmap-range-row">' +
-            '<span class="pp-cmap-range-label">K</span>' +
-            '<input class="pp-cmap-range" id="pp-cmap-k" type="range" min="2" max="12" value="5" step="1">' +
-            '<span class="pp-cmap-range-val" id="pp-cmap-k-val">5</span>' +
-          '</div>' +
-        '</div>' +
-        '<div class="pp-cmap-ctrl-col">' +
-          '<div class="pp-cmap-group-label">Sub-concepts</div>' +
-          '<div class="pp-cmap-range-row">' +
-            '<span class="pp-cmap-range-label">Min</span>' +
-            '<input class="pp-cmap-range" id="pp-cmap-subk" type="range" min="2" max="8" value="3" step="1">' +
-            '<span class="pp-cmap-range-val" id="pp-cmap-subk-val">3</span>' +
+            '<input class="pp-cmap-range" id="pp-cmap-depth" type="range" min="1" max="8" value="5" step="1">' +
+            '<span class="pp-cmap-range-val" id="pp-cmap-depth-val">5</span>' +
           '</div>' +
         '</div>' +
         '<button id="pp-cmap-rebuild">Rebuild</button>' +
@@ -250,7 +233,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
     '</div>' +
     '<div id="pp-cmap-canvas">' +
       '<div id="pp-cmap-world"></div>' +
-      '<div id="pp-cmap-empty">Concept map will appear<br>once embeddings finish</div>' +
+      '<div id="pp-cmap-empty">Concept map will appear<br>once the spreadsheet loads</div>' +
       '<button id="pp-cmap-fit" title="Fit all cards into view">' +
         '<svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">' +
           '<path d="M1 5V2h3M12 2h3v3M15 11v3h-3M4 14H1v-3"/>' +
@@ -274,21 +257,13 @@ function initConceptMapTool(paneEl, sidebarEl) {
   const layoutOpts  = paneEl.querySelectorAll('.pp-cmap-layout-opt');
   const depthSlider = paneEl.querySelector('#pp-cmap-depth');
   const depthValEl  = paneEl.querySelector('#pp-cmap-depth-val');
-  const kSlider     = paneEl.querySelector('#pp-cmap-k');
-  const kValEl      = paneEl.querySelector('#pp-cmap-k-val');
-  const subKSlider  = paneEl.querySelector('#pp-cmap-subk');
-  const subKValEl   = paneEl.querySelector('#pp-cmap-subk-val');
 
   const CARD_W   = 160;
   const MM_PAD   = 12;
   const MM_ITERS = 25;
-  const HOVER_MS = 200;
-  const EXP_MS   = 260;
 
-  let _depth = 3, _topK = 5, _layout = 'radial';
-  // _subKMin starts at the global constant; the slider can override it at runtime
-  let _subKMin = CMAP_CHILD_K_MIN;
-  let _vectors = null, _rows = null, _rendered = false;
+  let _depth = 5, _layout = 'radial';
+  let _rows = null, _rendered = false;
   let _rebuildTimer = null, _topZ = 10;
   let _panX = 0, _panY = 0, _zoom = 1;
 
@@ -432,15 +407,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
   // ── Sliders ──────────────────────────────────────────────────────────────
   depthSlider.addEventListener('input', () => {
     _depth = +depthSlider.value; depthValEl.textContent = _depth;
-    scheduleRebuild(true); // depth-only: preserve positions
-  });
-  kSlider.addEventListener('input', () => {
-    _topK = +kSlider.value; kValEl.textContent = _topK;
-    scheduleRebuild(false);
-  });
-  subKSlider.addEventListener('input', () => {
-    _subKMin = +subKSlider.value; subKValEl.textContent = _subKMin;
-    scheduleRebuild(true); // preserve positions — only branching factor changes
+    scheduleRebuild(true);
   });
   rebuildBtn.addEventListener('click', () => {
     clearTimeout(_rebuildTimer);
@@ -557,14 +524,18 @@ function initConceptMapTool(paneEl, sidebarEl) {
     setId(root);
 
     const toRender = [];
-    const topRoots = getTopClusters(root, _topK);
 
-    // Dynamic children: re-split each node's subtree into a natural number
-    // of sub-clusters proportional to sqrt(entries), floored at _subKMin.
+    // Top-level split: use sqrt(n) clamped to [CMAP_CHILD_K_MIN, 12] so the
+    // number of root cards scales naturally with dataset size.
+    const topK = Math.max(CMAP_CHILD_K_MIN, Math.min(12, Math.round(Math.sqrt(root.rows.length))));
+    const topRoots = getTopClusters(root, topK);
+
+    // Recursively collect nodes to render down to _depth levels.
+    // Each non-leaf is re-split into childK sub-concepts proportional to sqrt(entries).
     function collect(node, d, pid) {
       toRender.push({node, d, pid});
       if (d < _depth - 1 && node.rows.length > 1 && node.children.length) {
-        const childK = Math.max(_subKMin, Math.min(7, Math.round(Math.sqrt(node.rows.length))));
+        const childK = Math.max(CMAP_CHILD_K_MIN, Math.min(7, Math.round(Math.sqrt(node.rows.length))));
         const subs   = getTopClusters(node, childK);
         subs.filter(s => s !== node).forEach(c => collect(c, d + 1, node._cid));
       }
@@ -756,8 +727,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
       footer.className = 'pp-cmap-footer';
       const entryStr = node.rows.length + ' entr' + (node.rows.length === 1 ? 'y' : 'ies');
       if (!isLeaf) {
-        // Use _subKMin so the footer count matches what collect() actually produced
-        const childK   = Math.max(_subKMin, Math.min(7, Math.round(Math.sqrt(node.rows.length))));
+        const childK   = Math.max(CMAP_CHILD_K_MIN, Math.min(7, Math.round(Math.sqrt(node.rows.length))));
         const subCount = getTopClusters(node, childK).filter(s => s !== node).length;
         footer.textContent = entryStr + ' · ' + subCount + ' sub-concept' + (subCount === 1 ? '' : 's');
       } else {
@@ -1003,7 +973,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
     if(_rendered) return;
     if(!window.EmbeddingUtils||!window.EmbeddingUtils.isReady()) return;
     if(typeof buildRowIndex!=='function') return;
-    if(_vectors&&_rows){doRender();return;}
+    if(_rows){doRender();return;}
     const rows=buildRowIndex();
     if(!rows.length) return;
     setStatus('loading','Building concept map for '+rows.length+' entries\u2026');
@@ -1019,7 +989,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
       const embedded=rows.filter(r=>vectors.has(r.tabIdx+':'+r.rowIdx));
       if(embedded.length<3){setStatus('error','Not enough data');return;}
       embedded.forEach(r=>{r.vec=vectors.get(r.tabIdx+':'+r.rowIdx);});
-      _vectors=vectors;_rows=embedded;
+      _rows=embedded;
       requestAnimationFrame(doRender);
     });
   }
@@ -1030,7 +1000,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
       try{
         const dendro=buildDendrogram(_rows);
         renderConceptMap(dendro);
-        subtitleEl.textContent=_topK+' concept'+(_topK===1?'':'s')+' \u00b7 '+_rows.length+' entries \u00b7 depth '+_depth;
+        subtitleEl.textContent=_rows.length+' entries \u00b7 depth '+_depth;
         setStatus('ready','Done'); _rendered=true;
       }catch(err){console.error('[concept-map]',err);setStatus('error','Clustering failed');}
     },20);
@@ -1042,7 +1012,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
 
   return {
     reset(){
-      _rendered=false;_vectors=null;_rows=null;
+      _rendered=false;_rows=null;
       _posCache.clear(); _preservePan=false;
       _liveRects=new Map(); _liveCidToNode=new Map();
       world.innerHTML='';
