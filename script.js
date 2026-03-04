@@ -74,6 +74,7 @@ const THEMES = {
   relational:         makeTheme('#535fc1'),
   organizational:     makeTheme('#5a3f86'),
   physical:           makeTheme('#bb463c'),
+  yellow:           makeTheme('#D4AF37'),
 };
 
 const TAB_THEMES = [
@@ -81,6 +82,7 @@ const TAB_THEMES = [
   'relational',
   'organizational',
   'physical',
+  'yellow',
 ];
 
 // ── Color utility ──
