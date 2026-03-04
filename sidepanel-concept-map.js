@@ -1,17 +1,14 @@
-// sidepanel-concept-map.js — Concept Map v14
-// v13 → v14 changes:
-//   • Multi-parent support: each node can now link to multiple parent nodes,
-//     producing a true concept map (DAG) instead of a strict tree.
-//   • New "Max Parents" slider (1–6) controls the maximum number of parent
-//     edges per node. Setting it to 1 reproduces the old tree behaviour.
-//   • parents[] replaced with a Map<nodeIdx, nodeIdx[]> (parentsOf) and
-//     parentSims[] replaced with Map<nodeIdx, number[]> (parentSimsOf).
-//   • Connector drawing iterates parentsOf entries instead of a single parent.
-//   • simToChildren footer % uses average sim across all incoming child edges.
-//   • Multi-parent badge shown on cards with >1 parent.
-//   • Subtitle shows count of multi-parent nodes.
-//   • All other v13 behaviour preserved.
-console.log('[sidepanel-concept-map.js v14]');
+// sidepanel-concept-map.js — Concept Map v15
+// v14 → v15 changes:
+//   • Dual similarity indicators on each card footer:
+//       ↑ X% to parent  — how similar THIS node is to its parent(s) (avg)
+//       ↓ X% to children — how similar THIS node's children are to it (avg)
+//   • Root nodes show only the downward (↓) indicator.
+//   • Leaf nodes show only the upward (↑) indicator.
+//   • Middle nodes (both parent and child) show both indicators side-by-side.
+//   • simToParents[] added to hierarchy output (avg sim to own parent nodes).
+//   • All v14 behaviour preserved.
+console.log('[sidepanel-concept-map.js v15]');
 
 const CMAP_PARENT_CHILD_THRESHOLD = 0.50;
 const CMAP_MIN_SPLIT_LENGTH = 60;
@@ -175,11 +172,15 @@ const CMAP_MIN_SPLIT_LENGTH = 60;
 .pp-cmap-merge-sep { border-top:1px solid rgba(0,0,0,.07); margin:3px 0; }
 .pp-cmap-card-footer {
   padding:4px 9px 7px; border-top:1px solid rgba(0,0,0,.06); margin-top:2px;
-  display:flex; align-items:center; gap:5px;
+  display:flex; flex-direction:column; gap:3px;
+}
+.pp-cmap-sim-row { display:flex; align-items:center; gap:5px; }
+.pp-cmap-sim-arrow {
+  font-size:9px; font-weight:800; flex-shrink:0; width:10px; text-align:center; opacity:.55;
 }
 .pp-cmap-sim-bar { flex:1; height:3px; border-radius:2px; background:rgba(0,0,0,.08); overflow:hidden; }
 .pp-cmap-sim-fill { height:100%; border-radius:2px; transition:width .3s ease; }
-.pp-cmap-sim-label { font-size:9px; font-weight:700; letter-spacing:.04em; flex-shrink:0; color:rgba(0,0,0,.45); }
+.pp-cmap-sim-label { font-size:9px; font-weight:700; letter-spacing:.04em; flex-shrink:0; color:rgba(0,0,0,.45); min-width:52px; }
 .pp-cmap-leaf-badge {
   font-size:8px; font-weight:600; letter-spacing:.06em; text-transform:uppercase;
   color:rgba(0,0,0,.28); padding:4px 9px 7px; display:block;
@@ -474,6 +475,10 @@ function initConceptMapTool(paneEl, sidebarEl) {
     const simToChildren=new Float32Array(n);
     for (let i=0;i<n;i++) { if (!childrenOf[i].length) continue; let sum=0; childrenOf[i].forEach(c=>{sum+=cosineSim(rows[i].vec,rows[c].vec);}); simToChildren[i]=sum/childrenOf[i].length; }
 
+    // 6b. Avg similarity to own parents (for upward footer indicator)
+    const simToParents=new Float32Array(n);
+    for (let i=0;i<n;i++) { const pars=parentsOf.get(i)||[]; if (!pars.length) continue; let sum=0; pars.forEach(p=>{sum+=cosineSim(rows[i].vec,rows[p].vec);}); simToParents[i]=sum/pars.length; }
+
     // 7. Merge: same level + identical parent set + identical children set → one card
     const absorbedInto=new Int32Array(n).fill(-1), mergeExtras=new Map();
     const mkKey=i=>levels[i]+':p'+parentsOf.get(i).slice().sort((a,b)=>a-b).join(',')+':c'+childrenOf[i].slice().sort((a,b)=>a-b).join(',');
@@ -485,7 +490,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
       else seenKeys.set(k,i);
     }
 
-    return { rows, n, levels, parentsOf, parentSimsOf, childrenOf, simToChildren, absorbedInto, mergeExtras };
+    return { rows, n, levels, parentsOf, parentSimsOf, childrenOf, simToChildren, simToParents, absorbedInto, mergeExtras };
   }
 
   // ── Connectors ────────────────────────────────────────────────────────────
@@ -538,7 +543,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
     _connSvg.style.cssText='position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:1';
     world.appendChild(_connSvg);
 
-    const{rows,n,levels,parentsOf,childrenOf,simToChildren,absorbedInto,mergeExtras}=hier;
+    const{rows,n,levels,parentsOf,childrenOf,simToChildren,simToParents,absorbedInto,mergeExtras}=hier;
     const cardEls=new Map();
 
     for (let i=0;i<n;i++) {
@@ -585,13 +590,31 @@ function initConceptMapTool(paneEl, sidebarEl) {
       card.appendChild(body);
 
       const hasChildren=childrenOf[i].length>0;
-      if (hasChildren) {
-        const sim=simToChildren[i], pct=Math.round(sim*100);
+      const hasParents=(parentsOf.get(i)||[]).length>0;
+
+      if (hasChildren || hasParents) {
         const footer=document.createElement('div'); footer.className='pp-cmap-card-footer';
-        const bar=document.createElement('div'); bar.className='pp-cmap-sim-bar';
-        const fill=document.createElement('div'); fill.className='pp-cmap-sim-fill'; fill.style.width=pct+'%'; fill.style.background=accent+'cc';
-        bar.appendChild(fill); footer.appendChild(bar);
-        const lbl=document.createElement('span'); lbl.className='pp-cmap-sim-label'; lbl.textContent=pct+'% match'; footer.appendChild(lbl);
+
+        function makeSimRow(arrow, sim, label, barColor) {
+          const pct=Math.round(sim*100);
+          const row=document.createElement('div'); row.className='pp-cmap-sim-row';
+          const arr=document.createElement('span'); arr.className='pp-cmap-sim-arrow'; arr.textContent=arrow; row.appendChild(arr);
+          const bar=document.createElement('div'); bar.className='pp-cmap-sim-bar';
+          const fill=document.createElement('div'); fill.className='pp-cmap-sim-fill'; fill.style.width=pct+'%'; fill.style.background=barColor;
+          bar.appendChild(fill); row.appendChild(bar);
+          const lbl=document.createElement('span'); lbl.className='pp-cmap-sim-label'; lbl.textContent=pct+'% '+label; row.appendChild(lbl);
+          return row;
+        }
+
+        // ↑ to parent (dimmed bar, child's own accent)
+        if (hasParents) {
+          footer.appendChild(makeSimRow('↑', simToParents[i], 'to parent', accent+'88'));
+        }
+        // ↓ to children (solid bar, full accent)
+        if (hasChildren) {
+          footer.appendChild(makeSimRow('↓', simToChildren[i], 'to children', accent+'cc'));
+        }
+
         card.appendChild(footer);
       } else {
         const leaf=document.createElement('span'); leaf.className='pp-cmap-leaf-badge'; leaf.textContent='Terminal concept'; card.appendChild(leaf);
