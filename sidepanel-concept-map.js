@@ -12,6 +12,7 @@ console.log('[sidepanel-concept-map.js v15]');
 
 const CMAP_PARENT_CHILD_THRESHOLD = 0.50;
 const CMAP_MIN_SPLIT_LENGTH = 60;
+const ORPHAN_RECOVERY_THRESHOLD = 0.85;
 
 (function injectCmapStyles() {
   if (document.getElementById('pp-cmap-styles')) return;
@@ -455,7 +456,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
     }
 
     // 4. Orphan recovery (relaxed threshold)
-    const relaxed=_threshold*0.70;
+    const relaxed=_threshold*ORPHAN_RECOVERY_THRESHOLD;
     for (let i=0;i<n;i++) {
       if (levels[i]<=1||parentsOf.get(i).length>0) continue;
       let bestJ=-1, bestSim=relaxed;
