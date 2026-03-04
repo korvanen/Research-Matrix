@@ -1,20 +1,12 @@
 // sidepanel-concept-map.js — Concept Map v16
 // v15 → v16 changes:
-//   • Slider CSS migrated to global style-slider-additions.css.
+//   • Slider CSS migrated to global style.css.
 //     Classes renamed: pp-cmap-range* → pp-range*, pp-cmap-group-label →
 //     pp-group-label, pp-cmap-range-row → pp-range-row, etc.
 //     Max-Parents slider gets pp-range--accent for purple thumb.
-//   • No behavioural changes.
-//
-// v15 notes:
-//   • Dual similarity indicators on each card footer:
-//       ↑ X% to parent  — how similar THIS node is to its parent(s) (avg)
-//       ↓ X% to children — how similar THIS node's children are to it (avg)
-//   • Root nodes show only the downward (↓) indicator.
-//   • Leaf nodes show only the upward (↑) indicator.
-//   • Middle nodes (both parent and child) show both indicators side-by-side.
-//   • simToParents[] added to hierarchy output (avg sim to own parent nodes).
-console.log('[sidepanel-concept-map.js aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa]');
+//   • Sliders upgraded with bounce animation via upgradeSlider().
+//   • Delay while dragging, instant apply on release.
+console.log('[sidepanel-concept-map.js nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn]');
 
 const CMAP_PARENT_CHILD_THRESHOLD = 0.50;
 const CMAP_MIN_SPLIT_LENGTH = 60;
@@ -54,10 +46,6 @@ const ORPHAN_RECOVERY_THRESHOLD = 0.85;
   display:grid; grid-template-columns:1fr 1fr 1fr auto auto; gap:6px; align-items:end;
 }
 .pp-cmap-ctrl-col { display:flex; flex-direction:column; gap:2px; }
-
-/* Slider styles now live in style-slider-additions.css:
-   .pp-group-label / .pp-range-row / .pp-range-label / .pp-range-val
-   .pp-range / .pp-range--accent / .pp-range--muted             */
 
 #pp-cmap-rebuild {
   border:none; border-radius:5px; padding:4px 8px; align-self:stretch;
@@ -175,8 +163,8 @@ const ORPHAN_RECOVERY_THRESHOLD = 0.85;
 // ════════════════════════════════════════════════════════════════════════════
 function initConceptMapTool(paneEl, sidebarEl) {
 
-  // Slider classes use the global pp-range* system from style-slider-additions.css.
-  // pp-range--accent (purple thumb) is applied to the Max Parents slider.
+  const DRAG_DELAY = 600; // ms debounce while slider is being dragged
+
   paneEl.innerHTML =
     '<div id="pp-cmap-head">' +
       '<div id="pp-cmap-subtitle">Waiting for embeddings\u2026</div>' +
@@ -238,6 +226,11 @@ function initConceptMapTool(paneEl, sidebarEl) {
       '<div id="pp-cmap-zoom-hint">scroll / pinch to zoom</div>' +
     '</div>';
 
+  // ── Upgrade all sliders with bounce animation ──────────────────────────────
+  if (typeof upgradeSlider === 'function') {
+    paneEl.querySelectorAll('.pp-range').forEach(upgradeSlider);
+  }
+
   const subtitleEl  = paneEl.querySelector('#pp-cmap-subtitle');
   const statusEl    = paneEl.querySelector('#pp-cmap-status');
   const labelEl     = paneEl.querySelector('#pp-cmap-label');
@@ -282,23 +275,29 @@ function initConceptMapTool(paneEl, sidebarEl) {
     if (state === 'ready') setTimeout(() => { statusEl.style.opacity = '0'; }, 3200);
   }
 
-  // ── Sliders ───────────────────────────────────────────────────────────────
-  depthSlider.addEventListener('input', () => {
-    _depth = +depthSlider.value; depthValEl.textContent = _depth; scheduleRebuild();
+  // ── Sliders: delay while dragging, instant on release ─────────────────────
+  [
+    { el: depthSlider,  valEl: depthValEl,  read: () => { _depth = +depthSlider.value; depthValEl.textContent = _depth; } },
+    { el: threshSlider, valEl: threshValEl, read: () => { _threshold = +threshSlider.value / 100; threshValEl.textContent = threshSlider.value + '%'; } },
+    { el: maxParSlider, valEl: maxParValEl, read: () => { _maxParents = +maxParSlider.value; maxParValEl.textContent = _maxParents; } },
+  ].forEach(({ el, read }) => {
+    // input: continuous while dragging — debounce
+    el.addEventListener('input', () => {
+      read();
+      clearTimeout(_rebuildTimer);
+      rebuildBtn.classList.add('pp-cmap-busy'); rebuildBtn.textContent = '\u2026';
+      _rebuildTimer = setTimeout(() => { _rendered = false; tryRender(); }, DRAG_DELAY);
+    });
+    // change: fires once on mouseup/touchend — apply instantly
+    el.addEventListener('change', () => {
+      read();
+      clearTimeout(_rebuildTimer);
+      rebuildBtn.classList.remove('pp-cmap-busy'); rebuildBtn.textContent = 'Rebuild';
+      _rendered = false; tryRender();
+    });
   });
-  threshSlider.addEventListener('input', () => {
-    _threshold = +threshSlider.value / 100; threshValEl.textContent = threshSlider.value + '%'; scheduleRebuild();
-  });
-  maxParSlider.addEventListener('input', () => {
-    _maxParents = +maxParSlider.value; maxParValEl.textContent = _maxParents; scheduleRebuild();
-  });
-  rebuildBtn.addEventListener('click', () => { clearTimeout(_rebuildTimer); _rendered = false; tryRender(); });
 
-  function scheduleRebuild() {
-    clearTimeout(_rebuildTimer);
-    rebuildBtn.classList.add('pp-cmap-busy'); rebuildBtn.textContent = '\u2026';
-    _rebuildTimer = setTimeout(() => { _rendered = false; tryRender(); }, 500);
-  }
+  rebuildBtn.addEventListener('click', () => { clearTimeout(_rebuildTimer); _rendered = false; tryRender(); });
 
   // ── Layout dropdown ───────────────────────────────────────────────────────
   const LAYOUT_LABELS = { radial:'Radial', vtree:'Vertical Tree', htree:'Horizontal Tree', vflow:'Vertical Flow', organic:'Organic' };
