@@ -635,17 +635,26 @@ mark.pkw {
 /* ════════════════════════════════════════════════════════════════
    ── GLOBAL RANGE-SLIDER SYSTEM ──
    Used by: sidepanel-clusters.js, sidepanel-concept-map.js
-   Edit once here; all panel sliders update automatically.
+
+   The native <input type="range"> is kept in the DOM but hidden.
+   upgradeSlider() in sidepanel-utils.js wraps it with a custom
+   thumb + fill div so we can animate the thumb with CSS transitions.
 
    Class inventory
    ───────────────
-   .pp-range-row     — flex row: label + slider + value
-   .pp-group-label   — section heading above a slider group
-   .pp-range-label   — short text left of slider (e.g. "Min")
-   .pp-range-val     — numeric readout right of slider
-   .pp-range         — the <input type="range"> base style
-   .pp-range--accent — purple-tinted thumb (e.g. Max Parents)
-   .pp-range--muted  — dimmed thumb (e.g. inner-cluster sliders)
+   .pp-range-row      — flex row: label + slider + value
+   .pp-group-label    — section heading above a slider group
+   .pp-range-label    — short text left of slider (e.g. "Min")
+   .pp-range-val      — numeric readout right of slider
+   .pp-range          — the native <input type="range"> (hidden after upgrade)
+   .pp-range--accent  — purple-tinted variant (e.g. Max Parents)
+   .pp-range--muted   — dimmed variant (e.g. inner-cluster sliders)
+
+   .pp-range-wrap     — outer container injected by upgradeSlider()
+   .pp-range-track    — the thin bar background
+   .pp-range-fill     — coloured fill from left up to thumb
+   .pp-range-thumb    — the animated dot
+   .pp-range-dragging — added to wrap while mouse/touch is held down
    ════════════════════════════════════════════════════════════════ */
 
 .pp-group-label {
@@ -681,77 +690,119 @@ mark.pkw {
   flex-shrink: 0;
   width: 22px;
   text-align: right;
-  /* smooth number transitions */
   font-variant-numeric: tabular-nums;
-  transition: color .6s ease;
 }
 
-/* ── Base track ── */
+/* ── Native input: hidden but still receives pointer events ── */
 .pp-range {
   -webkit-appearance: none;
   appearance: none;
-  flex: 1;
-  height: 3px;
-  border-radius: 2px;
-  background: rgba(0,0,0,.12);
-  outline: none;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
   cursor: pointer;
-  min-width: 0;
-  transition: background .18s ease;
-}
-.pp-range:hover {
-  background: rgba(0,0,0,.18);
+  margin: 0;
+  padding: 0;
+  z-index: 2; /* above the visual thumb so clicks register */
 }
 
-/* WebKit thumb — default (uses current sheet accent colour) */
-.pp-range::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
+/* ════════════════════════════════════════════════════════════════
+   ── Custom visual layer (injected by upgradeSlider) ──
+   ════════════════════════════════════════════════════════════════ */
+
+/* Outer wrapper — flex: 1 so it fills the row just like the old input did */
+.pp-range-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  height: 18px;   /* tall enough to catch pointer events */
+}
+
+/* Thin track bar */
+.pp-range-track {
+  position: absolute;
+  top: 50%; left: 0; right: 0;
+  height: 3px;
+  transform: translateY(-50%);
+  border-radius: 2px;
+  background: rgba(0,0,0,.12);
+  overflow: hidden;
+  pointer-events: none;
+  transition: background .18s ease;
+}
+.pp-range-wrap:hover .pp-range-track { background: rgba(0,0,0,.18); }
+
+/* Filled portion (left of thumb) */
+.pp-range-fill {
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 0%;
+  border-radius: 2px;
+  background: var(--color-topbar-sheet, #111);
+  opacity: 0.30;
+  pointer-events: none;
+  /* ── fill animates together with the thumb ── */
+  transition: width .22s cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+
+/* Animated thumb dot */
+.pp-range-thumb {
+  position: absolute;
+  top: 50%;
+  left: 0%;
   width: 11px;
   height: 11px;
   border-radius: 50%;
   background: var(--color-topbar-sheet, #111);
   box-shadow: 0 1px 3px rgba(0,0,0,.22);
-  cursor: pointer;
-  transition: transform .12s ease, box-shadow .12s ease;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  /*
+   * ── The bounce animation lives here ──
+   * Duration   : .22s  — how long the settle takes
+   * Easing     : cubic-bezier(0.34, 1.4, 0.64, 1)
+   *              The "1.4" overshoot value creates the bounce.
+   *              Raise it (e.g. 1.8) for more bounce,
+   *              lower it (e.g. 1.0) for a plain ease-out.
+   * transform / box-shadow animate on hover/drag separately below.
+   */
+  transition: left .22s cubic-bezier(0.34, 1.4, 0.64, 1),
+              transform .12s ease,
+              box-shadow .12s ease;
 }
-.pp-range::-webkit-slider-thumb:hover {
-  transform: scale(1.25);
+
+/* Hover: scale up thumb */
+.pp-range-wrap:hover .pp-range-thumb {
+  transform: translate(-50%, -50%) scale(1.28);
   box-shadow: 0 2px 6px rgba(0,0,0,.28);
 }
 
-/* Firefox thumb — default */
-.pp-range::-moz-range-thumb {
-  width: 11px;
-  height: 11px;
-  border-radius: 50%;
-  border: none;
-  background: var(--color-topbar-sheet, #111);
-  box-shadow: 0 1px 3px rgba(0,0,0,.22);
-  cursor: pointer;
-  transition: transform .12s ease;
+/* While dragging: no bounce — thumb should follow the finger exactly */
+.pp-range-wrap.pp-range-dragging .pp-range-thumb {
+  transition: transform .12s ease, box-shadow .12s ease;
+  transform: translate(-50%, -50%) scale(1.28);
+  box-shadow: 0 2px 6px rgba(0,0,0,.28);
 }
-.pp-range::-moz-range-thumb:hover {
-  transform: scale(1.25);
+/* Fill also instant while dragging */
+.pp-range-wrap.pp-range-dragging .pp-range-fill {
+  transition: none;
 }
 
 /* ── Accent variant — purple thumb (Max Parents slider) ── */
-.pp-range--accent::-webkit-slider-thumb {
+.pp-range-wrap--accent .pp-range-thumb {
   background: #7c5cbf;
   box-shadow: 0 1px 4px rgba(124,92,191,.35);
 }
-.pp-range--accent::-moz-range-thumb {
-  background: #7c5cbf;
-}
-.pp-range--accent::-webkit-slider-thumb:hover {
+.pp-range-wrap--accent .pp-range-fill { background: #7c5cbf; }
+.pp-range-wrap--accent:hover .pp-range-thumb {
   box-shadow: 0 2px 8px rgba(124,92,191,.45);
 }
 
-/* ── Muted variant — dimmed thumb (inner/secondary sliders) ── */
-.pp-range--muted::-webkit-slider-thumb {
+/* ── Muted variant — dimmed (inner/secondary sliders) ── */
+.pp-range-wrap--muted .pp-range-thumb {
   background: rgba(0,0,0,.38);
   box-shadow: 0 1px 2px rgba(0,0,0,.15);
 }
-.pp-range--muted::-moz-range-thumb {
-  background: rgba(0,0,0,.38);
-}
+.pp-range-wrap--muted .pp-range-fill { background: rgba(0,0,0,.38); }
