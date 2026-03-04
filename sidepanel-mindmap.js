@@ -1,10 +1,9 @@
-// sidepanel-mindmap.js — Concept Map tool v5
-// Changes vs v4:
-//   • Infinite canvas — cards no longer clamped to visible bounds, matching clusters tool
-//   • Fit-all button in bottom-right corner (frames all cards)
-//   • Depth slider preserves existing card positions; only new cards are placed via radial layout
-//   • K / rebuild still do a full reset (new cluster structure)
-console.log('[sidepanel-mindmap.js v666]');
+// sidepanel-mindmap.js — Concept Map tool v6
+// Changes vs v5:
+//   • 10-point dynamic anchor system for arrows (closest pair, tangent-aware bezier, endpoint dots)
+//   • Dynamic children per node: uses getTopClusters on each subtree (sqrt-based K)
+//     instead of always showing 2 binary Ward children
+console.log('[sidepanel-mindmap.js boogyman]');
 
 (function injectCmapStyles() {
   if (document.getElementById('pp-cmap-styles')) return;
@@ -413,11 +412,20 @@ function initConceptMapTool(paneEl, sidebarEl) {
 
     const toRender = [];
     const topRoots = getTopClusters(root, _topK);
+
+    // Dynamic children: instead of walking the binary dendrogram directly
+    // (which always gives exactly 2 children), we re-split each node's subtree
+    // into a natural number of sub-clusters proportional to sqrt(entries).
     function collect(node, d, pid) {
-      toRender.push({node,d,pid});
-      if (d<_depth-1&&node.children.length) node.children.forEach(c=>collect(c,d+1,node._cid));
+      toRender.push({node, d, pid});
+      if (d < _depth - 1 && node.rows.length > 1 && node.children.length) {
+        const childK = Math.max(2, Math.min(7, Math.round(Math.sqrt(node.rows.length))));
+        const subs   = getTopClusters(node, childK);
+        // getTopClusters returns [node] if it can't split — guard against self-loops
+        subs.filter(s => s !== node).forEach(c => collect(c, d + 1, node._cid));
+      }
     }
-    topRoots.forEach(r=>collect(r,0,null));
+    topRoots.forEach(r => collect(r, 0, null));
 
     toRender.forEach(({node,d,pid}) => {
       if (pid==null) return;
@@ -425,32 +433,68 @@ function initConceptMapTool(paneEl, sidebarEl) {
       arrows.push({fromId:pid, toId:node._cid, color:t['--tab-active-bg']||'#aaa', depth:d});
     });
 
-    // ── Arrow drawing ────────────────────────────────────────────────────────
+    // ── Arrow drawing — 10-point anchor system, picks closest pair ──────────
     function getR(id) {
       const r=rects.get(id); if(!r) return null;
       const el=cardEls.get(id);
       return {x:r.x, y:r.y, w:r.w, h: el ? (el.offsetHeight||r.h||80) : (r.h||80)};
     }
+    // 10 connection anchors per card: 3 top, 3 bottom, 2 left side, 2 right side
+    function cpts(id) {
+      const r=getR(id); if(!r) return [];
+      const {x,y,w:W,h:H}=r;
+      return [
+        {x:x+W*.25,y},     {x:x+W*.5,y},     {x:x+W*.75,y},
+        {x:x+W*.25,y:y+H}, {x:x+W*.5,y:y+H}, {x:x+W*.75,y:y+H},
+        {x,y:y+H*.33},     {x,y:y+H*.67},
+        {x:x+W,y:y+H*.33}, {x:x+W,y:y+H*.67}
+      ];
+    }
+    function closest(pA, pB) {
+      let best=null, bd=Infinity;
+      pA.forEach(a=>pB.forEach(b=>{const d=Math.hypot(a.x-b.x,a.y-b.y);if(d<bd){bd=d;best={a,b};}}));
+      return best;
+    }
+    // Outgoing tangent at an anchor point — perpendicular to whichever edge it's on
+    function tanDir(pt, id) {
+      const r=getR(id); if(!r) return{dx:0,dy:1}; const t=3;
+      if(Math.abs(pt.y-r.y)<t)         return{dx:0,dy:-1};
+      if(Math.abs(pt.y-(r.y+r.h))<t)   return{dx:0,dy:1};
+      if(Math.abs(pt.x-r.x)<t)         return{dx:-1,dy:0};
+      if(Math.abs(pt.x-(r.x+r.w))<t)   return{dx:1,dy:0};
+      return{dx:0,dy:1};
+    }
 
     function redrawArrows() {
       svgLines.innerHTML=''; svgDots.innerHTML='';
-      arrows.forEach(({fromId,toId,color}) => {
-        const fr=getR(fromId), tr=getR(toId);
-        if(!fr||!tr) return;
-        const x1=fr.x+fr.w/2, y1=fr.y+fr.h;
-        const x2=tr.x+tr.w/2, y2=tr.y;
-        const cy1=y1+(y2-y1)*0.5, cy2=y1+(y2-y1)*0.5;
+      arrows.forEach(({fromId, toId, color, depth: d}) => {
+        const pA=cpts(fromId), pB=cpts(toId);
+        if(!pA.length||!pB.length) return;
+        const pair=closest(pA,pB); if(!pair) return;
+        const {a,b}=pair;
+        const dist=Math.hypot(b.x-a.x,b.y-a.y), off=Math.min(dist*.45,90);
+        const tA=tanDir(a,fromId), tB=tanDir(b,toId);
+
         const path=document.createElementNS(ns,'path');
-        path.setAttribute('d',`M${x1},${y1} C${x1},${cy1} ${x2},${cy2} ${x2},${y2}`);
+        path.setAttribute('d',`M${a.x},${a.y} C${a.x+tA.dx*off},${a.y+tA.dy*off} ${b.x+tB.dx*off},${b.y+tB.dy*off} ${b.x},${b.y}`);
         path.setAttribute('fill','none');
         path.setAttribute('stroke',color);
-        path.setAttribute('stroke-width','1.5');
-        path.setAttribute('opacity','0.35');
+        path.setAttribute('stroke-width', d===0?'2':d===1?'1.5':'1');
+        path.setAttribute('stroke-opacity', String(d===0?.55:d===1?.38:.22));
+        if(d>1) path.setAttribute('stroke-dasharray','5,4');
         svgLines.appendChild(path);
-        const dot=document.createElementNS(ns,'circle');
-        dot.setAttribute('cx',String(x2)); dot.setAttribute('cy',String(y2));
-        dot.setAttribute('r','3'); dot.setAttribute('fill',color); dot.setAttribute('opacity','0.55');
-        svgDots.appendChild(dot);
+
+        // Draw a filled dot ringed with the card's own border/bg colour at each endpoint
+        [[a,fromId],[b,toId]].forEach(([pt,cid])=>{
+          const cc=colors.get(cid)||{border:color,bg:'#fff'};
+          const circ=document.createElementNS(ns,'circle');
+          circ.setAttribute('cx',String(pt.x)); circ.setAttribute('cy',String(pt.y)); circ.setAttribute('r','4');
+          circ.setAttribute('fill',cc.bg);
+          circ.setAttribute('stroke',cc.border);
+          circ.setAttribute('stroke-width','1.5');
+          circ.setAttribute('opacity', String(d===0?.9:.7));
+          svgDots.appendChild(circ);
+        });
       });
     }
 
