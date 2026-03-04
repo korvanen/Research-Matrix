@@ -1,9 +1,10 @@
-// sidepanel-mindmap.js — Concept Map tool v6
-// Changes vs v5:
-//   • 10-point dynamic anchor system for arrows (closest pair, tangent-aware bezier, endpoint dots)
-//   • Dynamic children per node: uses getTopClusters on each subtree (sqrt-based K)
-//     instead of always showing 2 binary Ward children
-console.log('[sidepanel-mindmap.js boogyman]');
+// sidepanel-mindmap.js — Concept Map tool v7
+// Changes vs v6:
+//   • 7 automatic layout algorithms (draw.io parity): Radial, Vertical Tree,
+//     Horizontal Tree, Circle, Organic (force-directed), Vertical Flow, Horizontal Flow
+//   • Layout dropdown button inserted between Top Concepts slider and Rebuild button
+//   • Layouts respect depth hierarchy and parent→child edges
+console.log('[sidepanel-mindmap.js huhaaa]');
 
 (function injectCmapStyles() {
   if (document.getElementById('pp-cmap-styles')) return;
@@ -33,9 +34,7 @@ console.log('[sidepanel-mindmap.js boogyman]');
 #pp-cmap-status.cmap-ready   .pp-cmap-dot { background:rgba(40,160,80,.9); }
 #pp-cmap-status.cmap-error   .pp-cmap-dot { background:rgba(180,40,40,.85); }
 @keyframes pp-cmap-pulse { 0%,100%{opacity:.25;transform:scale(.85);}50%{opacity:1;transform:scale(1.1);} }
-#pp-cmap-controls {
-  display:grid; grid-template-columns:1fr 1fr auto; gap:6px; align-items:end;
-}
+/* (grid overridden below with layout column) */
 .pp-cmap-ctrl-col { display:flex; flex-direction:column; gap:2px; }
 .pp-cmap-group-label {
   font-size:7px; font-weight:800; letter-spacing:.12em; text-transform:uppercase;
@@ -69,7 +68,47 @@ console.log('[sidepanel-mindmap.js boogyman]');
 }
 #pp-cmap-rebuild:hover { background:rgba(0,0,0,.13); color:rgba(0,0,0,.75); }
 #pp-cmap-rebuild.pp-cmap-busy { background:rgba(0,0,0,.04);color:rgba(0,0,0,.25);cursor:default; }
-/* Canvas: clips overflow, world inside is transformed for pan+zoom */
+/* Controls row: depth | k | layout-btn | rebuild */
+#pp-cmap-controls {
+  display:grid; grid-template-columns:1fr 1fr auto auto; gap:6px; align-items:end;
+}
+/* Layout dropdown */
+#pp-cmap-layout-wrap { position:relative; align-self:stretch; }
+#pp-cmap-layout-btn {
+  height:100%; border:none; border-radius:5px; padding:4px 7px;
+  font-size:8px; font-weight:700; letter-spacing:.07em; text-transform:uppercase;
+  background:rgba(0,0,0,.07); color:rgba(0,0,0,.45); cursor:pointer;
+  transition:background .15s,color .15s; white-space:nowrap;
+  display:flex; align-items:center; gap:3px;
+}
+#pp-cmap-layout-btn:hover,
+#pp-cmap-layout-btn.open { background:rgba(0,0,0,.13); color:rgba(0,0,0,.75); }
+#pp-cmap-layout-btn svg { flex-shrink:0; }
+#pp-cmap-layout-menu {
+  position:absolute; bottom:calc(100% + 5px); right:0; z-index:300;
+  background:#fff; border:1px solid rgba(0,0,0,.13); border-radius:9px;
+  box-shadow:0 6px 22px rgba(0,0,0,.18); padding:5px; min-width:148px;
+  display:none; flex-direction:column; gap:1px;
+}
+#pp-cmap-layout-menu.open { display:flex; }
+.pp-cmap-layout-sep {
+  height:1px; background:rgba(0,0,0,.07); margin:3px 4px;
+}
+.pp-cmap-layout-group {
+  font-size:7px; font-weight:800; letter-spacing:.1em; text-transform:uppercase;
+  color:rgba(0,0,0,.28); padding:4px 9px 2px;
+}
+.pp-cmap-layout-opt {
+  display:flex; align-items:center; gap:6px;
+  width:100%; border:none; background:transparent;
+  text-align:left; padding:5px 9px; border-radius:6px; cursor:pointer;
+  font-size:9px; font-weight:600; letter-spacing:.03em; color:rgba(0,0,0,.6);
+  transition:background .12s;
+}
+.pp-cmap-layout-opt:hover { background:rgba(0,0,0,.06); color:rgba(0,0,0,.85); }
+.pp-cmap-layout-opt.active { color:var(--color-topbar-sheet,#111); background:rgba(0,0,0,.07); }
+.pp-cmap-layout-opt svg { flex-shrink:0; opacity:0.55; }
+.pp-cmap-layout-opt.active svg { opacity:1; }
 #pp-cmap-canvas {
   flex:1; min-height:0; position:relative; overflow:hidden;
   cursor:default; user-select:none;
@@ -135,6 +174,40 @@ function initConceptMapTool(paneEl, sidebarEl) {
           '</div>' +
         '</div>' +
         '<button id="pp-cmap-rebuild">Rebuild</button>' +
+        '<div id="pp-cmap-layout-wrap">' +
+          '<button id="pp-cmap-layout-btn" title="Change layout">' +
+            '<svg viewBox="0 0 12 12" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><rect x="1" y="1" width="4" height="4" rx="1"/><rect x="7" y="1" width="4" height="4" rx="1"/><rect x="1" y="7" width="4" height="4" rx="1"/><rect x="7" y="7" width="4" height="4" rx="1"/></svg>' +
+            '<span id="pp-cmap-layout-label">Radial</span>' +
+          '</button>' +
+          '<div id="pp-cmap-layout-menu">' +
+            '<div class="pp-cmap-layout-group">Tree</div>' +
+            '<button class="pp-cmap-layout-opt active" data-layout="radial">' +
+              '<svg viewBox="0 0 14 14" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="7" cy="7" r="2"/><circle cx="7" cy="7" r="5.5" stroke-dasharray="2 2"/></svg>Radial' +
+            '</button>' +
+            '<button class="pp-cmap-layout-opt" data-layout="vtree">' +
+              '<svg viewBox="0 0 14 14" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="5" y="1" width="4" height="3" rx="1"/><rect x="1" y="10" width="4" height="3" rx="1"/><rect x="9" y="10" width="4" height="3" rx="1"/><path d="M7 4v3M7 7l-3 3M7 7l3 3"/></svg>Vertical Tree' +
+            '</button>' +
+            '<button class="pp-cmap-layout-opt" data-layout="htree">' +
+              '<svg viewBox="0 0 14 14" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="1" y="5" width="3" height="4" rx="1"/><rect x="10" y="1" width="3" height="4" rx="1"/><rect x="10" y="9" width="3" height="4" rx="1"/><path d="M4 7h3M7 7V3l3 0M7 7v4l3 0"/></svg>Horizontal Tree' +
+            '</button>' +
+            '<div class="pp-cmap-layout-sep"></div>' +
+            '<div class="pp-cmap-layout-group">Flow</div>' +
+            '<button class="pp-cmap-layout-opt" data-layout="vflow">' +
+              '<svg viewBox="0 0 14 14" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="2" y="1" width="10" height="3" rx="1"/><rect x="2" y="6" width="10" height="3" rx="1"/><rect x="2" y="11" width="10" height="2" rx="1"/><path d="M7 4v2M7 9v2" marker-end="url(#a)"/></svg>Vertical Flow' +
+            '</button>' +
+            '<button class="pp-cmap-layout-opt" data-layout="hflow">' +
+              '<svg viewBox="0 0 14 14" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="1" y="2" width="3" height="10" rx="1"/><rect x="6" y="2" width="3" height="10" rx="1"/><rect x="11" y="2" width="2" height="10" rx="1"/><path d="M4 7h2M9 7h2"/></svg>Horizontal Flow' +
+            '</button>' +
+            '<div class="pp-cmap-layout-sep"></div>' +
+            '<div class="pp-cmap-layout-group">Other</div>' +
+            '<button class="pp-cmap-layout-opt" data-layout="circle">' +
+              '<svg viewBox="0 0 14 14" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="7" cy="7" r="5.5"/><circle cx="7" cy="1.5" r="1" fill="currentColor" stroke="none"/><circle cx="12.2" cy="4.75" r="1" fill="currentColor" stroke="none"/><circle cx="12.2" cy="9.25" r="1" fill="currentColor" stroke="none"/><circle cx="7" cy="12.5" r="1" fill="currentColor" stroke="none"/><circle cx="1.8" cy="9.25" r="1" fill="currentColor" stroke="none"/><circle cx="1.8" cy="4.75" r="1" fill="currentColor" stroke="none"/></svg>Circle' +
+            '</button>' +
+            '<button class="pp-cmap-layout-opt" data-layout="organic">' +
+              '<svg viewBox="0 0 14 14" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="7" cy="4" r="1.5"/><circle cx="3" cy="10" r="1.5"/><circle cx="11" cy="10" r="1.5"/><circle cx="7" cy="9" r="1.5"/><path d="M7 5.5L3 8.5M7 5.5l4 4M7 5.5v2"/></svg>Organic' +
+            '</button>' +
+          '</div>' +
+        '</div>' +
       '</div>' +
     '</div>' +
     '<div id="pp-cmap-canvas">' +
@@ -155,9 +228,13 @@ function initConceptMapTool(paneEl, sidebarEl) {
   const canvas      = paneEl.querySelector('#pp-cmap-canvas');
   const world       = paneEl.querySelector('#pp-cmap-world');
   const emptyEl     = paneEl.querySelector('#pp-cmap-empty');
-  const rebuildBtn  = paneEl.querySelector('#pp-cmap-rebuild');
-  const fitBtn      = paneEl.querySelector('#pp-cmap-fit');
-  const depthSlider = paneEl.querySelector('#pp-cmap-depth');
+  const rebuildBtn   = paneEl.querySelector('#pp-cmap-rebuild');
+  const fitBtn       = paneEl.querySelector('#pp-cmap-fit');
+  const layoutBtn    = paneEl.querySelector('#pp-cmap-layout-btn');
+  const layoutMenu   = paneEl.querySelector('#pp-cmap-layout-menu');
+  const layoutLabel  = paneEl.querySelector('#pp-cmap-layout-label');
+  const layoutOpts   = paneEl.querySelectorAll('.pp-cmap-layout-opt');
+  const depthSlider  = paneEl.querySelector('#pp-cmap-depth');
   const depthValEl  = paneEl.querySelector('#pp-cmap-depth-val');
   const kSlider     = paneEl.querySelector('#pp-cmap-k');
   const kValEl      = paneEl.querySelector('#pp-cmap-k-val');
@@ -168,7 +245,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
   const HOVER_MS = 200;
   const EXP_MS   = 260;
 
-  let _depth = 3, _topK = 5;
+  let _depth = 3, _topK = 5, _layout = 'radial';
   let _vectors = null, _rows = null, _rendered = false;
   let _rebuildTimer = null, _topZ = 10;
   let _panX = 0, _panY = 0, _zoom = 1;
@@ -218,6 +295,30 @@ function initConceptMapTool(paneEl, sidebarEl) {
     applyTransform();
   }
   fitBtn.addEventListener('click', fitAll);
+
+  // ── Layout dropdown ──────────────────────────────────────────────────────
+  const LAYOUT_LABELS = {radial:'Radial',vtree:'Vertical Tree',htree:'Horizontal Tree',
+                         vflow:'Vertical Flow',hflow:'Horizontal Flow',circle:'Circle',organic:'Organic'};
+  layoutBtn.addEventListener('click', e => {
+    e.stopPropagation();
+    layoutMenu.classList.toggle('open');
+    layoutBtn.classList.toggle('open', layoutMenu.classList.contains('open'));
+  });
+  document.addEventListener('click', () => {
+    layoutMenu.classList.remove('open'); layoutBtn.classList.remove('open');
+  });
+  layoutMenu.addEventListener('click', e => e.stopPropagation());
+  layoutOpts.forEach(opt => {
+    opt.addEventListener('click', () => {
+      const l = opt.dataset.layout; if(!l) return;
+      _layout = l;
+      layoutLabel.textContent = LAYOUT_LABELS[l] || l;
+      layoutOpts.forEach(o => o.classList.toggle('active', o.dataset.layout === l));
+      layoutMenu.classList.remove('open'); layoutBtn.classList.remove('open');
+      // Reapply layout to existing cards without full rebuild
+      if (_rendered && _liveRects.size) { _posCache.clear(); _preservePan=true; _rendered=false; tryRender(); }
+    });
+  });
 
   // ── Pan: drag on empty canvas ────────────────────────────────────────────
   let _panning = false, _panSX = 0, _panSY = 0, _panBX = 0, _panBY = 0;
@@ -648,60 +749,216 @@ function initConceptMapTool(paneEl, sidebarEl) {
 
     toRender.forEach(({node,d})=>makeCard(node,d));
 
-    // ── Layout: radial, with position cache restore for existing nodes ────────
+    // ── Layout engine — 7 algorithms ─────────────────────────────────────────
     requestAnimationFrame(()=>{
-      const W=world.clientWidth||400, H=world.clientHeight||500;
-      const cx=W/2, cy=H/2;
-      const byD=new Map();
-      toRender.forEach(({node,d})=>{if(!byD.has(d))byD.set(d,[]);byD.get(d).push(node._cid);});
-      const maxD=Math.max(...byD.keys(),0);
+      const W = world.clientWidth  || 400;
+      const H = world.clientHeight || 500;
 
-      byD.forEach((ids,d)=>{
-        ids.forEach((id,idx)=>{
-          const el=cardEls.get(id); if(!el) return;
-          const cH=el.offsetHeight||80;
+      // Build parent map: cid -> pid
+      const parentOf = new Map(); // cid -> pid
+      const childrenOf = new Map(); // cid -> [cid]
+      toRender.forEach(({node,pid}) => {
+        parentOf.set(node._cid, pid);
+        if(pid!=null){ if(!childrenOf.has(pid)) childrenOf.set(pid,[]); childrenOf.get(pid).push(node._cid); }
+        if(!childrenOf.has(node._cid)) childrenOf.set(node._cid,[]);
+      });
+      const roots = toRender.filter(({pid})=>pid==null).map(({node})=>node._cid);
 
-          // Check if we have a saved position from before the depth slider moved
-          const node = _liveCidToNode.get(id);
-          const sk = node ? nodeStableKey(node) : null;
-          let x, y;
+      const GAP_X = MM_PAD + 8;
+      const GAP_Y = MM_PAD + 14;
 
-          if (sk && _posCache.has(sk)) {
-            // Restore previous position — card stays where it was
-            const saved = _posCache.get(sk);
-            x = saved.x; y = saved.y;
-          } else {
-            // New card: place via radial layout (no clamping — infinite canvas)
-            if(d===0&&ids.length===1){x=cx-CARD_W/2;y=cy-cH/2;}
-            else{
+      // Helper: get measured card height
+      const cH = id => { const el=cardEls.get(id); return el?(el.offsetHeight||80):80; };
+
+      // Helper: apply positions from a map and nudge collisions
+      function applyPositions(posMap) {
+        posMap.forEach((pos, id) => {
+          const el = cardEls.get(id); if(!el) return;
+          const h = cH(id);
+          el.style.left = pos.x + 'px'; el.style.top = pos.y + 'px';
+          rects.set(id, {x:pos.x, y:pos.y, w:CARD_W, h});
+        });
+        // Collision nudge
+        for(let pass=0;pass<MM_ITERS;pass++){
+          let moved=false;
+          rects.forEach((ra,ka)=>{rects.forEach((rb,kb)=>{
+            if(ka===kb)return;
+            if(ra.x<rb.x+rb.w+MM_PAD&&ra.x+ra.w+MM_PAD>rb.x&&ra.y<rb.y+rb.h+MM_PAD&&ra.y+ra.h+MM_PAD>rb.y){
+              const dR=rb.x+rb.w+MM_PAD-ra.x,dL=ra.x+ra.w+MM_PAD-rb.x;
+              const dD=rb.y+rb.h+MM_PAD-ra.y,dU=ra.y+ra.h+MM_PAD-rb.y;
+              if(Math.min(dR,dL)<=Math.min(dD,dU))ra.x+=dR<dL?dR:-dL;else ra.y+=dD<dU?dD:-dU;
+              const el=cardEls.get(ka);if(el){el.style.left=ra.x+'px';el.style.top=ra.y+'px';}
+              moved=true;
+            }
+          });});
+          if(!moved)break;
+        }
+      }
+
+      // Check position cache (for depth-slider preserve)
+      function restoreOrPlace(id, fallbackFn) {
+        const node = _liveCidToNode.get(id);
+        const sk   = node ? nodeStableKey(node) : null;
+        if(sk && _posCache.has(sk)) return _posCache.get(sk);
+        return fallbackFn();
+      }
+
+      // ── 1. RADIAL ─────────────────────────────────────────────────────────
+      function layoutRadial() {
+        const byD = new Map();
+        toRender.forEach(({node,d})=>{if(!byD.has(d))byD.set(d,[]);byD.get(d).push(node._cid);});
+        const maxD = Math.max(...byD.keys(), 0);
+        const cx=W/2, cy=H/2;
+        const pos = new Map();
+        byD.forEach((ids,d)=>{
+          ids.forEach((id,idx)=>{
+            pos.set(id, restoreOrPlace(id, ()=>{
+              const h=cH(id);
+              if(d===0&&ids.length===1) return{x:cx-CARD_W/2,y:cy-h/2};
               const R=(maxD===0?.28:.13+.19*d)*Math.min(W,H);
               const a=(2*Math.PI*idx/ids.length)-Math.PI/2;
-              x=cx+R*Math.cos(a)-CARD_W/2;
-              y=cy+R*Math.sin(a)-cH/2;
-            }
-            // No Math.max/min clamping — allow infinite canvas
-          }
-
-          el.style.left=x+'px'; el.style.top=y+'px';
-          rects.set(id,{x,y,w:CARD_W,h:cH});
+              return{x:cx+R*Math.cos(a)-CARD_W/2, y:cy+R*Math.sin(a)-h/2};
+            }));
+          });
         });
-      });
+        applyPositions(pos);
+      }
 
-      // Initial collision nudge only for newly placed cards (not restored ones)
-      for(let pass=0;pass<MM_ITERS;pass++){
-        let moved=false;
-        rects.forEach((ra,ka)=>{rects.forEach((rb,kb)=>{
-          if(ka===kb)return;
-          if(ra.x<rb.x+rb.w+MM_PAD&&ra.x+ra.w+MM_PAD>rb.x&&ra.y<rb.y+rb.h+MM_PAD&&ra.y+ra.h+MM_PAD>rb.y){
-            const dR=rb.x+rb.w+MM_PAD-ra.x,dL=ra.x+ra.w+MM_PAD-rb.x;
-            const dD=rb.y+rb.h+MM_PAD-ra.y,dU=ra.y+ra.h+MM_PAD-rb.y;
-            if(Math.min(dR,dL)<=Math.min(dD,dU))ra.x+=dR<dL?dR:-dL;else ra.y+=dD<dU?dD:-dU;
-            // No clamping
-            const el=cardEls.get(ka);if(el){el.style.left=ra.x+'px';el.style.top=ra.y+'px';}
-            moved=true;
+      // ── 2 & 3. TREE (vertical or horizontal) — Reingold-Tilford ──────────
+      function layoutTree(vertical) {
+        // Compute subtree widths first
+        function subtreeSize(id) {
+          const kids = childrenOf.get(id)||[];
+          if(!kids.length) return CARD_W;
+          const childWidths = kids.map(subtreeSize);
+          return childWidths.reduce((s,w)=>s+w,0) + GAP_X*(kids.length-1);
+        }
+        // Recursive position assignment
+        const pos = new Map();
+        function place(id, left, depth) {
+          const kids = childrenOf.get(id)||[];
+          const h=cH(id);
+          const myW = subtreeSize(id);
+          const cx  = left + myW/2;
+          const rowY = depth*(80+GAP_Y*2); // approximate row spacing
+          if(vertical){
+            pos.set(id,{x:cx-CARD_W/2, y:rowY});
+          } else {
+            pos.set(id,{x:rowY, y:cx-h/2});
           }
-        });});
-        if(!moved)break;
+          let childLeft = left;
+          kids.forEach(kid=>{
+            const kw=subtreeSize(kid);
+            place(kid, childLeft, depth+1);
+            childLeft+=kw+GAP_X;
+          });
+        }
+        // Place all roots side-by-side
+        let totalW = roots.map(subtreeSize).reduce((s,w)=>s+w,0)+GAP_X*(roots.length-1);
+        let curX = -totalW/2 + W/2;
+        roots.forEach(rid=>{ const w=subtreeSize(rid); place(rid,curX,0); curX+=w+GAP_X; });
+        applyPositions(pos);
+      }
+
+      // ── 4 & 5. FLOW (vertical or horizontal) — layered DAG ───────────────
+      function layoutFlow(vertical) {
+        // Assign depth levels
+        const depthOf = new Map();
+        toRender.forEach(({node,d})=>depthOf.set(node._cid,d));
+        // Group by depth
+        const byD = new Map();
+        toRender.forEach(({node,d})=>{if(!byD.has(d))byD.set(d,[]);byD.get(d).push(node._cid);});
+        const pos = new Map();
+        byD.forEach((ids,d)=>{
+          const layerH = Math.max(...ids.map(cH), 80);
+          const totalW = ids.length*(CARD_W+GAP_X)-GAP_X;
+          const startX = W/2 - totalW/2;
+          const rowY   = d*(layerH+GAP_Y*2);
+          ids.forEach((id,i)=>{
+            const h=cH(id);
+            if(vertical) pos.set(id,{x:startX+i*(CARD_W+GAP_X), y:rowY+(layerH-h)/2});
+            else          pos.set(id,{x:rowY, y:startX+i*(CARD_W+GAP_X)});
+          });
+        });
+        applyPositions(pos);
+      }
+
+      // ── 6. CIRCLE — all nodes on a single circle ─────────────────────────
+      function layoutCircle() {
+        const allIds = toRender.map(({node})=>node._cid);
+        const n = allIds.length;
+        const R = Math.max(160, (CARD_W+GAP_X)*n/(2*Math.PI));
+        const cx=W/2, cy=H/2;
+        const pos = new Map();
+        allIds.forEach((id,i)=>{
+          const h=cH(id);
+          const a=(2*Math.PI*i/n)-Math.PI/2;
+          pos.set(id,{x:cx+R*Math.cos(a)-CARD_W/2, y:cy+R*Math.sin(a)-h/2});
+        });
+        applyPositions(pos);
+      }
+
+      // ── 7. ORGANIC — force-directed (Fruchterman–Reingold) ───────────────
+      function layoutOrganic() {
+        const allIds = toRender.map(({node})=>node._cid);
+        // Build edge set from arrows
+        const edges = arrows.map(a=>({u:a.fromId,v:a.toId}));
+        // Init positions: current rects or radial seed
+        const px={}, py={};
+        allIds.forEach((id,i)=>{
+          const ex=rects.get(id); if(ex){px[id]=ex.x+CARD_W/2;py[id]=ex.y+cH(id)/2;return;}
+          const a=(2*Math.PI*i/allIds.length)-Math.PI/2;
+          const R=Math.min(W,H)*.35;
+          px[id]=W/2+R*Math.cos(a); py[id]=H/2+R*Math.sin(a);
+        });
+        const AREA=W*H, k=Math.sqrt(AREA/Math.max(allIds.length,1))*0.9;
+        let temp=Math.min(W,H)*0.25;
+        const ITERS=80;
+        for(let it=0;it<ITERS;it++){
+          const dx={}, dy={};
+          allIds.forEach(id=>{dx[id]=0;dy[id]=0;});
+          // Repulsion
+          for(let i=0;i<allIds.length;i++) for(let j=i+1;j<allIds.length;j++){
+            const u=allIds[i],v=allIds[j];
+            let ddx=px[u]-px[v], ddy=py[u]-py[v];
+            const d=Math.sqrt(ddx*ddx+ddy*ddy)||0.01;
+            const f=k*k/d;
+            ddx/=d; ddy/=d;
+            dx[u]+=ddx*f; dy[u]+=ddy*f;
+            dx[v]-=ddx*f; dy[v]-=ddy*f;
+          }
+          // Attraction
+          edges.forEach(({u,v})=>{
+            if(!px.hasOwnProperty(u)||!px.hasOwnProperty(v))return;
+            let ddx=px[v]-px[u], ddy=py[v]-py[u];
+            const d=Math.sqrt(ddx*ddx+ddy*ddy)||0.01;
+            const f=d*d/k;
+            ddx/=d; ddy/=d;
+            dx[u]+=ddx*f; dy[u]+=ddy*f;
+            dx[v]-=ddx*f; dy[v]-=ddy*f;
+          });
+          // Apply displacements capped by temperature
+          allIds.forEach(id=>{
+            const d=Math.sqrt(dx[id]*dx[id]+dy[id]*dy[id])||0.01;
+            const disp=Math.min(d,temp);
+            px[id]+=dx[id]/d*disp; py[id]+=dy[id]/d*disp;
+          });
+          temp*=0.93; // cool
+        }
+        const pos=new Map();
+        allIds.forEach(id=>{const h=cH(id);pos.set(id,{x:px[id]-CARD_W/2,y:py[id]-h/2});});
+        applyPositions(pos);
+      }
+
+      // ── Dispatch ─────────────────────────────────────────────────────────
+      switch(_layout){
+        case 'vtree':   layoutTree(true);    break;
+        case 'htree':   layoutTree(false);   break;
+        case 'vflow':   layoutFlow(true);    break;
+        case 'hflow':   layoutFlow(false);   break;
+        case 'circle':  layoutCircle();      break;
+        case 'organic': layoutOrganic();     break;
+        default:        layoutRadial();      break;
       }
       redrawArrows();
     });
