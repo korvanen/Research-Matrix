@@ -6,7 +6,7 @@
 //     Max-Parents slider gets pp-range--accent for purple thumb.
 //   • Sliders upgraded with bounce animation via upgradeSlider().
 //   • Delay while dragging, instant apply on release.
-console.log('[sidepanel-concept-map.js nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn]');
+console.log('[sidepanel-concept-map.js oooooooooooooooooooooooooooooooo]');
 
 const CMAP_PARENT_CHILD_THRESHOLD = 0.50;
 const CMAP_MIN_SPLIT_LENGTH = 60;
@@ -52,6 +52,7 @@ const ORPHAN_RECOVERY_THRESHOLD = 0.85;
   font-size:8px; font-weight:700; letter-spacing:.07em; text-transform:uppercase;
   background:rgba(0,0,0,.07); color:rgba(0,0,0,.45); cursor:pointer;
   transition:background .15s,color .15s; white-space:nowrap;
+  min-width: 52px; /* prevents shrink when text changes to … */
 }
 #pp-cmap-rebuild:hover { background:rgba(0,0,0,.13); color:rgba(0,0,0,.75); }
 #pp-cmap-rebuild.pp-cmap-busy { background:rgba(0,0,0,.04);color:rgba(0,0,0,.25);cursor:default; }
@@ -285,14 +286,14 @@ function initConceptMapTool(paneEl, sidebarEl) {
     el.addEventListener('input', () => {
       read();
       clearTimeout(_rebuildTimer);
-      rebuildBtn.classList.add('pp-cmap-busy'); rebuildBtn.textContent = '\u2026';
+      rebuildBtn.classList.add('pp-cmap-busy');
       _rebuildTimer = setTimeout(() => { _rendered = false; tryRender(); }, DRAG_DELAY);
     });
     // change: fires once on mouseup/touchend — apply instantly
     el.addEventListener('change', () => {
       read();
       clearTimeout(_rebuildTimer);
-      rebuildBtn.classList.remove('pp-cmap-busy'); rebuildBtn.textContent = 'Rebuild';
+      rebuildBtn.classList.remove('pp-cmap-busy'); 
       _rendered = false; tryRender();
     });
   });
@@ -702,7 +703,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
   }
 
   async function doRender() {
-    rebuildBtn.classList.remove('pp-cmap-busy'); rebuildBtn.textContent='Rebuild';
+    rebuildBtn.classList.remove('pp-cmap-busy');
     setStatus('loading','Splitting cells\u2026');
     let workRows;
     try { workRows=await splitAllRows(_rows); } catch(e){ console.warn('[concept-map v16] split error:',e); workRows=_rows; }
