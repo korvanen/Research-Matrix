@@ -1,4 +1,4 @@
-// sidepanel-clusters.js — Clusters tool v13
+// sidepanel-clusters.js — Clusters tool v14
 // Changes vs v12:
 //   • Collision resolution for top-level nests: after initial flow layout,
 //     runs 60 iterations of overlap-repulsion so nests never overlap each other.
@@ -9,7 +9,7 @@
 //     respected precisely, replacing the old CSS flex-wrap approach for depth-1.
 //   • depth-0 nest height is now set explicitly after sub-nest layout so the
 //     container actually encloses all children.
-console.log('[sidepanel-clusters.js v13]');
+console.log('[sidepanel-clusters.js v14]');
 
 (function injectClusterStyles() {
   if (document.getElementById('pp-cluster-styles')) return;
@@ -571,57 +571,64 @@ function initClustersTool(paneEl, sidebarEl) {
     const body = document.createElement('div'); body.className = 'pp-cl-nest-body';
     nest.appendChild(body);
 
+    // Size constants — estimated from known card/layout metrics, no DOM reads
+    const HEAD_H = 28;
+    const CARD_H = 58; // average rendered card height
+
     if (isLeaf) {
       // ── Leaf: flex-wrap cards ──────────────────────────────────────────
       body.classList.add('pp-cl-body-leaf');
       body.style.gap = gap + 'px'; body.style.padding = pad + 'px';
       rows.forEach((r, ri) => body.appendChild(buildCard(r, col, ri * 14)));
 
-      // Estimate dimensions for initial width (height will be determined by flex-wrap)
-      const cols = Math.min(rows.length, 3);
-      const w = pad * 2 + cols * CARD_W + (cols - 1) * gap;
-      nest.style.width = w + 'px';
+      const cols_  = Math.min(rows.length, 3);
+      const rows_  = Math.ceil(rows.length / cols_);
+      const estW   = Math.max(RESIZE_MIN_W, pad * 2 + cols_ * CARD_W + (cols_ - 1) * gap);
+      const estH   = Math.max(RESIZE_MIN_H, HEAD_H + pad * 2 + rows_ * CARD_H + (rows_ - 1) * gap);
+      nest.style.width  = estW + 'px';
+      nest.style.height = estH + 'px';
+      nest._estW = estW; nest._estH = estH;
 
     } else {
-      // ── Non-leaf: build child nests, then collision-resolve their positions ──
+      // ── Non-leaf: build children, collision-resolve synchronously ─────
       const validChildren = (children || []).filter(c => c.members.length > 0);
       const childEls = validChildren.map(({ members, childPath }) => {
         const child = buildNestRecursive(members, depth + 1, maxDepth, childPath, null);
-        body.appendChild(child);
         if (depth + 1 < maxDepth || depth === 0) makeNestDraggable(child);
         return child;
       });
 
-      // Give the browser a chance to measure child sizes, then layout.
-      // We store a callback on the nest element and run it in a post-render pass.
-      nest._layoutChildren = function() {
-        const headH = head.offsetHeight || 28;
+      // Use sizes already set by recursive calls (_estW / _estH) — no DOM reads
+      const rects = childEls.map((el, i) => ({
+        x: pad + i * ((el._estW || 140) + SUB_GAP),
+        y: pad,
+        w: el._estW || 140,
+        h: el._estH || 100,
+        el
+      }));
 
-        // Collect measured sizes
-        const rects = childEls.map((el, i) => ({
-          x: pad + i * (CARD_W + SUB_GAP),   // initial naive position
-          y: pad,
-          w: el.offsetWidth  || parseInt(el.style.width)  || 140,
-          h: el.offsetHeight || parseInt(el.style.height) || 100,
-          el
-        }));
+      // Fully synchronous collision resolution
+      resolveCollisions(rects, SUB_GAP, 120);
 
-        // Run collision resolution
-        resolveCollisions(rects, SUB_GAP);
+      // Clamp to padding boundary
+      rects.forEach(r => { r.x = Math.max(pad, r.x); r.y = Math.max(pad, r.y); });
 
-        // Clamp so nothing goes above pad
-        rects.forEach(r => { r.x = Math.max(pad, r.x); r.y = Math.max(pad, r.y); });
+      // Apply positions and append to body
+      rects.forEach(r => {
+        r.el.style.left = r.x + 'px';
+        r.el.style.top  = r.y + 'px';
+        body.appendChild(r.el);
+      });
 
-        // Apply positions
-        rects.forEach(r => { r.el.style.left = r.x + 'px'; r.el.style.top  = r.y + 'px'; });
-
-        // Size the parent to exactly contain all children
-        const maxRight  = Math.max(...rects.map(r => r.x + r.w)) + pad;
-        const maxBottom = Math.max(...rects.map(r => r.y + r.h)) + pad;
-        nest.style.width  = Math.max(RESIZE_MIN_W, maxRight) + 'px';
-        nest.style.height = Math.max(RESIZE_MIN_H, headH + maxBottom) + 'px';
-        body.style.height = maxBottom + 'px';
-      };
+      // Size this nest to exactly contain all children
+      const maxRight  = Math.max(...rects.map(r => r.x + r.w)) + pad;
+      const maxBottom = Math.max(...rects.map(r => r.y + r.h)) + pad;
+      const nestW = Math.max(RESIZE_MIN_W, maxRight);
+      const nestH = Math.max(RESIZE_MIN_H, HEAD_H + maxBottom);
+      nest.style.width  = nestW + 'px';
+      nest.style.height = nestH + 'px';
+      body.style.height = maxBottom + 'px';
+      nest._estW = nestW; nest._estH = nestH;
     }
 
     makeResizable(nest);
@@ -661,44 +668,30 @@ function initClustersTool(paneEl, sidebarEl) {
       world.appendChild(nest); nestEls.push(nest);
     });
 
-    // Step 4: two-pass layout in rAF
-    // Pass A: run all _layoutChildren callbacks (sub-nest collision resolution)
-    // Pass B: collect final nest sizes, resolve top-level collisions, apply positions
-    requestAnimationFrame(() => {
-      // Pass A — layout sub-nests inside each depth-0 nest
-      nestEls.forEach(n => { if (typeof n._layoutChildren === 'function') n._layoutChildren(); });
+    // Step 4: synchronous top-level collision resolution using estimated sizes
+    // No rAF or DOM measurement needed — _estW/_estH set during buildNestRecursive.
+    const topRects = nestEls.map((n, i) => ({
+      x: NEST_GAP + (i % 4) * ((n._estW || 200) + NEST_GAP),
+      y: NEST_GAP + Math.floor(i / 4) * ((n._estH || 200) + NEST_GAP),
+      w: n._estW || 200,
+      h: n._estH || 200,
+      el: n
+    }));
 
-      requestAnimationFrame(() => {
-        // Pass B — resolve top-level nest collisions
-        const canvasW = canvas.offsetWidth || 800;
-        const canvasH = canvas.offsetHeight || 600;
+    resolveCollisions(topRects, NEST_GAP, 120);
 
-        // Initial grid placement (simple flow, just to seed positions)
-        const rects = nestEls.map((n, i) => ({
-          x: NEST_GAP + (i % 4) * (200 + NEST_GAP),
-          y: NEST_GAP + Math.floor(i / 4) * (200 + NEST_GAP),
-          w: n.offsetWidth  || parseInt(n.style.width)  || 200,
-          h: n.offsetHeight || parseInt(n.style.height) || 200,
-          el: n
-        }));
+    // Shift so nothing is off the top-left edge
+    const minX = Math.min(...topRects.map(r => r.x));
+    const minY = Math.min(...topRects.map(r => r.y));
+    const offX = minX < NEST_GAP ? NEST_GAP - minX : 0;
+    const offY = minY < NEST_GAP ? NEST_GAP - minY : 0;
 
-        // Resolve all overlaps between top-level nests
-        resolveCollisions(rects, NEST_GAP, 120);
-
-        // Shift so no nest has negative coords
-        const minX = Math.min(...rects.map(r => r.x));
-        const minY = Math.min(...rects.map(r => r.y));
-        const offX = minX < NEST_GAP ? NEST_GAP - minX : 0;
-        const offY = minY < NEST_GAP ? NEST_GAP - minY : 0;
-
-        rects.forEach(r => {
-          r.el.style.left = (r.x + offX) + 'px';
-          r.el.style.top  = (r.y + offY) + 'px';
-        });
-
-        subtitle.textContent = numTop + ' cluster' + (numTop === 1 ? '' : 's') + ' \u00b7 ' + rows.length + ' entries';
-      });
+    topRects.forEach(r => {
+      r.el.style.left = (r.x + offX) + 'px';
+      r.el.style.top  = (r.y + offY) + 'px';
     });
+
+    subtitle.textContent = numTop + ' cluster' + (numTop === 1 ? '' : 's') + ' \u00b7 ' + rows.length + ' entries';
   }
 
   // ── Embedding pipeline ────────────────────────────────────────────────────
