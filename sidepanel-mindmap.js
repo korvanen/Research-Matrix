@@ -1,10 +1,10 @@
-// sidepanel-mindmap.js — Concept Map tool v8
-// Changes vs v7:
-//   • Cards animate smoothly into position when layout changes (420ms ease)
-//   • Arrows stay in sync during animation via rAF loop
-//   • Layout dropdown now opens downward (was upward, cutting off items)
-//   • Dropdown opens with a subtle scale+fade animation
-console.log('[sidepanel-mindmap.js v8]');
+// sidepanel-mindmap.js — Concept Map tool v9
+// Changes vs v8:
+//   • Cards always fully expanded — no hover expand/contract, full text always visible
+//   • Entry count removed from card header (already in footer)
+//   • Footer shows correct dynamic sub-concept count (not hardcoded binary "2 sub-groups")
+//   • Card colours cycle through TAB_THEMES by depth level, not by which tab data belongs to
+console.log('[sidepanel-mindmap.js v9]');
 
 (function injectCmapStyles() {
   if (document.getElementById('pp-cmap-styles')) return;
@@ -149,6 +149,24 @@ console.log('[sidepanel-mindmap.js v8]');
 .pp-cmap-d2 { opacity:0.65; }
 .pp-cmap-d3 { opacity:0.48; }
 .pp-cmap-d4 { opacity:0.34; }
+/* Concept-map cards are always fully open — override find-matches card defaults */
+.pp-cmap-card { overflow:visible !important; cursor:grab; }
+.pp-cmap-card:active { cursor:grabbing; }
+.pp-cmap-card .pp-mm-card-body { padding:6px 9px 8px; }
+.pp-cmap-card .pp-mm-field {
+  display:block !important;
+  -webkit-line-clamp:unset !important;
+  -webkit-box-orient:unset !important;
+  overflow:visible !important;
+  font-size:10px; line-height:1.4; color:rgba(0,0,0,.72);
+}
+.pp-cmap-card .pp-mm-lock { display:none; }
+.pp-cmap-card .pp-mm-head-label { display:none; }
+.pp-cmap-footer {
+  font-size:9px; font-weight:600; letter-spacing:.05em;
+  color:rgba(0,0,0,.38); padding:0 9px 7px;
+  border-top:1px solid rgba(0,0,0,.06); margin-top:4px; padding-top:5px;
+}
 `;
   document.head.appendChild(s);
 })();
@@ -679,77 +697,94 @@ function initConceptMapTool(paneEl, sidebarEl) {
       el.addEventListener('touchend',end);
     }
 
+    // ── depthColor — cycles through TAB_THEMES by depth, not by tab ────────────
+    function depthColor(depth) {
+      if (typeof TAB_THEMES !== 'undefined' && typeof THEMES !== 'undefined') {
+        const tname = TAB_THEMES[depth % TAB_THEMES.length] || 'default';
+        const theme = THEMES[tname] || THEMES.default || {};
+        return {
+          accent: theme['--tab-active-bg']    || '#5b7fa6',
+          lc:     theme['--tab-active-color'] || '#fff',
+          bg:     theme['--bg-data']          || '#f8f8f8'
+        };
+      }
+      // Fallback palette if THEMES unavailable
+      const P = ['#5b7fa6','#7a6e9e','#5a9e7a','#9e7a5a','#9e5a7a','#7a9e5a'];
+      return { accent: P[depth % P.length], lc: '#fff', bg: '#f8f8f8' };
+    }
+
     // ── makeCard ──────────────────────────────────────────────────────────────
     function makeCard(node, depth) {
-      const isLeaf = node.children.length===0 || depth>=_depth-1;
-      const tabIdx = node.rows[0]?.tabIdx||0;
-      const t      = tv(tabIdx);
-      const accent = t['--tab-active-bg']    || '#888';
-      const lc     = t['--tab-active-color'] || '#fff';
-      const bg     = t['--bg-data']          || '#fff';
+      const isLeaf = node.children.length === 0 || depth >= _depth - 1;
       const id     = node._cid;
-      colors.set(id,{border:accent,bg});
+      const { accent, lc, bg } = depthColor(depth);
+      colors.set(id, { border: accent, bg });
 
-      const card=document.createElement('div');
-      card.className='pp-mm-card pp-cmap-d'+Math.min(depth,4);
-      card.style.cssText=`width:${CARD_W}px;position:absolute;z-index:${++_topZ}`;
-      card.style.setProperty('--ppc-border',accent);
-      card.style.setProperty('--ppc-bg',bg);
+      const card = document.createElement('div');
+      card.className = 'pp-mm-card pp-cmap-card pp-cmap-d' + Math.min(depth, 4);
+      card.style.cssText = `width:${CARD_W}px;position:absolute;z-index:${++_topZ}`;
+      card.style.setProperty('--ppc-border', accent);
+      card.style.setProperty('--ppc-bg', bg);
 
-      const head=document.createElement('div');
-      head.className='pp-mm-card-head';
-      head.style.background=accent; head.style.color=lc;
-      const levelLabel = ordinal(depth+1)+' level concept';
-      head.innerHTML=
-        '<span class="pp-mm-badge">'+esc(levelLabel)+'</span>'+
-        '<span class="pp-mm-head-label">'+esc(node.rows.length+' entr'+(node.rows.length===1?'y':'ies'))+'</span>';
-
-      const lockBtn=document.createElement('button');
-      lockBtn.className='pp-mm-lock'; lockBtn.innerHTML=lockSVG(false); lockBtn.style.color=lc;
-      lockBtn.addEventListener('click',e=>{
-        e.stopPropagation();
-        const nl=!locked.has(id); nl?locked.add(id):locked.delete(id);
-        card.classList.toggle('pp-mm-card-locked',nl); lockBtn.innerHTML=lockSVG(nl);
-        if(nl) expand(card,true,id); else if(!card.matches(':hover')) expand(card,false,id);
-      });
-      head.appendChild(lockBtn);
+      // ── Header: level label only (no entry count — shown in footer) ──────
+      const head = document.createElement('div');
+      head.className = 'pp-mm-card-head';
+      head.style.cssText = `background:${accent};color:${lc};padding:5px 9px`;
+      head.innerHTML = '<span class="pp-mm-badge">' + esc(ordinal(depth + 1) + ' level concept') + '</span>';
       card.appendChild(head);
 
-      const body=document.createElement('div');
-      body.className='pp-mm-card-body';
-      (isLeaf?node.rows.slice(0,3):[node.rows[0]]).forEach(r=>{
-        if(!r) return;
-        const cells=r.row?.cells||r.cells||[];
-        const cats =r.row?.cats ?r.row.cats.filter(c=>c.trim()):[];
-        const best =cells.reduce((b,c)=>c.length>b.length?c:b,'');
-        const parsed=typeof parseCitation==='function'?parseCitation(best):{body:best};
-        if(cats.length){const ce=document.createElement('div');ce.className='pp-mm-cat';ce.textContent=cats.join(' \u00b7 ');body.appendChild(ce);}
-        const fe=document.createElement('div'); fe.className='pp-mm-field';
-        const lim=isLeaf?120:80;
-        fe.textContent=parsed.body.slice(0,lim)+(parsed.body.length>lim?'\u2026':'');
+      // ── Body: full text, no truncation ────────────────────────────────────
+      const body = document.createElement('div');
+      body.className = 'pp-mm-card-body';
+      (isLeaf ? node.rows.slice(0, 5) : [node.rows[0]]).forEach(r => {
+        if (!r) return;
+        const cells  = r.row?.cells || r.cells || [];
+        const cats   = r.row?.cats  ? r.row.cats.filter(c => c.trim()) : [];
+        const best   = cells.reduce((b, c) => c.length > b.length ? c : b, '');
+        const parsed = typeof parseCitation === 'function' ? parseCitation(best) : { body: best };
+        if (cats.length) {
+          const ce = document.createElement('div');
+          ce.className = 'pp-mm-cat';
+          ce.textContent = cats.join(' · ');
+          body.appendChild(ce);
+        }
+        const fe = document.createElement('div');
+        fe.className = 'pp-mm-field';
+        fe.textContent = parsed.body; // full text — no slice
         body.appendChild(fe);
       });
-      if(!isLeaf){const se=document.createElement('div');se.className='pp-mm-cat';se.style.marginTop='3px';se.textContent=node.rows.length+' entries \u00b7 '+node.children.length+' sub-groups';body.appendChild(se);}
       card.appendChild(body);
 
-      if(isLeaf&&node.rows.length===1&&node.rows[0]){
-        const r=node.rows[0];
-        const gb=document.createElement('button');gb.className='pp-goto-btn';
-        gb.style.borderColor=accent;gb.style.color=accent;
-        gb.addEventListener('click',e=>{e.stopPropagation();if(typeof panelGoTo==='function')panelGoTo(r,0);});
-        gb.addEventListener('mousedown',e=>e.stopPropagation());
+      // ── Footer: entry count + sub-concept count ───────────────────────────
+      const footer = document.createElement('div');
+      footer.className = 'pp-cmap-footer';
+      const entryStr = node.rows.length + ' entr' + (node.rows.length === 1 ? 'y' : 'ies');
+      if (!isLeaf) {
+        // Compute actual dynamic child count the same way collect() does
+        const childK    = Math.max(2, Math.min(7, Math.round(Math.sqrt(node.rows.length))));
+        const subCount  = getTopClusters(node, childK).filter(s => s !== node).length;
+        footer.textContent = entryStr + ' · ' + subCount + ' sub-concept' + (subCount === 1 ? '' : 's');
+      } else {
+        footer.textContent = entryStr;
+      }
+      card.appendChild(footer);
+
+      // ── Go-to button for single-entry leaf cards ──────────────────────────
+      if (isLeaf && node.rows.length === 1 && node.rows[0]) {
+        const r  = node.rows[0];
+        const gb = document.createElement('button');
+        gb.className = 'pp-goto-btn';
+        gb.style.cssText = `border-color:${accent};color:${accent};opacity:0.6;pointer-events:auto`;
+        gb.addEventListener('click',  e => { e.stopPropagation(); if (typeof panelGoTo === 'function') panelGoTo(r, 0); });
+        gb.addEventListener('mousedown', e => e.stopPropagation());
         card.appendChild(gb);
       }
 
-      let _hvt=null;
-      card.addEventListener('mouseenter',()=>{if(card._dragging)return;clearTimeout(_hvt);_hvt=setTimeout(()=>expand(card,true,id),HOVER_MS);});
-      card.addEventListener('mouseleave',()=>{clearTimeout(_hvt);if(locked.has(id))return;expand(card,false,id);});
-
       world.appendChild(card);
-      card._cid=id;
-      drag(card,id);
-      cardEls.set(id,card);
-      if(window.ResizeObserver) new ResizeObserver(()=>redrawArrows()).observe(card);
+      card._cid = id;
+      drag(card, id);
+      cardEls.set(id, card);
+      if (window.ResizeObserver) new ResizeObserver(() => redrawArrows()).observe(card);
       return card;
     }
 
