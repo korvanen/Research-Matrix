@@ -5,7 +5,7 @@
 //   • Non-leaf cards now show ALL their entries as a compact bulleted list (up to 8)
 //     instead of showing only the single most-representative entry, making sub-concept
 //     count visually obvious at a glance
-console.log('[sidepanel-mindmap.js v10]');
+console.log('[sidepanel-mindmap.js v11]');
 
 // ── Global tuning constants ──────────────────────────────────────────────────
 // Minimum number of sub-concepts any non-leaf card will try to produce.
@@ -651,6 +651,21 @@ function initConceptMapTool(paneEl, sidebarEl) {
       });
     }
 
+    // ── pushApart — nudge overlapping cards away from the moved card ────
+    // Defined here (before drag) so the drag move handler can call it.
+    function pushApart(movedId) {
+      const ra=rects.get(movedId); if(!ra) return;
+      rects.forEach((rb,kb)=>{
+        if(kb===movedId)return;
+        if(ra.x<rb.x+rb.w+MM_PAD&&ra.x+ra.w+MM_PAD>rb.x&&ra.y<rb.y+rb.h+MM_PAD&&ra.y+ra.h+MM_PAD>rb.y){
+          const dR=rb.x+rb.w+MM_PAD-ra.x,dL=ra.x+ra.w+MM_PAD-rb.x;
+          const dD=rb.y+rb.h+MM_PAD-ra.y,dU=ra.y+ra.h+MM_PAD-rb.y;
+          if(Math.min(dR,dL)<=Math.min(dD,dU))rb.x+=dR<dL?-dR:dL;else rb.y+=dD<dU?-dD:dU;
+          const el=cardEls.get(kb);if(el){el.style.left=rb.x+'px';el.style.top=rb.y+'px';}
+        }
+      });
+    }
+
     // ── Drag — world-space, no clamping ─────────────────────────────────
     function drag(el, id) {
       let on=false,ox=0,oy=0,sl=0,st=0;
@@ -856,19 +871,6 @@ function initConceptMapTool(paneEl, sidebarEl) {
         const sk   = node ? nodeStableKey(node) : null;
         if(sk && _posCache.has(sk)) return _posCache.get(sk);
         return fallbackFn();
-      }
-
-      function pushApart(movedId) {
-        const ra=rects.get(movedId); if(!ra) return;
-        rects.forEach((rb,kb)=>{
-          if(kb===movedId)return;
-          if(ra.x<rb.x+rb.w+MM_PAD&&ra.x+ra.w+MM_PAD>rb.x&&ra.y<rb.y+rb.h+MM_PAD&&ra.y+ra.h+MM_PAD>rb.y){
-            const dR=rb.x+rb.w+MM_PAD-ra.x,dL=ra.x+ra.w+MM_PAD-rb.x;
-            const dD=rb.y+rb.h+MM_PAD-ra.y,dU=ra.y+ra.h+MM_PAD-rb.y;
-            if(Math.min(dR,dL)<=Math.min(dD,dU))rb.x+=dR<dL?-dR:dL;else rb.y+=dD<dU?-dD:dU;
-            const el=cardEls.get(kb);if(el){el.style.left=rb.x+'px';el.style.top=rb.y+'px';}
-          }
-        });
       }
 
       // ── 1. RADIAL ───────────────────────────────────────────────────────
