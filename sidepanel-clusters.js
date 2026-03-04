@@ -7,6 +7,8 @@
 //     the injected <style> block.
 //   • Collision passes increased to 160 for top-level and sub-nests.
 //   • Initial grid spread uses NEST_GAP=20 / SUB_GAP=10 for sparser start.
+//   • Sliders upgraded with bounce animation via upgradeSlider().
+//   • Delay while dragging, instant apply on release.
 console.log('[sidepanel-clusters.js uuuuu]');
 
 (function injectClusterStyles() {
@@ -153,7 +155,7 @@ console.log('[sidepanel-clusters.js uuuuu]');
 // ════════════════════════════════════════════════════════════════════════════
 function initClustersTool(paneEl, sidebarEl) {
 
-  // Uses .pp-range / .pp-range--muted / .pp-range--accent from style-slider-additions.css
+  // Uses .pp-range / .pp-range--muted / .pp-range--accent from style.css
   paneEl.innerHTML =
     '<div id="pp-cl-head">' +
       '<div id="pp-cl-subtitle">Waiting for embeddings\u2026</div>' +
@@ -184,6 +186,11 @@ function initClustersTool(paneEl, sidebarEl) {
       '<div class="pp-cl-tooltip-goto" id="pp-cl-tt-goto">Go to \u2197</div>' +
     '</div>';
 
+  // ── Upgrade all sliders with bounce animation ──────────────────────────────
+  if (typeof upgradeSlider === 'function') {
+    paneEl.querySelectorAll('.pp-range').forEach(upgradeSlider);
+  }
+
   const subtitle     = paneEl.querySelector('#pp-cl-subtitle');
   const statusEl     = paneEl.querySelector('#pp-cl-status');
   const labelEl      = paneEl.querySelector('#pp-cl-label');
@@ -208,6 +215,7 @@ function initClustersTool(paneEl, sidebarEl) {
   const RESIZE_MIN_H = 50;
   const NEST_GAP     = 20;   // gap between top-level nests
   const SUB_GAP      = 10;   // gap between sub-nests inside a depth-0 nest
+  const DRAG_DELAY   = 600;  // ms debounce while slider is being dragged
 
   let _outerMin=2, _outerMax=12, _innerMin=2, _innerMax=4, _depth=2;
   let _rendered=false, _ttRow=null;
@@ -258,13 +266,25 @@ function initClustersTool(paneEl, sidebarEl) {
     state.raf = requestAnimationFrame(step);
   }
 
-  function scheduleRecluster() {
-    syncSliders(); if (!_cachedEmbedded) return;
-    clearTimeout(_reclusterTimer);
-    reclusterBtn.classList.add('pp-cl-reclustering'); reclusterBtn.textContent = '\u2026';
-    _reclusterTimer = setTimeout(() => { _rendered = false; tryRender(); }, 520);
-  }
-  [oMinSlider, oMaxSlider, iMinSlider, iMaxSlider, depthSlider].forEach(s => s.addEventListener('input', scheduleRecluster));
+  // ── Slider event listeners: delay while dragging, instant on release ──────
+  [oMinSlider, oMaxSlider, iMinSlider, iMaxSlider, depthSlider].forEach(s => {
+    // input fires continuously while dragging — debounce
+    s.addEventListener('input', () => {
+      syncSliders();
+      if (!_cachedEmbedded) return;
+      clearTimeout(_reclusterTimer);
+      reclusterBtn.classList.add('pp-cl-reclustering'); reclusterBtn.textContent = '\u2026';
+      _reclusterTimer = setTimeout(() => { _rendered = false; tryRender(); }, DRAG_DELAY);
+    });
+    // change fires once on mouseup/touchend — apply instantly
+    s.addEventListener('change', () => {
+      syncSliders();
+      if (!_cachedEmbedded) return;
+      clearTimeout(_reclusterTimer);
+      _rendered = false; tryRender();
+    });
+  });
+
   reclusterBtn.addEventListener('click', () => { clearTimeout(_reclusterTimer); _rendered = false; tryRender(); });
 
   // ── Canvas pan ───────────────────────────────────────────────────────────
