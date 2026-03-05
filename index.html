@@ -1,3 +1,7 @@
+ <script>
+   console.log("index updated to v.3");
+ </script>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -334,8 +338,66 @@
       </div>
     </div>
   </footer>
- <script>
-   console.log("index updated to v.2");
- </script>
+
 </body>
 </html>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="utilities/utils-keywords.js"></script>
+<script src="utilities/embedding-bridge.js"></script>
+
+<script>
+const XLSX_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRKom5SD7yrnPoGV4pzsf4f20uv0nkrZXEDRA6_-g_ZTogUVBNPzeDAr4Przl7WA9Y07ev5XNuZbhTz/pub?output=xlsx';
+
+function parseXLSXSheet(sheet) {
+  const raw = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, defval: '' });
+  const rows = raw.map(row => Array.from(row).map(v => v == null ? '' : String(v)));
+  return rows;
+}
+
+function processSheetData(grid) {
+  if (!grid.length) return null;
+  const flagRow = grid[0];
+  const catIndices = flagRow.reduce((a, c, i) => { if (c.trim() === 'CATEGORY') a.push(i); return a; }, []);
+  let headerRowIdx = -1;
+  for (let r = 1; r < grid.length; r++) {
+    if ((grid[r][0] || '').trim() === 'HEADER ROW') { headerRowIdx = r; break; }
+  }
+  if (headerRowIdx === -1) return null;
+  const colIndices = flagRow.reduce((a, c, i) => {
+    if (c.trim() === 'COLUMN') a.push(i); return a;
+  }, []);
+  const headers = colIndices.map(i => grid[headerRowIdx][i] || '');
+  let title = '';
+  for (let r = 0; r < grid.length; r++) {
+    if ((grid[r][0] || '').trim() === 'TITLE') { title = grid[r].slice(1).filter(c => c.trim()).join(' '); break; }
+  }
+  const rows = [];
+  for (let r = headerRowIdx + 1; r < grid.length; r++) {
+    const g = grid[r] || [];
+    if (g.every(c => !c.trim())) continue;
+    const cats = catIndices.length ? catIndices.map(i => g[i] || '') : [g[0] || ''];
+    if (!cats[0].trim()) continue;
+    rows.push({ cats, cells: colIndices.map(i => g[i] || '') });
+  }
+  return { catIndices, headers, rows, title };
+}
+
+window.TABS = [];
+
+(async () => {
+  try {
+    const res = await fetch(XLSX_URL);
+    const workbook = XLSX.read(await res.arrayBuffer(), { type: 'array', cellText: true });
+    const all = workbook.SheetNames.map(name => ({
+      name,
+      grid: parseXLSXSheet(workbook.Sheets[name])
+    }));
+    window.TABS = all.filter(s => s.name.includes('MX'));
+    console.log('[index] Loaded', window.TABS.length, 'tabs');
+    EmbeddingBridge.host();
+  } catch(e) {
+    console.warn('[index] Background load failed:', e);
+  }
+})();
+</script>
+<script type="module" src="utilities/utils-embedding.js"></script>
