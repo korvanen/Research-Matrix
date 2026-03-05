@@ -9,7 +9,7 @@
 //   • Initial grid spread uses NEST_GAP=20 / SUB_GAP=10 for sparser start.
 //   • Sliders upgraded with bounce animation via upgradeSlider().
 //   • Delay while dragging, instant apply on release.
-console.log('[sidepanel-clusters.js uuuuu]');
+console.log('[sidepanel-clusters.js V33]');
 
 (function injectClusterStyles() {
   if (document.getElementById('pp-cluster-styles')) return;
@@ -75,58 +75,50 @@ console.log('[sidepanel-clusters.js uuuuu]');
   letter-spacing:.05em; color:rgba(0,0,0,.22); pointer-events:none; z-index:20;
 }
 
-/* ── Nests ── */
+/* ── Nests — outer clusters only ── */
 .pp-cl-nest {
   position:absolute; border-radius:10px; border:1.5px solid transparent;
-  display:block; overflow:hidden;
-  box-shadow:0 2px 12px rgba(0,0,0,.08);
-  transition:box-shadow .18s,
-    left .28s cubic-bezier(0.22,1,0.36,1),
-    top  .28s cubic-bezier(0.22,1,0.36,1),
-    width  .28s cubic-bezier(0.22,1,0.36,1),
-    height .28s cubic-bezier(0.22,1,0.36,1);
+  display:flex; flex-direction:column; overflow:hidden;
+  box-shadow:0 2px 12px rgba(0,0,0,.10);
+  transition:box-shadow .18s;
 }
-.pp-cl-nest.pp-cl-nest-lifted { box-shadow:0 8px 28px rgba(0,0,0,.18); }
-.pp-cl-nest.pp-cl-no-transition { transition:box-shadow .18s !important; }
+.pp-cl-nest.pp-cl-nest-lifted { box-shadow:0 8px 28px rgba(0,0,0,.18); transition:box-shadow .18s; }
 .pp-cl-nest-head {
-  display:flex; align-items:center; gap:6px; padding:5px 8px;
+  display:flex; align-items:center; gap:6px; padding:6px 9px;
   cursor:grab; flex-shrink:0; user-select:none;
 }
 .pp-cl-nest-head:active { cursor:grabbing; }
 .pp-cl-nest-dot { width:7px;height:7px;border-radius:50%;flex-shrink:0; }
 .pp-cl-nest-count { font-size:8px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:rgba(0,0,0,.45);white-space:nowrap; }
 
-/* nest body */
+/* nest body — scrollable tile container */
 .pp-cl-nest-body {
-  position:relative; overflow:hidden;
+  flex:1; min-height:0; overflow-y:auto; padding:7px;
+  display:flex; flex-direction:column; gap:5px;
   scrollbar-width:thin; scrollbar-color:var(--scrollbar-thumb,rgba(0,0,0,.18)) transparent;
 }
-.pp-cl-nest-body::-webkit-scrollbar { width:5px;height:5px; }
+.pp-cl-nest-body::-webkit-scrollbar { width:5px; }
 .pp-cl-nest-body::-webkit-scrollbar-thumb { background:var(--scrollbar-thumb,rgba(0,0,0,.18));border-radius:3px; }
 .pp-cl-nest-body::-webkit-scrollbar-track { background:transparent; }
 
-/* leaf body: flex-wrap cards
-   align-items:flex-start is the KEY FIX — prevents cards from stretching
-   to the height of the tallest card in each row. */
-.pp-cl-nest-body.pp-cl-body-leaf {
-  display:flex; flex-wrap:wrap;
-  align-content:flex-start;
-  align-items:flex-start;
+/* tile row inside nest body */
+.pp-cl-tile-row {
+  display:flex; flex-wrap:wrap; align-items:flex-start; align-content:flex-start; gap:5px; width:100%;
 }
-.pp-cl-body-inner { display:flex; flex-wrap:wrap; position:absolute; }
-.pp-cl-body-panning { cursor:grabbing !important; }
+
 .pp-cl-resize-handle {
   position:absolute; bottom:0; right:0; width:14px; height:14px; cursor:nwse-resize;
-  background:linear-gradient(135deg,transparent 50%,rgba(0,0,0,.15) 50%);
+  background:linear-gradient(135deg,transparent 50%,rgba(0,0,0,.18) 50%);
   border-radius:0 0 8px 0; z-index:5;
 }
 
-/* ── Cards ── */
+/* ── Cards — auto-sizing tiles ── */
 .pp-cl-card {
   border-radius:6px; border:1px solid var(--ppc-border,rgba(0,0,0,.12));
-  background:var(--ppc-bg,#fff); flex-shrink:0; cursor:pointer;
+  background:var(--ppc-bg,#fff); cursor:pointer; flex:1 1 100px; min-width:100px;
   transition:transform .12s, box-shadow .12s;
   animation:pp-cl-card-in .22s cubic-bezier(0.22,1,0.36,1) both;
+  box-sizing:border-box;
 }
 .pp-cl-card:hover { transform:translateY(-1px); box-shadow:0 3px 10px rgba(0,0,0,.12); }
 @keyframes pp-cl-card-in { from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:none;} }
@@ -208,14 +200,11 @@ function initClustersTool(paneEl, sidebarEl) {
   const iMaxSlider   = paneEl.querySelector('#pp-cl-imax'), iMaxVal = paneEl.querySelector('#pp-cl-imax-val');
   const depthSlider  = paneEl.querySelector('#pp-cl-depth'), depthVal = paneEl.querySelector('#pp-cl-depth-val');
 
-  const CARD_W       = 78;
-  const BODY_GAP     = [7, 5, 4, 3];
-  const BODY_PAD     = [7, 5, 4, 3];
-  const RESIZE_MIN_W = 90;
-  const RESIZE_MIN_H = 50;
-  const NEST_GAP     = 20;   // gap between top-level nests
-  const SUB_GAP      = 10;   // gap between sub-nests inside a depth-0 nest
-  const DRAG_DELAY   = 600;  // ms debounce while slider is being dragged
+  const CARD_W       = 120;  // min card width for tile layout
+  const RESIZE_MIN_W = 120;
+  const RESIZE_MIN_H = 60;
+  const NEST_GAP     = 20;
+  const DRAG_DELAY   = 600;
 
   let _outerMin=2, _outerMax=12, _innerMin=2, _innerMax=4, _depth=2;
   let _rendered=false, _ttRow=null;
@@ -551,24 +540,37 @@ function initClustersTool(paneEl, sidebarEl) {
     });
   }
 
-  // ── Color palette ─────────────────────────────────────────────────────────
-  const PALETTE = [
+  // ── Color: use tab themes from script.js (panelThemeVars) ────────────────
+  // Falls back to a built-in palette if panelThemeVars isn't available.
+  const FALLBACK_PALETTE = [
     { accent: '#4f7af7', bg: '#f0f4ff' }, { accent: '#e05a6a', bg: '#fff0f2' },
     { accent: '#2eb87a', bg: '#edfaf4' }, { accent: '#f59b20', bg: '#fffbf0' },
     { accent: '#9f6ef5', bg: '#f7f0ff' }, { accent: '#20b8c8', bg: '#edfbfd' },
     { accent: '#d4700a', bg: '#fff6ed' }, { accent: '#6aab3e', bg: '#f2fbec' },
   ];
-  function colForPath(path) { return PALETTE[(path[0] || 0) % PALETTE.length]; }
+
+  function colForIndex(i) {
+    // Try to use the global tab theme system
+    if (typeof panelThemeVars === 'function') {
+      const vars = panelThemeVars(i % 5); // cycle through tabs
+      return {
+        accent: vars['--tab-active-bg']    || FALLBACK_PALETTE[i % FALLBACK_PALETTE.length].accent,
+        bg:     vars['--bg-data']          || FALLBACK_PALETTE[i % FALLBACK_PALETTE.length].bg,
+        label:  vars['--tab-active-color'] || '#fff',
+      };
+    }
+    const p = FALLBACK_PALETTE[i % FALLBACK_PALETTE.length];
+    return { accent: p.accent, bg: p.bg, label: '#fff' };
+  }
 
   // ── Card builder ──────────────────────────────────────────────────────────
   function buildCard(r, col, delay) {
-    const cells = r.row && r.row.cells ? r.row.cells : [];
+    const cells = r.row && r.row.cells ? r.row.cells : (r.cells || []);
     const cats  = r.row && r.row.cats  ? r.row.cats.filter(c => c.trim()) : [];
     const best  = cells.reduce((b, c) => c.length > b.length ? c : b, '');
     const parsed = typeof parseCitation === 'function' ? parseCitation(best) : { body: best };
     const card = document.createElement('div');
     card.className = 'pp-cl-card';
-    card.style.width = CARD_W + 'px';
     card.style.setProperty('--ppc-border', col.accent + '88');
     card.style.setProperty('--ppc-bg', col.bg);
     if (delay) card.style.animationDelay = delay + 'ms';
@@ -583,113 +585,99 @@ function initClustersTool(paneEl, sidebarEl) {
   }
 
   // ════════════════════════════════════════════════════════════════════════
-  // ── Recursive nest builder ───────────────────────────────────────────────
+  // ── Nest builder — outer clusters only, tiles inside ────────────────────
+  // Outer nests (depth=0): draggable, resizable, collision-resolved
+  // Inner content: flex-wrap tiles that auto-size — no absolute positioning
   // ════════════════════════════════════════════════════════════════════════
-  function buildNestRecursive(rows, depth, maxDepth, path, alignedAsgn) {
-    const col    = colForPath(path);
-    const isLeaf = depth >= maxDepth;
-    const gap    = BODY_GAP[Math.min(depth, BODY_GAP.length-1)];
-    const pad    = BODY_PAD[Math.min(depth, BODY_PAD.length-1)];
 
-    let children = null;
-    if (!isLeaf) {
-      const asgn = alignedAsgn || autoCluster(rows,
-        depth === 0 ? _outerMin : _innerMin,
-        depth === 0 ? _outerMax : _innerMax
-      );
-      const numC = Math.max(...asgn, 0) + 1;
-      const groups = Array.from({ length: numC }, () => []);
-      rows.forEach((r, i) => groups[asgn[i]].push(r));
-      children = groups.map((members, ci) => ({ members, childPath: [...path, ci] }));
+  // Build a sub-cluster label strip + tiled cards inside a flex container
+  function buildInnerTiles(rows, subAsgn, col, parentPath) {
+    // subAsgn: array of cluster indices per row, or null = all one group
+    const frag = document.createDocumentFragment();
+
+    if (!subAsgn || _depth <= 1) {
+      // No sub-clustering — tile all cards in one row
+      const tileRow = document.createElement('div');
+      tileRow.className = 'pp-cl-tile-row';
+      rows.forEach((r, ri) => tileRow.appendChild(buildCard(r, col, ri * 10)));
+      frag.appendChild(tileRow);
+      return frag;
     }
+
+    // Group by sub-cluster index
+    const numSub = Math.max(...subAsgn, 0) + 1;
+    const groups = Array.from({ length: numSub }, () => []);
+    rows.forEach((r, i) => groups[subAsgn[i]].push(r));
+
+    groups.forEach((members, si) => {
+      if (!members.length) return;
+      const subCol = colForIndex(parentPath * 8 + si); // slight color variation
+
+      // Sub-cluster header strip
+      const strip = document.createElement('div');
+      strip.className = 'pp-cl-sub-strip';
+      strip.style.cssText =
+        'width:100%;display:flex;align-items:center;gap:4px;' +
+        'padding:3px 6px;margin-top:' + (si === 0 ? '0' : '4px') + ';' +
+        'background:' + subCol.accent + '18;border-radius:4px;box-sizing:border-box;';
+      const dot = document.createElement('span');
+      dot.style.cssText = 'width:5px;height:5px;border-radius:50%;background:' + subCol.accent + ';flex-shrink:0;';
+      const lbl = document.createElement('span');
+      lbl.style.cssText = 'font-size:7px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:' + subCol.accent + ';';
+      lbl.textContent = members.length + ' entr' + (members.length === 1 ? 'y' : 'ies');
+      strip.appendChild(dot); strip.appendChild(lbl);
+      frag.appendChild(strip);
+
+      // Tiled cards for this sub-group
+      const tileWrap = document.createElement('div');
+      tileWrap.className = 'pp-cl-tile-row';
+      members.forEach((r, ri) => tileWrap.appendChild(buildCard(r, subCol, ri * 10)));
+      frag.appendChild(tileWrap);
+    });
+
+    return frag;
+  }
+
+  // Build a single outer nest (depth=0) — draggable + resizable container
+  function buildOuterNest(members, outerIdx, subAsgn) {
+    const col = colForIndex(outerIdx);
 
     const nest = document.createElement('div');
     nest.className = 'pp-cl-nest';
-    nest.setAttribute('data-depth', String(depth));
-    nest.style.borderColor = col.accent + (depth === 0 ? '55' : '33');
-    nest.style.background  = col.accent + (depth === 0 ? '0a' : '07');
-    if (depth > 0) nest.style.animationDelay = ((path[path.length-1] || 0) * 30) + 'ms';
+    nest.setAttribute('data-depth', '0');
+    nest.style.borderColor = col.accent + '55';
+    nest.style.background  = col.bg;
 
-    const countLabel = rows.length + ' entr' + (rows.length === 1 ? 'y' : 'ies');
-    const subLabel   = children ? ' \u00b7 ' + children.length + ' group' + (children.length === 1 ? '' : 's') : '';
+    // Head — drag handle
+    const subCount = subAsgn ? (Math.max(...subAsgn, 0) + 1) : 0;
+    const subLabel = subAsgn && _depth > 1 ? ' · ' + subCount + ' group' + (subCount === 1 ? '' : 's') : '';
     const head = document.createElement('div'); head.className = 'pp-cl-nest-head';
-    head.style.background = col.accent + (depth === 0 ? '18' : '10');
+    head.style.background = col.accent + '20';
     const dot = document.createElement('span'); dot.className = 'pp-cl-nest-dot'; dot.style.background = col.accent;
-    const cnt = document.createElement('span'); cnt.className = 'pp-cl-nest-count'; cnt.textContent = countLabel + subLabel;
+    const cnt = document.createElement('span'); cnt.className = 'pp-cl-nest-count';
+    cnt.textContent = members.length + ' entr' + (members.length === 1 ? 'y' : 'ies') + subLabel;
     head.appendChild(dot); head.appendChild(cnt); nest.appendChild(head);
 
-    const body = document.createElement('div'); body.className = 'pp-cl-nest-body';
+    // Body — scrollable tile container (styled via .pp-cl-nest-body CSS)
+    const body = document.createElement('div');
+    body.className = 'pp-cl-nest-body';
     nest.appendChild(body);
 
-    const HEAD_H = 28;
-    function estCardH(r) {
-      const cells = r.row && r.row.cells ? r.row.cells : r.cells || [];
-      const best = cells.reduce((b,c)=>c.length>b.length?c:b,'');
-      const lines = Math.min(4, Math.ceil(best.length / 38));
-      return 28 + lines * 13;
-    }
+    body.appendChild(buildInnerTiles(members, subAsgn, col, outerIdx));
 
-    if (isLeaf) {
-      // ── Leaf: flex-wrap cards (align-items:flex-start applied via CSS) ──
-      body.classList.add('pp-cl-body-leaf');
-      body.style.gap     = gap + 'px';
-      body.style.padding = pad + 'px';
-      rows.forEach((r, ri) => body.appendChild(buildCard(r, col, ri * 14)));
+    // Estimate size for layout
+    const CARD_H_EST = 52, CARD_COLS = 3;
+    const numRows = Math.ceil(members.length / CARD_COLS);
+    const bodyH   = Math.max(80, numRows * (CARD_H_EST + 5) + 14 + (subAsgn && _depth > 1 ? subCount * 18 : 0));
+    const nestW   = Math.max(RESIZE_MIN_W, CARD_W * CARD_COLS + 5 * (CARD_COLS - 1) + 14);
+    const nestH   = Math.max(RESIZE_MIN_H, 28 + bodyH);
+    nest.style.width  = nestW + 'px';
+    nest.style.height = nestH + 'px';
+    body.style.height = bodyH + 'px';
+    nest._estW = nestW; nest._estH = nestH;
 
-      const cols_        = Math.min(rows.length, 3);
-      const numRowsGrid  = Math.ceil(rows.length / cols_);
-      const totalCardH   = rows.reduce((s,r)=>s+estCardH(r),0);
-      const avgCardH     = Math.max(60, totalCardH / Math.max(rows.length,1));
-      const estW = Math.max(RESIZE_MIN_W, pad * 2 + cols_ * CARD_W + (cols_ - 1) * gap);
-      const estH = Math.max(RESIZE_MIN_H, HEAD_H + pad * 2 + numRowsGrid * avgCardH + (numRowsGrid - 1) * gap);
-      nest.style.width  = estW + 'px';
-      nest.style.height = estH + 'px';
-      body.style.height = (estH - HEAD_H) + 'px';
-      nest._estW = estW; nest._estH = estH;
-
-    } else {
-      // ── Non-leaf: absolute-position children + collision-resolve ─────
-      const validChildren = (children || []).filter(c => c.members.length > 0);
-      const childEls = validChildren.map(({ members, childPath }) => {
-        const child = buildNestRecursive(members, depth + 1, maxDepth, childPath, null);
-        if (depth + 1 < maxDepth || depth === 0) makeNestDraggable(child);
-        return child;
-      });
-
-      // Initial grid spread — well-spaced so fewer collision passes needed
-      const rects = childEls.map((el, i) => {
-        const cols = Math.max(1, Math.ceil(Math.sqrt(childEls.length)));
-        const col_ = i % cols, row_ = Math.floor(i / cols);
-        return {
-          x: pad + col_ * ((el._estW || 140) + SUB_GAP * 2),
-          y: pad + row_ * ((el._estH || 100) + SUB_GAP * 2),
-          w: el._estW || 140,
-          h: el._estH || 100,
-          el
-        };
-      });
-
-      resolveCollisions(rects, SUB_GAP, 160);
-      rects.forEach(r => { r.x = Math.max(pad, r.x); r.y = Math.max(pad, r.y); });
-      rects.forEach(r => {
-        r.el.style.left = r.x + 'px';
-        r.el.style.top  = r.y + 'px';
-        body.appendChild(r.el);
-      });
-
-      const maxRight  = Math.max(...rects.map(r => r.x + r.w)) + pad;
-      const maxBottom = Math.max(...rects.map(r => r.y + r.h)) + pad;
-      const nestW = Math.max(RESIZE_MIN_W, maxRight);
-      const nestH = Math.max(RESIZE_MIN_H, HEAD_H + maxBottom);
-      nest.style.width    = nestW + 'px';
-      nest.style.height   = nestH + 'px';
-      body.style.height   = maxBottom + 'px';
-      body.style.position = 'relative';
-      nest._estW = nestW; nest._estH = nestH;
-    }
-
+    makeNestDraggable(nest);
     makeResizable(nest);
-    if (depth === 0) makeNestDraggable(nest);
     return nest;
   }
 
@@ -699,29 +687,31 @@ function initClustersTool(paneEl, sidebarEl) {
     emptyEl.style.display = 'none';
     _panX = 0; _panY = 0; _zoom = 1; applyWorldTransform(); _topZ = 10;
 
-    const maxDepth = _depth - 1;
-    const topAsgn   = autoCluster(rows, _outerMin, _outerMax);
-    const numTop    = Math.max(...topAsgn, 0) + 1;
+    // Outer clustering
+    const topAsgn  = autoCluster(rows, _outerMin, _outerMax);
+    const numTop   = Math.max(...topAsgn, 0) + 1;
     const topGroups = Array.from({ length: numTop }, () => []);
     rows.forEach((r, i) => topGroups[topAsgn[i]].push(r));
 
+    // Sub-clustering (aligned across groups)
     let alignedAsgns = null;
     const nonEmpty = topGroups.filter(g => g.length > 0);
-    if (maxDepth >= 1 && nonEmpty.length > 1) {
+    if (_depth > 1 && nonEmpty.length > 1) {
       alignedAsgns = alignedSubCluster(nonEmpty, _innerMin, _innerMax);
     }
 
+    // Build outer nests
     const nestEls = [];
     let alignIdx = 0;
     topGroups.forEach((members, oi) => {
       if (!members.length) return;
-      const asgn = (alignedAsgns && maxDepth >= 1) ? alignedAsgns[alignIdx++] : null;
-      const nest = buildNestRecursive(members, 0, maxDepth, [oi], asgn);
+      const subAsgn = (alignedAsgns && _depth > 1) ? alignedAsgns[alignIdx++] : null;
+      const nest = buildOuterNest(members, oi, subAsgn);
       nest.style.animationDelay = (oi * 55) + 'ms';
       world.appendChild(nest); nestEls.push(nest);
     });
 
-    // Top-level collision resolution using estimated sizes
+    // Top-level collision resolution
     const cols = Math.max(1, Math.ceil(Math.sqrt(nestEls.length)));
     const topRects = nestEls.map((n, i) => ({
       x: NEST_GAP + (i % cols) * ((n._estW || 200) + NEST_GAP * 2),
@@ -743,7 +733,7 @@ function initClustersTool(paneEl, sidebarEl) {
       r.el.style.top  = (r.y + offY) + 'px';
     });
 
-    subtitle.textContent = numTop + ' cluster' + (numTop === 1 ? '' : 's') + ' \u00b7 ' + rows.length + ' entries';
+    subtitle.textContent = numTop + ' cluster' + (numTop === 1 ? '' : 's') + ' · ' + rows.length + ' entries';
   }
 
   // ── Embedding pipeline ────────────────────────────────────────────────────
