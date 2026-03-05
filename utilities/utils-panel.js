@@ -94,7 +94,11 @@ function createSidePanel(hostEl, options) {
     panel.appendChild(handle);
   }
 
+  if (options.side === 'left') {
+  hostEl.prepend(panel);
+} else {
   hostEl.appendChild(panel);
+}
   document.body.appendChild(handleFixed);
 
   // ── CSS variable helpers ─────────────────────────────────────────
@@ -132,23 +136,23 @@ function createSidePanel(hostEl, options) {
   }
 
   // ── Fixed handle positioning ─────────────────────────────────────
-  function positionFixedHandle() {
-    const rect = panel.getBoundingClientRect();
-    const hw   = handleW();
-    handleFixed.style.width  = hw + 'px';
-    handleFixed.style.height = rect.height + 'px';
-    handleFixed.style.top    = rect.top + 'px';
-    if (options.side === 'right') {
-      handleFixed.style.left  = rect.left + 'px';
-      handleFixed.style.right = '';
-    } else {
-      handleFixed.style.right = (window.innerWidth - rect.right) + 'px';
-      handleFixed.style.left  = '';
-    }
-    const useFixed = Math.round(rect.width) < hw + 2;
-    handleFixed.classList.toggle('active', useFixed);
-    handle.style.opacity = useFixed ? '0' : '1';
+ function positionFixedHandle() {
+  const rect = panel.getBoundingClientRect();
+  const hw   = handleW();
+  handleFixed.style.width  = hw + 'px';
+  handleFixed.style.height = rect.height + 'px';
+  handleFixed.style.top    = rect.top + 'px';
+  if (options.side === 'right') {
+    handleFixed.style.left  = rect.left + 'px';
+    handleFixed.style.right = '';
+  } else {
+    handleFixed.style.left  = rect.right - hw + 'px';
+    handleFixed.style.right = '';
   }
+  const useFixed = Math.round(rect.width) < hw + 2;
+  handleFixed.classList.toggle('active', useFixed);
+  handle.style.opacity = useFixed ? '0' : '1';
+}
 
   // ── Set width (instant) ──────────────────────────────────────────
   function setWidth(w) {
