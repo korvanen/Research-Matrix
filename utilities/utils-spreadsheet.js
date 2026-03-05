@@ -1,7 +1,7 @@
 // ════════════════════════════════════════════════════════════════
 // utils-spreadsheet.js — spreadsheet viewer logic
 // Loaded only by: tools/spreadsheet.html
-// Depends on: utils-shared.js being loaded first
+// Depends on: utils-shared.js loaded first
 // ════════════════════════════════════════════════════════════════
 console.log('[utils-spreadsheet.js]');
 
@@ -65,33 +65,140 @@ const ARROW_SIZE                   = () => R().arrowSize;
 const ARROW_OFFSET                 = () => R().arrowOffset;
 const TAB_BAR_PADDING              = () => Math.round(window.innerHeight * R().tabBarPadding);
 const TAB_BAR_INSET                = () => Math.round(window.innerHeight * R().tabBarInset);
+const PANEL_GOTO_DELAY             = 320; // ms before "Go to ↗" button appears on hover
 
 // ── DOM refs ─────────────────────────────────────────────────────
-const sidebar        = document.getElementById('sidebar');
-const dragHandle     = document.getElementById('drag-handle');
-const corner         = document.getElementById('corner');
-const headerScroll   = document.getElementById('header-scroll');
-const catScroll      = document.getElementById('cat-scroll');
-const dataScroll     = document.getElementById('data-scroll');
-const headerTable    = document.getElementById('header-table');
-const headerRow      = document.getElementById('header-row');
-const catTable       = document.getElementById('cat-table');
-const catBody        = document.getElementById('cat-body');
-const dataTable      = document.getElementById('data-table');
-const dataBody       = document.getElementById('data-body');
-const tabBar         = document.getElementById('tab-bar');
-const topbar         = document.getElementById('topbar');
-const topbarGlobal   = document.getElementById('topbar-global');
-const topbarSheet    = document.getElementById('topbar-sheet');
-const bottombar      = document.querySelector('.bottombar');
-const loadingOverlay = document.getElementById('loading-overlay');
-const sidebarBox     = document.getElementById('sidebar-box');
+const sidebar         = document.getElementById('sidebar');
+const dragHandle      = document.getElementById('drag-handle');
+const corner          = document.getElementById('corner');
+const headerScroll    = document.getElementById('header-scroll');
+const catScroll       = document.getElementById('cat-scroll');
+const dataScroll      = document.getElementById('data-scroll');
+const headerTable     = document.getElementById('header-table');
+const headerRow       = document.getElementById('header-row');
+const catTable        = document.getElementById('cat-table');
+const catBody         = document.getElementById('cat-body');
+const dataTable       = document.getElementById('data-table');
+const dataBody        = document.getElementById('data-body');
+const tabBar          = document.getElementById('tab-bar');
+const topbar          = document.getElementById('topbar');
+const topbarGlobal    = document.getElementById('topbar-global');
+const topbarSheet     = document.getElementById('topbar-sheet');
+const bottombar       = document.querySelector('.bottombar');
+const loadingOverlay  = document.getElementById('loading-overlay');
+const sidebarBox      = document.getElementById('sidebar-box');
 const dragHandleFixed = document.getElementById('drag-handle-fixed');
 
 let activeTab    = 0;
 let NUM_CAT_COLS = 1;
 
-// ── Build spans ───────────────────────────────────────────────────
+// ════════════════════════════════════════════════════════════════
+// GOTO NAVIGATION
+// (moved from utils-sidepanel.js — needs live spreadsheet DOM)
+// ════════════════════════════════════════════════════════════════
+
+// Returns the data-column index with the most shared-keyword hits.
+// Falls back to the first non-empty column, then 0.
+function _bestColForMatch(match) {
+  if (!match || !match.row || !match.row.cells) return 0;
+  var cells  = match.row.cells;
+  var shared = match.shared;
+  var bestIdx = -1, bestScore = -1;
+  cells.forEach(function(cell, ci) {
+    if (!cell || !cell.trim()) return;
+    var score = 0;
+    if (shared && typeof shared.forEach === 'function') {
+      var kws = typeof panelExtractKW === 'function' ? panelExtractKW(cell) : [];
+      shared.forEach(function(k) { if (kws.indexOf(k) !== -1) score++; });
+    }
+    if (score > bestScore || bestIdx === -1) { bestScore = score; bestIdx = ci; }
+  });
+  return bestIdx >= 0 ? bestIdx : 0;
+}
+
+// Switches to the correct tab, then selects and scrolls to the target cell.
+// colIdx — explicit column (0-based). Omit to auto-pick by keyword overlap.
+function panelGoTo(match, colIdx) {
+  var tabIdx    = match.tabIdx;
+  var rowIdx    = match.rowIdx;
+  var targetCol = (typeof colIdx === 'number' && colIdx >= 0)
+    ? colIdx
+    : _bestColForMatch(match);
+
+  var needsTabSwitch = activeTab !== tabIdx;
+
+  if (needsTabSwitch) {
+    activeTab = tabIdx;
+    buildTabBar();
+    showTab(tabIdx);
+  }
+
+  function doSelect() {
+    clearSelection();
+    var dataRows = Array.from(dataBody.querySelectorAll('tr'));
+    var tr = dataRows[rowIdx];
+    if (!tr) return;
+    var tds = Array.from(tr.querySelectorAll('td'));
+    var td  = tds[targetCol] !== undefined ? tds[targetCol] : tds[0];
+    if (!td) return;
+    var targets = getHighlightTargets(td);
+    if (targets) {
+      applySelection(targets);
+      td.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    } else {
+      td.classList.add('selected-cell');
+      td.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }
+
+  // After a tab switch, showTab fires two nested rAFs before the layout
+  // is stable — setTimeout pushes past both of them.
+  needsTabSwitch ? setTimeout(doSelect, 150) : requestAnimationFrame(doSelect);
+}
+
+// Attaches a hover "Go to ↗" button to a result card.
+// Best column is computed once at attach time so every click lands correctly.
+function attachGoTo(card, match, accentColor) {
+  var bestCol    = _bestColForMatch(match);
+  var hoverTimer = null;
+  var btn        = null;
+
+  function showBtn() {
+    if (btn) return;
+    btn = document.createElement('button');
+    btn.className   = 'pp-goto-btn';
+    btn.textContent = 'Go to ↗';
+    btn.style.borderColor = accentColor || 'rgba(0,0,0,.2)';
+    btn.style.color       = accentColor || 'rgba(0,0,0,.6)';
+    btn.addEventListener('click', function(e) { e.stopPropagation(); panelGoTo(match, bestCol); });
+    btn.addEventListener('mouseenter', function() { clearTimeout(hoverTimer); });
+    btn.addEventListener('mouseleave', hideBtn);
+    card.appendChild(btn);
+    requestAnimationFrame(function() { btn && btn.classList.add('pp-goto-visible'); });
+  }
+
+  function hideBtn() {
+    if (!btn) return;
+    var b = btn; btn = null;
+    b.classList.remove('pp-goto-visible');
+    setTimeout(function() { if (b.parentNode) b.parentNode.removeChild(b); }, 180);
+  }
+
+  card.addEventListener('mouseenter', function() {
+    clearTimeout(hoverTimer);
+    hoverTimer = setTimeout(showBtn, PANEL_GOTO_DELAY);
+  });
+  card.addEventListener('mouseleave', function(e) {
+    clearTimeout(hoverTimer);
+    if (btn && btn.contains(e.relatedTarget)) return;
+    hideBtn();
+  });
+}
+
+// ════════════════════════════════════════════════════════════════
+// SPREADSHEET RENDERING
+// ════════════════════════════════════════════════════════════════
+
 function buildSpans(rows, numLevels) {
   const allSpans = [];
   for (let level = 0; level < numLevels; level++) {
@@ -106,8 +213,7 @@ function buildSpans(rows, numLevels) {
         i += count;
       }
     } else {
-      const parentSpans = allSpans[level - 1];
-      parentSpans.forEach(({ start, count: parentCount }) => {
+      allSpans[level - 1].forEach(({ start, count: parentCount }) => {
         let i = start;
         const end = start + parentCount;
         while (i < end) {
@@ -124,7 +230,6 @@ function buildSpans(rows, numLevels) {
   return allSpans;
 }
 
-// ── Render ────────────────────────────────────────────────────────
 function renderSheet(data) {
   NUM_CAT_COLS = data.catIndices.length || 1;
   const spans    = buildSpans(data.rows, NUM_CAT_COLS);
@@ -164,7 +269,7 @@ function renderSheet(data) {
     const tr = document.createElement('tr');
     row.cells.forEach(val => {
       const td = document.createElement('td');
-      const _parsed = typeof parseCitation === 'function' ? parseCitation(val) : { body: val };
+      const _parsed = parseCitation(val); // from utils-shared.js
       td.textContent = _parsed.body;
       if (groupEndRows.has(ri)) td.classList.add('group-end');
       tr.appendChild(td);
@@ -175,7 +280,10 @@ function renderSheet(data) {
   updateLayout(data.headers.length);
 }
 
-// ── Category cell rotation ────────────────────────────────────────
+// ════════════════════════════════════════════════════════════════
+// CATEGORY COLUMN ROTATION
+// ════════════════════════════════════════════════════════════════
+
 const _rotatedMinH = new Map();
 
 function _measureTextWidth(text, td) {
@@ -203,8 +311,7 @@ function applyRotations() {
     td.classList.remove('cat-rotated');
     td.style.height = '';
   });
-  const catRows = Array.from(catBody.querySelectorAll('tr'));
-  catRows.forEach((tr, rowIdx) => {
+  Array.from(catBody.querySelectorAll('tr')).forEach((tr, rowIdx) => {
     Array.from(tr.querySelectorAll('td')).forEach(td => {
       const text = td.textContent.trim();
       if (!text) return;
@@ -224,7 +331,10 @@ function applyRotations() {
   });
 }
 
-// ── Layout ────────────────────────────────────────────────────────
+// ════════════════════════════════════════════════════════════════
+// LAYOUT
+// ════════════════════════════════════════════════════════════════
+
 function updateLayout(numDataCols) {
   numDataCols = numDataCols ?? dataTable.querySelectorAll('tbody tr:first-child td').length;
   if (!numDataCols) return;
@@ -259,8 +369,7 @@ function _doSyncRowHeights() {
   _rotatedMinH.forEach(({ neededH, rowspan }, startRow) => {
     const cumH = naturalH.slice(startRow, startRow + rowspan).reduce((a, b) => a + b, 0);
     if (cumH >= neededH) return;
-    const deficit = neededH - cumH;
-    const newH = naturalH[startRow] + deficit;
+    const newH = naturalH[startRow] + (neededH - cumH);
     dataRows[startRow].style.height = newH + 'px';
     catRows[startRow].style.height  = newH + 'px';
     naturalH[startRow] = newH;
@@ -286,7 +395,10 @@ if (window.ResizeObserver) {
   }).observe(dataScroll);
 }
 
-// ── Highlight & Selection ─────────────────────────────────────────
+// ════════════════════════════════════════════════════════════════
+// HIGHLIGHT & SELECTION
+// ════════════════════════════════════════════════════════════════
+
 let selectedElements = [];
 
 function clearHighlights() {
@@ -359,7 +471,10 @@ function applyTheme(themeName) {
   Object.entries(vars).forEach(([k, v]) => document.documentElement.style.setProperty(k, v));
 }
 
-// ── Tab bar ───────────────────────────────────────────────────────
+// ════════════════════════════════════════════════════════════════
+// TAB BAR
+// ════════════════════════════════════════════════════════════════
+
 let tabBarMode = 'full';
 
 function getTabBarMode() {
@@ -403,8 +518,7 @@ function buildTabBar() {
 function buildTabBarCompact() {
   tabBar.innerHTML = '';
   bottombar.classList.add('tabs-compact');
-  const sidebarW  = sidebar.offsetWidth;
-  const available = Math.max(0, window.innerWidth - sidebarW);
+  const available = Math.max(0, window.innerWidth - sidebar.offsetWidth);
   tabBar.style.width = available + 'px';
   if (!TABS.length) return;
   const tabData = processSheetData(TABS[activeTab].grid);
@@ -444,7 +558,10 @@ function buildTabBarCompact() {
   tabBar.appendChild(nextBtn);
 }
 
-// ── Sidebar overlap ───────────────────────────────────────────────
+// ════════════════════════════════════════════════════════════════
+// SIDEBAR
+// ════════════════════════════════════════════════════════════════
+
 function updateSidebarOverlap(skipTabRebuild) {
   const sidebarW   = sidebar.offsetWidth;
   const threshold  = SIDEBAR_OVERLAP_THRESHOLD();
@@ -498,7 +615,6 @@ function applyBarSizes_noOverlap() {
   document.documentElement.style.setProperty('--tab-bar-inset',       TAB_BAR_INSET()   + 'px');
 }
 
-// ── Handle arrows ─────────────────────────────────────────────────
 function updateHandleArrows(forcedWidth) {
   const sidebarW     = forcedWidth !== undefined ? forcedWidth : sidebar.offsetWidth;
   const isClosed     = sidebarW <= SIDEBAR_MIN() + 4;
@@ -523,9 +639,8 @@ function positionDragHandle() {
   dragHandle.style.opacity = useFixed ? '0' : '1';
 }
 
-// ── Sidebar animation ─────────────────────────────────────────────
+// ── Mind-map snapshot (cross-panel state save/restore) ────────────
 let _mmSnapshot = null;
-
 function saveMmSnapshot() {
   window.__mmSnapshotData = null;
   document.dispatchEvent(new CustomEvent('mm-snapshot-request', { bubbles: false }));
@@ -536,6 +651,7 @@ function restoreMmSnapshot() {
   document.dispatchEvent(new CustomEvent('mm-snapshot-restore', { detail: _mmSnapshot, bubbles: false }));
 }
 
+// ── Sidebar animation ─────────────────────────────────────────────
 function animateSidebarTo(targetW, { restoreMm = false } = {}) {
   if (animateSidebarTo._rafId) cancelAnimationFrame(animateSidebarTo._rafId);
   const startW     = parseFloat(sidebar.style.width) || sidebar.getBoundingClientRect().width;
@@ -661,7 +777,6 @@ document.addEventListener('mouseup', () => {
   else { updateHandleArrows(); positionDragHandle(); }
 });
 
-// ── Handle arrow clicks ───────────────────────────────────────────
 document.addEventListener('click', e => {
   const btn = e.target.closest('.handle-arrow');
   if (!btn) return;
@@ -677,7 +792,10 @@ document.addEventListener('click', e => {
   }
 });
 
-// ── Hover & selection ─────────────────────────────────────────────
+// ════════════════════════════════════════════════════════════════
+// HOVER & SELECTION EVENTS
+// ════════════════════════════════════════════════════════════════
+
 function setupHover() {
   [dataBody, catBody, headerRow].forEach(container => {
     container.addEventListener('mouseover',  e => { clearHighlights(); applyHighlight(getHighlightTargets(e.target)); });
@@ -697,8 +815,15 @@ function setupHover() {
           if (anyIntersects) {
             allTargetEls.forEach(el => { el.classList.remove('selected-cell', 'selected-group'); selectedElements = selectedElements.filter(s => s !== el); });
           } else {
-            targets.group.forEach(el => { if (!el.classList.contains('selected-cell') && !el.classList.contains('selected-group')) { el.classList.add('selected-group'); selectedElements.push(el); } });
-            targets.focal.forEach(el => { el.classList.remove('selected-group'); el.classList.add('selected-cell'); if (!selectedElements.includes(el)) selectedElements.push(el); });
+            targets.group.forEach(el => {
+              if (!el.classList.contains('selected-cell') && !el.classList.contains('selected-group')) {
+                el.classList.add('selected-group'); selectedElements.push(el);
+              }
+            });
+            targets.focal.forEach(el => {
+              el.classList.remove('selected-group'); el.classList.add('selected-cell');
+              if (!selectedElements.includes(el)) selectedElements.push(el);
+            });
           }
         }
       } else {
@@ -720,24 +845,29 @@ dataScroll.addEventListener('scroll', () => {
   catScroll.scrollTop     = dataScroll.scrollTop;
 });
 
-// ── Show tab ──────────────────────────────────────────────────────
+// ════════════════════════════════════════════════════════════════
+// SHOW TAB
+// ════════════════════════════════════════════════════════════════
+
 function showTab(idx) {
   const data = processSheetData(TABS[idx].grid);
   if (!data) { dataBody.innerHTML = '<tr><td>No data found</td></tr>'; return; }
   applyTheme(TAB_THEMES[idx] || 'default');
-  topbarSheet.textContent  = data.title || TABS[idx].name;
-  dataScroll.scrollTop     = 0;
-  dataScroll.scrollLeft    = 0;
+  topbarSheet.textContent = data.title || TABS[idx].name;
+  dataScroll.scrollTop    = 0;
+  dataScroll.scrollLeft   = 0;
   renderSheet(data);
 }
 
-// ── Resize ────────────────────────────────────────────────────────
+// ════════════════════════════════════════════════════════════════
+// RESIZE
+// ════════════════════════════════════════════════════════════════
+
 function fixBottombar() {
   if (!bottombar) return;
-  const bh = BOTTOMBAR_HEIGHT();
   bottombar.style.height = bottombar.style.minHeight = '';
   requestAnimationFrame(() => requestAnimationFrame(() => {
-    bottombar.style.height = bottombar.style.minHeight = bh + 'px';
+    bottombar.style.height = bottombar.style.minHeight = BOTTOMBAR_HEIGHT() + 'px';
   }));
 }
 
@@ -761,7 +891,10 @@ if (window.visualViewport) {
   window.visualViewport.addEventListener('resize', fixBottombar);
 }
 
-// ── Init ──────────────────────────────────────────────────────────
+// ════════════════════════════════════════════════════════════════
+// INIT
+// ════════════════════════════════════════════════════════════════
+
 window.onerror = (msg, src, line, col, err) => {
   loadingOverlay.style.cssText = 'display:flex;color:red;font-size:13px;padding:20px;text-align:center';
   loadingOverlay.textContent   = `JS Error: ${msg} (line ${line})`;
@@ -777,7 +910,6 @@ updateHandleArrows();
 positionDragHandle();
 tabBar.innerHTML = '<div style="padding:8px 12px;color:#999;font-size:12px">Loading…</div>';
 
-// Wait for utils-shared.js to populate window.TABS then render
 function _waitForTabs() {
   if (window.TABS && window.TABS.length) {
     buildTabBar();
