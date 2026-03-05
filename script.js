@@ -86,6 +86,21 @@ const TAB_THEMES = [
   'yellow',
 ];
 
+// ── Global shared palette ─────────────────────────────────────────────────
+// Single source of truth consumed by all tools (clusters, concept-map, etc.)
+// Order: visions(0), relational(1), organizational(2), physical(3),
+//        yellow(4), default(5) — index-stable; do not reorder.
+// Built immediately after THEMES so tools can read window.PP_PALETTE at any time.
+window.PP_PALETTE = ['visions', 'relational', 'organizational', 'physical', 'yellow', 'default']
+  .map(name => {
+    const t = THEMES[name] || THEMES.default || {};
+    return {
+      accent: t['--tab-active-bg']    || '#4f7af7',
+      bg:     t['--bg-data']          || '#f0f4ff',
+      label:  t['--tab-active-color'] || '#ffffff',
+    };
+  });
+
 // ── Color utility ──
 function hexToRgb(hex) {
   const n = parseInt(hex.replace('#', ''), 16);
@@ -350,7 +365,6 @@ function renderSheet(data) {
     const tr = document.createElement('tr');
     row.cells.forEach(val => {
       const td = document.createElement('td');
-      // Strip trailing citation from display; it appears in sidebar cards as a pill
       const _parsed = typeof parseCitation === 'function' ? parseCitation(val) : { body: val };
       td.textContent = _parsed.body;
       if (groupEndRows.has(ri)) td.classList.add('group-end');
@@ -363,10 +377,7 @@ function renderSheet(data) {
 }
 
 // ── Category cell rotation ──
-// Measures each category td; if the text is too wide to fit on one line,
-// wraps it in a rotated inner span and records the minimum height needed
-// so that _doSyncRowHeights can respect it.
-const _rotatedMinH = new Map(); // rowIndex (of first row in span) -> { neededH, rowspan }
+const _rotatedMinH = new Map();
 
 function _measureTextWidth(text, td) {
   const cs = getComputedStyle(td);
@@ -387,44 +398,29 @@ function _measureTextWidth(text, td) {
 
 function applyRotations() {
   _rotatedMinH.clear();
-
-  // Reset any previous rotation state
   catBody.querySelectorAll('td.cat-rotated').forEach(td => {
     const inner = td.querySelector('.cat-inner');
     if (inner) td.textContent = inner.textContent;
     td.classList.remove('cat-rotated');
     td.style.height = '';
   });
-
-  // Walk all cat tds; each td that has text may need rotation
-  // We need to know the rowIndex of the first row of each span.
-  // catBody rows map 1:1 with data rows; a td with rowSpan > 1 only
-  // appears in the first tr of its span.
   const catRows = Array.from(catBody.querySelectorAll('tr'));
   catRows.forEach((tr, rowIdx) => {
     Array.from(tr.querySelectorAll('td')).forEach(td => {
       const text = td.textContent.trim();
       if (!text) return;
-
       const catW   = td.getBoundingClientRect().width;
-      const padH   = 28; // 14px padding each side, used for horizontal fit check
+      const padH   = 28;
       const textW  = _measureTextWidth(text, td);
-
-      if (textW <= catW - padH) return; // fits — leave as normal
-
-      // Needs rotation
+      if (textW <= catW - padH) return;
       td.classList.add('cat-rotated');
       const inner = document.createElement('span');
       inner.className = 'cat-inner';
       inner.textContent = text;
       td.textContent = '';
       td.appendChild(inner);
-
-      // After -90° rotation: text width becomes height requirement
-      const neededH = Math.ceil(textW) + 12; // +12px breathing room
+      const neededH = Math.ceil(textW) + 12;
       inner.style.width = neededH + 'px';
-
-      // Record minimum height for this span so syncRowHeights can enforce it
       _rotatedMinH.set(rowIdx, { neededH, rowspan: td.rowSpan || 1 });
     });
   });
@@ -463,18 +459,10 @@ function syncRowHeights() {
 function _doSyncRowHeights() {
   const dataRows = Array.from(dataBody.querySelectorAll('tr'));
   const catRows  = Array.from(catBody.querySelectorAll('tr'));
-
-  // Clear all explicit heights so we can measure natural sizes
   dataRows.forEach(tr => tr.style.height = '');
   catRows.forEach(tr  => tr.style.height = '');
   void dataBody.offsetHeight;
-
-  // Natural heights after clearing
   const naturalH = dataRows.map(tr => tr.getBoundingClientRect().height);
-
-  // For each rotated cat cell, ensure the cumulative height of its spanned
-  // data rows is at least as tall as the rotated text needs.
-  // If not, add the deficit to the first row of the span.
   _rotatedMinH.forEach(({ neededH, rowspan }, startRow) => {
     const cumH = naturalH.slice(startRow, startRow + rowspan).reduce((a, b) => a + b, 0);
     if (cumH >= neededH) return;
@@ -482,10 +470,8 @@ function _doSyncRowHeights() {
     const newH = naturalH[startRow] + deficit;
     dataRows[startRow].style.height = newH + 'px';
     catRows[startRow].style.height  = newH + 'px';
-    naturalH[startRow] = newH; // keep array consistent for subsequent spans
+    naturalH[startRow] = newH;
   });
-
-  // Standard max-sync: each row gets height = max(data row, cat row)
   dataRows.forEach((dataRow, i) => {
     const catRow = catRows[i];
     if (!catRow) return;
@@ -493,7 +479,6 @@ function _doSyncRowHeights() {
     dataRow.style.height = h + 'px';
     catRow.style.height  = h + 'px';
   });
-
   const scrollbarH = dataScroll.offsetHeight - dataScroll.clientHeight;
   const scrollbarW = dataScroll.offsetWidth  - dataScroll.clientWidth;
   catScroll.style.paddingBottom   = scrollbarH + 'px';
@@ -998,13 +983,13 @@ applyBarSizes();
 setupHover();
 updateHandleArrows();
 positionDragHandle();
-tabBar.innerHTML = '<div style="padding:8px 12px;color:#999;font-size:12px">Loading…</div>';
+tabBar.innerHTML = '<div style="padding:8px 12px;color:#999;font-size:12px">Loading\u2026</div>';
 
 (async () => {
   try {
-    loadingOverlay.textContent = 'Fetching data…';
+    loadingOverlay.textContent = 'Fetching data\u2026';
     const all = await fetchODS();
-    loadingOverlay.textContent = `Fetched ${all.length} sheets, filtering…`;
+    loadingOverlay.textContent = `Fetched ${all.length} sheets, filtering\u2026`;
     TABS = all.filter(s => s.name.includes('MX'));
     if (!TABS.length) {
       loadingOverlay.textContent = `No MX tabs found. Sheets: ${all.map(s=>s.name).join(', ')}`;
@@ -1012,11 +997,11 @@ tabBar.innerHTML = '<div style="padding:8px 12px;color:#999;font-size:12px">Load
       tabBar.innerHTML = '';
       return;
     }
-    loadingOverlay.textContent = `Building ${TABS.length} tabs…`;
+    loadingOverlay.textContent = `Building ${TABS.length} tabs\u2026`;
     buildTabBar();
     showTab(0);
     loadingOverlay.style.display = 'none';
-    if (typeof initEmbeddings === 'function') initEmbeddings(); // ← add this
+    if (typeof initEmbeddings === 'function') initEmbeddings();
   } catch (err) {
     console.error(err);
     loadingOverlay.style.cssText = 'display:flex;color:red;font-size:13px;padding:20px;text-align:center';
