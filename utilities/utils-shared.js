@@ -1,18 +1,66 @@
 // ════════════════════════════════════════════════════════════════
-// utils-shared.js — shared data + theme utilities
+// utils-shared.js — shared data, theme, and UI utilities
 // Loaded by: index.html, tools/spreadsheet.html, tools/*.html
 // ════════════════════════════════════════════════════════════════
 console.log('[utils-shared.js]');
 
 const XLSX_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRKom5SD7yrnPoGV4pzsf4f20uv0nkrZXEDRA6_-g_ZTogUVBNPzeDAr4Przl7WA9Y07ev5XNuZbhTz/pub?output=xlsx';
 
-// ── Color utilities ──────────────────────────────────────────────
+// ════════════════════════════════════════════════════════════════
+// HTML / TEXT UTILITIES
+// ════════════════════════════════════════════════════════════════
+
+function panelEscH(t) {
+  return String(t == null ? '' : t)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// Wraps whole-word keyword matches in <mark class="pkw">
+function panelHighlight(text, kwSet) {
+  if (!kwSet || !kwSet.size) return panelEscH(text);
+  const pat = new RegExp(
+    '\\b(' + [...kwSet].map(k => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|') + ')\\b', 'gi'
+  );
+  return panelEscH(text).replace(pat, m => '<mark class="pkw">' + m + '</mark>');
+}
+
+// ════════════════════════════════════════════════════════════════
+// CITATION PARSING
+// ════════════════════════════════════════════════════════════════
+
+// Extracts a trailing (Author, Year) from the end of cell text only —
+// mid-sentence parens like "(between elements)" are never matched.
+var _citationRe = /\s*\(([^)]+)\)\s*\.?\s*$/;
+
+function parseCitation(text) {
+  text = String(text == null ? '' : text);
+  var m = _citationRe.exec(text);
+  if (!m) return { body: text, citation: null };
+  return {
+    body:     text.slice(0, m.index).trimEnd(),
+    citation: m[1],
+  };
+}
+
+function citationPillHtml(citation, accentColor, textColor) {
+  if (!citation) return '';
+  return '<span class="pp-cite-pill" style="background:' +
+    panelEscH(accentColor) + ';color:' + panelEscH(textColor) + '">' +
+    panelEscH(citation) + '</span>';
+}
+
+// ════════════════════════════════════════════════════════════════
+// COLOR UTILITIES
+// ════════════════════════════════════════════════════════════════
+
 function hexToRgb(hex) {
   const n = parseInt(hex.replace('#', ''), 16);
   return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
 }
 function rgbToHex({ r, g, b }) {
-  return '#' + [r, g, b].map(v => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')).join('');
+  return '#' + [r, g, b].map(v =>
+    Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')
+  ).join('');
 }
 function rgbToHsl({ r, g, b }) {
   r /= 255; g /= 255; b /= 255;
@@ -57,6 +105,10 @@ function modifyColor(hex, { lightness = 0, saturation = 0, hue = 0, alpha } = {}
   if (alpha !== undefined) return `rgba(${r}, ${g}, ${b}, ${Math.max(0, Math.min(1, alpha))})`;
   return rgbToHex({ r, g, b });
 }
+
+// ════════════════════════════════════════════════════════════════
+// THEMES
+// ════════════════════════════════════════════════════════════════
 
 function makeTheme(base) {
   const themeColor_1 = modifyColor(base, { lightness:  0.4  });
@@ -103,7 +155,6 @@ function makeTheme(base) {
   };
 }
 
-// ── Themes ───────────────────────────────────────────────────────
 const THEMES = {
   default:        makeTheme('#a1a1a1'),
   visions:        makeTheme('#346754'),
@@ -132,7 +183,103 @@ window.PP_PALETTE = ['visions', 'relational', 'organizational', 'physical', 'yel
     };
   });
 
-// ── XLSX fetch & parse ────────────────────────────────────────────
+// Returns the THEMES entry for a given tab index
+function panelThemeVars(tabIdx) {
+  const name = TAB_THEMES[tabIdx] || 'default';
+  return THEMES[name] || THEMES.default;
+}
+
+// ════════════════════════════════════════════════════════════════
+// UI COMPONENTS
+// ════════════════════════════════════════════════════════════════
+
+// Animated segmented pill toggle.
+// options: [{ label, value }, ...]
+// onSwitch: called with the selected value on change
+// Returns: { el, setValue }
+function buildPill(options, onSwitch) {
+  const wrap = document.createElement('div');
+  wrap.className = 'pp-pill';
+  const ind = document.createElement('div');
+  ind.className = 'pp-ind';
+  wrap.appendChild(ind);
+  const btns = {};
+  options.forEach(function(opt) {
+    const b = document.createElement('button');
+    b.className = 'pp-btn';
+    b.textContent = opt.label;
+    b.addEventListener('click', function() { setValue(opt.value); onSwitch(opt.value); });
+    wrap.appendChild(b);
+    btns[opt.value] = b;
+  });
+  let current = options[0].value;
+  function setValue(v, animate) {
+    animate = animate !== false;
+    current = v;
+    Object.keys(btns).forEach(bv => btns[bv].classList.toggle('active', bv === v));
+    const ab = btns[v];
+    if (!ab) return;
+    if (!animate) ind.style.transition = 'none';
+    ind.style.left  = ab.offsetLeft + 'px';
+    ind.style.width = ab.offsetWidth + 'px';
+    if (!animate) requestAnimationFrame(() => { ind.style.transition = ''; });
+  }
+  setValue(options[0].value, false);
+  if (window.ResizeObserver) new ResizeObserver(() => setValue(current, false)).observe(wrap);
+  return { el: wrap, setValue };
+}
+
+// Replaces a native range input's thumb with a custom animated one.
+// The native <input> stays in the DOM so all existing IDs and events work.
+// Call after the input is attached to the DOM.
+function upgradeSlider(input) {
+  const variant = input.classList.contains('pp-range--accent') ? 'accent'
+                : input.classList.contains('pp-range--muted')  ? 'muted'
+                : '';
+
+  const wrap  = document.createElement('div');
+  wrap.className = 'pp-range-wrap' + (variant ? ' pp-range-wrap--' + variant : '');
+
+  const track = document.createElement('div');
+  track.className = 'pp-range-track';
+  const fill  = document.createElement('div');
+  fill.className = 'pp-range-fill';
+  const thumb = document.createElement('div');
+  thumb.className = 'pp-range-thumb';
+
+  track.appendChild(fill);
+  wrap.appendChild(track);
+  wrap.appendChild(thumb);
+  input.parentNode.insertBefore(wrap, input);
+  wrap.appendChild(input);
+
+  function update() {
+    const min = +input.min || 0;
+    const max = +input.max || 100;
+    const pct = ((+input.value - min) / (max - min)) * 100;
+    thumb.style.left = pct + '%';
+    fill.style.width = pct + '%';
+  }
+
+  // Initial position without bounce
+  thumb.style.transition = 'none';
+  fill.style.transition  = 'none';
+  update();
+  requestAnimationFrame(() => { thumb.style.transition = ''; fill.style.transition = ''; });
+
+  input.addEventListener('input', update);
+
+  // Disable bounce while actively dragging
+  input.addEventListener('mousedown',  () => wrap.classList.add('pp-range-dragging'));
+  input.addEventListener('touchstart', () => wrap.classList.add('pp-range-dragging'), { passive: true });
+  document.addEventListener('mouseup',  () => wrap.classList.remove('pp-range-dragging'));
+  document.addEventListener('touchend', () => wrap.classList.remove('pp-range-dragging'));
+}
+
+// ════════════════════════════════════════════════════════════════
+// XLSX FETCH & PARSE
+// ════════════════════════════════════════════════════════════════
+
 async function fetchODS() {
   const res = await fetch(XLSX_URL);
   if (!res.ok) throw new Error(`Failed to fetch XLSX: ${res.status}`);
@@ -188,7 +335,6 @@ function processSheetData(grid) {
   return { catIndices, headers, rows, title };
 }
 
-// ── Row index for tools ───────────────────────────────────────────
 function buildRowIndex() {
   if (typeof TABS === 'undefined' || !TABS.length) return [];
   const rows = [];
@@ -207,9 +353,12 @@ function buildRowIndex() {
   return rows;
 }
 
-// ── Background data loader ────────────────────────────────────────
+// ════════════════════════════════════════════════════════════════
+// BACKGROUND DATA LOADER
 // Fetches the spreadsheet, populates window.TABS, then kicks off
 // embeddings and the bridge. Safe to call on any page.
+// ════════════════════════════════════════════════════════════════
+
 window.TABS = window.TABS || [];
 
 (async () => {
