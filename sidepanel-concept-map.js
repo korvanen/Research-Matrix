@@ -559,32 +559,23 @@ function initConceptMapTool(paneEl, sidebarEl) {
   // Cycles through all 5 tab themes (indices 0–4), same as the clusters tool.
   const CMAP_FALLBACK_PALETTE = ['#5b7fa6','#7a6e9e','#5a9e7a','#9e7a5a','#9e5a7a'];
 
-  function depthColor(level) {
-    const idx = (level - 1) % 5;
-
-    // Preferred: panelThemeVars reads computed CSS custom properties live
-    if (typeof panelThemeVars === 'function') {
-      const vars = panelThemeVars(idx);
-      return {
-        accent: vars['--tab-active-bg']    || CMAP_FALLBACK_PALETTE[idx],
-        label:  vars['--tab-active-color'] || '#fff',
-        bg:     vars['--bg-data']          || '#f8f8f8',
-      };
-    }
-
-    // Secondary: raw THEMES/TAB_THEMES globals (defined in script.js)
+function depthColor(level) {
+    // Level 1 → TAB_THEMES[0], level 2 → TAB_THEMES[1], etc.
+    // Levels beyond the array length use 'default'.
     if (typeof TAB_THEMES !== 'undefined' && typeof THEMES !== 'undefined') {
-      const tname = TAB_THEMES[idx] || 'default';
+      const tname = (level - 1 < TAB_THEMES.length) ? TAB_THEMES[level - 1] : 'default';
       const theme = THEMES[tname] || THEMES.default || {};
+      const fallback = CMAP_FALLBACK_PALETTE[(level - 1) % CMAP_FALLBACK_PALETTE.length];
       return {
-        accent: theme['--tab-active-bg']    || CMAP_FALLBACK_PALETTE[idx],
+        accent: theme['--tab-active-bg']    || fallback.accent,
         label:  theme['--tab-active-color'] || '#fff',
         bg:     theme['--bg-data']          || '#f8f8f8',
       };
     }
 
-    // Fallback palette
-    return { accent: CMAP_FALLBACK_PALETTE[idx], label: '#fff', bg: '#f8f8f8' };
+    // Fallback if THEMES not available (standalone/bridge mode)
+    const fallback = CMAP_FALLBACK_PALETTE[(level - 1) % CMAP_FALLBACK_PALETTE.length];
+    return { accent: fallback.accent, label: '#fff', bg: '#f8f8f8' };
   }
 
   function renderConceptMap(hier) {
