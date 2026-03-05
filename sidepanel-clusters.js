@@ -178,7 +178,7 @@ function initClustersTool(paneEl, sidebarEl) {
     '<div id="pp-cl-canvas">' +
       '<div id="pp-cl-canvas-world"></div>' +
       '<div id="pp-cl-empty">Clusters will appear<br>once embeddings finish</div>' +
-      '<div id="pp-cl-zoom-hint">scroll / pinch to zoom</div>' +
+      '<div id="pp-cl-zoom-hint">scroll = zoom · RMB drag = pan · pinch/2-finger = touch</div>' +
     '</div>' +
     '<div id="pp-cl-tooltip">' +
       '<div class="pp-cl-tooltip-cluster" id="pp-cl-tt-cluster"></div>' +
@@ -287,49 +287,93 @@ function initClustersTool(paneEl, sidebarEl) {
 
   reclusterBtn.addEventListener('click', () => { clearTimeout(_reclusterTimer); _rendered = false; tryRender(); });
 
-  // ── Canvas pan ───────────────────────────────────────────────────────────
+  // ── Canvas pan (right mouse button) / zoom (scroll wheel + ctrl+scroll) ──
+  // Mouse:      RMB drag = pan,  scroll wheel = zoom,  LMB = select/drag nests
+  // Touchpad:   2-finger scroll = pan,  pinch = zoom
+  // Touchscreen: 2-finger drag = pan,  pinch = zoom,  tap = select
   let _panning=false, _panSX=0, _panSY=0, _panBX=0, _panBY=0;
+
+  // RMB pan
   canvas.addEventListener('mousedown', ev => {
-    if (ev.button !== 0 || ev.target.closest('.pp-cl-nest')) return;
+    if (ev.button !== 2) return;
     _panning=true; _panSX=ev.clientX; _panSY=ev.clientY; _panBX=_panX; _panBY=_panY;
     canvas.classList.add('pp-cl-panning'); ev.preventDefault();
   });
-  canvas.addEventListener('touchstart', ev => {
-    if (ev.touches.length !== 1 || ev.target.closest('.pp-cl-nest')) return;
-    _panning=true; _panSX=ev.touches[0].clientX; _panSY=ev.touches[0].clientY; _panBX=_panX; _panBY=_panY;
-  }, { passive: true });
   document.addEventListener('mousemove', ev => {
-    if (!_panning) return; _panX=_panBX+ev.clientX-_panSX; _panY=_panBY+ev.clientY-_panSY; applyWorldTransform();
+    if (!_panning) return;
+    _panX=_panBX+ev.clientX-_panSX; _panY=_panBY+ev.clientY-_panSY; applyWorldTransform();
   });
-  document.addEventListener('mouseup', () => { if (!_panning) return; _panning=false; canvas.classList.remove('pp-cl-panning'); });
-  document.addEventListener('touchmove', ev => {
-    if (!_panning || ev.touches.length !== 1) return;
-    _panX=_panBX+ev.touches[0].clientX-_panSX; _panY=_panBY+ev.touches[0].clientY-_panSY;
-    applyWorldTransform(); ev.preventDefault();
-  }, { passive: false });
-  document.addEventListener('touchend', () => { _panning = false; });
+  document.addEventListener('mouseup', ev => {
+    if (ev.button !== 2 || !_panning) return;
+    _panning=false; canvas.classList.remove('pp-cl-panning');
+  });
+  // Suppress context menu on canvas so RMB drag doesn't open it
+  canvas.addEventListener('contextmenu', ev => ev.preventDefault());
 
-  // ── Wheel zoom ───────────────────────────────────────────────────────────
+  // Scroll wheel zoom (plain scroll) + pan (shift+scroll or 2-finger trackpad)
   canvas.addEventListener('wheel', ev => {
     ev.preventDefault();
     const rect = canvas.getBoundingClientRect();
     const mx = ev.clientX - rect.left, my = ev.clientY - rect.top;
-    const dz = ev.deltaY > 0 ? 0.9 : 1.1;
-    const nz = Math.max(0.15, Math.min(4, _zoom * dz));
-    _panX = mx - (mx - _panX) * nz / _zoom; _panY = my - (my - _panY) * nz / _zoom;
-    _zoom = nz; applyWorldTransform();
+
+    // Trackpad sends small deltaY with ctrlKey for pinch-zoom
+    // Mouse wheel sends large deltaY — both should zoom
+    if (ev.ctrlKey || Math.abs(ev.deltaY) < 50 && Math.abs(ev.deltaX) < 50 && !ev.shiftKey) {
+      // Pinch-to-zoom from trackpad (ctrlKey) or plain mouse wheel
+      const dz = ev.deltaY > 0 ? 0.94 : 1 / 0.94;
+      const nz = Math.max(0.15, Math.min(4, _zoom * dz));
+      _panX = mx - (mx - _panX) * nz / _zoom;
+      _panY = my - (my - _panY) * nz / _zoom;
+      _zoom = nz;
+    } else {
+      // 2-finger trackpad pan (deltaX/deltaY without ctrlKey)
+      _panX -= ev.deltaX; _panY -= ev.deltaY;
+    }
+    applyWorldTransform();
   }, { passive: false });
-  let _pinchD = null;
+
+  // Touch: 2-finger pan + pinch zoom, 1-finger = select/drag nests
+  let _pinchD=null, _touchPanSX=0, _touchPanSY=0, _touchPanBX=0, _touchPanBY=0, _touchPanning=false;
   canvas.addEventListener('touchstart', ev => {
-    if (ev.touches.length === 2)
-      _pinchD = Math.hypot(ev.touches[0].clientX - ev.touches[1].clientX, ev.touches[0].clientY - ev.touches[1].clientY);
+    if (ev.touches.length === 2) {
+      _pinchD = Math.hypot(
+        ev.touches[0].clientX - ev.touches[1].clientX,
+        ev.touches[0].clientY - ev.touches[1].clientY
+      );
+      // Start 2-finger pan from midpoint
+      _touchPanSX = (ev.touches[0].clientX + ev.touches[1].clientX) / 2;
+      _touchPanSY = (ev.touches[0].clientY + ev.touches[1].clientY) / 2;
+      _touchPanBX = _panX; _touchPanBY = _panY;
+      _touchPanning = true;
+    }
   }, { passive: true });
   canvas.addEventListener('touchmove', ev => {
-    if (ev.touches.length !== 2 || !_pinchD) return;
-    const d = Math.hypot(ev.touches[0].clientX - ev.touches[1].clientX, ev.touches[0].clientY - ev.touches[1].clientY);
-    _zoom = Math.max(0.15, Math.min(4, _zoom * d / _pinchD)); _pinchD = d; applyWorldTransform(); ev.preventDefault();
+    if (ev.touches.length !== 2 || !_touchPanning) return;
+    ev.preventDefault();
+    const mx = (ev.touches[0].clientX + ev.touches[1].clientX) / 2;
+    const my = (ev.touches[0].clientY + ev.touches[1].clientY) / 2;
+    // Pan from midpoint movement
+    _panX = _touchPanBX + (mx - _touchPanSX);
+    _panY = _touchPanBY + (my - _touchPanSY);
+    // Pinch zoom
+    if (_pinchD) {
+      const d = Math.hypot(
+        ev.touches[0].clientX - ev.touches[1].clientX,
+        ev.touches[0].clientY - ev.touches[1].clientY
+      );
+      const rect = canvas.getBoundingClientRect();
+      const pmx = mx - rect.left, pmy = my - rect.top;
+      const nz = Math.max(0.15, Math.min(4, _zoom * d / _pinchD));
+      _panX = pmx - (pmx - _panX) * nz / _zoom;
+      _panY = pmy - (pmy - _panY) * nz / _zoom;
+      _zoom = nz; _pinchD = d;
+      // Recalc pan base after zoom adjustment
+      _touchPanBX = _panX - (mx - _touchPanSX);
+      _touchPanBY = _panY - (my - _touchPanSY);
+    }
+    applyWorldTransform();
   }, { passive: false });
-  canvas.addEventListener('touchend', () => { _pinchD = null; });
+  canvas.addEventListener('touchend', () => { _pinchD=null; _touchPanning=false; });
 
   // ── Nest drag ────────────────────────────────────────────────────────────
   let _nestDrag = null;
@@ -718,10 +762,21 @@ function initClustersTool(paneEl, sidebarEl) {
   // ── Embedding pipeline ────────────────────────────────────────────────────
   function tryRender() {
     if (_rendered) return;
-    if (!window.EmbeddingUtils || !window.EmbeddingUtils.isReady()) return;
     if (typeof buildRowIndex !== 'function') return;
     if (_cachedEmbedded && _cachedVectors) { doRender(); return; }
     const rows = buildRowIndex(); if (!rows.length) return;
+
+    // Fast path: rows already have .vec attached (bridge pre-loads them)
+    const preVeced = rows.filter(r => r.vec && r.vec.length);
+    if (preVeced.length >= 2) {
+      const vectors = new Map();
+      preVeced.forEach(r => vectors.set(r.tabIdx+':'+r.rowIdx, r.vec));
+      _cachedEmbedded = preVeced; _cachedVectors = vectors;
+      requestAnimationFrame(doRender); return;
+    }
+
+    // Slow path: fetch via EmbeddingUtils (main page in-sidebar mode)
+    if (!window.EmbeddingUtils || !window.EmbeddingUtils.isReady()) return;
     setStatus('loading', 'Clustering ' + rows.length + ' entries\u2026'); emptyEl.style.display = 'none';
     Promise.all(rows.map(r => {
       const text = (r.row?.cells || r.cells || []).join(' ').trim();
