@@ -8,7 +8,7 @@
 //   • Cell splitting: long cells are semantically split into segments before
 //     clustering (same approach as concept-map v16). Requires embedding model;
 //     gracefully skips if vectors unavailable for segments.
-console.log('[sidepanel-clusters.js VTABLE]');
+console.log('[sidepanel-clusters.js V34]');
 
 // ── Constants shared with concept-map split logic ──────────────────────────
 var CL_MIN_SPLIT_LENGTH = 60;
@@ -914,24 +914,21 @@ function initClustersTool(paneEl, sidebarEl) {
   }
 
   // ── Color palette ────────────────────────────────────────────────────────
+  // Matches the colors derived from THEMES in script.js (same order: visions, relational,
+  // organizational, physical, yellow, default). When window.PP_PALETTE is available
+  // (set by script.js at startup), that is used instead so all tools stay in sync.
   const FALLBACK_PALETTE = [
-    { accent: '#4f7af7', bg: '#f0f4ff' }, { accent: '#e05a6a', bg: '#fff0f2' },
-    { accent: '#2eb87a', bg: '#edfaf4' }, { accent: '#f59b20', bg: '#fffbf0' },
-    { accent: '#9f6ef5', bg: '#f7f0ff' }, { accent: '#20b8c8', bg: '#edfbfd' },
-    { accent: '#d4700a', bg: '#fff6ed' }, { accent: '#6aab3e', bg: '#f2fbec' },
+    { accent: '#2e7d5e', bg: '#f4faf7', label: '#fff' }, // visions
+    { accent: '#4a56c8', bg: '#f4f5fd', label: '#fff' }, // relational
+    { accent: '#5e3d9e', bg: '#f6f3fb', label: '#fff' }, // organizational
+    { accent: '#c44035', bg: '#fdf5f4', label: '#fff' }, // physical
+    { accent: '#c8991a', bg: '#fffdf5', label: '#fff' }, // yellow
+    { accent: '#888888', bg: '#f7f7f8', label: '#fff' }, // default
   ];
 
   function colForIndex(i) {
-    if (typeof panelThemeVars === 'function') {
-      const vars = panelThemeVars(i % 5);
-      return {
-        accent: vars['--tab-active-bg']    || FALLBACK_PALETTE[i % FALLBACK_PALETTE.length].accent,
-        bg:     vars['--bg-data']          || FALLBACK_PALETTE[i % FALLBACK_PALETTE.length].bg,
-        label:  vars['--tab-active-color'] || '#fff',
-      };
-    }
-    const p = FALLBACK_PALETTE[i % FALLBACK_PALETTE.length];
-    return { accent: p.accent, bg: p.bg, label: '#fff' };
+    const pal = window.PP_PALETTE || FALLBACK_PALETTE;
+    return pal[i % pal.length];
   }
 
   // ── Card builder ──────────────────────────────────────────────────────────
