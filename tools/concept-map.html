@@ -17,6 +17,15 @@
       flex: 1; min-height: 0;
       display: flex; flex-direction: column;
       overflow: hidden; position: relative;
+
+    .cm-layout {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: row;
+  overflow: hidden;
+  position: relative;
+}
     }
   </style>
 </head>
@@ -35,7 +44,7 @@
       <span id="cm-badge-text">Connecting…</span>
     </div>
   </div>
-
+<div class="cm-layout">
   <div id="cm-pane">
     <div class="ds-no-host" id="cm-no-host">
       <h2>Data not available</h2>
@@ -112,6 +121,17 @@
       setBadge('disconnected', 'No data — visit home page first');
       noHost.classList.add('visible');
     });
+// A sidebar entty on the left side of the screen
+    const panel = createSidePanel(document.querySelector('.cm-layout'), {
+  side:               'left',
+  defaultFraction:    0.35,
+  minFraction:        0,
+  snapCloseFraction:  0.10,
+  onResize: () => cmTool.resize(), // tell the map to redraw
+  onOpen:   () => cmTool.resize(),
+  onClose:  () => cmTool.resize(),
+});
+  console.log("concept map with a sidebar")  
   </script>
 </body>
 </html>
