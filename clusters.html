@@ -180,79 +180,33 @@
   <script src="sidepanel-clusters.js"></script>
 
   <script>
-    // ── Shims so sidepanel-clusters.js works standalone ──────────────────
-    // It calls buildRowIndex() and panelGoTo() — we provide bridge versions.
-
     var _bridgeRows = null;
 
-    // buildRowIndex() shim — returns cached rows from the bridge
-    function buildRowIndex() {
-      return _bridgeRows || [];
-    }
+    function buildRowIndex() { return _bridgeRows || []; }
 
-    // panelGoTo() shim — post a message to the main page to navigate there
     function panelGoTo(match, colIdx) {
-      // Open main page with a hash so it can highlight the row
-      var url = 'index.html#goto=' + match.tabIdx + ':' + match.rowIdx + ':' + (colIdx || 0);
-      window.open(url, '_blank');
+      window.location.href = 'index.html#goto=' + match.tabIdx + ':' + match.rowIdx + ':' + (colIdx || 0);
     }
 
-    // parseCitation shim (may already exist in keyword-utils.js)
     if (typeof parseCitation === 'undefined') {
       window.parseCitation = function(text) { return { body: String(text || ''), citation: null }; };
     }
 
-    // ── Fake EmbeddingUtils so sidepanel-clusters.js doesn't block ────────
-    window.EmbeddingUtils = {
-      isReady: function() { return !!_bridgeRows; },
-      getCachedEmbedding: function(text) {
-        // vecs are already attached to rows — this shouldn't be called
-        return Promise.resolve(null);
-      },
-      getVectorSync: function() { return null; }
-    };
+    window.EmbeddingUtils = { isReady: function() { return !!_bridgeRows; } };
 
-    // ── UI helpers ────────────────────────────────────────────────────────
-    var badge = document.getElementById('cl-connection-badge');
+    var badge  = document.getElementById('cl-connection-badge');
     var noHost = document.getElementById('cl-no-host');
+    function setBadge(state, text) { badge.className = state; badge.textContent = text; }
 
-    function setBadge(state, text) {
-      badge.className = state;
-      badge.textContent = text;
-    }
-
-    // ── Init cluster tool ─────────────────────────────────────────────────
     var paneEl = document.getElementById('cl-pane');
     var clusterTool = initClustersTool(paneEl, null);
 
-    // ── Connect bridge ────────────────────────────────────────────────────
     EmbeddingBridge.guest(function(rows) {
       noHost.classList.remove('visible');
       setBadge('connected', rows.length + ' entries live');
       _bridgeRows = rows;
-
-      // Attach vecs directly so the cluster tool can use them
-      _bridgeRows.forEach(function(r) {
-        // vec is already a Float32Array from the bridge deserializer
-      });
-
-      // Inject a fake EmbeddingUtils.getCachedEmbedding that resolves from
-      // the row's .vec directly, keyed by tabIdx:rowIdx
-      var vecMap = new Map();
-      rows.forEach(function(r) {
-        if (r.vec) vecMap.set(r.tabIdx + ':' + r.rowIdx, r.vec);
-      });
-      window.EmbeddingUtils.getCachedEmbedding = function(text) {
-        // The cluster tool calls this with cell text — we can't reverse-lookup
-        // by text, so we return null and let the tool use r.vec directly.
-        return Promise.resolve(null);
-      };
-      window.EmbeddingUtils.isReady = function() { return true; };
-
-      // Reset and re-render with new data
       clusterTool.reset();
-
-      // Dispatch the events the cluster tool listens for
+      // Rows already have .vec attached — tryRender uses them directly
       window.dispatchEvent(new CustomEvent('embedder-ready'));
       setTimeout(function() {
         window.dispatchEvent(new CustomEvent('embedding-complete', { detail: { total: rows.length } }));
@@ -260,16 +214,8 @@
     });
 
     window.addEventListener('bridge-no-host', function() {
-      if (badge.className === 'waiting') {
-        setBadge('disconnected', 'Main tab not open');
-        noHost.classList.add('visible');
-      }
-    });
-
-    window.addEventListener('embedding-progress', function(ev) {
-      if (badge.className !== 'connected') {
-        setBadge('waiting', 'Loading… ' + (ev.detail && ev.detail.pct ? ev.detail.pct + '%' : ''));
-      }
+      setBadge('disconnected', 'No data — open main page first');
+      noHost.classList.add('visible');
     });
   </script>
 </body>
