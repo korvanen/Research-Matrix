@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dimensional Framework</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --black: rgba(0,0,0,1);
+      --white: rgba(255,255,255,1);
+      --grey:  rgba(118,118,118,1);
+      --bg:    rgba(255,255,255,1);
+      --font:  'Instrument Sans', sans-serif;
+    }
+
+    * { margin:0; padding:0; box-sizing:border-box; }
+
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--black);
+      width: 100%;
+      overflow-x: hidden;
+    }
+
+    /* ══════════════════════════════
+       NAV
+    ══════════════════════════════ */
+    .nav-contain {
+      display: flex;
+      flex-direction: row;
+      justify-content: space-between;
+      align-items: flex-end;
+      padding: 50px 15px 10px 15px;
+      width: 100%;
+      max-width: 1280px;
+      margin: 0 auto;
+    }
+
+    .logo-text {
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      color: var(--black);
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 40px;
+      align-items: flex-end;
+      padding-bottom: 2px;
+    }
+
+    .nav-link {
+      font-size: 15px;
+      font-weight: 500;
+      color: var(--grey);
+      text-decoration: none;
+      letter-spacing: -0.02em;
+      transition: color 0.15s;
+      cursor: pointer;
+    }
+    .nav-link:hover { color: var(--black); }
+
+    /* ══════════════════════════════
+       HERO
+    ══════════════════════════════ */
+    .hero-section {
+      padding: 15px 15px 0 15px;
+      max-width: 1280px;
+      margin: 0 auto;
+    }
+
+    .intro-content {
+      display: flex;
+      flex-direction: row;
+      justify-content: space-between;
+      align-items: flex-end;
+      padding: 10px 0 120px 0;
+      border-bottom: 1px solid var(--black);
+      width: 100%;
+    }
+
+    .hero-headline {
+      font-size: clamp(42px, 5vw, 64px);
+      font-weight: 400;
+      letter-spacing: -0.04em;
+      line-height: 1.08;
+      max-width: 680px;
+      color: var(--black);
+    }
+
+    .hero-sub {
+      font-size: 16px;
+      font-weight: 400;
+      color: var(--grey);
+      letter-spacing: -0.02em;
+      line-height: 1.5;
+      max-width: 260px;
+      text-align: right;
+      align-self: flex-end;
+    }
+
+    /* ══════════════════════════════
+       TOOLS SECTION
+    ══════════════════════════════ */
+    .tools-section {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding: 20px 15px 20px 15px;
+      max-width: 1280px;
+      margin: 0 auto;
+    }
+
+    .section-label {
+      font-size: 24px;
+      font-weight: 400;
+      letter-spacing: -0.02em;
+      color: var(--black);
+    }
+
+    .tools-content {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      padding-bottom: 80px;
+      width: 100%;
+    }
+
+    .tool-row {
+      display: flex;
+      flex-direction: row;
+      justify-content: space-between;
+      align-items: flex-start;
+      padding: 28px 0;
+      border-bottom: 1px solid rgba(0,0,0,0.12);
+      gap: 40px;
+      cursor: pointer;
+      text-decoration: none;
+      color: inherit;
+      transition: background 0.12s;
+    }
+    .tool-row:hover { background: rgba(0,0,0,0.02); }
+    .tool-row:first-child { border-top: 1px solid rgba(0,0,0,0.12); }
+
+    .tool-left {
+      display: flex;
+      flex-direction: row;
+      align-items: flex-start;
+      gap: 32px;
+      flex: 1;
+    }
+
+    .tool-number {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      color: var(--grey);
+      padding-top: 3px;
+      min-width: 24px;
+    }
+
+    .tool-accent {
+      width: 4px;
+      border-radius: 2px;
+      align-self: stretch;
+      min-height: 60px;
+      flex-shrink: 0;
+    }
+
+    .tool-info {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .tool-name {
+      font-size: 28px;
+      font-weight: 400;
+      letter-spacing: -0.03em;
+      color: var(--black);
+      line-height: 1.1;
+    }
+
+    .tool-desc {
+      font-size: 14px;
+      font-weight: 400;
+      color: var(--grey);
+      letter-spacing: -0.02em;
+      line-height: 1.5;
+      max-width: 380px;
+    }
+
+    .tool-tags {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 4px;
+    }
+
+    .tool-tag {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--grey);
+      border: 1px solid rgba(0,0,0,0.15);
+      border-radius: 20px;
+      padding: 3px 10px;
+    }
+
+    .tool-arrow {
+      font-size: 20px;
+      color: var(--grey);
+      align-self: center;
+      transition: transform 0.2s, color 0.15s;
+    }
+    .tool-row:hover .tool-arrow {
+      transform: translate(4px, -4px);
+      color: var(--black);
+    }
+
+    /* ══════════════════════════════
+       FOOTER
+    ══════════════════════════════ */
+    footer {
+      border-top: 1px solid var(--black);
+    }
+
+    .footer-section {
+      display: flex;
+      flex-direction: column;
+      padding: 20px 15px 20px 15px;
+      max-width: 1280px;
+      margin: 0 auto;
+    }
+
+    .footer-bottom {
+      display: flex;
+      flex-direction: row;
+      justify-content: space-between;
+      align-items: flex-end;
+      padding-bottom: 4px;
+    }
+
+    .footer-copy {
+      font-size: 13px;
+      color: var(--grey);
+      letter-spacing: -0.01em;
+    }
+
+    .footer-version {
+      font-size: 13px;
+      color: var(--grey);
+      letter-spacing: 0.04em;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* ══════════════════════════════
+       ANIMATIONS
+    ══════════════════════════════ */
+    .fade-in {
+      opacity: 0;
+      transform: translateY(16px);
+      animation: fadeUp 0.6s ease forwards;
+    }
+    .fade-in:nth-child(1) { animation-delay: 0.05s; }
+    .fade-in:nth-child(2) { animation-delay: 0.12s; }
+    .fade-in:nth-child(3) { animation-delay: 0.20s; }
+
+    @keyframes fadeUp {
+      to { opacity:1; transform:translateY(0); }
+    }
+
+    /* ══════════════════════════════
+       RESPONSIVE
+    ══════════════════════════════ */
+    @media (max-width: 900px) {
+      .intro-content { flex-direction: column; gap: 30px; }
+      .hero-sub { text-align: left; max-width: 100%; }
+    }
+    @media (max-width: 600px) {
+      .nav-links { gap: 20px; }
+      .tool-name { font-size: 22px; }
+      .footer-bottom { flex-direction: column; gap: 8px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ── NAV ── -->
+  <nav>
+    <div class="nav-contain">
+      <span class="logo-text">Dimensional Framework</span>
+      <div class="nav-links">
+        <a class="nav-link" href="find-matches.html">Find Matches</a>
+        <a class="nav-link" href="concept-map.html">Concept Map</a>
+        <a class="nav-link" href="clusters.html">Clusters</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ── HERO ── -->
+  <section class="hero-section">
+    <div class="intro-content fade-in">
+      <h1 class="hero-headline">A research tool for<br>navigating complex<br>dimensional data.</h1>
+      <p class="hero-sub">Spreadsheet analytical tool</p>
+    </div>
+  </section>
+
+  <!-- ── TOOLS ── -->
+  <section class="tools-section fade-in">
+    <span class="section-label">Tools</span>
+    <div class="tools-content">
+
+      <a class="tool-row" href="find-matches.html">
+        <div class="tool-left">
+          <span class="tool-number">01</span>
+          <div class="tool-accent" style="background:#346754;"></div>
+          <div class="tool-info">
+            <span class="tool-name">Find Matches</span>
+            <span class="tool-desc">Search across all dimensions simultaneously. Surface related cells, highlight category groups, and trace connections between disparate entries using semantic similarity.</span>
+            <div class="tool-tags">
+              <span class="tool-tag">Search</span>
+              <span class="tool-tag">Semantic</span>
+              <span class="tool-tag">Cross-dimensional</span>
+            </div>
+          </div>
+        </div>
+        <span class="tool-arrow">↗</span>
+      </a>
+
+      <a class="tool-row" href="concept-map.html">
+        <div class="tool-left">
+          <span class="tool-number">02</span>
+          <div class="tool-accent" style="background:#535fc1;"></div>
+          <div class="tool-info">
+            <span class="tool-name">Concept Map</span>
+            <span class="tool-desc">Automatically build a multi-level concept hierarchy from your data. Parent-child relationships are inferred by semantic distance — drag, zoom, and explore the structure.</span>
+            <div class="tool-tags">
+              <span class="tool-tag">Hierarchy</span>
+              <span class="tool-tag">DAG</span>
+              <span class="tool-tag">Embeddings</span>
+            </div>
+          </div>
+        </div>
+        <span class="tool-arrow">↗</span>
+      </a>
+
+      <a class="tool-row" href="clusters.html">
+        <div class="tool-left">
+          <span class="tool-number">03</span>
+          <div class="tool-accent" style="background:#5a3f86;"></div>
+          <div class="tool-info">
+            <span class="tool-name">Clusters</span>
+            <span class="tool-desc">Group entries by thematic similarity into nested clusters. Inner and outer groupings are labelled hierarchically — view as cards or explore the collapsible spreadsheet sidebar.</span>
+            <div class="tool-tags">
+              <span class="tool-tag">Clustering</span>
+              <span class="tool-tag">Grouping</span>
+              <span class="tool-tag">Spreadsheet view</span>
+            </div>
+          </div>
+        </div>
+        <span class="tool-arrow">↗</span>
+      </a>
+
+    </div>
+  </section>
+
+  <!-- ── FOOTER ── -->
+  <footer>
+    <div class="footer-section">
+      <div class="footer-bottom">
+        <span class="footer-copy">Dimensional Framework</span>
+        <span class="footer-version">v1.0 — 2026</span>
+      </div>
+    </div>
+  </footer>
+
+</body>
+</html>
