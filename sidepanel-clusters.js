@@ -8,7 +8,7 @@
 //   • Cell splitting: long cells are semantically split into segments before
 //     clustering (same approach as concept-map v16). Requires embedding model;
 //     gracefully skips if vectors unavailable for segments.
-console.log('[sidepanel-clusters.js V34]');
+console.log('[sidepanel-clusters.js VTABLE]');
 
 // ── Constants shared with concept-map split logic ──────────────────────────
 var CL_MIN_SPLIT_LENGTH = 60;
@@ -190,11 +190,19 @@ var CL_MIN_SPLIT_LENGTH = 60;
   display:flex; flex-direction:column;
   pointer-events:all; overflow:hidden;
   opacity:1; transition:opacity .18s;
-  /* left 5px = resize grab zone */
-  cursor:ew-resize;
 }
 #pp-cl-sheet-wrap.pp-cl-sheet-collapsed #pp-cl-sheet-panel {
   opacity:0; pointer-events:none;
+}
+#pp-cl-sheet-resize-handle {
+  position:absolute; left:0; top:0; bottom:0; width:6px;
+  cursor:ew-resize; z-index:10;
+  background:transparent;
+  transition:background .15s;
+}
+#pp-cl-sheet-resize-handle:hover,
+#pp-cl-sheet-resize-handle.pp-cl-resizing {
+  background:rgba(0,0,0,.12);
 }
 #pp-cl-sheet-phead {
   flex-shrink:0; padding:9px 12px 7px;
@@ -453,12 +461,19 @@ function initClustersTool(paneEl, sidebarEl) {
     setTimeout(() => sheetWrap.classList.remove('pp-cl-sheet-animating'), 280);
   });
 
-  // Resize by dragging left edge of panel (cursor is ew-resize on panel)
+  sheetPanel.addEventListener('wheel', ev => { ev.stopPropagation(); }, { passive: true });
+  sheetBody.addEventListener('wheel',  ev => { ev.stopPropagation(); }, { passive: true });
+
+  // Resize handle
+  const sheetResizeHandle = document.createElement('div');
+  sheetResizeHandle.id = 'pp-cl-sheet-resize-handle';
+  sheetPanel.style.position = 'relative';
+  sheetPanel.appendChild(sheetResizeHandle);
+
   let _shResizing=false, _shResizeSX=0, _shResizeSW=0;
-  sheetPanel.addEventListener('mousedown', ev => {
-    const rect = sheetPanel.getBoundingClientRect();
-    if (ev.clientX - rect.left > 7) return; // only near left edge
+  sheetResizeHandle.addEventListener('mousedown', ev => {
     _shResizing=true; _shResizeSX=ev.clientX; _shResizeSW=sheetWrap.offsetWidth;
+    sheetResizeHandle.classList.add('pp-cl-resizing');
     ev.preventDefault(); ev.stopPropagation();
   });
   document.addEventListener('mousemove', ev => {
@@ -468,7 +483,9 @@ function initClustersTool(paneEl, sidebarEl) {
     const newW = Math.max(220, Math.min(cw * 0.88, _shResizeSW + delta));
     sheetWrap.style.width = newW + 'px';
   });
-  document.addEventListener('mouseup', () => { _shResizing = false; });
+  document.addEventListener('mouseup', () => {
+    if (_shResizing) { _shResizing = false; sheetResizeHandle.classList.remove('pp-cl-resizing'); }
+  });
 
   // ── Build the spreadsheet table from current cluster state ─────────────
   function updateSheetPanel() {
