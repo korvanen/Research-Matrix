@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Find Matches</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg-topbar:          #ffffff;
+      --color-topbar-sheet: #111111;
+      --border-strong:      #e8e8e8;
+      --bg-page:            #f7f7f8;
+      --scrollbar-thumb:    rgba(0,0,0,.18);
+    }
+
+    body {
+      font-family: Inter, system-ui, sans-serif;
+      font-size: 14px;
+      height: 100vh;
+      height: 100dvh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      background: var(--bg-page);
+    }
+
+    /* ── Top bar ── */
+    #fm-topbar {
+      flex-shrink: 0;
+      background: var(--bg-topbar);
+      border-bottom: 1px solid var(--border-strong);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0 18px;
+      height: 48px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.06);
+      z-index: 10;
+    }
+
+    #fm-back {
+      display: flex; align-items: center; gap: 5px;
+      border: none; background: transparent; cursor: pointer;
+      font-size: 12px; font-weight: 600; letter-spacing: .04em;
+      color: rgba(0,0,0,.4); padding: 4px 8px; border-radius: 6px;
+      transition: background .15s, color .15s; flex-shrink: 0;
+    }
+    #fm-back:hover { background: rgba(0,0,0,.06); color: rgba(0,0,0,.7); }
+    #fm-back svg { flex-shrink: 0; }
+
+    #fm-title {
+      font-size: 13px; font-weight: 700; color: var(--color-topbar-sheet);
+      letter-spacing: .02em; flex: 1;
+    }
+
+    #fm-connection-badge {
+      font-size: 9px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase;
+      padding: 3px 8px; border-radius: 20px; flex-shrink: 0;
+      transition: background .3s, color .3s;
+    }
+    #fm-connection-badge.connected    { background: rgba(40,180,80,.12);  color: rgba(20,140,50,.9); }
+    #fm-connection-badge.waiting      { background: rgba(0,0,0,.06);       color: rgba(0,0,0,.4); }
+    #fm-connection-badge.disconnected { background: rgba(200,60,60,.10);   color: rgba(160,30,30,.9); }
+
+    /* ── Search bar ── */
+    #fm-search-wrap {
+      flex-shrink: 0;
+      background: #ffffff;
+      border-bottom: 1px solid var(--border-strong);
+      padding: 14px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    #fm-search-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    #fm-input {
+      flex: 1;
+      border: 1.5px solid rgba(0,0,0,.15);
+      border-radius: 8px;
+      padding: 9px 14px;
+      font-size: 14px;
+      font-family: inherit;
+      color: #111;
+      background: #fff;
+      outline: none;
+      transition: border-color .15s, box-shadow .15s;
+    }
+    #fm-input:focus {
+      border-color: rgba(0,0,0,.4);
+      box-shadow: 0 0 0 3px rgba(0,0,0,.06);
+    }
+    #fm-input::placeholder { color: rgba(0,0,0,.3); }
+
+    #fm-search-btn {
+      flex-shrink: 0;
+      border: none;
+      border-radius: 8px;
+      padding: 9px 18px;
+      background: #111;
+      color: #fff;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: background .15s;
+      font-family: inherit;
+    }
+    #fm-search-btn:hover { background: rgba(0,0,0,.75); }
+    #fm-search-btn:disabled { background: rgba(0,0,0,.2); cursor: default; }
+
+    /* Model status */
+    #fm-model-status {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 9px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase;
+      padding: 3px 8px; border-radius: 6px;
+      transition: opacity .6s ease, background .4s ease;
+      align-self: flex-start;
+    }
+    #fm-model-status.fm-loading { background: rgba(0,0,0,.06); color: rgba(0,0,0,.4); }
+    #fm-model-status.fm-ready   { background: rgba(60,180,100,.12); color: rgba(30,130,60,.9); }
+    #fm-model-status.fm-error   { background: rgba(200,60,60,.10); color: rgba(180,40,40,.85); }
+    .fm-model-dot {
+      width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; transition: background .4s;
+    }
+    #fm-model-status.fm-loading .fm-model-dot { background: rgba(0,0,0,.25); animation: fm-pulse 1.2s ease-in-out infinite; }
+    #fm-model-status.fm-ready   .fm-model-dot { background: rgba(40,160,80,.9); }
+    #fm-model-status.fm-error   .fm-model-dot { background: rgba(180,40,40,.85); }
+    @keyframes fm-pulse { 0%,100%{opacity:.25;transform:scale(.85);}50%{opacity:1;transform:scale(1.1);} }
+
+    /* ── Results pane ── */
+    #fm-pane {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      scrollbar-width: thin;
+      scrollbar-color: var(--scrollbar-thumb) transparent;
+    }
+    #fm-pane::-webkit-scrollbar { width: 6px; }
+    #fm-pane::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 3px; }
+    #fm-pane::-webkit-scrollbar-track { background: transparent; }
+
+    /* ── No-host overlay ── */
+    #fm-no-host {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      text-align: center;
+      padding: 40px 32px;
+      flex: 1;
+    }
+    #fm-no-host.visible { display: flex; }
+    #fm-no-host h2 { font-size: 14px; font-weight: 700; color: rgba(0,0,0,.55); letter-spacing: .02em; }
+    #fm-no-host p  { font-size: 12px; color: rgba(0,0,0,.38); line-height: 1.5; max-width: 280px; }
+    #fm-no-host a  { font-size: 12px; font-weight: 600; color: #5b7fa6; text-decoration: none; }
+    #fm-no-host a:hover { text-decoration: underline; }
+
+    /* ── Empty / hint state ── */
+    #fm-hint {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      flex: 1;
+      text-align: center;
+      padding: 40px;
+      color: rgba(0,0,0,.25);
+    }
+    #fm-hint .fm-hint-icon {
+      font-size: 28px;
+      opacity: .35;
+      margin-bottom: 4px;
+    }
+    #fm-hint p {
+      font-size: 11px;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      line-height: 1.6;
+    }
+
+    /* ── Result cards ── */
+    .fm-result-card {
+      background: #fff;
+      border: 1.5px solid rgba(0,0,0,.09);
+      border-radius: 10px;
+      overflow: hidden;
+      animation: fm-card-in .2s cubic-bezier(0.22,1,0.36,1) both;
+      transition: box-shadow .15s, transform .15s;
+    }
+    .fm-result-card:hover {
+      box-shadow: 0 4px 16px rgba(0,0,0,.10);
+      transform: translateY(-1px);
+    }
+    @keyframes fm-card-in {
+      from { opacity:0; transform:translateY(6px); }
+      to   { opacity:1; transform:translateY(0); }
+    }
+
+    .fm-card-head {
+      padding: 7px 12px 6px;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      border-bottom: 1px solid rgba(0,0,0,.06);
+    }
+    .fm-card-accent-bar {
+      width: 3px;
+      height: 14px;
+      border-radius: 2px;
+      flex-shrink: 0;
+    }
+    .fm-card-cats {
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: .09em;
+      text-transform: uppercase;
+      color: rgba(0,0,0,.35);
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .fm-score-pill {
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: .05em;
+      border-radius: 20px;
+      padding: 2px 8px;
+      flex-shrink: 0;
+    }
+
+    .fm-card-body {
+      padding: 8px 12px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    .fm-cell-row {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .fm-cell-label {
+      font-size: 8px;
+      font-weight: 700;
+      letter-spacing: .09em;
+      text-transform: uppercase;
+      color: rgba(0,0,0,.28);
+    }
+    .fm-cell-text {
+      font-size: 11px;
+      line-height: 1.42;
+      color: rgba(0,0,0,.72);
+    }
+    .fm-cell-row + .fm-cell-row {
+      padding-top: 5px;
+      border-top: 1px solid rgba(0,0,0,.06);
+    }
+
+    .fm-card-footer {
+      padding: 5px 12px 8px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-top: 1px solid rgba(0,0,0,.06);
+    }
+    .fm-sim-bar-wrap {
+      flex: 1;
+      height: 3px;
+      border-radius: 2px;
+      background: rgba(0,0,0,.07);
+      overflow: hidden;
+      margin-right: 10px;
+    }
+    .fm-sim-bar-fill {
+      height: 100%;
+      border-radius: 2px;
+      transition: width .3s ease;
+    }
+    .fm-sim-pct {
+      font-size: 9px;
+      font-weight: 700;
+      color: rgba(0,0,0,.35);
+      letter-spacing: .04em;
+      white-space: nowrap;
+    }
+
+    /* ── Results header ── */
+    .fm-results-header {
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: .10em;
+      text-transform: uppercase;
+      color: rgba(0,0,0,.3);
+      padding: 2px 0 4px 0;
+      flex-shrink: 0;
+    }
+
+    /* ── Slider styles (shared with other tools) ── */
+    .pp-group-label { font-size:7px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:rgba(0,0,0,.28);line-height:1;margin-bottom:1px; }
+    .pp-range-row   { display:flex;align-items:center;gap:3px; }
+    .pp-range-label { font-size:8px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:rgba(0,0,0,.35);flex-shrink:0;width:18px; }
+    .pp-range-val   { font-size:9px;font-weight:700;color:rgba(0,0,0,.55);flex-shrink:0;width:22px;text-align:right;font-variant-numeric:tabular-nums; }
+    .pp-range       { -webkit-appearance:none;appearance:none;position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;margin:0;padding:0;z-index:2; }
+    .pp-range-wrap  { position:relative;flex:1;min-width:0;height:18px; }
+    .pp-range-track { position:absolute;top:50%;left:0;right:0;height:3px;transform:translateY(-50%);border-radius:2px;background:rgba(0,0,0,.12);overflow:hidden;pointer-events:none; }
+    .pp-range-fill  { position:absolute;left:0;top:0;bottom:0;width:0%;border-radius:2px;background:#111;opacity:.30;pointer-events:none;transition:width .22s cubic-bezier(0.34,1.4,0.64,1); }
+    .pp-range-thumb { position:absolute;top:50%;left:0%;width:11px;height:11px;border-radius:50%;background:#111;box-shadow:0 1px 3px rgba(0,0,0,.22);transform:translate(-50%,-50%);pointer-events:none;transition:left .22s cubic-bezier(0.34,1.4,0.64,1),transform .12s ease,box-shadow .12s ease; }
+    .pp-range-wrap:hover .pp-range-thumb { transform:translate(-50%,-50%) scale(1.28);box-shadow:0 2px 6px rgba(0,0,0,.28); }
+  </style>
+</head>
+<body>
+
+  <!-- Top bar -->
+  <div id="fm-topbar">
+    <button id="fm-back" onclick="window.location.href='index.html'">
+      <svg viewBox="0 0 14 14" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M9 2L4 7l5 5"/>
+      </svg>
+      Back
+    </button>
+    <div id="fm-title">Find Matches</div>
+    <div id="fm-connection-badge" class="waiting">Connecting…</div>
+  </div>
+
+  <!-- Search bar -->
+  <div id="fm-search-wrap">
+    <div id="fm-search-row">
+      <input type="text" id="fm-input" placeholder="Search across all entries…" autocomplete="off" spellcheck="false" />
+      <button id="fm-search-btn">Search</button>
+    </div>
+    <div id="fm-model-status" class="fm-loading">
+      <div class="fm-model-dot"></div>
+      <span id="fm-model-label">Loading model…</span>
+    </div>
+  </div>
+
+  <!-- Results -->
+  <div id="fm-pane">
+    <div id="fm-no-host">
+      <h2>Spreadsheet not detected</h2>
+      <p>Open <a href="app.html">the main spreadsheet page</a> first, then come back here. Find Matches receives its data over a live connection to that tab.</p>
+    </div>
+    <div id="fm-hint">
+      <div class="fm-hint-icon">⌕</div>
+      <p>Type a query above<br>to find semantically similar entries</p>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="keyword-utils.js?v=3"></script>
+  <script src="sidepanel-utils.js?v=3"></script>
+  <script src="embedding-bridge.js?v=3"></script>
+  <script type="module" src="embedding-utils.js?v=3"></script>
+
+  <script>
+  (function () {
+    'use strict';
+
+    // ── Palette (matches script.js PP_PALETTE order) ──────────────────────────
+    var PALETTE = [
+      { accent: '#2e7d5e', bg: '#f4faf7' }, // visions
+      { accent: '#4a56c8', bg: '#f4f5fd' }, // relational
+      { accent: '#5e3d9e', bg: '#f6f3fb' }, // organizational
+      { accent: '#c44035', bg: '#fdf5f4' }, // physical
+      { accent: '#c8991a', bg: '#fffdf5' }, // yellow
+      { accent: '#888888', bg: '#f7f7f8' }, // default
+    ];
+    function colForIndex(i) {
+      var pal = window.PP_PALETTE || PALETTE;
+      return pal[i % pal.length];
+    }
+
+    // ── State ─────────────────────────────────────────────────────────────────
+    var _rows       = null;
+    var _modelReady = false;
+    var _searching  = false;
+
+    // ── DOM refs ──────────────────────────────────────────────────────────────
+    var badge       = document.getElementById('fm-connection-badge');
+    var noHost      = document.getElementById('fm-no-host');
+    var hint        = document.getElementById('fm-hint');
+    var pane        = document.getElementById('fm-pane');
+    var inputEl     = document.getElementById('fm-input');
+    var searchBtn   = document.getElementById('fm-search-btn');
+    var modelStatus = document.getElementById('fm-model-status');
+    var modelLabel  = document.getElementById('fm-model-label');
+
+    function setBadge(state, text) { badge.className = state; badge.textContent = text; }
+    function setModelStatus(cls, text) {
+      modelStatus.className = 'fm-' + cls;
+      modelLabel.textContent = text;
+    }
+
+    // ── Cosine similarity ──────────────────────────────────────────────────────
+    function cosineSim(a, b) {
+      if (!a || !b || a.length !== b.length) return 0;
+      var dot = 0, na = 0, nb = 0;
+      for (var i = 0; i < a.length; i++) { dot += a[i]*b[i]; na += a[i]*a[i]; nb += b[i]*b[i]; }
+      return (na && nb) ? Math.max(0, Math.min(1, dot / (Math.sqrt(na)*Math.sqrt(nb)))) : 0;
+    }
+
+    // ── Search function ────────────────────────────────────────────────────────
+    async function runSearch(queryText) {
+      if (!_rows || !queryText.trim()) return [];
+      queryText = queryText.trim();
+
+      var queryKws  = (typeof panelExtractKW === 'function') ? new Set(panelExtractKW(queryText)) : new Set();
+      var queryVec  = null;
+
+      if (window.EmbeddingUtils && window.EmbeddingUtils.isReady()) {
+        try {
+          var raw = await window.EmbeddingUtils.getCachedEmbedding(queryText);
+          if (raw) queryVec = (raw instanceof Float32Array) ? raw : new Float32Array(raw);
+        } catch (e) { /* no vec */ }
+      }
+
+      var results = _rows.map(function (r) {
+        var cells = (r.row && r.row.cells) ? r.row.cells : (r.cells || []);
+        var text  = cells.join(' ').trim();
+        var rowKwArr = (typeof panelExtractKW === 'function') ? panelExtractKW(text) : [];
+        var rowKws   = new Set(rowKwArr);
+        var shared   = Array.from(queryKws).filter(function (k) { return rowKws.has(k); });
+
+        // IDF-weighted keyword score
+        var kwScore = 0;
+        shared.forEach(function (k) { kwScore += 1 / (rowKwArr.filter(function(x){return x===k;}).length || 1); });
+
+        var embScore = 0;
+        if (queryVec && r.vec) {
+          var rv = (r.vec instanceof Float32Array) ? r.vec : new Float32Array(r.vec);
+          embScore = cosineSim(queryVec, rv);
+        }
+
+        var score = queryVec
+          ? (embScore * 0.85 + (shared.length > 0 ? Math.min(kwScore * 0.15, 0.15) : 0))
+          : (shared.length > 0 ? Math.min(kwScore / 5, 1) : 0);
+
+        return Object.assign({}, r, { shared: new Set(shared), kwScore: kwScore, embScore: embScore, score: score });
+      });
+
+      var threshold = queryVec ? 0.38 : 0;
+      return results
+        .filter(function (r) { return r.score > threshold || r.shared.size > 1; })
+        .sort(function (a, b) { return b.score - a.score; })
+        .slice(0, 40);
+    }
+
+    // ── Render results ─────────────────────────────────────────────────────────
+    function renderResults(results, query) {
+      // Remove old result cards & header but keep no-host and hint
+      var toRemove = pane.querySelectorAll('.fm-result-card, .fm-results-header');
+      toRemove.forEach(function (el) { el.remove(); });
+      hint.style.display = 'none';
+
+      if (!results || !results.length) {
+        hint.style.display = 'flex';
+        hint.querySelector('p').textContent = 'No matches found for "' + query + '"';
+        return;
+      }
+
+      var header = document.createElement('div');
+      header.className = 'fm-results-header';
+      header.textContent = results.length + ' result' + (results.length === 1 ? '' : 's') + ' for "' + query + '"';
+      pane.appendChild(header);
+
+      results.forEach(function (r, idx) {
+        var cells   = (r.row && r.row.cells) ? r.row.cells : (r.cells || []);
+        var cats    = (r.row && r.row.cats)  ? r.row.cats.filter(function(c){return c.trim();}) : [];
+        var headers = r.headers || [];
+        var col     = colForIndex(r.tabIdx || 0);
+        var pct     = Math.round(r.score * 100);
+
+        var card = document.createElement('div');
+        card.className = 'fm-result-card';
+        card.style.animationDelay = (idx * 25) + 'ms';
+        card.style.borderLeftColor = col.accent;
+        card.style.borderLeftWidth = '3px';
+
+        // Head
+        var head = document.createElement('div');
+        head.className = 'fm-card-head';
+
+        var bar = document.createElement('div');
+        bar.className = 'fm-card-accent-bar';
+        bar.style.background = col.accent;
+
+        var catEl = document.createElement('div');
+        catEl.className = 'fm-card-cats';
+        catEl.textContent = cats.length ? cats.join(' · ') : (r.title || 'Entry');
+
+        var pill = document.createElement('div');
+        pill.className = 'fm-score-pill';
+        pill.style.background = col.accent + '20';
+        pill.style.color      = col.accent;
+        pill.textContent = pct + '%';
+
+        head.appendChild(bar);
+        head.appendChild(catEl);
+        head.appendChild(pill);
+        card.appendChild(head);
+
+        // Body — show all non-empty cells
+        var body = document.createElement('div');
+        body.className = 'fm-card-body';
+
+        cells.forEach(function (text, ci) {
+          if (!text || !text.trim()) return;
+          var parsed = (typeof parseCitation === 'function') ? parseCitation(text) : { body: text };
+          var row = document.createElement('div');
+          row.className = 'fm-cell-row';
+          var lbl = document.createElement('div');
+          lbl.className = 'fm-cell-label';
+          lbl.textContent = headers[ci] || ('Column ' + (ci + 1));
+          var txt = document.createElement('div');
+          txt.className = 'fm-cell-text';
+          // Bold shared keywords
+          if (r.shared && r.shared.size > 0 && typeof panelHighlight === 'function') {
+            txt.innerHTML = panelHighlight(parsed.body, r.shared);
+          } else {
+            txt.textContent = parsed.body;
+          }
+          row.appendChild(lbl);
+          row.appendChild(txt);
+          body.appendChild(row);
+        });
+        card.appendChild(body);
+
+        // Footer — similarity bar
+        if (r.embScore > 0) {
+          var footer = document.createElement('div');
+          footer.className = 'fm-card-footer';
+          var barWrap = document.createElement('div');
+          barWrap.className = 'fm-sim-bar-wrap';
+          var barFill = document.createElement('div');
+          barFill.className = 'fm-sim-bar-fill';
+          barFill.style.width      = Math.round(r.embScore * 100) + '%';
+          barFill.style.background = col.accent;
+          barWrap.appendChild(barFill);
+          var simPct = document.createElement('div');
+          simPct.className = 'fm-sim-pct';
+          simPct.textContent = Math.round(r.embScore * 100) + '% semantic match';
+          footer.appendChild(barWrap);
+          footer.appendChild(simPct);
+          card.appendChild(footer);
+        }
+
+        pane.appendChild(card);
+      });
+    }
+
+    // ── Search trigger ─────────────────────────────────────────────────────────
+    async function doSearch() {
+      var q = inputEl.value.trim();
+      if (!q || _searching) return;
+      if (!_rows) {
+        noHost.classList.add('visible');
+        return;
+      }
+      _searching = true;
+      searchBtn.disabled = true;
+      searchBtn.textContent = '…';
+      try {
+        var results = await runSearch(q);
+        renderResults(results, q);
+      } catch (e) {
+        console.error('[find-matches]', e);
+      }
+      _searching = false;
+      searchBtn.disabled = false;
+      searchBtn.textContent = 'Search';
+    }
+
+    searchBtn.addEventListener('click', doSearch);
+    inputEl.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') doSearch();
+    });
+
+    // ── Model status listeners ────────────────────────────────────────────────
+    window.addEventListener('embedder-ready', function () {
+      _modelReady = true;
+      setModelStatus('ready', 'Semantic model ready');
+    });
+    window.addEventListener('embedding-progress', function (e) {
+      if (!_modelReady) setModelStatus('loading', 'Indexing… ' + (e.detail && e.detail.pct ? e.detail.pct + '%' : ''));
+    });
+    window.addEventListener('embedding-complete', function (e) {
+      _modelReady = true;
+      setModelStatus('ready', 'Model ready · ' + (e.detail && e.detail.total ? e.detail.total + ' rows' : ''));
+      setTimeout(function () { modelStatus.style.opacity = '0'; }, 3000);
+    });
+
+    // If model was already ready (fast cache hit) before this script ran
+    if (window.EmbeddingUtils && window.EmbeddingUtils.isReady()) {
+      _modelReady = true;
+      setModelStatus('ready', 'Semantic model ready');
+    }
+
+    // ── Bridge connection ─────────────────────────────────────────────────────
+    // Shims needed by keyword-utils.js when running outside the main app
+    window.TABS                 = window.TABS || [];
+    window.processSheetData     = window.processSheetData || function () { return null; };
+    if (typeof parseCitation === 'undefined') {
+      window.parseCitation = function (t) { return { body: String(t || ''), citation: null }; };
+    }
+    window.EmbeddingUtils = window.EmbeddingUtils || { isReady: function () { return false; } };
+
+    EmbeddingBridge.guest(function (rows) {
+      _rows = rows;
+      noHost.classList.remove('visible');
+      setBadge('connected', rows.length + ' entries live');
+      hint.querySelector('p').textContent = 'Type a query above\nto find semantically similar entries';
+      hint.style.display = 'flex';
+      // Make vectors available for cosineSim
+      setModelStatus('ready', rows.length + ' entries loaded');
+      setTimeout(function () { modelStatus.style.opacity = '0'; }, 2500);
+    });
+
+    window.addEventListener('bridge-no-host', function () {
+      setBadge('disconnected', 'No data — open main page first');
+      noHost.classList.add('visible');
+      hint.style.display = 'none';
+    });
+  })();
+  </script>
+
+  <!-- Shared keyword-highlight style -->
+  <style>
+    mark.pkw {
+      background: transparent;
+      border-bottom: 2px solid currentColor;
+      font-weight: 700;
+      padding: 0;
+      color: inherit;
+    }
+  </style>
+</body>
+</html>
