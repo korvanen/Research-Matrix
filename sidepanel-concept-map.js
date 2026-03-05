@@ -6,7 +6,7 @@
 //     Max-Parents slider gets pp-range--accent for purple thumb.
 //   • Sliders upgraded with bounce animation via upgradeSlider().
 //   • Delay while dragging, instant apply on release.
-console.log('[sidepanel-concept-map.js aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa]');
+console.log('[sidepanel-concept-map.js [v.55]');
 
 const CMAP_PARENT_CHILD_THRESHOLD = 0.50;
 const CMAP_MIN_SPLIT_LENGTH = 60;
@@ -554,14 +554,37 @@ function initConceptMapTool(paneEl, sidebarEl) {
     });
   }
 
-  // ── Render ────────────────────────────────────────────────────────────────
+  // ── Color by hierarchy level — uses panelThemeVars if available ───────────
+  // Priority: panelThemeVars (reads live CSS vars) → TAB_THEMES/THEMES globals → fallback palette.
+  // Cycles through all 5 tab themes (indices 0–4), same as the clusters tool.
+  const CMAP_FALLBACK_PALETTE = ['#5b7fa6','#7a6e9e','#5a9e7a','#9e7a5a','#9e5a7a'];
+
   function depthColor(level) {
-    if (typeof TAB_THEMES!=='undefined'&&typeof THEMES!=='undefined') {
-      const tname=TAB_THEMES[(level-1)%TAB_THEMES.length]||'default', theme=THEMES[tname]||THEMES.default||{};
-      return { accent:theme['--tab-active-bg']||'#5b7fa6', label:theme['--tab-active-color']||'#fff', bg:theme['--bg-data']||'#f8f8f8' };
+    const idx = (level - 1) % 5;
+
+    // Preferred: panelThemeVars reads computed CSS custom properties live
+    if (typeof panelThemeVars === 'function') {
+      const vars = panelThemeVars(idx);
+      return {
+        accent: vars['--tab-active-bg']    || CMAP_FALLBACK_PALETTE[idx],
+        label:  vars['--tab-active-color'] || '#fff',
+        bg:     vars['--bg-data']          || '#f8f8f8',
+      };
     }
-    const P=['#5b7fa6','#7a6e9e','#5a9e7a','#9e7a5a','#9e5a7a'];
-    return { accent:P[(level-1)%P.length], label:'#fff', bg:'#f8f8f8' };
+
+    // Secondary: raw THEMES/TAB_THEMES globals (defined in script.js)
+    if (typeof TAB_THEMES !== 'undefined' && typeof THEMES !== 'undefined') {
+      const tname = TAB_THEMES[idx] || 'default';
+      const theme = THEMES[tname] || THEMES.default || {};
+      return {
+        accent: theme['--tab-active-bg']    || CMAP_FALLBACK_PALETTE[idx],
+        label:  theme['--tab-active-color'] || '#fff',
+        bg:     theme['--bg-data']          || '#f8f8f8',
+      };
+    }
+
+    // Fallback palette
+    return { accent: CMAP_FALLBACK_PALETTE[idx], label: '#fff', bg: '#f8f8f8' };
   }
 
   function renderConceptMap(hier) {
