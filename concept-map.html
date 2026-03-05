@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Concept Map — Dimensional Framework</title>
+  <link rel="stylesheet" href="design-system.css">
+  <style>
+    body {
+      height: 100vh;
+      height: 100dvh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      background: var(--tool-pane-bg);
+    }
+    #cm-pane {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      position: relative;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="ds-topbar">
+    <a class="ds-topbar-back" href="index.html">
+      <svg viewBox="0 0 14 14" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M9 2L4 7l5 5"/>
+      </svg>
+      Back
+    </a>
+    <div class="ds-topbar-title">Concept Map</div>
+    <div class="ds-badge ds-badge--waiting" id="cm-connection-badge">
+      <div class="ds-badge-dot"></div>
+      <span id="cm-badge-text">Connecting…</span>
+    </div>
+  </div>
+
+  <div id="cm-pane">
+    <div class="ds-no-host" id="cm-no-host">
+      <h2>Main tab not detected</h2>
+      <p>Open <a href="index.html">the main spreadsheet page</a> first, then come back here. The concept map receives its data over a live connection to that tab.</p>
+    </div>
+  </div>
+
+  <script src="keyword-utils.js?v=3"></script>
+  <script src="sidepanel-utils.js?v=3"></script>
+  <script src="embedding-bridge.js?v=3"></script>
+  <script src="sidepanel-concept-map.js?v=3"></script>
+
+  <script>
+    var _bridgeRows = null;
+    function buildRowIndex() { return _bridgeRows || []; }
+    function panelGoTo(match, colIdx) {
+      var url = 'app.html#goto=' + match.tabIdx + ':' + match.rowIdx + ':' + (colIdx || 0);
+      window.open(url, '_blank');
+    }
+    if (typeof parseCitation === 'undefined') {
+      window.parseCitation = function(text) { return { body: String(text || ''), citation: null }; };
+    }
+
+    window.EmbeddingUtils = {
+      isReady: function() { return !!_bridgeRows; },
+      getCachedEmbedding: function(text) { return Promise.resolve(null); },
+      getVectorSync: function() { return null; }
+    };
+
+    var badgeEl   = document.getElementById('cm-connection-badge');
+    var badgeText = document.getElementById('cm-badge-text');
+    var noHost    = document.getElementById('cm-no-host');
+
+    function setBadge(state, text) {
+      badgeEl.className = 'ds-badge ds-badge--' + state;
+      badgeText.textContent = text;
+    }
+
+    var paneEl = document.getElementById('cm-pane');
+    var cmTool = initConceptMapTool(paneEl, null);
+
+    EmbeddingBridge.guest(function(rows) {
+      noHost.classList.remove('visible');
+      setBadge('connected', rows.length + ' entries live');
+      _bridgeRows = rows;
+
+      window.EmbeddingUtils.isReady = function() { return true; };
+
+      var textToVec = new Map();
+      rows.forEach(function(r) {
+        if (!r.vec) return;
+        var cells = (r.row && r.row.cells) ? r.row.cells : (r.cells || []);
+        var text  = cells.join(' ').trim();
+        if (text) textToVec.set(text, r.vec);
+        cells.forEach(function(c) { if (c && c.trim()) textToVec.set(c.trim(), r.vec); });
+      });
+
+      window.EmbeddingUtils.getCachedEmbedding = function(text) {
+        var vec = textToVec.get(text) || textToVec.get(text.trim());
+        if (vec) return Promise.resolve(vec);
+        var t = text.trim().slice(0, 40);
+        var found = null;
+        textToVec.forEach(function(v, k) { if (!found && k.startsWith(t)) found = v; });
+        return Promise.resolve(found || null);
+      };
+
+      cmTool.reset();
+      window.dispatchEvent(new CustomEvent('embedder-ready'));
+      setTimeout(function() {
+        window.dispatchEvent(new CustomEvent('embedding-complete', { detail: { total: rows.length } }));
+      }, 100);
+    });
+
+    window.addEventListener('bridge-no-host', function() {
+      if (badgeEl.className.includes('waiting')) {
+        setBadge('disconnected', 'Main tab not open');
+        noHost.classList.add('visible');
+      }
+    });
+
+    window.addEventListener('embedding-progress', function(ev) {
+      if (!badgeEl.className.includes('connected')) {
+        setBadge('waiting', 'Loading… ' + (ev.detail && ev.detail.pct ? ev.detail.pct + '%' : ''));
+      }
+    });
+  </script>
+</body>
+</html>
