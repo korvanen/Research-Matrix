@@ -333,47 +333,34 @@ function initClustersTool(paneEl, sidebarEl) {
   }, { passive: false });
 
   // Touch: 2-finger pan + pinch zoom, 1-finger = select/drag nests
-  let _pinchD=null, _touchPanSX=0, _touchPanSY=0, _touchPanBX=0, _touchPanBY=0, _touchPanning=false;
+  let _pinchD=null, _touchMidX=0, _touchMidY=0;
   canvas.addEventListener('touchstart', ev => {
     if (ev.touches.length === 2) {
-      _pinchD = Math.hypot(
-        ev.touches[0].clientX - ev.touches[1].clientX,
-        ev.touches[0].clientY - ev.touches[1].clientY
-      );
-      // Start 2-finger pan from midpoint
-      _touchPanSX = (ev.touches[0].clientX + ev.touches[1].clientX) / 2;
-      _touchPanSY = (ev.touches[0].clientY + ev.touches[1].clientY) / 2;
-      _touchPanBX = _panX; _touchPanBY = _panY;
-      _touchPanning = true;
+      _pinchD   = Math.hypot(ev.touches[0].clientX-ev.touches[1].clientX, ev.touches[0].clientY-ev.touches[1].clientY);
+      _touchMidX = (ev.touches[0].clientX+ev.touches[1].clientX)/2;
+      _touchMidY = (ev.touches[0].clientY+ev.touches[1].clientY)/2;
     }
   }, { passive: true });
   canvas.addEventListener('touchmove', ev => {
-    if (ev.touches.length !== 2 || !_touchPanning) return;
+    if (ev.touches.length !== 2 || !_pinchD) return;
     ev.preventDefault();
-    const mx = (ev.touches[0].clientX + ev.touches[1].clientX) / 2;
-    const my = (ev.touches[0].clientY + ev.touches[1].clientY) / 2;
-    // Pan from midpoint movement
-    _panX = _touchPanBX + (mx - _touchPanSX);
-    _panY = _touchPanBY + (my - _touchPanSY);
-    // Pinch zoom
-    if (_pinchD) {
-      const d = Math.hypot(
-        ev.touches[0].clientX - ev.touches[1].clientX,
-        ev.touches[0].clientY - ev.touches[1].clientY
-      );
-      const rect = canvas.getBoundingClientRect();
-      const pmx = mx - rect.left, pmy = my - rect.top;
-      const nz = Math.max(0.15, Math.min(4, _zoom * d / _pinchD));
-      _panX = pmx - (pmx - _panX) * nz / _zoom;
-      _panY = pmy - (pmy - _panY) * nz / _zoom;
-      _zoom = nz; _pinchD = d;
-      // Recalc pan base after zoom adjustment
-      _touchPanBX = _panX - (mx - _touchPanSX);
-      _touchPanBY = _panY - (my - _touchPanSY);
-    }
+    const mx  = (ev.touches[0].clientX+ev.touches[1].clientX)/2;
+    const my  = (ev.touches[0].clientY+ev.touches[1].clientY)/2;
+    const d   = Math.hypot(ev.touches[0].clientX-ev.touches[1].clientX, ev.touches[0].clientY-ev.touches[1].clientY);
+    const rect = canvas.getBoundingClientRect();
+    const cmx = mx-rect.left, cmy = my-rect.top;
+    // Zoom around midpoint first
+    const nz = Math.max(0.15, Math.min(4, _zoom * d / _pinchD));
+    _panX = cmx - (cmx - _panX) * nz / _zoom;
+    _panY = cmy - (cmy - _panY) * nz / _zoom;
+    _zoom = nz; _pinchD = d;
+    // Then apply pan delta from midpoint movement
+    _panX += mx - _touchMidX;
+    _panY += my - _touchMidY;
+    _touchMidX = mx; _touchMidY = my;
     applyWorldTransform();
   }, { passive: false });
-  canvas.addEventListener('touchend', () => { _pinchD=null; _touchPanning=false; });
+  canvas.addEventListener('touchend', () => { _pinchD = null; });
 
   // ── Nest drag ────────────────────────────────────────────────────────────
   let _nestDrag = null;
