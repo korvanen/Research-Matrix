@@ -1,0 +1,882 @@
+/* ============================================================
+   DIMENSIONAL FRAMEWORK — Design System
+   design-system.css
+
+   CONTENTS
+   ─────────
+   1. Fonts
+   2. CSS Custom Properties (tokens)
+      2a. Base palette (raw colors)
+      2b. Theme tokens (mapped from palette)
+      2c. Tab themes
+   3. Reset & Base
+   4. Typography scale
+   5. Layout primitives
+      5a. Topbar
+      5b. Page shell
+   6. Components
+      6a. Buttons
+      6b. Pill / segmented control
+      6c. Range sliders
+      6d. Cards
+      6e. Badge / status pill
+      6f. Tables
+      6g. Scrollbars
+      6h. Tooltips
+      6i. Empty states
+   7. Animations
+   8. Utilities
+   ============================================================ */
+
+
+/* ── 1. Fonts ─────────────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap');
+
+
+/* ── 2. CSS Custom Properties ─────────────────────────────── */
+
+/* 2a. Base palette (raw color values — do not use directly in components) */
+:root {
+  /* Neutrals */
+  --raw-black:       #111111;
+  --raw-white:       #ffffff;
+  --raw-grey-100:    #f7f7f8;
+  --raw-grey-200:    #f0f0f0;
+  --raw-grey-300:    #e8e8e8;
+  --raw-grey-400:    #d0d0d0;
+  --raw-grey-500:    #c0c0c8;
+  --raw-grey-600:    #9898aa;
+  --raw-grey-700:    #767676;
+
+  /* Brand palette — each theme color in 5 tints */
+  --raw-visions-dark:   #1a4a3a;
+  --raw-visions:        #346754;
+  --raw-visions-mid:    #2e7d5e;
+  --raw-visions-light:  #a8cfc0;
+  --raw-visions-bg:     #f4faf7;
+
+  --raw-relational-dark:  #2e3899;
+  --raw-relational:       #535fc1;
+  --raw-relational-mid:   #4a56c8;
+  --raw-relational-light: #b0b6e8;
+  --raw-relational-bg:    #f4f5fd;
+
+  --raw-org-dark:   #3d2868;
+  --raw-org:        #5a3f86;
+  --raw-org-mid:    #5e3d9e;
+  --raw-org-light:  #c0a8e0;
+  --raw-org-bg:     #f6f3fb;
+
+  --raw-physical-dark:  #8a2820;
+  --raw-physical:       #bb463c;
+  --raw-physical-mid:   #c44035;
+  --raw-physical-light: #e0a8a4;
+  --raw-physical-bg:    #fdf5f4;
+
+  --raw-yellow-dark:  #9a7010;
+  --raw-yellow:       #D4AF37;
+  --raw-yellow-mid:   #c8991a;
+  --raw-yellow-light: #e8d080;
+  --raw-yellow-bg:    #fffdf5;
+
+  /* 2b. Semantic / component tokens */
+  --color-text-primary:    var(--raw-black);
+  --color-text-secondary:  var(--raw-grey-700);
+  --color-text-muted:      rgba(0,0,0,0.35);
+  --color-text-disabled:   rgba(0,0,0,0.25);
+
+  --color-bg-page:         var(--raw-white);
+  --color-bg-surface:      var(--raw-grey-100);
+  --color-bg-overlay:      rgba(247,247,248,0.96);
+
+  --color-border-subtle:   var(--raw-grey-300);
+  --color-border-strong:   var(--raw-grey-400);
+
+  /* Topbar */
+  --topbar-height:          48px;
+  --topbar-bg:              var(--raw-white);
+  --topbar-border:          var(--raw-grey-300);
+  --topbar-shadow:          0 1px 4px rgba(0,0,0,0.06);
+  --topbar-title-color:     var(--raw-black);
+  --topbar-global-color:    rgba(0,0,0,0.35);
+
+  /* Tool page shared */
+  --tool-pane-bg:           var(--raw-grey-100);
+
+  /* Sidebar / panel */
+  --panel-bg:               var(--raw-grey-100);
+  --panel-box-bg:           rgba(0,0,0,0.04);
+  --panel-box-border:       rgba(0,0,0,0.10);
+  --panel-border:           var(--raw-grey-300);
+
+  /* Scrollbar */
+  --scrollbar-track:        var(--raw-grey-200);
+  --scrollbar-thumb:        var(--raw-grey-500);
+  --scrollbar-thumb-hover:  var(--raw-grey-600);
+
+  /* Focus ring */
+  --focus-ring:             0 0 0 3px rgba(0,0,0,0.10);
+
+  /* Transitions */
+  --transition-fast:   0.12s ease;
+  --transition-base:   0.18s ease;
+  --transition-slow:   0.28s ease;
+  --transition-bounce: 0.22s cubic-bezier(0.34, 1.4, 0.64, 1);
+
+  /* Radius */
+  --radius-xs:   4px;
+  --radius-sm:   6px;
+  --radius-md:   8px;
+  --radius-lg:   10px;
+  --radius-xl:   12px;
+  --radius-full: 9999px;
+
+  /* Spacing */
+  --space-1:  4px;
+  --space-2:  8px;
+  --space-3:  12px;
+  --space-4:  16px;
+  --space-5:  20px;
+  --space-6:  24px;
+
+  /* Typography */
+  --font-family:         'Instrument Sans', system-ui, sans-serif;
+  --font-size-xs:        8px;
+  --font-size-sm:        10px;
+  --font-size-base:      13px;
+  --font-size-md:        14px;
+  --font-size-lg:        16px;
+
+  --font-weight-normal:  400;
+  --font-weight-medium:  500;
+  --font-weight-semibold:600;
+  --font-weight-bold:    700;
+  --font-weight-black:   800;
+
+  --letter-spacing-wide:  0.06em;
+  --letter-spacing-wider: 0.10em;
+  --letter-spacing-caps:  0.12em;
+}
+
+/* 2c. Per-tab theme overrides — set by JS on <html> or used as data-theme */
+/* These are the variables that sheet-specific code reads */
+:root {
+  --bg-topbar:              var(--topbar-bg);
+  --bg-bottombar:           var(--raw-grey-200);
+  --bg-header:              var(--raw-grey-100);
+  --bg-cat:                 var(--raw-grey-100);
+  --bg-corner:              var(--raw-grey-100);
+  --bg-data:                var(--raw-white);
+  --bg-sidebar:             var(--raw-grey-100);
+  --color-data:             rgba(0,0,0,0.65);
+  --color-cat:              rgba(0,0,0,0.50);
+  --color-header:           rgba(0,0,0,0.50);
+  --color-topbar-global:    rgba(0,0,0,0.35);
+  --color-topbar-sheet:     var(--raw-black);
+  --border-main:            var(--raw-grey-300);
+  --border-group:           var(--raw-grey-400);
+  --border-strong:          var(--raw-grey-400);
+  --border-corner:          var(--raw-grey-400);
+  --border-sticky:          var(--raw-grey-400);
+  --border-sidebar:         var(--raw-grey-300);
+  --border-content-surround:var(--raw-grey-300);
+  --highlight-cell:         #ebebff;
+  --highlight-group:        #f0f0ff;
+  --selected-cell:          #c7c7ff;
+  --selected-group:         #d8d8ff;
+  --tab-bg:                 var(--raw-grey-300);
+  --tab-border:             var(--raw-grey-400);
+  --tab-active-bg:          var(--raw-white);
+  --tab-color:              rgba(0,0,0,0.45);
+  --tab-active-color:       var(--raw-black);
+  --drag-handle:            rgba(107,107,240,0.33);
+  --sidebar-box-bg:         rgba(0,0,0,0.04);
+  --sidebar-box-border:     rgba(0,0,0,0.10);
+  --tab-arrow-bg:           var(--raw-grey-400);
+  --tab-arrow-color:        #333;
+  --bg-content-surround:    var(--raw-grey-200);
+}
+
+/* Global shared palette (also set by script.js as window.PP_PALETTE for JS) */
+/* Index: 0=visions, 1=relational, 2=org, 3=physical, 4=yellow, 5=default */
+:root {
+  --palette-0-accent: var(--raw-visions-mid);
+  --palette-0-bg:     var(--raw-visions-bg);
+  --palette-1-accent: var(--raw-relational-mid);
+  --palette-1-bg:     var(--raw-relational-bg);
+  --palette-2-accent: var(--raw-org-mid);
+  --palette-2-bg:     var(--raw-org-bg);
+  --palette-3-accent: var(--raw-physical-mid);
+  --palette-3-bg:     var(--raw-physical-bg);
+  --palette-4-accent: var(--raw-yellow-mid);
+  --palette-4-bg:     var(--raw-yellow-bg);
+  --palette-5-accent: var(--raw-grey-600);
+  --palette-5-bg:     var(--raw-grey-100);
+}
+
+
+/* ── 3. Reset & Base ──────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  font-family: var(--font-family);
+  font-size: var(--font-size-md);
+  color: var(--color-text-primary);
+  background: var(--color-bg-page);
+  line-height: 1.5;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  font-family: var(--font-family);
+  cursor: pointer;
+}
+
+input, textarea, select {
+  font-family: var(--font-family);
+}
+
+
+/* ── 4. Typography scale ──────────────────────────────────── */
+.ds-label-caps {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-black);
+  letter-spacing: var(--letter-spacing-caps);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  line-height: 1;
+}
+
+.ds-label-sm {
+  font-size: 9px;
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--letter-spacing-wide);
+  text-transform: uppercase;
+}
+
+.ds-body-sm {
+  font-size: var(--font-size-sm);
+  line-height: 1.4;
+  color: var(--color-text-secondary);
+}
+
+.ds-body {
+  font-size: var(--font-size-base);
+  line-height: 1.5;
+}
+
+.ds-mono {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+}
+
+
+/* ── 5. Layout primitives ────────────────────────────────── */
+
+/* 5a. Topbar — shared across ALL pages */
+.ds-topbar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 18px;
+  height: var(--topbar-height);
+  background: var(--topbar-bg);
+  border-bottom: 1px solid var(--topbar-border);
+  box-shadow: var(--topbar-shadow);
+  z-index: 10;
+}
+
+.ds-topbar-back {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-family: var(--font-family);
+  font-size: 12px;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted);
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  transition: background var(--transition-fast), color var(--transition-fast);
+  flex-shrink: 0;
+  text-decoration: none;
+}
+.ds-topbar-back:hover {
+  background: rgba(0,0,0,0.06);
+  color: rgba(0,0,0,0.7);
+}
+.ds-topbar-back svg {
+  flex-shrink: 0;
+  display: block;
+}
+
+.ds-topbar-title {
+  font-size: 13px;
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+  letter-spacing: 0.02em;
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ds-topbar-global {
+  font-size: 11px;
+  font-weight: var(--font-weight-medium);
+  color: var(--topbar-global-color);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* 5b. Tool page shell — flex column, full viewport */
+.ds-tool-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+  background: var(--tool-pane-bg);
+  font-family: var(--font-family);
+  font-size: var(--font-size-md);
+}
+
+
+/* ── 6. Components ───────────────────────────────────────── */
+
+/* 6a. Buttons */
+.ds-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 5px 12px;
+  font-family: var(--font-family);
+  font-size: 9px;
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--letter-spacing-wide);
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+  white-space: nowrap;
+}
+
+.ds-btn-ghost {
+  background: rgba(0,0,0,0.07);
+  color: rgba(0,0,0,0.45);
+}
+.ds-btn-ghost:hover {
+  background: rgba(0,0,0,0.13);
+  color: rgba(0,0,0,0.75);
+}
+.ds-btn-ghost:disabled {
+  background: rgba(0,0,0,0.04);
+  color: rgba(0,0,0,0.25);
+  cursor: default;
+}
+
+.ds-btn-solid {
+  background: var(--raw-black);
+  color: var(--raw-white);
+}
+.ds-btn-solid:hover {
+  background: rgba(0,0,0,0.75);
+}
+
+/* 6b. Pill / segmented control */
+.ds-pill {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  background: rgba(0,0,0,0.07);
+  border-radius: var(--radius-full);
+  padding: 2px;
+  box-sizing: border-box;
+}
+
+.ds-pill-indicator {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  background: var(--raw-white);
+  border-radius: var(--radius-full);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+  transition: left 0.6s ease, width 0.6s ease;
+  pointer-events: none;
+}
+
+.ds-pill-btn {
+  flex: 1;
+  position: relative;
+  z-index: 1;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-full);
+  padding: 4px 5px;
+  font-family: var(--font-family);
+  font-size: 9px;
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--letter-spacing-wide);
+  text-transform: uppercase;
+  color: rgba(0,0,0,0.35);
+  cursor: pointer;
+  transition: color var(--transition-fast);
+  white-space: nowrap;
+}
+.ds-pill-btn.active { color: rgba(0,0,0,0.75); }
+
+
+/* 6c. Range sliders */
+/* Shared label row */
+.ds-slider-group-label {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-black);
+  letter-spacing: var(--letter-spacing-caps);
+  text-transform: uppercase;
+  color: rgba(0,0,0,0.28);
+  line-height: 1;
+  margin-bottom: 1px;
+}
+
+.ds-slider-row {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.ds-slider-label {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(0,0,0,0.35);
+  flex-shrink: 0;
+  width: 18px;
+}
+
+.ds-slider-val {
+  font-size: 9px;
+  font-weight: var(--font-weight-bold);
+  color: rgba(0,0,0,0.55);
+  flex-shrink: 0;
+  width: 22px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Native input: hidden, overlaid on custom track */
+.ds-range-input {
+  -webkit-appearance: none;
+  appearance: none;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  margin: 0;
+  padding: 0;
+  z-index: 2;
+}
+
+.ds-range-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  height: 18px;
+}
+
+.ds-range-track {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 3px;
+  transform: translateY(-50%);
+  border-radius: 2px;
+  background: rgba(0,0,0,0.12);
+  overflow: hidden;
+  pointer-events: none;
+  transition: background var(--transition-base);
+}
+.ds-range-wrap:hover .ds-range-track { background: rgba(0,0,0,0.18); }
+
+.ds-range-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 0%;
+  border-radius: 2px;
+  background: var(--color-topbar-sheet, var(--raw-black));
+  opacity: 0.30;
+  pointer-events: none;
+  transition: width var(--transition-bounce);
+}
+
+.ds-range-thumb {
+  position: absolute;
+  top: 50%;
+  left: 0%;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--color-topbar-sheet, var(--raw-black));
+  box-shadow: 0 1px 3px rgba(0,0,0,0.22);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  transition: left var(--transition-bounce),
+              transform var(--transition-fast),
+              box-shadow var(--transition-fast);
+}
+.ds-range-wrap:hover .ds-range-thumb {
+  transform: translate(-50%, -50%) scale(1.28);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.28);
+}
+.ds-range-wrap.dragging .ds-range-thumb {
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+  transform: translate(-50%, -50%) scale(1.28);
+}
+.ds-range-wrap.dragging .ds-range-fill { transition: none; }
+
+/* Accent variant (purple) */
+.ds-range-wrap--accent .ds-range-thumb {
+  background: #7c5cbf;
+  box-shadow: 0 1px 4px rgba(124,92,191,0.35);
+}
+.ds-range-wrap--accent .ds-range-fill { background: #7c5cbf; }
+
+/* Muted variant */
+.ds-range-wrap--muted .ds-range-thumb {
+  background: rgba(0,0,0,0.38);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.15);
+}
+.ds-range-wrap--muted .ds-range-fill { background: rgba(0,0,0,0.38); }
+
+/* Legacy aliases (keep backward compat with existing JS) */
+.pp-group-label    { font-size:var(--font-size-xs); font-weight:800; letter-spacing:var(--letter-spacing-caps); text-transform:uppercase; color:rgba(0,0,0,.28); line-height:1; margin-bottom:1px; }
+.pp-range-row      { display:flex; align-items:center; gap:3px; }
+.pp-range-label    { font-size:var(--font-size-xs); font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:rgba(0,0,0,.35); flex-shrink:0; width:18px; }
+.pp-range-val      { font-size:9px; font-weight:700; color:rgba(0,0,0,.55); flex-shrink:0; width:22px; text-align:right; font-variant-numeric:tabular-nums; }
+.pp-range          { -webkit-appearance:none; appearance:none; position:absolute; inset:0; width:100%; height:100%; opacity:0; cursor:pointer; margin:0; padding:0; z-index:2; }
+.pp-range-wrap     { position:relative; flex:1; min-width:0; height:18px; }
+.pp-range-track    { position:absolute; top:50%; left:0; right:0; height:3px; transform:translateY(-50%); border-radius:2px; background:rgba(0,0,0,.12); overflow:hidden; pointer-events:none; transition:background .18s ease; }
+.pp-range-wrap:hover .pp-range-track { background:rgba(0,0,0,.18); }
+.pp-range-fill     { position:absolute; left:0; top:0; bottom:0; width:0%; border-radius:2px; background:var(--color-topbar-sheet,#111); opacity:.30; pointer-events:none; transition:width .22s cubic-bezier(0.34,1.4,0.64,1); }
+.pp-range-thumb    { position:absolute; top:50%; left:0%; width:11px; height:11px; border-radius:50%; background:var(--color-topbar-sheet,#111); box-shadow:0 1px 3px rgba(0,0,0,.22); transform:translate(-50%,-50%); pointer-events:none; transition:left .22s cubic-bezier(0.34,1.4,0.64,1),transform .12s ease,box-shadow .12s ease; }
+.pp-range-wrap:hover .pp-range-thumb { transform:translate(-50%,-50%) scale(1.28); box-shadow:0 2px 6px rgba(0,0,0,.28); }
+.pp-range-wrap.pp-range-dragging .pp-range-thumb { transition:transform .12s ease,box-shadow .12s ease; transform:translate(-50%,-50%) scale(1.28); }
+.pp-range-wrap.pp-range-dragging .pp-range-fill  { transition:none; }
+.pp-range-wrap--accent .pp-range-thumb { background:#7c5cbf; box-shadow:0 1px 4px rgba(124,92,191,.35); }
+.pp-range-wrap--accent .pp-range-fill  { background:#7c5cbf; }
+.pp-range-wrap--muted .pp-range-thumb  { background:rgba(0,0,0,.38); box-shadow:0 1px 2px rgba(0,0,0,.15); }
+.pp-range-wrap--muted .pp-range-fill   { background:rgba(0,0,0,.38); }
+
+
+/* 6d. Cards — base card used in all tools */
+.ds-card {
+  border-radius: var(--radius-md);
+  border: 1.5px solid var(--ppc-border, rgba(0,0,0,0.12));
+  background: var(--ppc-bg, var(--raw-white));
+  transition: box-shadow var(--transition-fast), transform var(--transition-fast);
+}
+.ds-card:hover {
+  box-shadow: 0 4px 16px rgba(0,0,0,0.10);
+  transform: translateY(-1px);
+}
+
+.ds-card-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 10px 5px;
+  border-bottom: 1px solid rgba(0,0,0,0.06);
+}
+
+.ds-card-body {
+  padding: 8px 10px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.ds-card-accent-bar {
+  width: 3px;
+  height: 14px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+/* 6e. Badge / status pill */
+.ds-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: var(--radius-full);
+  font-size: 9px;
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  flex-shrink: 0;
+  transition: background var(--transition-slow), color var(--transition-slow);
+}
+
+.ds-badge--connected {
+  background: rgba(40,180,80,0.12);
+  color: rgba(20,140,50,0.9);
+}
+.ds-badge--waiting {
+  background: rgba(0,0,0,0.06);
+  color: rgba(0,0,0,0.4);
+}
+.ds-badge--disconnected {
+  background: rgba(200,60,60,0.10);
+  color: rgba(160,30,30,0.9);
+}
+.ds-badge--loading {
+  background: rgba(0,0,0,0.06);
+  color: rgba(0,0,0,0.4);
+}
+.ds-badge--ready {
+  background: rgba(60,180,100,0.12);
+  color: rgba(30,130,60,0.9);
+}
+.ds-badge--error {
+  background: rgba(200,60,60,0.10);
+  color: rgba(180,40,40,0.85);
+}
+
+.ds-badge-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  transition: background var(--transition-slow);
+}
+.ds-badge--waiting   .ds-badge-dot,
+.ds-badge--loading   .ds-badge-dot { background: rgba(0,0,0,0.25); animation: ds-pulse 1.2s ease-in-out infinite; }
+.ds-badge--connected .ds-badge-dot,
+.ds-badge--ready     .ds-badge-dot { background: rgba(40,160,80,0.9); }
+.ds-badge--disconnected .ds-badge-dot,
+.ds-badge--error     .ds-badge-dot { background: rgba(180,40,40,0.85); }
+
+/* 6f. Shared table (inside cluster sheet panel) */
+.ds-table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 9px;
+}
+.ds-table thead tr { position: sticky; top: 0; z-index: 10; }
+.ds-table th {
+  background: var(--raw-white);
+  padding: 6px 8px 5px;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-black);
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  text-align: left;
+  white-space: nowrap;
+  border-right: 1px solid rgba(0,0,0,0.08);
+  border-bottom: 2px solid rgba(0,0,0,0.10);
+}
+.ds-table td {
+  padding: 4px;
+  vertical-align: top;
+  border-right: 1px solid rgba(0,0,0,0.07);
+  border-bottom: 1px solid rgba(0,0,0,0.07);
+}
+
+/* 6g. Scrollbars */
+.ds-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) transparent;
+}
+.ds-scroll::-webkit-scrollbar { width: 5px; height: 5px; }
+.ds-scroll::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 3px; }
+.ds-scroll::-webkit-scrollbar-track { background: transparent; }
+
+/* 6h. Tooltip */
+.ds-tooltip {
+  position: fixed;
+  z-index: 9999;
+  pointer-events: none;
+  background: var(--raw-white);
+  border: 1px solid rgba(0,0,0,0.12);
+  border-radius: var(--radius-lg);
+  padding: 8px 11px;
+  max-width: 240px;
+  box-shadow: 0 6px 22px rgba(0,0,0,0.16);
+  opacity: 0;
+  transition: opacity 0.14s;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.ds-tooltip.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* 6i. Empty states */
+.ds-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 32px;
+  text-align: center;
+  color: rgba(0,0,0,0.25);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  line-height: 1.5;
+}
+
+/* No-host overlay used in tool pages */
+.ds-no-host {
+  display: none;
+  position: absolute;
+  inset: 0;
+  background: rgba(247,247,248,0.92);
+  backdrop-filter: blur(4px);
+  z-index: 50;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  text-align: center;
+  padding: 32px;
+}
+.ds-no-host.visible { display: flex; }
+.ds-no-host h2 {
+  font-size: 14px;
+  font-weight: var(--font-weight-bold);
+  color: rgba(0,0,0,0.6);
+  letter-spacing: 0.02em;
+}
+.ds-no-host p {
+  font-size: 12px;
+  color: rgba(0,0,0,0.4);
+  line-height: 1.5;
+  max-width: 280px;
+}
+.ds-no-host a {
+  font-size: 12px;
+  font-weight: var(--font-weight-semibold);
+  color: #5b7fa6;
+  text-decoration: none;
+}
+.ds-no-host a:hover { text-decoration: underline; }
+
+/* Citation pill (used in match cards) */
+.pp-cite-pill {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 3px 7px;
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-normal);
+  letter-spacing: 0.07em;
+  line-height: 1.35;
+  white-space: nowrap;
+  vertical-align: middle;
+  opacity: 0.85;
+}
+
+/* Keyword highlight mark */
+mark.pkw {
+  background: transparent;
+  border-bottom: 2px solid currentColor;
+  font-weight: var(--font-weight-bold);
+  padding: 0;
+  color: inherit;
+  transition: border-bottom-color var(--transition-fast),
+              font-weight var(--transition-fast);
+}
+
+
+/* ── 7. Animations ───────────────────────────────────────── */
+@keyframes ds-pulse {
+  0%, 100% { opacity: 0.25; transform: scale(0.85); }
+  50%       { opacity: 1;   transform: scale(1.1); }
+}
+
+@keyframes ds-fade-up {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes ds-card-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: none; }
+}
+
+@keyframes ds-menu-in {
+  from { opacity: 0; transform: scale(0.92) translateY(-6px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+
+/* ── 8. Utilities ────────────────────────────────────────── */
+.ds-truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ds-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0,0,0,0);
+  white-space: nowrap;
+}
+
+.ds-flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ds-flex-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* Zoom hint — used in canvas-based tools */
+.ds-zoom-hint {
+  position: absolute;
+  bottom: 7px;
+  right: 9px;
+  font-size: 9px;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.05em;
+  color: rgba(0,0,0,0.22);
+  pointer-events: none;
+  z-index: 20;
+}
