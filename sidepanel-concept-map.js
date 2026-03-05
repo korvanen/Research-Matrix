@@ -562,20 +562,21 @@ function initConceptMapTool(paneEl, sidebarEl) {
 function depthColor(level) {
     // Level 1 → TAB_THEMES[0], level 2 → TAB_THEMES[1], etc.
     // Levels beyond the array length use 'default'.
+    // CMAP_FALLBACK_PALETTE is an array of plain color strings — use directly, not .accent
+    const fallbackAccent = CMAP_FALLBACK_PALETTE[(level - 1) % CMAP_FALLBACK_PALETTE.length];
+
     if (typeof TAB_THEMES !== 'undefined' && typeof THEMES !== 'undefined') {
       const tname = (level - 1 < TAB_THEMES.length) ? TAB_THEMES[level - 1] : 'default';
       const theme = THEMES[tname] || THEMES.default || {};
-      const fallback = CMAP_FALLBACK_PALETTE[(level - 1) % CMAP_FALLBACK_PALETTE.length];
       return {
-        accent: theme['--tab-active-bg']    || fallback.accent,
+        accent: theme['--tab-active-bg']    || fallbackAccent,
         label:  theme['--tab-active-color'] || '#fff',
         bg:     theme['--bg-data']          || '#f8f8f8',
       };
     }
 
     // Fallback if THEMES not available (standalone/bridge mode)
-    const fallback = CMAP_FALLBACK_PALETTE[(level - 1) % CMAP_FALLBACK_PALETTE.length];
-    return { accent: fallback.accent, label: '#fff', bg: '#f8f8f8' };
+    return { accent: fallbackAccent, label: '#fff', bg: '#f8f8f8' };
   }
 
   function renderConceptMap(hier) {
