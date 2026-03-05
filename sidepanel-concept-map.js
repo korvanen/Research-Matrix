@@ -6,7 +6,9 @@
 //     Max-Parents slider gets pp-range--accent for purple thumb.
 //   • Sliders upgraded with bounce animation via upgradeSlider().
 //   • Delay while dragging, instant apply on release.
-console.log('[sidepanel-concept-map.js [v.55]');
+console.log('[sidepanel-concept-map.js [v.16]');
+// Level themes:
+const CMAP_LEVEL_THEMES = ['yellow','visions','relational','organizational','physical','yellow'];
 
 const CMAP_PARENT_CHILD_THRESHOLD = 0.50;
 const CMAP_MIN_SPLIT_LENGTH = 60;
@@ -558,10 +560,6 @@ function initConceptMapTool(paneEl, sidebarEl) {
   // Priority: panelThemeVars (reads live CSS vars) → TAB_THEMES/THEMES globals → fallback palette.
   // Cycles through all 5 tab themes (indices 0–4), same as the clusters tool.
   const CMAP_FALLBACK_PALETTE = ['#5b7fa6','#7a6e9e','#5a9e7a','#9e7a5a','#9e5a7a'];
-
-// Level themes: level 1 = yellow, 2 = visions, 3 = relational, 4 = organizational,
-  // 5 = physical, 6 = yellow again, beyond that = 'default'.
-  const CMAP_LEVEL_THEMES = ['yellow','visions','relational','organizational','physical','yellow'];
 
   function depthColor(level) {
     const fallbackAccent = CMAP_FALLBACK_PALETTE[(level - 1) % CMAP_FALLBACK_PALETTE.length];
