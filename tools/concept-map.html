@@ -4,23 +4,19 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Concept Map — Dimensional Framework</title>
- <link rel="stylesheet" href="../design-system.css">
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="../design-system.css">
   <style>
     body {
-      height: 100vh;
-      height: 100dvh;
+      height: 100vh; height: 100dvh;
       overflow: hidden;
-      display: flex;
-      flex-direction: column;
+      display: flex; flex-direction: column;
       background: var(--tool-pane-bg);
     }
     #cm-pane {
-      flex: 1;
-      min-height: 0;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-      position: relative;
+      flex: 1; min-height: 0;
+      display: flex; flex-direction: column;
+      overflow: hidden; position: relative;
     }
   </style>
 </head>
@@ -42,27 +38,26 @@
 
   <div id="cm-pane">
     <div class="ds-no-host" id="cm-no-host">
-      <h2>Main tab not detected</h2>
-      <p>Open <a href="index.html">the main spreadsheet page</a> first, then come back here. The concept map receives its data over a live connection to that tab.</p>
+      <h2>Data not available</h2>
+      <p>Return to the <a href="../index.html">home page</a> to load data first.</p>
     </div>
   </div>
 
-<script src="../utilities/utils-keywords.js?v=0"></script>
-<script src="../utilities/utils-sidepanel.js?v=0"></script>
-<script src="../utilities/embedding-bridge.js?v=0"></script>
-<script src="../utilities/utils-concept-map.js?v=0"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="../utilities/utils-keywords.js"></script>
+  <script src="../utilities/utils-sidepanel.js"></script>
+  <script src="../utilities/embedding-bridge.js"></script>
+  <script src="../utilities/utils-concept-map.js"></script>
 
   <script>
     var _bridgeRows = null;
     function buildRowIndex() { return _bridgeRows || []; }
     function panelGoTo(match, colIdx) {
-      var url = 'app.html#goto=' + match.tabIdx + ':' + match.rowIdx + ':' + (colIdx || 0);
-      window.open(url, '_blank');
+      window.open('../tools/spreadsheet.html#goto=' + match.tabIdx + ':' + match.rowIdx + ':' + (colIdx || 0), '_blank');
     }
     if (typeof parseCitation === 'undefined') {
       window.parseCitation = function(text) { return { body: String(text || ''), citation: null }; };
     }
-
     window.EmbeddingUtils = {
       isReady: function() { return !!_bridgeRows; },
       getCachedEmbedding: function(text) { return Promise.resolve(null); },
@@ -114,16 +109,8 @@
     });
 
     window.addEventListener('bridge-no-host', function() {
-      if (badgeEl.className.includes('waiting')) {
-        setBadge('disconnected', 'Main tab not open');
-        noHost.classList.add('visible');
-      }
-    });
-
-    window.addEventListener('embedding-progress', function(ev) {
-      if (!badgeEl.className.includes('connected')) {
-        setBadge('waiting', 'Loading… ' + (ev.detail && ev.detail.pct ? ev.detail.pct + '%' : ''));
-      }
+      setBadge('disconnected', 'No data — visit home page first');
+      noHost.classList.add('visible');
     });
   </script>
 </body>
