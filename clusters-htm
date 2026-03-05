@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Clusters — Dimensional Framework</title>
+  <link rel="stylesheet" href="design-system.css">
+  <style>
+    body {
+      height: 100vh;
+      height: 100dvh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      background: var(--tool-pane-bg);
+    }
+    #cl-pane {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      position: relative;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="ds-topbar">
+    <a class="ds-topbar-back" href="index.html">
+      <svg viewBox="0 0 14 14" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M9 2L4 7l5 5"/>
+      </svg>
+      Back
+    </a>
+    <div class="ds-topbar-title">Cluster Map</div>
+    <div class="ds-badge ds-badge--waiting" id="cl-connection-badge">
+      <div class="ds-badge-dot"></div>
+      <span id="cl-badge-text">Connecting…</span>
+    </div>
+  </div>
+
+  <div id="cl-pane">
+    <div class="ds-no-host" id="cl-no-host">
+      <h2>Main tab not detected</h2>
+      <p>Open <a href="index.html">the main spreadsheet page</a> first, then come back here. The cluster tool receives its data over a live connection to that tab.</p>
+    </div>
+  </div>
+
+  <script src="keyword-utils.js?v=3"></script>
+  <script src="sidepanel-utils.js?v=3"></script>
+  <script src="embedding-bridge.js?v=3"></script>
+  <script src="sidepanel-clusters.js?v=3"></script>
+
+  <script>
+    var _bridgeRows = null;
+    function buildRowIndex() { return _bridgeRows || []; }
+    function panelGoTo(match, colIdx) {
+      window.location.href = 'app.html#goto=' + match.tabIdx + ':' + match.rowIdx + ':' + (colIdx || 0);
+    }
+    if (typeof parseCitation === 'undefined') {
+      window.parseCitation = function(text) { return { body: String(text || ''), citation: null }; };
+    }
+    window.EmbeddingUtils = { isReady: function() { return !!_bridgeRows; } };
+
+    var badgeEl   = document.getElementById('cl-connection-badge');
+    var badgeText = document.getElementById('cl-badge-text');
+    var noHost    = document.getElementById('cl-no-host');
+
+    function setBadge(state, text) {
+      badgeEl.className = 'ds-badge ds-badge--' + state;
+      badgeText.textContent = text;
+    }
+
+    var paneEl      = document.getElementById('cl-pane');
+    var clusterTool = initClustersTool(paneEl, null);
+
+    EmbeddingBridge.guest(function(rows) {
+      noHost.classList.remove('visible');
+      setBadge('connected', rows.length + ' entries live');
+      _bridgeRows = rows;
+      clusterTool.reset();
+      window.dispatchEvent(new CustomEvent('embedder-ready'));
+      setTimeout(function() {
+        window.dispatchEvent(new CustomEvent('embedding-complete', { detail: { total: rows.length } }));
+      }, 100);
+    });
+
+    window.addEventListener('bridge-no-host', function() {
+      setBadge('disconnected', 'No data — open main page first');
+      noHost.classList.add('visible');
+    });
+  </script>
+</body>
+</html>
