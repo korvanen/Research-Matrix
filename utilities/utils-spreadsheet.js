@@ -558,240 +558,25 @@ function buildTabBarCompact() {
   tabBar.appendChild(nextBtn);
 }
 
-// ════════════════════════════════════════════════════════════════
-// SIDEBAR
-// ════════════════════════════════════════════════════════════════
+// ── Sidebar (via utils-panel.js) ──────────────────────────────────
 
-function updateSidebarOverlap(skipTabRebuild) {
-  const sidebarW   = sidebar.offsetWidth;
-  const threshold  = SIDEBAR_OVERLAP_THRESHOLD();
-  const fullscreen = SIDEBAR_FULLSCREEN_THRESHOLD();
-  if (sidebarW >= fullscreen) {
-    document.documentElement.style.setProperty('--sidebar-reserved-width', threshold + 'px');
-    document.documentElement.style.setProperty('--sidebar-intrusion', '0px');
-    sidebar.classList.add('is-overlapping', 'is-fullscreen');
-  } else if (sidebarW >= threshold) {
-    document.documentElement.style.setProperty('--sidebar-reserved-width', threshold + 'px');
-    document.documentElement.style.setProperty('--sidebar-intrusion', (sidebarW - threshold) + 'px');
-    sidebar.classList.add('is-overlapping');
-    sidebar.classList.remove('is-fullscreen');
-  } else {
-    document.documentElement.style.setProperty('--sidebar-reserved-width', sidebarW + 'px');
-    document.documentElement.style.setProperty('--sidebar-intrusion', '0px');
-    sidebar.classList.remove('is-overlapping', 'is-fullscreen');
-  }
-  if (!skipTabRebuild) buildTabBar();
-}
-
-function applyBarSizes() {
-  const th = TOPBAR_HEIGHT(), bh = BOTTOMBAR_HEIGHT();
-  const supportsDvh = CSS.supports('height', '1dvh');
-  if (supportsDvh) {
-    document.documentElement.style.setProperty('--bottombar-dvh', (R().bottombar * 100).toFixed(3) + 'dvh');
-    document.documentElement.style.setProperty('--topbar-dvh',    (R().topbar    * 100).toFixed(3) + 'dvh');
-    if (bottombar) { bottombar.style.height = bottombar.style.minHeight = ''; }
-    if (topbar)    { topbar.style.height    = topbar.style.minHeight    = ''; }
-  } else {
-    if (topbar)    { topbar.style.height    = topbar.style.minHeight    = th + 'px'; }
-    if (bottombar) { bottombar.style.height = bottombar.style.minHeight = bh + 'px'; }
-  }
-  document.documentElement.style.setProperty('--tab-height',          Math.round(bh * 0.70) + 'px');
-  document.documentElement.style.setProperty('--tab-gap',             Math.round(window.innerWidth * 0.008) + 'px');
-  document.documentElement.style.setProperty('--sidebar-box-margin',  SIDEBAR_BOX_MARGIN() + 'px');
-  document.documentElement.style.setProperty('--drag-handle-width',   DRAG_HANDLE_WIDTH() + 'px');
-  document.documentElement.style.setProperty('--handle-arrow-size',   ARROW_SIZE() + 'px');
-  document.documentElement.style.setProperty('--handle-arrow-offset', ARROW_OFFSET() + 'px');
-  document.documentElement.style.setProperty('--tab-bar-padding',     TAB_BAR_PADDING() + 'px');
-  document.documentElement.style.setProperty('--tab-bar-inset',       TAB_BAR_INSET()   + 'px');
-  updateSidebarOverlap();
-}
-
-function applyBarSizes_noOverlap() {
-  document.documentElement.style.setProperty('--sidebar-box-margin',  SIDEBAR_BOX_MARGIN() + 'px');
-  document.documentElement.style.setProperty('--drag-handle-width',   DRAG_HANDLE_WIDTH() + 'px');
-  document.documentElement.style.setProperty('--handle-arrow-size',   ARROW_SIZE() + 'px');
-  document.documentElement.style.setProperty('--handle-arrow-offset', ARROW_OFFSET() + 'px');
-  document.documentElement.style.setProperty('--tab-bar-padding',     TAB_BAR_PADDING() + 'px');
-  document.documentElement.style.setProperty('--tab-bar-inset',       TAB_BAR_INSET()   + 'px');
-}
-
-function updateHandleArrows(forcedWidth) {
-  const sidebarW     = forcedWidth !== undefined ? forcedWidth : sidebar.offsetWidth;
-  const isClosed     = sidebarW <= SIDEBAR_MIN() + 4;
-  const isFullscreen = sidebarW >= SIDEBAR_FULLSCREEN_THRESHOLD() - 4;
-  [dragHandle, dragHandleFixed].forEach(handle => {
-    handle.querySelector('[aria-label="Open sidebar"]')?.classList.toggle('visible', isClosed);
-    handle.querySelector('[aria-label="Close sidebar"]')?.classList.toggle('visible', isFullscreen);
-    handle.querySelector('.handle-arrows')?.classList.toggle('arrows-left', isClosed);
-  });
-}
-
-function positionDragHandle() {
-  const handleW     = DRAG_HANDLE_WIDTH();
-  const sidebarRect = sidebar.getBoundingClientRect();
-  const sidebarW    = Math.round(sidebarRect.width);
-  dragHandleFixed.style.left   = sidebarRect.left + 'px';
-  dragHandleFixed.style.width  = handleW + 'px';
-  dragHandleFixed.style.height = sidebarRect.height + 'px';
-  dragHandleFixed.style.top    = sidebarRect.top + 'px';
-  const useFixed = sidebarW < handleW + 2;
-  dragHandleFixed.classList.toggle('active', useFixed);
-  dragHandle.style.opacity = useFixed ? '0' : '1';
-}
-
-// ── Mind-map snapshot (cross-panel state save/restore) ────────────
-let _mmSnapshot = null;
-function saveMmSnapshot() {
-  window.__mmSnapshotData = null;
-  document.dispatchEvent(new CustomEvent('mm-snapshot-request', { bubbles: false }));
-  if (window.__mmSnapshotData) { _mmSnapshot = window.__mmSnapshotData; window.__mmSnapshotData = null; }
-}
-function restoreMmSnapshot() {
-  if (!_mmSnapshot) return;
-  document.dispatchEvent(new CustomEvent('mm-snapshot-restore', { detail: _mmSnapshot, bubbles: false }));
-}
-
-// ── Sidebar animation ─────────────────────────────────────────────
-function animateSidebarTo(targetW, { restoreMm = false } = {}) {
-  if (animateSidebarTo._rafId) cancelAnimationFrame(animateSidebarTo._rafId);
-  const startW     = parseFloat(sidebar.style.width) || sidebar.getBoundingClientRect().width;
-  const distance   = targetW - startW;
-  const duration   = 320;
-  const startTime  = performance.now();
-  const ease       = t => 1 - Math.pow(1 - t, 3.5);
-  const threshold  = SIDEBAR_OVERLAP_THRESHOLD();
-  const fullscreen = SIDEBAR_FULLSCREEN_THRESHOLD();
-  const needsFixed = (startW >= threshold) || (targetW >= threshold);
-  if (needsFixed) sidebar.classList.add('is-overlapping');
-  updateHandleArrows(targetW);
-  if (SIDEBAR_TWO_POSITION()) {
-    sidebar.classList.add('is-overlapping');
-    document.documentElement.style.setProperty('--sidebar-reserved-width', '0px');
-    document.documentElement.style.setProperty('--sidebar-intrusion', '0px');
-    if (targetW >= fullscreen) sidebar.classList.add('is-fullscreen');
-    else sidebar.classList.remove('is-fullscreen');
-  }
-  function rafLoop(now) {
-    const t        = Math.min(1, (now - startTime) / duration);
-    const currentW = Math.round(startW + distance * ease(t));
-    sidebar.style.width = currentW + 'px';
-    if (!SIDEBAR_TWO_POSITION()) {
-      if (needsFixed) {
-        if (currentW >= fullscreen) {
-          document.documentElement.style.setProperty('--sidebar-reserved-width', threshold + 'px');
-          document.documentElement.style.setProperty('--sidebar-intrusion', '0px');
-          sidebar.classList.add('is-fullscreen');
-        } else if (currentW >= threshold) {
-          document.documentElement.style.setProperty('--sidebar-reserved-width', threshold + 'px');
-          document.documentElement.style.setProperty('--sidebar-intrusion', (currentW - threshold) + 'px');
-          sidebar.classList.remove('is-fullscreen');
-        } else {
-          document.documentElement.style.setProperty('--sidebar-reserved-width', currentW + 'px');
-          document.documentElement.style.setProperty('--sidebar-intrusion', '0px');
-          sidebar.classList.remove('is-fullscreen');
-        }
-      } else {
-        document.documentElement.style.setProperty('--sidebar-reserved-width', currentW + 'px');
-        document.documentElement.style.setProperty('--sidebar-intrusion', '0px');
-      }
-    }
-    positionDragHandle();
-    applyBarSizes_noOverlap();
-    if (t < 1) {
-      animateSidebarTo._rafId = requestAnimationFrame(rafLoop);
-    } else {
-      sidebar.style.width = targetW + 'px';
-      if (SIDEBAR_TWO_POSITION() && targetW <= SIDEBAR_MIN()) {
-        sidebar.classList.remove('is-overlapping', 'is-fullscreen');
-        document.documentElement.style.setProperty('--sidebar-reserved-width', '0px');
-      }
-      applySidebarWidth(targetW);
-      updateSidebarOverlap();
-      updateLayout();
-      updateHandleArrows(targetW);
-      positionDragHandle();
-      if (restoreMm) requestAnimationFrame(() => requestAnimationFrame(restoreMmSnapshot));
-    }
-  }
-  animateSidebarTo._rafId = requestAnimationFrame(rafLoop);
-}
-animateSidebarTo._rafId = null;
-
-function applySidebarWidth(w) {
-  const threshold = SIDEBAR_OVERLAP_THRESHOLD(), fullscreen = SIDEBAR_FULLSCREEN_THRESHOLD();
-  if (w >= fullscreen) {
-    document.documentElement.style.setProperty('--sidebar-reserved-width', threshold + 'px');
-    document.documentElement.style.setProperty('--sidebar-intrusion', '0px');
-    sidebar.classList.add('is-overlapping', 'is-fullscreen');
-  } else if (w >= threshold) {
-    document.documentElement.style.setProperty('--sidebar-reserved-width', threshold + 'px');
-    document.documentElement.style.setProperty('--sidebar-intrusion', Math.max(0, w - threshold) + 'px');
-    sidebar.classList.add('is-overlapping');
-    sidebar.classList.remove('is-fullscreen');
-  } else {
-    document.documentElement.style.setProperty('--sidebar-reserved-width', w + 'px');
-    document.documentElement.style.setProperty('--sidebar-intrusion', '0px');
-    sidebar.classList.remove('is-overlapping', 'is-fullscreen');
-  }
-  positionDragHandle();
-  applyBarSizes_noOverlap();
-}
-
-// ── Sidebar drag ──────────────────────────────────────────────────
-let dragging = false, startX, startSidebarWidth, _snapSaved = false;
-
-function startDrag(e) {
-  if (e.target.closest('.handle-arrow')) return;
-  if (SIDEBAR_TWO_POSITION()) return;
-  dragging = true; _snapSaved = false;
-  startX = e.clientX; startSidebarWidth = sidebar.offsetWidth;
-  dragHandle.classList.add('dragging');
-  dragHandleFixed.classList.add('dragging');
-  document.body.style.cursor     = 'col-resize';
-  document.body.style.userSelect = 'none';
-  e.preventDefault();
-}
-dragHandle.addEventListener('mousedown', startDrag);
-dragHandleFixed.addEventListener('mousedown', startDrag);
-
-document.addEventListener('mousemove', e => {
-  if (!dragging) return;
-  const newW = Math.min(SIDEBAR_MAX(), Math.max(SIDEBAR_MIN(), startSidebarWidth + (startX - e.clientX)));
-  if (!_snapSaved && newW <= SIDEBAR_SNAP_CLOSE()) { saveMmSnapshot(); _snapSaved = true; }
-  sidebar.style.width = newW + 'px';
-  updateSidebarOverlap();
-  updateLayout();
-  positionDragHandle();
+const sidePanel = createSidePanel(document.querySelector('.main'), {
+  side:               'right',
+  defaultFraction:    isPortrait() ? 0 : 0.60,
+  minFraction:        0,
+  maxFraction:        1,
+  snapCloseFraction:  isPortrait() ? 0.05 : 0.30,
+  overlapFraction:    isPortrait() ? 0    : 0.50,
+  fullscreenFraction: isPortrait() ? 1    : 0.70,
+  twoPosition:        isPortrait(),
+  onResize: () => { buildTabBar(); updateLayout(); },
+  onOpen:   () => { buildTabBar(); updateLayout(); },
+  onClose:  () => { buildTabBar(); updateLayout(); },
 });
 
-document.addEventListener('mouseup', () => {
-  if (!dragging) return;
-  dragging = false;
-  dragHandle.classList.remove('dragging');
-  dragHandleFixed.classList.remove('dragging');
-  document.body.style.cursor = '';
-  document.body.style.userSelect = '';
-  const sidebarW = sidebar.offsetWidth;
-  if (sidebarW >= SIDEBAR_FULLSCREEN_THRESHOLD()) animateSidebarTo(window.innerWidth);
-  else if (sidebarW <= SIDEBAR_SNAP_CLOSE())      animateSidebarTo(SIDEBAR_MIN());
-  else { updateHandleArrows(); positionDragHandle(); }
-});
-
-document.addEventListener('click', e => {
-  const btn = e.target.closest('.handle-arrow');
-  if (!btn) return;
-  e.stopPropagation();
-  const isOpen  = btn.getAttribute('aria-label') === 'Open sidebar';
-  const isClose = btn.getAttribute('aria-label') === 'Close sidebar';
-  if (SIDEBAR_TWO_POSITION()) {
-    if (isOpen)  animateSidebarTo(window.innerWidth, { restoreMm: true });
-    if (isClose) { saveMmSnapshot(); animateSidebarTo(SIDEBAR_MIN()); }
-  } else {
-    if (isOpen)  animateSidebarTo(SIDEBAR_DEFAULT(), { restoreMm: true });
-    if (isClose) { saveMmSnapshot(); animateSidebarTo(SIDEBAR_DEFAULT()); }
-  }
-});
-
+// Expose for utils-sidepanel.js panelGoTo compatibility
+const sidebar = sidePanel.el;
+const sidebarBox = sidePanel.bodyEl;
 // ════════════════════════════════════════════════════════════════
 // HOVER & SELECTION EVENTS
 // ════════════════════════════════════════════════════════════════
