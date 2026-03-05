@@ -4,37 +4,20 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dimensional Framework</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="design-system.css">
   <style>
-    :root {
-      --black: rgba(0,0,0,1);
-      --white: rgba(255,255,255,1);
-      --grey:  rgba(118,118,118,1);
-      --bg:    rgba(255,255,255,1);
-      --font:  'Instrument Sans', sans-serif;
-    }
-
-    * { margin:0; padding:0; box-sizing:border-box; }
-
     body {
-      font-family: var(--font);
-      background: var(--bg);
-      color: var(--black);
-      width: 100%;
       overflow-x: hidden;
+      min-height: 100vh;
     }
 
-    /* ══════════════════════════════
-       NAV
-    ══════════════════════════════ */
+    /* ── Nav ── */
     .nav-contain {
       display: flex;
       flex-direction: row;
       justify-content: space-between;
       align-items: flex-end;
-      padding: 50px 15px 10px 15px;
+      padding: 50px 24px 10px;
       width: 100%;
       max-width: 1280px;
       margin: 0 auto;
@@ -42,9 +25,8 @@
 
     .logo-text {
       font-size: 15px;
-      font-weight: 600;
+      font-weight: var(--font-weight-semibold);
       letter-spacing: -0.02em;
-      color: var(--black);
     }
 
     .nav-links {
@@ -56,20 +38,17 @@
 
     .nav-link {
       font-size: 15px;
-      font-weight: 500;
-      color: var(--grey);
+      font-weight: var(--font-weight-medium);
+      color: var(--color-text-muted);
       text-decoration: none;
       letter-spacing: -0.02em;
-      transition: color 0.15s;
-      cursor: pointer;
+      transition: color var(--transition-fast);
     }
-    .nav-link:hover { color: var(--black); }
+    .nav-link:hover { color: var(--raw-black); }
 
-    /* ══════════════════════════════
-       HERO
-    ══════════════════════════════ */
+    /* ── Hero ── */
     .hero-section {
-      padding: 15px 15px 0 15px;
+      padding: 15px 24px 0;
       max-width: 1280px;
       margin: 0 auto;
     }
@@ -79,24 +58,23 @@
       flex-direction: row;
       justify-content: space-between;
       align-items: flex-end;
-      padding: 10px 0 120px 0;
-      border-bottom: 1px solid var(--black);
+      padding: 10px 0 120px;
+      border-bottom: 1px solid var(--raw-black);
       width: 100%;
     }
 
     .hero-headline {
       font-size: clamp(42px, 5vw, 64px);
-      font-weight: 400;
+      font-weight: var(--font-weight-normal);
       letter-spacing: -0.04em;
       line-height: 1.08;
       max-width: 680px;
-      color: var(--black);
     }
 
     .hero-sub {
-      font-size: 16px;
-      font-weight: 400;
-      color: var(--grey);
+      font-size: var(--font-size-lg);
+      font-weight: var(--font-weight-normal);
+      color: var(--color-text-muted);
       letter-spacing: -0.02em;
       line-height: 1.5;
       max-width: 260px;
@@ -104,23 +82,20 @@
       align-self: flex-end;
     }
 
-    /* ══════════════════════════════
-       TOOLS SECTION
-    ══════════════════════════════ */
+    /* ── Tools section ── */
     .tools-section {
       display: flex;
       flex-direction: column;
       gap: 10px;
-      padding: 20px 15px 20px 15px;
+      padding: 20px 24px 20px;
       max-width: 1280px;
       margin: 0 auto;
     }
 
     .section-label {
       font-size: 24px;
-      font-weight: 400;
+      font-weight: var(--font-weight-normal);
       letter-spacing: -0.02em;
-      color: var(--black);
     }
 
     .tools-content {
@@ -142,7 +117,7 @@
       cursor: pointer;
       text-decoration: none;
       color: inherit;
-      transition: background 0.12s;
+      transition: background var(--transition-fast);
     }
     .tool-row:hover { background: rgba(0,0,0,0.02); }
     .tool-row:first-child { border-top: 1px solid rgba(0,0,0,0.12); }
@@ -157,9 +132,9 @@
 
     .tool-number {
       font-size: 11px;
-      font-weight: 600;
+      font-weight: var(--font-weight-semibold);
       letter-spacing: 0.06em;
-      color: var(--grey);
+      color: var(--color-text-muted);
       padding-top: 3px;
       min-width: 24px;
     }
@@ -180,16 +155,15 @@
 
     .tool-name {
       font-size: 28px;
-      font-weight: 400;
+      font-weight: var(--font-weight-normal);
       letter-spacing: -0.03em;
-      color: var(--black);
       line-height: 1.1;
     }
 
     .tool-desc {
       font-size: 14px;
-      font-weight: 400;
-      color: var(--grey);
+      font-weight: var(--font-weight-normal);
+      color: var(--color-text-muted);
       letter-spacing: -0.02em;
       line-height: 1.5;
       max-width: 380px;
@@ -204,37 +178,33 @@
 
     .tool-tag {
       font-size: 10px;
-      font-weight: 600;
+      font-weight: var(--font-weight-semibold);
       letter-spacing: 0.06em;
       text-transform: uppercase;
-      color: var(--grey);
+      color: var(--color-text-muted);
       border: 1px solid rgba(0,0,0,0.15);
-      border-radius: 20px;
+      border-radius: var(--radius-full);
       padding: 3px 10px;
     }
 
     .tool-arrow {
       font-size: 20px;
-      color: var(--grey);
+      color: var(--color-text-muted);
       align-self: center;
-      transition: transform 0.2s, color 0.15s;
+      transition: transform var(--transition-base), color var(--transition-fast);
     }
     .tool-row:hover .tool-arrow {
       transform: translate(4px, -4px);
-      color: var(--black);
+      color: var(--raw-black);
     }
 
-    /* ══════════════════════════════
-       FOOTER
-    ══════════════════════════════ */
-    footer {
-      border-top: 1px solid var(--black);
-    }
+    /* ── Footer ── */
+    footer { border-top: 1px solid var(--raw-black); }
 
     .footer-section {
       display: flex;
       flex-direction: column;
-      padding: 20px 15px 20px 15px;
+      padding: 20px 24px;
       max-width: 1280px;
       margin: 0 auto;
     }
@@ -247,38 +217,25 @@
       padding-bottom: 4px;
     }
 
-    .footer-copy {
-      font-size: 13px;
-      color: var(--grey);
-      letter-spacing: -0.01em;
-    }
-
+    .footer-copy,
     .footer-version {
       font-size: 13px;
-      color: var(--grey);
-      letter-spacing: 0.04em;
-      font-variant-numeric: tabular-nums;
+      color: var(--color-text-muted);
+      letter-spacing: -0.01em;
     }
+    .footer-version { letter-spacing: 0.04em; font-variant-numeric: tabular-nums; }
 
-    /* ══════════════════════════════
-       ANIMATIONS
-    ══════════════════════════════ */
+    /* ── Animations ── */
     .fade-in {
       opacity: 0;
       transform: translateY(16px);
-      animation: fadeUp 0.6s ease forwards;
+      animation: ds-fade-up 0.6s ease forwards;
     }
     .fade-in:nth-child(1) { animation-delay: 0.05s; }
     .fade-in:nth-child(2) { animation-delay: 0.12s; }
     .fade-in:nth-child(3) { animation-delay: 0.20s; }
 
-    @keyframes fadeUp {
-      to { opacity:1; transform:translateY(0); }
-    }
-
-    /* ══════════════════════════════
-       RESPONSIVE
-    ══════════════════════════════ */
+    /* ── Responsive ── */
     @media (max-width: 900px) {
       .intro-content { flex-direction: column; gap: 30px; }
       .hero-sub { text-align: left; max-width: 100%; }
@@ -292,7 +249,6 @@
 </head>
 <body>
 
-  <!-- ── NAV ── -->
   <nav>
     <div class="nav-contain">
       <span class="logo-text">Dimensional Framework</span>
@@ -304,7 +260,6 @@
     </div>
   </nav>
 
-  <!-- ── HERO ── -->
   <section class="hero-section">
     <div class="intro-content fade-in">
       <h1 class="hero-headline">A research tool for<br>navigating complex<br>dimensional data.</h1>
@@ -312,7 +267,6 @@
     </div>
   </section>
 
-  <!-- ── TOOLS ── -->
   <section class="tools-section fade-in">
     <span class="section-label">Tools</span>
     <div class="tools-content">
@@ -320,7 +274,7 @@
       <a class="tool-row" href="find-matches.html">
         <div class="tool-left">
           <span class="tool-number">01</span>
-          <div class="tool-accent" style="background:#346754;"></div>
+          <div class="tool-accent" style="background:var(--raw-visions);"></div>
           <div class="tool-info">
             <span class="tool-name">Find Matches</span>
             <span class="tool-desc">Search across all dimensions simultaneously. Surface related cells, highlight category groups, and trace connections between disparate entries using semantic similarity.</span>
@@ -337,7 +291,7 @@
       <a class="tool-row" href="concept-map.html">
         <div class="tool-left">
           <span class="tool-number">02</span>
-          <div class="tool-accent" style="background:#535fc1;"></div>
+          <div class="tool-accent" style="background:var(--raw-relational);"></div>
           <div class="tool-info">
             <span class="tool-name">Concept Map</span>
             <span class="tool-desc">Automatically build a multi-level concept hierarchy from your data. Parent-child relationships are inferred by semantic distance — drag, zoom, and explore the structure.</span>
@@ -354,7 +308,7 @@
       <a class="tool-row" href="clusters.html">
         <div class="tool-left">
           <span class="tool-number">03</span>
-          <div class="tool-accent" style="background:#5a3f86;"></div>
+          <div class="tool-accent" style="background:var(--raw-org);"></div>
           <div class="tool-info">
             <span class="tool-name">Clusters</span>
             <span class="tool-desc">Group entries by thematic similarity into nested clusters. Inner and outer groupings are labelled hierarchically — view as cards or explore the collapsible spreadsheet sidebar.</span>
@@ -371,12 +325,11 @@
     </div>
   </section>
 
-  <!-- ── FOOTER ── -->
   <footer>
     <div class="footer-section">
       <div class="footer-bottom">
         <span class="footer-copy">Dimensional Framework</span>
-        <span class="footer-version">v1.0 — 2026</span>
+        <span class="footer-version">v2.0 — 2026</span>
       </div>
     </div>
   </footer>
