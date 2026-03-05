@@ -559,24 +559,22 @@ function initConceptMapTool(paneEl, sidebarEl) {
   // Cycles through all 5 tab themes (indices 0–4), same as the clusters tool.
   const CMAP_FALLBACK_PALETTE = ['#5b7fa6','#7a6e9e','#5a9e7a','#9e7a5a','#9e5a7a'];
 
-function depthColor(level) {
-    // Level 1 → TAB_THEMES[0], level 2 → TAB_THEMES[1], etc.
-    // Levels beyond the array length use 'default'.
-    // CMAP_FALLBACK_PALETTE is an array of plain color strings — use directly, not .accent
+// Level themes: level 1 = yellow, 2 = visions, 3 = relational, 4 = organizational,
+  // 5 = physical, 6 = yellow again, beyond that = 'default'.
+  const CMAP_LEVEL_THEMES = ['yellow','visions','relational','organizational','physical','yellow'];
+
+  function depthColor(level) {
     const fallbackAccent = CMAP_FALLBACK_PALETTE[(level - 1) % CMAP_FALLBACK_PALETTE.length];
-
-    if (typeof TAB_THEMES !== 'undefined' && typeof THEMES !== 'undefined') {
-      const tname = (level - 1 < TAB_THEMES.length) ? TAB_THEMES[level - 1] : 'default';
-      const theme = THEMES[tname] || THEMES.default || {};
-      return {
-        accent: theme['--tab-active-bg']    || fallbackAccent,
-        label:  theme['--tab-active-color'] || '#fff',
-        bg:     theme['--bg-data']          || '#f8f8f8',
-      };
+    if (typeof THEMES === 'undefined') {
+      return { accent: fallbackAccent, label: '#fff', bg: '#f8f8f8' };
     }
-
-    // Fallback if THEMES not available (standalone/bridge mode)
-    return { accent: fallbackAccent, label: '#fff', bg: '#f8f8f8' };
+    const tname = (level - 1 < CMAP_LEVEL_THEMES.length) ? CMAP_LEVEL_THEMES[level - 1] : 'default';
+    const theme = THEMES[tname] || THEMES.default || {};
+    return {
+      accent: theme['--tab-active-bg']    || fallbackAccent,
+      label:  theme['--tab-active-color'] || '#fff',
+      bg:     theme['--bg-data']          || '#f8f8f8',
+    };
   }
 
   function renderConceptMap(hier) {
