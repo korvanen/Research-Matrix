@@ -256,7 +256,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
   let _depth      = 5;
   let _threshold  = CMAP_PARENT_CHILD_THRESHOLD;
   let _maxParents = 1;
-  let _layout     = 'radial';
+  let _layout     = 'organic';
   let _rows       = null;
   let _rendered   = false;
   let _rebuildTimer = null;
