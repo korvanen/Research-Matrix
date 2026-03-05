@@ -78,6 +78,7 @@ const THEMES = {
 };
 
 const TAB_THEMES = [
+  'yellow',
   'visions',
   'relational',
   'organizational',
