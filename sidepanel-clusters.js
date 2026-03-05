@@ -8,7 +8,7 @@
 //   • Cell splitting: long cells are semantically split into segments before
 //     clustering (same approach as concept-map v16). Requires embedding model;
 //     gracefully skips if vectors unavailable for segments.
-console.log('[sidepanel-clusters.js V34]');
+console.log('[sidepanel-clusters.js V15]');
 
 // ── Constants shared with concept-map split logic ──────────────────────────
 var CL_MIN_SPLIT_LENGTH = 60;
