@@ -880,3 +880,130 @@ mark.pkw {
   pointer-events: none;
   z-index: 20;
 }
+/* ════════════════════════════════════════════════════════════════
+   PANEL — reusable draggable/resizable side panel
+   Used by: tools/spreadsheet.html and any future tool
+   ════════════════════════════════════════════════════════════════ */
+
+.ds-panel {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  overflow: hidden;
+  position: relative;
+  z-index: 15;
+  flex-shrink: 0;
+}
+
+.ds-panel--right { flex-direction: row; }
+.ds-panel--left  { flex-direction: row-reverse; }
+
+/* ── Overlap states ─────────────────────────────────────────────── */
+.ds-panel.is-overlapping {
+  position: absolute;
+  top: 0; bottom: 0;
+  z-index: 30;
+}
+.ds-panel--right.is-overlapping { right: 0; }
+.ds-panel--left.is-overlapping  { left: 0; }
+
+.ds-panel.is-fullscreen {
+  z-index: 40;
+}
+
+/* ── Drag handle ────────────────────────────────────────────────── */
+.ds-panel-handle {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  min-width: 16px;
+  background: var(--color-bg-surface);
+  border-left: 1px solid var(--color-border-subtle);
+  cursor: col-resize;
+  gap: 4px;
+  user-select: none;
+  transition: background var(--transition-fast);
+}
+.ds-panel-handle:hover { background: var(--color-bg-hover); }
+.ds-panel-handle.dragging { cursor: col-resize; }
+
+.ds-panel--left .ds-panel-handle {
+  border-left: none;
+  border-right: 1px solid var(--color-border-subtle);
+}
+
+/* ── Fixed handle (shown when panel is too narrow) ──────────────── */
+.ds-panel-handle--fixed {
+  position: fixed;
+  z-index: 50;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: col-resize;
+  background: var(--color-bg-surface);
+  border-left: 1px solid var(--color-border-subtle);
+  user-select: none;
+}
+.ds-panel-handle--fixed.active { display: flex; }
+
+.ds-panel-handle--fixed.ds-panel--left {
+  border-left: none;
+  border-right: 1px solid var(--color-border-subtle);
+}
+
+/* ── Arrow buttons ──────────────────────────────────────────────── */
+.ds-panel-arrows {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ds-panel-arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  padding: 0;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--transition-fast),
+              color var(--transition-fast),
+              background var(--transition-fast);
+}
+.ds-panel-arrow.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+.ds-panel-arrow:hover {
+  color: var(--color-text-default);
+  background: var(--color-bg-hover);
+}
+.ds-panel-arrow svg {
+  width: 8px;
+  height: 13px;
+  pointer-events: none;
+}
+
+/* ── Body ───────────────────────────────────────────────────────── */
+.ds-panel-body {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg-surface);
+  border-left: 1px solid var(--color-border-subtle);
+}
+.ds-panel--left .ds-panel-body {
+  border-left: none;
+  border-right: 1px solid var(--color-border-subtle);
+}
