@@ -6,7 +6,7 @@
 //     Max-Parents slider gets pp-range--accent for purple thumb.
 //   • Sliders upgraded with bounce animation via upgradeSlider().
 //   • Delay while dragging, instant apply on release.
-console.log('[sidepanel-concept-map.js oooooooooooooooooooooooooooooooo]');
+console.log('[sidepanel-concept-map.js aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa]');
 
 const CMAP_PARENT_CHILD_THRESHOLD = 0.50;
 const CMAP_MIN_SPLIT_LENGTH = 60;
@@ -52,7 +52,6 @@ const ORPHAN_RECOVERY_THRESHOLD = 0.85;
   font-size:8px; font-weight:700; letter-spacing:.07em; text-transform:uppercase;
   background:rgba(0,0,0,.07); color:rgba(0,0,0,.45); cursor:pointer;
   transition:background .15s,color .15s; white-space:nowrap;
-  min-width: 52px; /* prevents shrink when text changes to … */
 }
 #pp-cmap-rebuild:hover { background:rgba(0,0,0,.13); color:rgba(0,0,0,.75); }
 #pp-cmap-rebuild.pp-cmap-busy { background:rgba(0,0,0,.04);color:rgba(0,0,0,.25);cursor:default; }
@@ -224,7 +223,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
           '<rect x="4" y="4" width="8" height="8" rx="1" opacity=".4"/>' +
         '</svg>' +
       '</button>' +
-      '<div id="pp-cmap-zoom-hint">scroll / pinch to zoom</div>' +
+      '<div id="pp-cmap-zoom-hint">scroll = zoom · RMB drag = pan · pinch/2-finger = touch</div>' +
     '</div>';
 
   // ── Upgrade all sliders with bounce animation ──────────────────────────────
@@ -251,13 +250,13 @@ function initConceptMapTool(paneEl, sidebarEl) {
   const maxParSlider= paneEl.querySelector('#pp-cmap-maxpar');
   const maxParValEl = paneEl.querySelector('#pp-cmap-maxpar-val');
 
-  const CARD_W = 200;
+  const CARD_W = 170;
   const MM_PAD = 16;
 
   let _depth      = 5;
   let _threshold  = CMAP_PARENT_CHILD_THRESHOLD;
   let _maxParents = 1;
-  let _layout     = 'organic';
+  let _layout     = 'radial';
   let _rows       = null;
   let _rendered   = false;
   let _rebuildTimer = null;
@@ -286,14 +285,14 @@ function initConceptMapTool(paneEl, sidebarEl) {
     el.addEventListener('input', () => {
       read();
       clearTimeout(_rebuildTimer);
-      rebuildBtn.classList.add('pp-cmap-busy');
+      rebuildBtn.classList.add('pp-cmap-busy'); rebuildBtn.textContent = '\u2026';
       _rebuildTimer = setTimeout(() => { _rendered = false; tryRender(); }, DRAG_DELAY);
     });
     // change: fires once on mouseup/touchend — apply instantly
     el.addEventListener('change', () => {
       read();
       clearTimeout(_rebuildTimer);
-      rebuildBtn.classList.remove('pp-cmap-busy'); 
+      rebuildBtn.classList.remove('pp-cmap-busy'); rebuildBtn.textContent = 'Rebuild';
       _rendered = false; tryRender();
     });
   });
@@ -331,20 +330,69 @@ function initConceptMapTool(paneEl, sidebarEl) {
   fitBtn.addEventListener('click', fitAll);
 
   // ── Pan & zoom ────────────────────────────────────────────────────────────
+  // Mouse:     RMB drag = pan,  scroll wheel = zoom,  LMB = drag cards
+  // Trackpad:  2-finger scroll = pan,  pinch (ctrlKey) = zoom
+  // Touch:     2-finger drag = pan,  pinch = zoom,  tap = select
   let _panning=false, _panSX=0, _panSY=0, _panBX=0, _panBY=0;
-  canvas.addEventListener('mousedown', ev => { if (ev.button!==0||ev.target.closest('.pp-cmap-card')) return; _panning=true; _panSX=ev.clientX; _panSY=ev.clientY; _panBX=_panX; _panBY=_panY; canvas.classList.add('pp-cmap-panning'); });
-  document.addEventListener('mousemove', ev => { if (!_panning) return; _panX=_panBX+(ev.clientX-_panSX); _panY=_panBY+(ev.clientY-_panSY); applyTransform(); });
-  document.addEventListener('mouseup', () => { if (_panning) { _panning=false; canvas.classList.remove('pp-cmap-panning'); } });
+
+  // RMB pan
+  canvas.addEventListener('mousedown', ev => {
+    if (ev.button !== 2) return;
+    _panning=true; _panSX=ev.clientX; _panSY=ev.clientY; _panBX=_panX; _panBY=_panY;
+    canvas.classList.add('pp-cmap-panning'); ev.preventDefault();
+  });
+  document.addEventListener('mousemove', ev => {
+    if (!_panning) return;
+    _panX=_panBX+(ev.clientX-_panSX); _panY=_panBY+(ev.clientY-_panSY); applyTransform();
+  });
+  document.addEventListener('mouseup', ev => {
+    if (ev.button !== 2 || !_panning) return;
+    _panning=false; canvas.classList.remove('pp-cmap-panning');
+  });
+  canvas.addEventListener('contextmenu', ev => ev.preventDefault());
+
+  // Scroll wheel zoom + trackpad pan
   canvas.addEventListener('wheel', ev => {
     ev.preventDefault();
     const rect=canvas.getBoundingClientRect(), mx=ev.clientX-rect.left, my=ev.clientY-rect.top;
-    const dz=ev.deltaY<0?1.1:0.9, nz=Math.max(0.15,Math.min(4,_zoom*dz));
-    _panX=mx-(mx-_panX)*nz/_zoom; _panY=my-(my-_panY)*nz/_zoom; _zoom=nz; applyTransform();
+    if (ev.ctrlKey || (Math.abs(ev.deltaY) >= 50 && Math.abs(ev.deltaX) < 50)) {
+      // Mouse wheel or trackpad pinch → zoom
+      const dz=ev.deltaY>0?0.94:1/0.94, nz=Math.max(0.15,Math.min(4,_zoom*dz));
+      _panX=mx-(mx-_panX)*nz/_zoom; _panY=my-(my-_panY)*nz/_zoom; _zoom=nz;
+    } else {
+      // Trackpad 2-finger scroll → pan
+      _panX-=ev.deltaX; _panY-=ev.deltaY;
+    }
+    applyTransform();
   }, {passive:false});
-  let _pinchD=null;
-  canvas.addEventListener('touchstart', ev=>{ if(ev.touches.length===2) _pinchD=Math.hypot(ev.touches[0].clientX-ev.touches[1].clientX,ev.touches[0].clientY-ev.touches[1].clientY); },{passive:true});
-  canvas.addEventListener('touchmove', ev=>{ if(ev.touches.length!==2||!_pinchD) return; const d=Math.hypot(ev.touches[0].clientX-ev.touches[1].clientX,ev.touches[0].clientY-ev.touches[1].clientY); _zoom=Math.max(.15,Math.min(4,_zoom*d/_pinchD)); _pinchD=d; applyTransform(); ev.preventDefault(); },{passive:false});
-  canvas.addEventListener('touchend',()=>{_pinchD=null;});
+
+  // Touch: 2-finger pan + pinch zoom simultaneously
+  let _pinchD=null, _touchMidX=0, _touchMidY=0;
+  canvas.addEventListener('touchstart', ev => {
+    if (ev.touches.length === 2) {
+      _pinchD    = Math.hypot(ev.touches[0].clientX-ev.touches[1].clientX, ev.touches[0].clientY-ev.touches[1].clientY);
+      _touchMidX = (ev.touches[0].clientX+ev.touches[1].clientX)/2;
+      _touchMidY = (ev.touches[0].clientY+ev.touches[1].clientY)/2;
+    }
+  }, {passive:true});
+  canvas.addEventListener('touchmove', ev => {
+    if (ev.touches.length !== 2 || !_pinchD) return;
+    ev.preventDefault();
+    const mx  = (ev.touches[0].clientX+ev.touches[1].clientX)/2;
+    const my  = (ev.touches[0].clientY+ev.touches[1].clientY)/2;
+    const d   = Math.hypot(ev.touches[0].clientX-ev.touches[1].clientX, ev.touches[0].clientY-ev.touches[1].clientY);
+    const rect = canvas.getBoundingClientRect();
+    const cmx = mx-rect.left, cmy = my-rect.top;
+    // Zoom around midpoint
+    const nz = Math.max(0.15, Math.min(4, _zoom * d / _pinchD));
+    _panX = cmx-(cmx-_panX)*nz/_zoom; _panY = cmy-(cmy-_panY)*nz/_zoom;
+    _zoom = nz; _pinchD = d;
+    // Pan from midpoint delta
+    _panX += mx-_touchMidX; _panY += my-_touchMidY;
+    _touchMidX = mx; _touchMidY = my;
+    applyTransform();
+  }, {passive:false});
+  canvas.addEventListener('touchend', () => { _pinchD=null; });
 
   // ── Card drag ─────────────────────────────────────────────────────────────
   function makeDraggable(el, cid) {
@@ -703,7 +751,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
   }
 
   async function doRender() {
-    rebuildBtn.classList.remove('pp-cmap-busy');
+    rebuildBtn.classList.remove('pp-cmap-busy'); rebuildBtn.textContent='Rebuild';
     setStatus('loading','Splitting cells\u2026');
     let workRows;
     try { workRows=await splitAllRows(_rows); } catch(e){ console.warn('[concept-map v16] split error:',e); workRows=_rows; }
