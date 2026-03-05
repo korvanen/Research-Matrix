@@ -1,13 +1,12 @@
-// sidepanel-concept-map.js — Concept Map v16
-// v15 → v16 changes:
-//   • Slider CSS migrated to global style.css.
-//     Classes renamed: pp-cmap-range* → pp-range*, pp-cmap-group-label →
-//     pp-group-label, pp-cmap-range-row → pp-range-row, etc.
-//     Max-Parents slider gets pp-range--accent for purple thumb.
-//   • Sliders upgraded with bounce animation via upgradeSlider().
-//   • Delay while dragging, instant apply on release.
-console.log('[sidepanel-concept-map.js [v.16]');
-// Level themes:
+// sidepanel-concept-map.js — Concept Map v17
+// v16 → v17 changes:
+//   • depthColor() now reads window.PP_PALETTE (set by script.js) as first
+//     priority so all tools share one color source. Falls back to THEMES
+//     globals then hardcoded CMAP_FALLBACK_PALETTE for standalone/bridge mode.
+//   • CMAP_FALLBACK_PALETTE upgraded from 5 plain hex strings to 7 full
+//     { accent, bg, label } objects matching the global theme palette.
+console.log('[sidepanel-concept-map.js [v.17]');
+// Level themes (used by THEMES fallback path only):
 const CMAP_LEVEL_THEMES = ['yellow','visions','relational','organizational','physical','yellow'];
 
 const CMAP_PARENT_CHILD_THRESHOLD = 0.50;
@@ -225,7 +224,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
           '<rect x="4" y="4" width="8" height="8" rx="1" opacity=".4"/>' +
         '</svg>' +
       '</button>' +
-      '<div id="pp-cmap-zoom-hint">scroll = zoom · RMB drag = pan · pinch/2-finger = touch</div>' +
+      '<div id="pp-cmap-zoom-hint">scroll = zoom \u00b7 RMB drag = pan \u00b7 pinch/2-finger = touch</div>' +
     '</div>';
 
   // ── Upgrade all sliders with bounce animation ──────────────────────────────
@@ -283,18 +282,16 @@ function initConceptMapTool(paneEl, sidebarEl) {
     { el: threshSlider, valEl: threshValEl, read: () => { _threshold = +threshSlider.value / 100; threshValEl.textContent = threshSlider.value + '%'; } },
     { el: maxParSlider, valEl: maxParValEl, read: () => { _maxParents = +maxParSlider.value; maxParValEl.textContent = _maxParents; } },
   ].forEach(({ el, read }) => {
-    // input: continuous while dragging — debounce
     el.addEventListener('input', () => {
       read();
       clearTimeout(_rebuildTimer);
-      rebuildBtn.classList.add('pp-cmap-busy'); 
+      rebuildBtn.classList.add('pp-cmap-busy');
       _rebuildTimer = setTimeout(() => { _rendered = false; tryRender(); }, DRAG_DELAY);
     });
-    // change: fires once on mouseup/touchend — apply instantly
     el.addEventListener('change', () => {
       read();
       clearTimeout(_rebuildTimer);
-      rebuildBtn.classList.remove('pp-cmap-busy'); 
+      rebuildBtn.classList.remove('pp-cmap-busy');
       _rendered = false; tryRender();
     });
   });
@@ -332,12 +329,8 @@ function initConceptMapTool(paneEl, sidebarEl) {
   fitBtn.addEventListener('click', fitAll);
 
   // ── Pan & zoom ────────────────────────────────────────────────────────────
-  // Mouse:     RMB drag = pan,  scroll wheel = zoom,  LMB = drag cards
-  // Trackpad:  2-finger scroll = pan,  pinch (ctrlKey) = zoom
-  // Touch:     2-finger drag = pan,  pinch = zoom,  tap = select
   let _panning=false, _panSX=0, _panSY=0, _panBX=0, _panBY=0;
 
-  // RMB pan
   canvas.addEventListener('mousedown', ev => {
     if (ev.button !== 2) return;
     _panning=true; _panSX=ev.clientX; _panSY=ev.clientY; _panBX=_panX; _panBY=_panY;
@@ -353,22 +346,18 @@ function initConceptMapTool(paneEl, sidebarEl) {
   });
   canvas.addEventListener('contextmenu', ev => ev.preventDefault());
 
-  // Scroll wheel zoom + trackpad pan
   canvas.addEventListener('wheel', ev => {
     ev.preventDefault();
     const rect=canvas.getBoundingClientRect(), mx=ev.clientX-rect.left, my=ev.clientY-rect.top;
     if (ev.ctrlKey || (Math.abs(ev.deltaY) >= 50 && Math.abs(ev.deltaX) < 50)) {
-      // Mouse wheel or trackpad pinch → zoom
       const dz=ev.deltaY>0?0.94:1/0.94, nz=Math.max(0.15,Math.min(4,_zoom*dz));
       _panX=mx-(mx-_panX)*nz/_zoom; _panY=my-(my-_panY)*nz/_zoom; _zoom=nz;
     } else {
-      // Trackpad 2-finger scroll → pan
       _panX-=ev.deltaX; _panY-=ev.deltaY;
     }
     applyTransform();
   }, {passive:false});
 
-  // Touch: 2-finger pan + pinch zoom simultaneously
   let _pinchD=null, _touchMidX=0, _touchMidY=0;
   canvas.addEventListener('touchstart', ev => {
     if (ev.touches.length === 2) {
@@ -385,11 +374,9 @@ function initConceptMapTool(paneEl, sidebarEl) {
     const d   = Math.hypot(ev.touches[0].clientX-ev.touches[1].clientX, ev.touches[0].clientY-ev.touches[1].clientY);
     const rect = canvas.getBoundingClientRect();
     const cmx = mx-rect.left, cmy = my-rect.top;
-    // Zoom around midpoint
     const nz = Math.max(0.15, Math.min(4, _zoom * d / _pinchD));
     _panX = cmx-(cmx-_panX)*nz/_zoom; _panY = cmy-(cmy-_panY)*nz/_zoom;
     _zoom = nz; _pinchD = d;
-    // Pan from midpoint delta
     _panX += mx-_touchMidX; _panY += my-_touchMidY;
     _touchMidX = mx; _touchMidY = my;
     applyTransform();
@@ -425,7 +412,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
   }
 
   async function maybeSplitRow(row) {
-    const cells=row.row?.cells||row.cells||[], cats=row.row?.cats?row.row.cats.filter(c=>c.trim()):[], catStr=cats.join(' · ')||'Cell';
+    const cells=row.row?.cells||row.cells||[], cats=row.row?.cats?row.row.cats.filter(c=>c.trim()):[], catStr=cats.join(' \u00b7 ')||'Cell';
     let bestText='', bestIdx=0;
     cells.forEach((c,i)=>{ if(c.trim().length>bestText.length){ bestText=c.trim(); bestIdx=i; } });
     if (bestText.length<CMAP_MIN_SPLIT_LENGTH*2) return [row];
@@ -459,16 +446,13 @@ function initConceptMapTool(paneEl, sidebarEl) {
   function buildHierarchy(rows) {
     const n=rows.length; if (n<2) return null;
 
-    // 1. Generality score
     const scores=new Float32Array(n);
     for (let i=0;i<n;i++) { let sum=0; for (let j=0;j<n;j++) { if (i!==j) sum+=cosineSim(rows[i].vec,rows[j].vec); } scores[i]=sum/(n-1); }
 
-    // 2. Rank → level
     const rankOrder=Array.from({length:n},(_,i)=>i).sort((a,b)=>scores[b]-scores[a]);
     const levels=new Int32Array(n);
     rankOrder.forEach((ri,rank)=>{ levels[ri]=Math.max(1,Math.min(_depth,Math.floor(rank*_depth/n)+1)); });
 
-    // 3. Multi-parent assignment
     const parentsOf    = new Map();
     const parentSimsOf = new Map();
 
@@ -487,7 +471,6 @@ function initConceptMapTool(paneEl, sidebarEl) {
       parentSimsOf.set(i,kept.map(c=>c.s));
     }
 
-    // 4. Orphan recovery (relaxed threshold)
     const relaxed=_threshold*ORPHAN_RECOVERY_THRESHOLD;
     for (let i=0;i<n;i++) {
       if (levels[i]<=1||parentsOf.get(i).length>0) continue;
@@ -500,19 +483,15 @@ function initConceptMapTool(paneEl, sidebarEl) {
       else levels[i]=1;
     }
 
-    // 5. Children lists (derived from parentsOf)
     const childrenOf=Array.from({length:n},()=>[]);
     for (let i=0;i<n;i++) { parentsOf.get(i).forEach(p=>{ if(!childrenOf[p].includes(i)) childrenOf[p].push(i); }); }
 
-    // 6. Avg similarity to children
     const simToChildren=new Float32Array(n);
     for (let i=0;i<n;i++) { if (!childrenOf[i].length) continue; let sum=0; childrenOf[i].forEach(c=>{sum+=cosineSim(rows[i].vec,rows[c].vec);}); simToChildren[i]=sum/childrenOf[i].length; }
 
-    // 6b. Avg similarity to own parents
     const simToParents=new Float32Array(n);
     for (let i=0;i<n;i++) { const pars=parentsOf.get(i)||[]; if (!pars.length) continue; let sum=0; pars.forEach(p=>{sum+=cosineSim(rows[i].vec,rows[p].vec);}); simToParents[i]=sum/pars.length; }
 
-    // 7. Merge: same level + identical parent set + identical children set → one card
     const absorbedInto=new Int32Array(n).fill(-1), mergeExtras=new Map();
     const mkKey=i=>levels[i]+':p'+parentsOf.get(i).slice().sort((a,b)=>a-b).join(',')+':c'+childrenOf[i].slice().sort((a,b)=>a-b).join(',');
     const seenKeys=new Map();
@@ -556,23 +535,51 @@ function initConceptMapTool(paneEl, sidebarEl) {
     });
   }
 
-  // ── Color by hierarchy level — uses panelThemeVars if available ───────────
-  // Priority: panelThemeVars (reads live CSS vars) → TAB_THEMES/THEMES globals → fallback palette.
-  // Cycles through all 5 tab themes (indices 0–4), same as the clusters tool.
-  const CMAP_FALLBACK_PALETTE = ['#5b7fa6','#7a6e9e','#5a9e7a','#9e7a5a','#9e5a7a'];
+  // ── Color by hierarchy level ──────────────────────────────────────────────
+  // Priority order:
+  //   1. window.PP_PALETTE  — set by script.js, single source of truth
+  //   2. THEMES globals     — available when running inside the main page
+  //   3. CMAP_FALLBACK_PALETTE — hardcoded safety net for standalone/bridge mode
+  //
+  // PP_PALETTE order: visions(0), relational(1), organizational(2), physical(3),
+  //                   yellow(4), default(5)
+  // Concept map level sequence: yellow(L1), visions(L2), relational(L3),
+  //   organizational(L4), physical(L5), yellow(L6), default(L7+)
+  // → Rotate PP_PALETTE: start at index 4 (yellow), then wrap through 0,1,2,3,4,5.
+  const CMAP_FALLBACK_PALETTE = [
+    { accent: '#c8991a', bg: '#fffdf5', label: '#fff' }, // yellow         (level 1)
+    { accent: '#2e7d5e', bg: '#f4faf7', label: '#fff' }, // visions        (level 2)
+    { accent: '#4a56c8', bg: '#f4f5fd', label: '#fff' }, // relational     (level 3)
+    { accent: '#5e3d9e', bg: '#f6f3fb', label: '#fff' }, // organizational (level 4)
+    { accent: '#c44035', bg: '#fdf5f4', label: '#fff' }, // physical       (level 5)
+    { accent: '#c8991a', bg: '#fffdf5', label: '#fff' }, // yellow again   (level 6)
+    { accent: '#888888', bg: '#f7f7f8', label: '#fff' }, // default        (level 7+)
+  ];
 
   function depthColor(level) {
-    const fallbackAccent = CMAP_FALLBACK_PALETTE[(level - 1) % CMAP_FALLBACK_PALETTE.length];
-    if (typeof THEMES === 'undefined') {
-      return { accent: fallbackAccent, label: '#fff', bg: '#f8f8f8' };
+    const idx = level - 1; // 0-based
+
+    // 1. Best: window.PP_PALETTE from script.js — rotate so yellow (index 4) is level 1
+    if (window.PP_PALETTE && window.PP_PALETTE.length >= 5) {
+      const pal = window.PP_PALETTE;
+      const rotated = [pal[4], pal[0], pal[1], pal[2], pal[3], pal[4], pal[5] || pal[0]];
+      return rotated[Math.min(idx, rotated.length - 1)];
     }
-    const tname = (level - 1 < CMAP_LEVEL_THEMES.length) ? CMAP_LEVEL_THEMES[level - 1] : 'default';
-    const theme = THEMES[tname] || THEMES.default || {};
-    return {
-      accent: theme['--tab-active-bg']    || fallbackAccent,
-      label:  theme['--tab-active-color'] || '#fff',
-      bg:     theme['--bg-data']          || '#f8f8f8',
-    };
+
+    // 2. THEMES globals (same-page context, PP_PALETTE not yet available)
+    if (typeof THEMES !== 'undefined') {
+      const tname = (idx < CMAP_LEVEL_THEMES.length) ? CMAP_LEVEL_THEMES[idx] : 'default';
+      const theme = THEMES[tname] || THEMES.default || {};
+      const fb = CMAP_FALLBACK_PALETTE[Math.min(idx, CMAP_FALLBACK_PALETTE.length - 1)];
+      return {
+        accent: theme['--tab-active-bg']    || fb.accent,
+        label:  theme['--tab-active-color'] || '#fff',
+        bg:     theme['--bg-data']          || fb.bg,
+      };
+    }
+
+    // 3. Hardcoded fallback (standalone / bridge mode)
+    return CMAP_FALLBACK_PALETTE[Math.min(idx, CMAP_FALLBACK_PALETTE.length - 1)];
   }
 
   function renderConceptMap(hier) {
@@ -625,7 +632,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
         const r=rows[ri], cells=r.row?.cells||r.cells||[], cats=r.row?.cats?r.row.cats.filter(c=>c.trim()):[];
         const best=cells.reduce((b,c)=>c.trim().length>b.length?c.trim():b,'');
         const parsed=typeof parseCitation==='function'?parseCitation(best):{body:best};
-        if (cats.length) { const ce=document.createElement('div'); ce.className='pp-cmap-cell-cat'; ce.textContent=cats.join(' · '); body.appendChild(ce); }
+        if (cats.length) { const ce=document.createElement('div'); ce.className='pp-cmap-cell-cat'; ce.textContent=cats.join(' \u00b7 '); body.appendChild(ce); }
         const te=document.createElement('div'); te.className='pp-cmap-cell-text'; te.textContent=parsed.body; body.appendChild(te);
       });
       card.appendChild(body);
@@ -647,13 +654,8 @@ function initConceptMapTool(paneEl, sidebarEl) {
           return row;
         }
 
-        if (hasParents) {
-          footer.appendChild(makeSimRow('↑', simToParents[i], 'to parent', accent+'88'));
-        }
-        if (hasChildren) {
-          footer.appendChild(makeSimRow('↓', simToChildren[i], 'to children', accent+'cc'));
-        }
-
+        if (hasParents) footer.appendChild(makeSimRow('\u2191', simToParents[i], 'to parent', accent+'88'));
+        if (hasChildren) footer.appendChild(makeSimRow('\u2193', simToChildren[i], 'to children', accent+'cc'));
         card.appendChild(footer);
       } else {
         const leaf=document.createElement('span'); leaf.className='pp-cmap-leaf-badge'; leaf.textContent='Terminal concept'; card.appendChild(leaf);
@@ -664,7 +666,6 @@ function initConceptMapTool(paneEl, sidebarEl) {
       if (window.ResizeObserver) { new ResizeObserver(()=>{ const r=_liveRects.get(i); if(r){r.h=card.offsetHeight;redrawConnectors();} }).observe(card); }
     }
 
-    // Draw one connector edge per (parent, child) pair
     for (let i=0;i<n;i++) {
       if (absorbedInto[i]!==-1) continue;
       (parentsOf.get(i)||[]).forEach(par=>{
@@ -762,10 +763,10 @@ function initConceptMapTool(paneEl, sidebarEl) {
   }
 
   async function doRender() {
-    rebuildBtn.classList.remove('pp-cmap-busy'); 
+    rebuildBtn.classList.remove('pp-cmap-busy');
     setStatus('loading','Splitting cells\u2026');
     let workRows;
-    try { workRows=await splitAllRows(_rows); } catch(e){ console.warn('[concept-map v16] split error:',e); workRows=_rows; }
+    try { workRows=await splitAllRows(_rows); } catch(e){ console.warn('[concept-map v17] split error:',e); workRows=_rows; }
     const splitCount=workRows.length-_rows.length;
     setStatus('loading','Building hierarchy for '+workRows.length+' concepts\u2026');
     setTimeout(()=>{
@@ -779,13 +780,13 @@ function initConceptMapTool(paneEl, sidebarEl) {
           const lv=hier.levels[i]; levelCounts.set(lv,(levelCounts.get(lv)||0)+1);
           if ((hier.parentsOf.get(i)||[]).length>1) multiParentCount++;
         }
-        const levelStr=[...levelCounts.keys()].sort((a,b)=>a-b).map(l=>'L'+l+': '+levelCounts.get(l)).join(' · ');
-        const splitStr=splitCount>0?' · '+splitCount+' split'+(splitCount===1?'':'s'):'';
-        const mpStr=multiParentCount>0?' · '+multiParentCount+' multi-parent':'';
+        const levelStr=[...levelCounts.keys()].sort((a,b)=>a-b).map(l=>'L'+l+': '+levelCounts.get(l)).join(' \u00b7 ');
+        const splitStr=splitCount>0?' \u00b7 '+splitCount+' split'+(splitCount===1?'':'s'):'';
+        const mpStr=multiParentCount>0?' \u00b7 '+multiParentCount+' multi-parent':'';
         renderConceptMap(hier);
-        subtitleEl.textContent=visibleCount+' cards · '+levelStr+splitStr+mpStr;
+        subtitleEl.textContent=visibleCount+' cards \u00b7 '+levelStr+splitStr+mpStr;
         setStatus('ready','Done'); _rendered=true;
-      } catch(err){ console.error('[concept-map v16]',err); setStatus('error','Failed: '+err.message); }
+      } catch(err){ console.error('[concept-map v17]',err); setStatus('error','Failed: '+err.message); }
     },20);
   }
 
