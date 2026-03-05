@@ -285,14 +285,14 @@ function initConceptMapTool(paneEl, sidebarEl) {
     el.addEventListener('input', () => {
       read();
       clearTimeout(_rebuildTimer);
-      rebuildBtn.classList.add('pp-cmap-busy'); rebuildBtn.textContent = '\u2026';
+      rebuildBtn.classList.add('pp-cmap-busy'); 
       _rebuildTimer = setTimeout(() => { _rendered = false; tryRender(); }, DRAG_DELAY);
     });
     // change: fires once on mouseup/touchend — apply instantly
     el.addEventListener('change', () => {
       read();
       clearTimeout(_rebuildTimer);
-      rebuildBtn.classList.remove('pp-cmap-busy'); rebuildBtn.textContent = 'Rebuild';
+      rebuildBtn.classList.remove('pp-cmap-busy'); 
       _rendered = false; tryRender();
     });
   });
@@ -751,7 +751,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
   }
 
   async function doRender() {
-    rebuildBtn.classList.remove('pp-cmap-busy'); rebuildBtn.textContent='Rebuild';
+    rebuildBtn.classList.remove('pp-cmap-busy'); 
     setStatus('loading','Splitting cells\u2026');
     let workRows;
     try { workRows=await splitAllRows(_rows); } catch(e){ console.warn('[concept-map v16] split error:',e); workRows=_rows; }
