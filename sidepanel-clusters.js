@@ -1,15 +1,17 @@
-// sidepanel-clusters.js — Clusters tool v15
-// v14 → v15 changes:
-//   • Card stacking fix: added align-items:flex-start to .pp-cl-body-leaf so
-//     cards don't stretch to full row height when rows are uneven.
-//   • Global slider classes: all .pp-cl-range* replaced with .pp-range*
-//     (defined once in style-slider-additions.css). Slider CSS removed from
-//     the injected <style> block.
-//   • Collision passes increased to 160 for top-level and sub-nests.
-//   • Initial grid spread uses NEST_GAP=20 / SUB_GAP=10 for sparser start.
-//   • Sliders upgraded with bounce animation via upgradeSlider().
-//   • Delay while dragging, instant apply on release.
-console.log('[sidepanel-clusters.js V33]');
+// sidepanel-clusters.js — Clusters tool v16
+// v15 → v16 changes:
+//   • Zoom/pan now matches concept-map: large deltaY (≥50) = mouse wheel zoom,
+//     small deltaY without ctrlKey = trackpad 2-finger pan (no more confusion).
+//   • Clusters labelled A, B, C… (outer); A1, A2, A3… (inner);
+//     A1.1, A1.2… (sub-inner if depth ≥ 3). Labels shown in nest heads and
+//     sub-cluster strips.
+//   • Cell splitting: long cells are semantically split into segments before
+//     clustering (same approach as concept-map v16). Requires embedding model;
+//     gracefully skips if vectors unavailable for segments.
+console.log('[sidepanel-clusters.js V34]');
+
+// ── Constants shared with concept-map split logic ──────────────────────────
+var CL_MIN_SPLIT_LENGTH = 60;
 
 (function injectClusterStyles() {
   if (document.getElementById('pp-cluster-styles')) return;
@@ -88,6 +90,10 @@ console.log('[sidepanel-clusters.js V33]');
   cursor:grab; flex-shrink:0; user-select:none;
 }
 .pp-cl-nest-head:active { cursor:grabbing; }
+.pp-cl-nest-label {
+  font-size:11px; font-weight:800; letter-spacing:.04em; flex-shrink:0;
+  opacity:.75; min-width:16px;
+}
 .pp-cl-nest-dot { width:7px;height:7px;border-radius:50%;flex-shrink:0; }
 .pp-cl-nest-count { font-size:8px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:rgba(0,0,0,.45);white-space:nowrap; }
 
@@ -125,6 +131,7 @@ console.log('[sidepanel-clusters.js V33]');
 .pp-cl-card-body { padding:5px 7px 6px; }
 .pp-cl-card-cat { font-size:7px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:rgba(0,0,0,.35);margin-bottom:2px; }
 .pp-cl-card-text { font-size:9px;line-height:1.38;color:rgba(0,0,0,.72); }
+.pp-cl-card-split { font-size:7px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:rgba(0,0,0,.28);margin-top:2px; }
 
 /* ── Tooltip ── */
 #pp-cl-tooltip {
@@ -147,7 +154,6 @@ console.log('[sidepanel-clusters.js V33]');
 // ════════════════════════════════════════════════════════════════════════════
 function initClustersTool(paneEl, sidebarEl) {
 
-  // Uses .pp-range / .pp-range--muted / .pp-range--accent from style.css
   paneEl.innerHTML =
     '<div id="pp-cl-head">' +
       '<div id="pp-cl-subtitle">Waiting for embeddings\u2026</div>' +
@@ -200,7 +206,7 @@ function initClustersTool(paneEl, sidebarEl) {
   const iMaxSlider   = paneEl.querySelector('#pp-cl-imax'), iMaxVal = paneEl.querySelector('#pp-cl-imax-val');
   const depthSlider  = paneEl.querySelector('#pp-cl-depth'), depthVal = paneEl.querySelector('#pp-cl-depth-val');
 
-  const CARD_W       = 120;  // min card width for tile layout
+  const CARD_W       = 120;
   const RESIZE_MIN_W = 120;
   const RESIZE_MIN_H = 60;
   const NEST_GAP     = 20;
@@ -212,6 +218,27 @@ function initClustersTool(paneEl, sidebarEl) {
   let _reclusterTimer=null;
   let _panX=0, _panY=0, _zoom=1;
   let _topZ=10;
+
+  // ── Label helpers ──────────────────────────────────────────────────────────
+  // Converts a zero-based outer index to a letter label: 0→A, 1→B, …, 25→Z, 26→AA, …
+  function outerLabel(i) {
+    let label = '';
+    let n = i;
+    do {
+      label = String.fromCharCode(65 + (n % 26)) + label;
+      n = Math.floor(n / 26) - 1;
+    } while (n >= 0);
+    return label;
+  }
+
+  // inner: outerLabel + (subIdx+1), e.g. "A1", "A2"
+  // subInner: outerLabel + (subIdx+1) + "." + (subSubIdx+1), e.g. "A1.1"
+  function innerLabel(outerLbl, subIdx) {
+    return outerLbl + (subIdx + 1);
+  }
+  function subInnerLabel(outerLbl, subIdx, subSubIdx) {
+    return outerLbl + (subIdx + 1) + '.' + (subSubIdx + 1);
+  }
 
   function applyWorldTransform() {
     world.style.transform = `translate(${_panX}px,${_panY}px) scale(${_zoom})`;
@@ -235,7 +262,6 @@ function initClustersTool(paneEl, sidebarEl) {
     smoothSliderVal(depthSlider, depthVal, _depth);
   }
 
-  // Smooth value label animation
   const _sliderTargets = new Map();
   function smoothSliderVal(slider, valEl, intVal) {
     let state = _sliderTargets.get(slider);
@@ -255,9 +281,7 @@ function initClustersTool(paneEl, sidebarEl) {
     state.raf = requestAnimationFrame(step);
   }
 
-  // ── Slider event listeners: delay while dragging, instant on release ──────
   [oMinSlider, oMaxSlider, iMinSlider, iMaxSlider, depthSlider].forEach(s => {
-    // input fires continuously while dragging — debounce
     s.addEventListener('input', () => {
       syncSliders();
       if (!_cachedEmbedded) return;
@@ -265,7 +289,6 @@ function initClustersTool(paneEl, sidebarEl) {
       reclusterBtn.classList.add('pp-cl-reclustering'); reclusterBtn.textContent = '\u2026';
       _reclusterTimer = setTimeout(() => { _rendered = false; tryRender(); }, DRAG_DELAY);
     });
-    // change fires once on mouseup/touchend — apply instantly
     s.addEventListener('change', () => {
       syncSliders();
       if (!_cachedEmbedded) return;
@@ -276,13 +299,16 @@ function initClustersTool(paneEl, sidebarEl) {
 
   reclusterBtn.addEventListener('click', () => { clearTimeout(_reclusterTimer); _rendered = false; tryRender(); });
 
-  // ── Canvas pan (right mouse button) / zoom (scroll wheel + ctrl+scroll) ──
-  // Mouse:      RMB drag = pan,  scroll wheel = zoom,  LMB = select/drag nests
-  // Touchpad:   2-finger scroll = pan,  pinch = zoom
-  // Touchscreen: 2-finger drag = pan,  pinch = zoom,  tap = select
+  // ══════════════════════════════════════════════════════════════════════════
+  // ── Canvas pan & zoom ─────────────────────────────────────────────────────
+  // Matches concept-map v16:
+  //   Mouse wheel (large deltaY ≥ 50)  → zoom
+  //   Trackpad pinch (ctrlKey)          → zoom
+  //   Trackpad 2-finger scroll          → pan (small deltaY without ctrlKey)
+  //   RMB drag                          → pan
+  // ══════════════════════════════════════════════════════════════════════════
   let _panning=false, _panSX=0, _panSY=0, _panBX=0, _panBY=0;
 
-  // RMB pan
   canvas.addEventListener('mousedown', ev => {
     if (ev.button !== 2) return;
     _panning=true; _panSX=ev.clientX; _panSY=ev.clientY; _panBX=_panX; _panBY=_panY;
@@ -296,32 +322,29 @@ function initClustersTool(paneEl, sidebarEl) {
     if (ev.button !== 2 || !_panning) return;
     _panning=false; canvas.classList.remove('pp-cl-panning');
   });
-  // Suppress context menu on canvas so RMB drag doesn't open it
   canvas.addEventListener('contextmenu', ev => ev.preventDefault());
 
-  // Scroll wheel zoom (plain scroll) + pan (shift+scroll or 2-finger trackpad)
+  // Scroll wheel / trackpad — same logic as concept-map
   canvas.addEventListener('wheel', ev => {
     ev.preventDefault();
     const rect = canvas.getBoundingClientRect();
     const mx = ev.clientX - rect.left, my = ev.clientY - rect.top;
 
-    // Trackpad sends small deltaY with ctrlKey for pinch-zoom
-    // Mouse wheel sends large deltaY — both should zoom
-    if (ev.ctrlKey || Math.abs(ev.deltaY) < 50 && Math.abs(ev.deltaX) < 50 && !ev.shiftKey) {
-      // Pinch-to-zoom from trackpad (ctrlKey) or plain mouse wheel
+    if (ev.ctrlKey || (Math.abs(ev.deltaY) >= 50 && Math.abs(ev.deltaX) < 50)) {
+      // Mouse wheel zoom OR trackpad pinch (ctrlKey)
       const dz = ev.deltaY > 0 ? 0.94 : 1 / 0.94;
       const nz = Math.max(0.15, Math.min(4, _zoom * dz));
       _panX = mx - (mx - _panX) * nz / _zoom;
       _panY = my - (my - _panY) * nz / _zoom;
       _zoom = nz;
     } else {
-      // 2-finger trackpad pan (deltaX/deltaY without ctrlKey)
+      // Trackpad 2-finger scroll → pan
       _panX -= ev.deltaX; _panY -= ev.deltaY;
     }
     applyWorldTransform();
   }, { passive: false });
 
-  // Touch: 2-finger pan + pinch zoom, 1-finger = select/drag nests
+  // Touch: 2-finger pan + pinch zoom
   let _pinchD=null, _touchMidX=0, _touchMidY=0;
   canvas.addEventListener('touchstart', ev => {
     if (ev.touches.length === 2) {
@@ -338,12 +361,10 @@ function initClustersTool(paneEl, sidebarEl) {
     const d   = Math.hypot(ev.touches[0].clientX-ev.touches[1].clientX, ev.touches[0].clientY-ev.touches[1].clientY);
     const rect = canvas.getBoundingClientRect();
     const cmx = mx-rect.left, cmy = my-rect.top;
-    // Zoom around midpoint first
     const nz = Math.max(0.15, Math.min(4, _zoom * d / _pinchD));
     _panX = cmx - (cmx - _panX) * nz / _zoom;
     _panY = cmy - (cmy - _panY) * nz / _zoom;
     _zoom = nz; _pinchD = d;
-    // Then apply pan delta from midpoint movement
     _panX += mx - _touchMidX;
     _panY += my - _touchMidY;
     _touchMidX = mx; _touchMidY = my;
@@ -393,8 +414,8 @@ function initClustersTool(paneEl, sidebarEl) {
   }
 
   // ── Tooltip ──────────────────────────────────────────────────────────────
-  function showTooltip(ev, r, text, accentColor) {
-    _ttRow=r; ttCluster.textContent=''; ttCluster.style.color=accentColor;
+  function showTooltip(ev, r, text, accentColor, clusterLabel) {
+    _ttRow=r; ttCluster.textContent=clusterLabel||''; ttCluster.style.color=accentColor;
     ttText.textContent = text.slice(0,160) + (text.length>160?'\u2026':'');
     ttGoto.style.color = accentColor;
     tooltip.classList.add('pp-cl-tt-visible'); moveTooltip(ev);
@@ -410,11 +431,96 @@ function initClustersTool(paneEl, sidebarEl) {
   ttGoto.addEventListener('click', () => { if (_ttRow && typeof panelGoTo === 'function') panelGoTo(_ttRow, 0); hideTooltip(); });
 
   // ════════════════════════════════════════════════════════════════════════
+  // ── Cell splitting (same approach as concept-map v16) ───────────────────
+  // ════════════════════════════════════════════════════════════════════════
+  function sentenceSplit(text) {
+    return text
+      .replace(/([.!?;])\s+/g, '$1\n')
+      .split('\n')
+      .map(s => s.trim())
+      .filter(s => s.length >= CL_MIN_SPLIT_LENGTH);
+  }
+
+  function avgVec(vecs) {
+    const valid = vecs.filter(Boolean); if (!valid.length) return null;
+    const dim = valid[0].length, sum = new Float32Array(dim);
+    valid.forEach(v => v.forEach((x, i) => { sum[i] += x; }));
+    return Array.from(sum).map(x => x / valid.length);
+  }
+
+  async function maybeSplitRow(row) {
+    // Only attempt splitting if a real getCachedEmbedding is available
+    if (!window.EmbeddingUtils || typeof window.EmbeddingUtils.getCachedEmbedding !== 'function') return [row];
+
+    const cells = row.row && row.row.cells ? row.row.cells : (row.cells || []);
+    const cats  = row.row && row.row.cats  ? row.row.cats.filter(c => c.trim()) : [];
+
+    // Find the longest cell
+    let bestText = '', bestIdx = 0;
+    cells.forEach((c, i) => { if (c.trim().length > bestText.length) { bestText = c.trim(); bestIdx = i; } });
+    if (bestText.length < CL_MIN_SPLIT_LENGTH * 2) return [row];
+
+    const segments = sentenceSplit(bestText);
+    if (segments.length <= 1) return [row];
+
+    let segVecs;
+    try {
+      segVecs = await Promise.all(segments.map(s => window.EmbeddingUtils.getCachedEmbedding(s)));
+    } catch(e) { return [row]; }
+
+    const valid = segments
+      .map((s, i) => ({ text: s, vec: segVecs[i] }))
+      .filter(x => x.vec && x.vec.length);
+    if (valid.length <= 1) return [row];
+
+    // Simple cosine-similarity-based grouping (same as concept map)
+    const n = valid.length;
+    const threshold = 0.55;
+    const sim = Array.from({length: n}, (_, i) =>
+      Array.from({length: n}, (_, j) => i === j ? 1 : cosineSim(valid[i].vec, valid[j].vec))
+    );
+    const groupOf = new Array(n).fill(-1); let numGroups = 0;
+    for (let i = 0; i < n; i++) {
+      if (groupOf[i] !== -1) continue; const g = numGroups++; groupOf[i] = g;
+      for (let j = i+1; j < n; j++) {
+        if (groupOf[j] !== -1) continue;
+        let linked = false;
+        for (let k = 0; k < j; k++) { if (groupOf[k] === g && sim[k][j] >= threshold) { linked=true; break; } }
+        if (linked) groupOf[j] = g;
+      }
+    }
+    if (numGroups <= 1) return [row];
+
+    const groups = Array.from({length: numGroups}, () => []);
+    valid.forEach((seg, i) => groups[groupOf[i]].push(seg));
+
+    return groups.map((segs, ni) => ({
+      tabIdx: row.tabIdx, rowIdx: row.rowIdx,
+      headers: row.headers || [], title: row.title || '',
+      kws: row.kws || new Set(),
+      _splitN: ni + 1, _splitT: numGroups,
+      vec: avgVec(segs.map(s => s.vec)),
+      row: {
+        cells: cells.map((c, ci) => ci === bestIdx ? segs.map(s => s.text).join(' ') : c),
+        cats
+      }
+    }));
+  }
+
+  async function splitAllRows(rows) {
+    const result = [];
+    for (const row of rows) {
+      const parts = await maybeSplitRow(row);
+      parts.forEach(r => result.push(r));
+    }
+    return result;
+  }
+
+  // ════════════════════════════════════════════════════════════════════════
   // ── Collision resolution ─────────────────────────────────────────────────
   // ════════════════════════════════════════════════════════════════════════
   function resolveCollisions(rects, gap, maxPasses) {
-    gap = gap || 0;
-    maxPasses = maxPasses || 160;
+    gap = gap || 0; maxPasses = maxPasses || 160;
     for (let pass = 0; pass < maxPasses; pass++) {
       let moved = false;
       for (let a = 0; a < rects.length; a++) {
@@ -425,8 +531,7 @@ function initClustersTool(paneEl, sidebarEl) {
           const overlapX2 = (rb.x + rb.w + gap) - ra.x;
           const overlapY2 = (rb.y + rb.h + gap) - ra.y;
           if (overlapX <= 0 || overlapX2 <= 0 || overlapY <= 0 || overlapY2 <= 0) continue;
-          const pushX = Math.min(overlapX, overlapX2);
-          const pushY = Math.min(overlapY, overlapY2);
+          const pushX = Math.min(overlapX, overlapX2), pushY = Math.min(overlapY, overlapY2);
           if (pushX <= pushY) {
             const half = pushX / 2;
             if (overlapX < overlapX2) { ra.x -= half; rb.x += half; }
@@ -540,8 +645,7 @@ function initClustersTool(paneEl, sidebarEl) {
     });
   }
 
-  // ── Color: use tab themes from script.js (panelThemeVars) ────────────────
-  // Falls back to a built-in palette if panelThemeVars isn't available.
+  // ── Color palette ────────────────────────────────────────────────────────
   const FALLBACK_PALETTE = [
     { accent: '#4f7af7', bg: '#f0f4ff' }, { accent: '#e05a6a', bg: '#fff0f2' },
     { accent: '#2eb87a', bg: '#edfaf4' }, { accent: '#f59b20', bg: '#fffbf0' },
@@ -550,9 +654,8 @@ function initClustersTool(paneEl, sidebarEl) {
   ];
 
   function colForIndex(i) {
-    // Try to use the global tab theme system
     if (typeof panelThemeVars === 'function') {
-      const vars = panelThemeVars(i % 5); // cycle through tabs
+      const vars = panelThemeVars(i % 5);
       return {
         accent: vars['--tab-active-bg']    || FALLBACK_PALETTE[i % FALLBACK_PALETTE.length].accent,
         bg:     vars['--bg-data']          || FALLBACK_PALETTE[i % FALLBACK_PALETTE.length].bg,
@@ -564,7 +667,7 @@ function initClustersTool(paneEl, sidebarEl) {
   }
 
   // ── Card builder ──────────────────────────────────────────────────────────
-  function buildCard(r, col, delay) {
+  function buildCard(r, col, delay, clusterLabel) {
     const cells = r.row && r.row.cells ? r.row.cells : (r.cells || []);
     const cats  = r.row && r.row.cats  ? r.row.cats.filter(c => c.trim()) : [];
     const best  = cells.reduce((b, c) => c.length > b.length ? c : b, '');
@@ -577,43 +680,44 @@ function initClustersTool(paneEl, sidebarEl) {
     const body = document.createElement('div'); body.className = 'pp-cl-card-body';
     if (cats.length) { const ce = document.createElement('div'); ce.className = 'pp-cl-card-cat'; ce.textContent = cats.join(' · '); body.appendChild(ce); }
     const te = document.createElement('div'); te.className = 'pp-cl-card-text'; te.textContent = parsed.body; body.appendChild(te);
+    // Show split indicator if this row was split from a longer cell
+    if (r._splitN && r._splitT && r._splitT > 1) {
+      const sp = document.createElement('div'); sp.className = 'pp-cl-card-split';
+      sp.textContent = 'Segment ' + r._splitN + '\u2009/\u2009' + r._splitT;
+      body.appendChild(sp);
+    }
     card.appendChild(body);
-    card.addEventListener('mouseenter', ev => showTooltip(ev, r, parsed.body, col.accent));
+    card.addEventListener('mouseenter', ev => showTooltip(ev, r, parsed.body, col.accent, clusterLabel || ''));
     card.addEventListener('mousemove',  ev => moveTooltip(ev));
     card.addEventListener('mouseleave', ()  => hideTooltip());
     return card;
   }
 
   // ════════════════════════════════════════════════════════════════════════
-  // ── Nest builder — outer clusters only, tiles inside ────────────────────
-  // Outer nests (depth=0): draggable, resizable, collision-resolved
-  // Inner content: flex-wrap tiles that auto-size — no absolute positioning
+  // ── Nest builder ─────────────────────────────────────────────────────────
   // ════════════════════════════════════════════════════════════════════════
 
-  // Build a sub-cluster label strip + tiled cards inside a flex container
-  function buildInnerTiles(rows, subAsgn, col, parentPath) {
-    // subAsgn: array of cluster indices per row, or null = all one group
+  // Build inner tiles with optional sub-cluster labelling (A1, A2… or A1.1…)
+  function buildInnerTiles(rows, subAsgn, col, outerLbl) {
     const frag = document.createDocumentFragment();
 
     if (!subAsgn || _depth <= 1) {
-      // No sub-clustering — tile all cards in one row
       const tileRow = document.createElement('div');
       tileRow.className = 'pp-cl-tile-row';
-      rows.forEach((r, ri) => tileRow.appendChild(buildCard(r, col, ri * 10)));
+      rows.forEach((r, ri) => tileRow.appendChild(buildCard(r, col, ri * 10, outerLbl)));
       frag.appendChild(tileRow);
       return frag;
     }
 
-    // Group by sub-cluster index
     const numSub = Math.max(...subAsgn, 0) + 1;
     const groups = Array.from({ length: numSub }, () => []);
     rows.forEach((r, i) => groups[subAsgn[i]].push(r));
 
     groups.forEach((members, si) => {
       if (!members.length) return;
-      const subCol = colForIndex(parentPath * 8 + si); // slight color variation
+      const subCol = colForIndex(si);
+      const subLbl = innerLabel(outerLbl, si);
 
-      // Sub-cluster header strip
       const strip = document.createElement('div');
       strip.className = 'pp-cl-sub-strip';
       strip.style.cssText =
@@ -623,24 +727,27 @@ function initClustersTool(paneEl, sidebarEl) {
       const dot = document.createElement('span');
       dot.style.cssText = 'width:5px;height:5px;border-radius:50%;background:' + subCol.accent + ';flex-shrink:0;';
       const lbl = document.createElement('span');
-      lbl.style.cssText = 'font-size:7px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:' + subCol.accent + ';';
-      lbl.textContent = members.length + ' entr' + (members.length === 1 ? 'y' : 'ies');
-      strip.appendChild(dot); strip.appendChild(lbl);
+      lbl.style.cssText = 'font-size:9px;font-weight:800;letter-spacing:.06em;color:' + subCol.accent + ';margin-right:4px;flex-shrink:0;';
+      lbl.textContent = subLbl;
+      const cnt = document.createElement('span');
+      cnt.style.cssText = 'font-size:7px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:' + subCol.accent + ';opacity:.7;';
+      cnt.textContent = members.length + ' entr' + (members.length === 1 ? 'y' : 'ies');
+      strip.appendChild(dot); strip.appendChild(lbl); strip.appendChild(cnt);
       frag.appendChild(strip);
 
-      // Tiled cards for this sub-group
       const tileWrap = document.createElement('div');
       tileWrap.className = 'pp-cl-tile-row';
-      members.forEach((r, ri) => tileWrap.appendChild(buildCard(r, subCol, ri * 10)));
+      members.forEach((r, ri) => tileWrap.appendChild(buildCard(r, subCol, ri * 10, subLbl)));
       frag.appendChild(tileWrap);
     });
 
     return frag;
   }
 
-  // Build a single outer nest (depth=0) — draggable + resizable container
+  // Build a single outer nest (draggable + resizable)
   function buildOuterNest(members, outerIdx, subAsgn) {
     const col = colForIndex(outerIdx);
+    const lbl = outerLabel(outerIdx);
 
     const nest = document.createElement('div');
     nest.className = 'pp-cl-nest';
@@ -648,24 +755,27 @@ function initClustersTool(paneEl, sidebarEl) {
     nest.style.borderColor = col.accent + '55';
     nest.style.background  = col.bg;
 
-    // Head — drag handle
     const subCount = subAsgn ? (Math.max(...subAsgn, 0) + 1) : 0;
     const subLabel = subAsgn && _depth > 1 ? ' · ' + subCount + ' group' + (subCount === 1 ? '' : 's') : '';
+
     const head = document.createElement('div'); head.className = 'pp-cl-nest-head';
     head.style.background = col.accent + '20';
+
+    // Big letter label
+    const nestLblEl = document.createElement('span'); nestLblEl.className = 'pp-cl-nest-label';
+    nestLblEl.textContent = lbl; nestLblEl.style.color = col.accent;
+
     const dot = document.createElement('span'); dot.className = 'pp-cl-nest-dot'; dot.style.background = col.accent;
     const cnt = document.createElement('span'); cnt.className = 'pp-cl-nest-count';
     cnt.textContent = members.length + ' entr' + (members.length === 1 ? 'y' : 'ies') + subLabel;
-    head.appendChild(dot); head.appendChild(cnt); nest.appendChild(head);
+    head.appendChild(nestLblEl); head.appendChild(dot); head.appendChild(cnt); nest.appendChild(head);
 
-    // Body — scrollable tile container (styled via .pp-cl-nest-body CSS)
     const body = document.createElement('div');
     body.className = 'pp-cl-nest-body';
     nest.appendChild(body);
 
-    body.appendChild(buildInnerTiles(members, subAsgn, col, outerIdx));
+    body.appendChild(buildInnerTiles(members, subAsgn, col, lbl));
 
-    // Estimate size for layout
     const CARD_H_EST = 52, CARD_COLS = 3;
     const numRows = Math.ceil(members.length / CARD_COLS);
     const bodyH   = Math.max(80, numRows * (CARD_H_EST + 5) + 14 + (subAsgn && _depth > 1 ? subCount * 18 : 0));
@@ -687,20 +797,17 @@ function initClustersTool(paneEl, sidebarEl) {
     emptyEl.style.display = 'none';
     _panX = 0; _panY = 0; _zoom = 1; applyWorldTransform(); _topZ = 10;
 
-    // Outer clustering
     const topAsgn  = autoCluster(rows, _outerMin, _outerMax);
     const numTop   = Math.max(...topAsgn, 0) + 1;
     const topGroups = Array.from({ length: numTop }, () => []);
     rows.forEach((r, i) => topGroups[topAsgn[i]].push(r));
 
-    // Sub-clustering (aligned across groups)
     let alignedAsgns = null;
     const nonEmpty = topGroups.filter(g => g.length > 0);
     if (_depth > 1 && nonEmpty.length > 1) {
       alignedAsgns = alignedSubCluster(nonEmpty, _innerMin, _innerMax);
     }
 
-    // Build outer nests
     const nestEls = [];
     let alignIdx = 0;
     topGroups.forEach((members, oi) => {
@@ -711,7 +818,6 @@ function initClustersTool(paneEl, sidebarEl) {
       world.appendChild(nest); nestEls.push(nest);
     });
 
-    // Top-level collision resolution
     const cols = Math.max(1, Math.ceil(Math.sqrt(nestEls.length)));
     const topRects = nestEls.map((n, i) => ({
       x: NEST_GAP + (i % cols) * ((n._estW || 200) + NEST_GAP * 2),
@@ -733,10 +839,16 @@ function initClustersTool(paneEl, sidebarEl) {
       r.el.style.top  = (r.y + offY) + 'px';
     });
 
-    subtitle.textContent = numTop + ' cluster' + (numTop === 1 ? '' : 's') + ' · ' + rows.length + ' entries';
+    // Build subtitle: "A, B, C · 42 entries (3 split)"
+    const splitCount = rows.filter(r => r._splitN && r._splitN > 1).length;
+    const clusterNames = nestEls.map((_, i) => outerLabel(i)).join(', ');
+    subtitle.textContent =
+      numTop + ' cluster' + (numTop === 1 ? '' : 's') +
+      ' (' + clusterNames + ') · ' + rows.length + ' entries' +
+      (splitCount > 0 ? ' · ' + splitCount + ' split' : '');
   }
 
-  // ── Embedding pipeline ────────────────────────────────────────────────────
+  // ── Embedding + split pipeline ────────────────────────────────────────────
   function tryRender() {
     if (_rendered) return;
     if (typeof buildRowIndex !== 'function') return;
@@ -768,11 +880,25 @@ function initClustersTool(paneEl, sidebarEl) {
       _cachedEmbedded = embedded; _cachedVectors = vectors; requestAnimationFrame(doRender);
     });
   }
-  function doRender() {
+
+  async function doRender() {
     reclusterBtn.classList.remove('pp-cl-reclustering'); reclusterBtn.textContent = 'Re-cluster';
-    setStatus('loading', 'Rendering\u2026');
+    setStatus('loading', 'Splitting cells\u2026');
+
+    // Try cell splitting (gracefully skips if model unavailable for segments)
+    let workRows = _cachedEmbedded;
+    try {
+      const split = await splitAllRows(_cachedEmbedded);
+      if (split.length > _cachedEmbedded.length) {
+        workRows = split;
+        setStatus('loading', 'Clustering ' + workRows.length + ' concepts\u2026');
+      }
+    } catch(e) {
+      console.warn('[clusters] split error:', e);
+    }
+
     setTimeout(() => {
-      try { render(_cachedEmbedded); setStatus('ready', 'Done'); _rendered = true; }
+      try { render(workRows); setStatus('ready', 'Done'); _rendered = true; }
       catch (err) { console.error('[clusters]', err); setStatus('error', 'Clustering failed'); }
     }, 20);
   }
