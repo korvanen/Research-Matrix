@@ -147,6 +147,123 @@ var CL_MIN_SPLIT_LENGTH = 60;
   font-size:8px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
   cursor:pointer;align-self:flex-end;margin-top:2px;
 }
+
+/* ══ Cluster Spreadsheet Overlay Panel ══════════════════════════════════ */
+#pp-cl-sheet-wrap {
+  position:absolute; top:0; right:0; bottom:0;
+  display:flex; flex-direction:row; align-items:stretch;
+  z-index:60; pointer-events:none;
+  width:360px; min-width:28px; max-width:85%;
+}
+#pp-cl-sheet-wrap.pp-cl-sheet-animating {
+  transition:width .22s cubic-bezier(0.4,0,0.2,1);
+}
+#pp-cl-sheet-wrap.pp-cl-sheet-collapsed { width:28px; }
+
+/* Toggle tab on left edge */
+#pp-cl-sheet-tab {
+  width:28px; flex-shrink:0;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  cursor:pointer; pointer-events:all; gap:6px; position:relative;
+  border-left:1px solid transparent;
+  transition:background .15s;
+}
+#pp-cl-sheet-tab:hover { background:rgba(0,0,0,.04); }
+#pp-cl-sheet-tab-pill {
+  width:3px; height:32px; background:rgba(0,0,0,.15); border-radius:2px;
+  transition:background .15s, height .15s;
+}
+#pp-cl-sheet-tab:hover #pp-cl-sheet-tab-pill { background:rgba(0,0,0,.35); height:42px; }
+#pp-cl-sheet-tab-icon {
+  font-size:7.5px; font-weight:800; text-transform:uppercase; letter-spacing:.1em;
+  writing-mode:vertical-rl; text-orientation:mixed; transform:rotate(180deg);
+  color:rgba(0,0,0,.28); transition:color .15s; line-height:1;
+}
+#pp-cl-sheet-tab:hover #pp-cl-sheet-tab-icon { color:rgba(0,0,0,.55); }
+
+/* The main panel */
+#pp-cl-sheet-panel {
+  flex:1; min-width:0;
+  background:var(--sidebar-bg,#fff);
+  border-left:1.5px solid var(--sidebar-box-border,rgba(0,0,0,.1));
+  box-shadow:-6px 0 28px rgba(0,0,0,.14);
+  display:flex; flex-direction:column;
+  pointer-events:all; overflow:hidden;
+  opacity:1; transition:opacity .18s;
+  /* left 5px = resize grab zone */
+  cursor:ew-resize;
+}
+#pp-cl-sheet-wrap.pp-cl-sheet-collapsed #pp-cl-sheet-panel {
+  opacity:0; pointer-events:none;
+}
+#pp-cl-sheet-phead {
+  flex-shrink:0; padding:9px 12px 7px;
+  border-bottom:1px solid var(--sidebar-box-border,rgba(0,0,0,.1));
+  display:flex; align-items:center; gap:8px;
+  cursor:default;
+}
+#pp-cl-sheet-ptitle {
+  font-size:10px; font-weight:800; letter-spacing:.07em;
+  text-transform:uppercase; color:rgba(0,0,0,.45); flex:1;
+}
+#pp-cl-sheet-desc {
+  font-size:8.5px; color:rgba(0,0,0,.3); font-weight:500;
+  letter-spacing:.03em; white-space:nowrap;
+}
+#pp-cl-sheet-body {
+  flex:1; min-height:0; overflow:auto; cursor:default;
+  scrollbar-width:thin; scrollbar-color:rgba(0,0,0,.15) transparent;
+}
+#pp-cl-sheet-body::-webkit-scrollbar { width:5px; height:5px; }
+#pp-cl-sheet-body::-webkit-scrollbar-thumb { background:rgba(0,0,0,.15); border-radius:3px; }
+#pp-cl-sheet-body::-webkit-scrollbar-track { background:transparent; }
+
+/* Spreadsheet table */
+.pp-cl-table {
+  border-collapse:collapse; width:100%; font-size:9px;
+}
+.pp-cl-table thead tr { position:sticky; top:0; z-index:10; }
+.pp-cl-table th {
+  background:#fff; padding:6px 8px 5px;
+  font-size:8px; font-weight:800; letter-spacing:.09em; text-transform:uppercase;
+  text-align:left; white-space:nowrap;
+  border-right:1px solid rgba(0,0,0,.08);
+  border-bottom:2px solid rgba(0,0,0,.1);
+}
+.pp-cl-table th.pp-cl-th-corner {
+  position:sticky; left:0; z-index:11;
+  min-width:28px; width:28px; text-align:center;
+  border-right:2px solid rgba(0,0,0,.1);
+}
+.pp-cl-table td {
+  padding:4px; vertical-align:top;
+  border-right:1px solid rgba(0,0,0,.07);
+  border-bottom:1px solid rgba(0,0,0,.07);
+  min-width:130px;
+}
+.pp-cl-table td.pp-cl-td-rowlabel {
+  position:sticky; left:0; z-index:5;
+  background:#f7f7f8;
+  font-size:8px; font-weight:800; letter-spacing:.07em;
+  color:rgba(0,0,0,.38); text-align:center;
+  padding:4px 6px; white-space:nowrap;
+  min-width:28px; width:28px;
+  border-right:2px solid rgba(0,0,0,.1);
+}
+.pp-cl-table td.pp-cl-td-empty {
+  background:rgba(0,0,0,.018);
+  color:rgba(0,0,0,.2); font-size:9px; text-align:center; padding:8px 4px;
+}
+/* Mini cards inside cells */
+.pp-cl-scard {
+  background:#fff; border:1px solid rgba(0,0,0,.1); border-radius:4px;
+  padding:3px 6px 4px; margin-bottom:3px; cursor:pointer;
+  font-size:8px; line-height:1.38; color:rgba(0,0,0,.7);
+  border-left:3px solid transparent;
+  transition:background .1s, box-shadow .1s;
+}
+.pp-cl-scard:last-child { margin-bottom:0; }
+.pp-cl-scard:hover { background:rgba(0,0,0,.03); box-shadow:0 1px 4px rgba(0,0,0,.09); }
 `;
   document.head.appendChild(s);
 })();
@@ -218,6 +335,7 @@ function initClustersTool(paneEl, sidebarEl) {
   let _reclusterTimer=null;
   let _panX=0, _panY=0, _zoom=1;
   let _topZ=10;
+  let _clusterState=null; // { nonEmpty, alignedAsgns }
 
   // ── Label helpers ──────────────────────────────────────────────────────────
   // Converts a zero-based outer index to a letter label: 0→A, 1→B, …, 25→Z, 26→AA, …
@@ -298,6 +416,139 @@ function initClustersTool(paneEl, sidebarEl) {
   });
 
   reclusterBtn.addEventListener('click', () => { clearTimeout(_reclusterTimer); _rendered = false; tryRender(); });
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // ── Sheet Overlay Panel ───────────────────────────────────────────────────
+  // ══════════════════════════════════════════════════════════════════════════
+  const sheetWrap = document.createElement('div'); sheetWrap.id = 'pp-cl-sheet-wrap';
+  sheetWrap.classList.add('pp-cl-sheet-collapsed');
+
+  // Left toggle tab
+  const sheetTab = document.createElement('div'); sheetTab.id = 'pp-cl-sheet-tab';
+  const tabPill = document.createElement('div'); tabPill.id = 'pp-cl-sheet-tab-pill';
+  const tabIcon = document.createElement('div'); tabIcon.id = 'pp-cl-sheet-tab-icon';
+  tabIcon.textContent = 'Table';
+  sheetTab.appendChild(tabPill); sheetTab.appendChild(tabIcon);
+
+  // Panel
+  const sheetPanel = document.createElement('div'); sheetPanel.id = 'pp-cl-sheet-panel';
+  const sheetPHead = document.createElement('div'); sheetPHead.id = 'pp-cl-sheet-phead';
+  const sheetTitle = document.createElement('div'); sheetTitle.id = 'pp-cl-sheet-ptitle';
+  sheetTitle.textContent = 'Cluster Table';
+  const sheetDesc = document.createElement('div'); sheetDesc.id = 'pp-cl-sheet-desc';
+  sheetPHead.appendChild(sheetTitle); sheetPHead.appendChild(sheetDesc);
+  const sheetBody = document.createElement('div'); sheetBody.id = 'pp-cl-sheet-body';
+  sheetBody.innerHTML = '<div style="padding:18px 14px;font-size:9px;color:rgba(0,0,0,.3);letter-spacing:.05em">Clusters will appear here once embeddings finish</div>';
+  sheetPanel.appendChild(sheetPHead); sheetPanel.appendChild(sheetBody);
+
+  sheetWrap.appendChild(sheetTab); sheetWrap.appendChild(sheetPanel);
+  canvas.appendChild(sheetWrap);
+
+  // Toggle open/close
+  let _sheetOpen = false;
+  sheetTab.addEventListener('click', () => {
+    _sheetOpen = !_sheetOpen;
+    sheetWrap.classList.add('pp-cl-sheet-animating');
+    sheetWrap.classList.toggle('pp-cl-sheet-collapsed', !_sheetOpen);
+    setTimeout(() => sheetWrap.classList.remove('pp-cl-sheet-animating'), 280);
+  });
+
+  // Resize by dragging left edge of panel (cursor is ew-resize on panel)
+  let _shResizing=false, _shResizeSX=0, _shResizeSW=0;
+  sheetPanel.addEventListener('mousedown', ev => {
+    const rect = sheetPanel.getBoundingClientRect();
+    if (ev.clientX - rect.left > 7) return; // only near left edge
+    _shResizing=true; _shResizeSX=ev.clientX; _shResizeSW=sheetWrap.offsetWidth;
+    ev.preventDefault(); ev.stopPropagation();
+  });
+  document.addEventListener('mousemove', ev => {
+    if (!_shResizing) return;
+    const delta = _shResizeSX - ev.clientX;
+    const cw = canvas.offsetWidth;
+    const newW = Math.max(220, Math.min(cw * 0.88, _shResizeSW + delta));
+    sheetWrap.style.width = newW + 'px';
+  });
+  document.addEventListener('mouseup', () => { _shResizing = false; });
+
+  // ── Build the spreadsheet table from current cluster state ─────────────
+  function updateSheetPanel() {
+    if (!_clusterState) return;
+    const { nonEmpty, alignedAsgns } = _clusterState;
+    if (!nonEmpty || !nonEmpty.length) {
+      sheetBody.innerHTML = '<div style="padding:18px 14px;font-size:9px;color:rgba(0,0,0,.3)">No clusters yet</div>';
+      return;
+    }
+
+    // Build column descriptors — one per outer cluster
+    const cols = nonEmpty.map((members, ci) => {
+      const subAsgn = alignedAsgns ? alignedAsgns[ci] : null;
+      const numSub = subAsgn ? Math.max(...subAsgn, 0) + 1 : 1;
+      const groups = Array.from({ length: numSub }, () => []);
+      if (subAsgn) members.forEach((r, i) => groups[subAsgn[i]].push(r));
+      else groups[0] = members.slice();
+      return { label: outerLabel(ci), col: colForIndex(ci), groups };
+    });
+
+    const maxRows = Math.max(...cols.map(c => c.groups.length));
+
+    // Update header desc
+    sheetDesc.textContent = cols.length + ' col · ' + maxRows + ' row' + (maxRows === 1 ? '' : 's');
+
+    // Build table
+    const table = document.createElement('table');
+    table.className = 'pp-cl-table';
+
+    // Header row
+    const thead = document.createElement('thead');
+    const hrow = document.createElement('tr');
+    const thCorner = document.createElement('th'); thCorner.className = 'pp-cl-th-corner'; thCorner.textContent = '#';
+    hrow.appendChild(thCorner);
+    cols.forEach(c => {
+      const th = document.createElement('th');
+      th.textContent = c.label + ' cluster';
+      th.style.color = c.col.accent;
+      th.style.borderTop = '3px solid ' + c.col.accent;
+      hrow.appendChild(th);
+    });
+    thead.appendChild(hrow);
+    table.appendChild(thead);
+
+    // Body rows
+    const tbody = document.createElement('tbody');
+    for (let ri = 0; ri < maxRows; ri++) {
+      const tr = document.createElement('tr');
+      // Row label cell (sticky left)
+      const tdRowLbl = document.createElement('td'); tdRowLbl.className = 'pp-cl-td-rowlabel';
+      tdRowLbl.textContent = ri + 1;
+      tr.appendChild(tdRowLbl);
+      // Data cells
+      cols.forEach(c => {
+        const td = document.createElement('td');
+        const members = c.groups[ri] || [];
+        if (!members.length) {
+          td.className = 'pp-cl-td-empty'; td.textContent = '—';
+        } else {
+          members.forEach(r => {
+            const cells = r.row && r.row.cells ? r.row.cells : (r.cells || []);
+            const best  = cells.reduce((b, x) => x.length > b.length ? x : b, '');
+            const parsed = typeof parseCitation === 'function' ? parseCitation(best) : { body: best };
+            const scard = document.createElement('div'); scard.className = 'pp-cl-scard';
+            scard.style.borderLeftColor = c.col.accent;
+            const txt = parsed.body || best;
+            scard.textContent = txt.length > 130 ? txt.slice(0, 130) + '\u2026' : txt;
+            scard.title = txt;
+            scard.addEventListener('click', () => { if (typeof panelGoTo === 'function') panelGoTo(r, 0); });
+            td.appendChild(scard);
+          });
+        }
+        tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
+    }
+    table.appendChild(tbody);
+    sheetBody.innerHTML = '';
+    sheetBody.appendChild(table);
+  }
 
   // ══════════════════════════════════════════════════════════════════════════
   // ── Canvas pan & zoom ─────────────────────────────────────────────────────
@@ -846,6 +1097,10 @@ function initClustersTool(paneEl, sidebarEl) {
       numTop + ' cluster' + (numTop === 1 ? '' : 's') +
       ' (' + clusterNames + ') · ' + rows.length + ' entries' +
       (splitCount > 0 ? ' · ' + splitCount + ' split' : '');
+
+    // Store state for sheet panel and rebuild it
+    _clusterState = { nonEmpty, alignedAsgns: (_depth > 1 ? alignedAsgns : null) };
+    updateSheetPanel();
   }
 
   // ── Embedding + split pipeline ────────────────────────────────────────────
@@ -913,10 +1168,12 @@ function initClustersTool(paneEl, sidebarEl) {
   return {
     reset() {
       _rendered = false; _cachedEmbedded = null; _cachedVectors = null;
+      _clusterState = null;
       Array.from(world.children).forEach(c => c.remove());
       emptyEl.style.display = 'flex';
       _panX = 0; _panY = 0; _zoom = 1; applyWorldTransform();
       hideTooltip();
+      sheetBody.innerHTML = '<div style="padding:18px 14px;font-size:9px;color:rgba(0,0,0,.3);letter-spacing:.05em">Clusters will appear here once embeddings finish</div>';
     }
   };
 }
