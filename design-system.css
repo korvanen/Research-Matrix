@@ -35,6 +35,7 @@
 /* ── 1. Fonts ─────────────────────────────────────────────── */
 @import url('https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,300;0,400;0,500;0,700;1,400&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap');
 
 
 /* ══════════════════════════════════════════════════════════
@@ -287,6 +288,7 @@
   /* Typography */
   --font-family:          'Roboto', 'Instrument Sans', system-ui, sans-serif;
   --font-family-display:  'Roboto', system-ui, sans-serif;
+  --font-family-serif:    'Instrument Serif', Georgia, serif;
 
   /* MD3 type scale sizes */
   --font-size-xs:         11px;  /* Label Small */
@@ -1312,252 +1314,325 @@ mark.pkw {
 
 
 /* ══════════════════════════════════════════════════════════════════════════
-   16. Product-label card system
+   16. Editorial card system  (concept map + clusters)
    ══════════════════════════════════════════════════════════════════════════
 
-   Visual anatomy (mirrors the FYODOR deodorant label reference):
+   Visual anatomy (based on editorial magazine reference):
 
-     ┌──────────────────────────┐
-     │                          │  ← blank white zone  (::before pseudo-element)
-     │                          │
-     ├──────────────────────────┤  ← 1px outline-variant rule
-     │  BRAND / LEVEL LABEL     │  ← .pp-cl-card-cat  /  .pp-cmap-card-head strip
-     │  KEYWORD TEXT            │  ← .pp-cl-card-text /  .pp-cmap-cell-text  (large bold)
-     │  sub-descriptor          │  ← .pp-cl-card-split / .pp-cmap-leaf-badge
-     └──────────────────────────┘
-       ▔▔▔▔▔ accent bottom stripe (var(--ppc-border))
+     ┌──────────────────────────────────┐
+     │  [big cat letter]   [level num]  │  ← .pp-cmap-card-top
+     │                     LEVEL        │
+     ├──────────────────────────────────┤  ← .pp-cmap-card-rule
+     │  CATS · TAGS                     │  ← .pp-cmap-cell-cat
+     │  Concept text in italic serif    │  ← .pp-cmap-cell-text (Instrument Serif)
+     │  ↑ 84%  to parent                │  ← .pp-cmap-sim-line (plain text, no bars)
+     │  ↓ 71%  to children              │
+     └──────────────────────────────────┘
+       whole card = one solid theme colour (var(--ppc-bg))
+       thin border = var(--ppc-border)
 
-   The lower band uses var(--ppc-bg) which is set inline per-card by JS:
-     • utils-clusters.js   → after our patch, sets --ppc-bg / --ppc-border on each card
-     • utils-concept-map.js → already sets --ppc-bg / --ppc-border on each card
+   Cards use NO ::before layout tricks — plain div structure only,
+   so offsetWidth/Height are reliable for connector geometry and
+   pointer-event drag works on both desktop and touchscreen.
 
-   All !important declarations are required because the JS-injected <style>
-   blocks (#pp-cluster-styles, #pp-cmap-styles) are appended to <head> at
-   runtime, so they load after this stylesheet and would otherwise win.
+   --ppc-bg and --ppc-border are set inline per-card by JS from the
+   shared PP_PALETTE. All !important needed to beat the injected
+   runtime <style> blocks (#pp-cmap-styles, #pp-cluster-styles).
    ══════════════════════════════════════════════════════════════════════════ */
 
 
-/* ── 16a. Card shell — shared by both tools ───────────────────────────────
-   Make cards flex-column so ::before stacks above the body as a blank zone. */
+/* ── 16a. Concept-map card shell ──────────────────────────────────────────
+   position:absolute is set inline by JS.  We only override visual props.  */
 
-.pp-cl-card,
 .pp-cmap-card {
   display: flex !important;
   flex-direction: column !important;
   overflow: hidden !important;
-  position: relative !important;
   border-radius: var(--radius-lg) !important;
-  border: 1px solid var(--md-sys-color-outline-variant) !important;
+  border: 1px solid var(--ppc-border, var(--md-sys-color-outline-variant)) !important;
+  background: var(--ppc-bg, var(--md-sys-color-surface-container-low)) !important;
   box-shadow: var(--md-elev-1) !important;
-  cursor: pointer !important;
-  transition: box-shadow var(--transition-base), transform var(--transition-base) !important;
+  cursor: grab !important;
+  touch-action: none !important;
+  transition: box-shadow var(--transition-fast) !important;
+  /* Reset any previously injected pseudo-element damage */
 }
+.pp-cmap-card::before { display: none !important; }
 
-.pp-cl-card:hover,
 .pp-cmap-card:hover {
   box-shadow: var(--md-elev-3) !important;
-  transform: translateY(-2px) !important;
 }
+.pp-cmap-card:active { cursor: grabbing !important; }
 
 
-/* ── 16b. Blank upper zone — cluster cards ────────────────────────────────
-   The injected pp-cluster-styles sets .pp-cl-card::before as a full-inset
-   state-layer overlay (position:absolute; inset:0). We must reset every
-   property of that pseudo-element before repurposing it as a static block. */
+/* ── 16b. Top row: big category number (left) + level block (right) ───── */
 
-.pp-cl-card::before {
-  /* Reset the injected hover overlay */
-  content: '' !important;
-  position: static !important;
-  inset: auto !important;
-  background: var(--md-sys-color-surface-container-lowest) !important;
-  opacity: 1 !important;
-  transition: none !important;
-  /* Now: blank white zone above the label band */
-  display: block !important;
-  width: 100% !important;
-  height: 72px !important;
+.pp-cmap-card-top {
+  display: flex !important;
+  align-items: flex-start !important;
+  justify-content: space-between !important;
+  padding: 14px 14px 0 !important;
   flex-shrink: 0 !important;
-  border-bottom: 1px solid var(--md-sys-color-outline-variant) !important;
-  pointer-events: none !important;
 }
 
-/* Hover state-layer via the card element itself instead */
-.pp-cl-card:hover {
-  background: var(--md-sys-color-surface-container-lowest) !important;
-}
-
-
-/* ── 16c. Blank upper zone — concept map cards ────────────────────────────
-   pp-cmap-card has no ::before in the injected styles, so we can use it
-   freely as the blank zone. The card-head comes right after it.           */
-
-.pp-cmap-card::before {
-  content: '' !important;
-  display: block !important;
-  width: 100% !important;
-  height: 48px !important;
+/* Big editorial letter/number — the "31" of the reference image */
+.pp-cmap-card-cat-num {
+  font-family: var(--font-family-serif) !important;
+  font-size: 52px !important;
+  line-height: 1 !important;
+  font-weight: 400 !important;
+  font-style: italic !important;
+  color: var(--ppc-border, var(--md-sys-color-on-surface)) !important;
+  letter-spacing: -0.03em !important;
+  opacity: .85 !important;
   flex-shrink: 0 !important;
-  background: var(--md-sys-color-surface-container-lowest) !important;
-  border-bottom: 1px solid var(--md-sys-color-outline-variant) !important;
-  pointer-events: none !important;
 }
 
-
-/* ── 16d. Cluster card label band ─────────────────────────────────────────
-   .pp-cl-card-body is the direct child after ::before.
-   --ppc-bg is now set per-card by the patched buildCard() in utils-clusters.js. */
-
-.pp-cl-card-body {
-  padding: var(--space-2) var(--space-3) var(--space-3) !important;
+/* Level block — top right, like "31 / NOV '20" */
+.pp-cmap-card-level-block {
   display: flex !important;
   flex-direction: column !important;
-  gap: 1px !important;
-  background: var(--ppc-bg, var(--md-sys-color-surface-container-low)) !important;
-  flex: 1 !important;
+  align-items: flex-end !important;
+  padding-top: 4px !important;
 }
-
-/* "FYODOR" line — category / cluster label */
-.pp-cl-card-cat {
-  font-size: 10px !important;
-  font-weight: var(--font-weight-medium) !important;
-  letter-spacing: var(--letter-spacing-caps) !important;
-  text-transform: uppercase !important;
-  color: var(--md-sys-color-on-surface-variant) !important;
-  line-height: 1.2 !important;
-  margin-bottom: 0 !important;
-}
-
-/* "STONE" — main keyword, large + bold */
-.pp-cl-card-text {
-  font-size: 17px !important;
+.pp-cmap-card-level-num {
+  font-family: var(--font-family) !important;
+  font-size: 22px !important;
   font-weight: var(--font-weight-bold) !important;
+  line-height: 1 !important;
+  color: var(--ppc-border, var(--md-sys-color-on-surface)) !important;
   letter-spacing: -0.02em !important;
-  line-height: 1.15 !important;
-  color: var(--md-sys-color-on-surface) !important;
-  display: -webkit-box !important;
-  -webkit-line-clamp: 2 !important;
-  -webkit-box-orient: vertical !important;
-  overflow: hidden !important;
 }
-
-/* "DEODORANT · ALUMINUM FREE" — segment / sub-descriptor */
-.pp-cl-card-split {
+.pp-cmap-card-level-label {
+  font-family: var(--font-family) !important;
   font-size: 9px !important;
   font-weight: var(--font-weight-medium) !important;
   letter-spacing: var(--letter-spacing-caps) !important;
   text-transform: uppercase !important;
-  color: var(--md-sys-color-outline) !important;
-  margin-top: 2px !important;
-  line-height: 1.1 !important;
+  color: var(--ppc-border, var(--md-sys-color-outline)) !important;
+  opacity: .7 !important;
+  margin-top: 3px !important;
 }
 
-/* Accent bottom stripe — replaces the left border */
-.pp-cl-card {
-  border-left-width: 1px !important;
-  border-bottom: 3px solid var(--ppc-border, var(--md-sys-color-outline-variant)) !important;
-  background: var(--md-sys-color-surface-container-lowest) !important;
-}
-
-
-/* ── 16e. Concept map card label band ─────────────────────────────────────
-   Structure after ::before:
-     .pp-cmap-card-head  [inline bg = accent colour set by JS]
-     .pp-cmap-card-body  [tinted bg = var(--ppc-bg)]
-     .pp-cmap-card-footer or .pp-cmap-leaf-badge                          */
-
-/* Head strip: slim brand/level line with the accent background */
-.pp-cmap-card-head {
-  padding: 4px var(--space-3) 4px !important;
-  display: flex !important;
-  align-items: center !important;
-  gap: var(--space-1) !important;
-  flex-wrap: wrap !important;
-  flex-shrink: 0 !important;
-  /* background is set inline by JS per-card — we leave it */
-}
-
-/* Level / split badge inside the head strip */
-.pp-cmap-level-badge,
-.pp-cmap-split-badge {
+/* Merged ×N indicator — small, top-right corner */
+.pp-cmap-card-merged {
+  font-family: var(--font-family) !important;
   font-size: 9px !important;
   font-weight: var(--font-weight-bold) !important;
-  letter-spacing: var(--letter-spacing-caps) !important;
-  text-transform: uppercase !important;
-  line-height: 1.2 !important;
-  opacity: 1 !important;
-  flex: 1 !important;
-  min-width: 0 !important;
+  letter-spacing: .05em !important;
+  color: var(--ppc-border, var(--md-sys-color-outline)) !important;
+  opacity: .65 !important;
+  text-align: right !important;
+  padding: 0 14px 0 !important;
+  flex-shrink: 0 !important;
 }
 
-/* Card body: tinted label band */
+
+/* ── 16c. Divider rule ────────────────────────────────────────────────────  */
+
+.pp-cmap-card-rule {
+  width: calc(100% - 28px) !important;
+  height: 1px !important;
+  background: var(--ppc-border, var(--md-sys-color-outline-variant)) !important;
+  opacity: .35 !important;
+  margin: 10px 14px 0 !important;
+  flex-shrink: 0 !important;
+}
+
+
+/* ── 16d. Card body — category tag + main text ────────────────────────── */
+
 .pp-cmap-card-body {
-  padding: var(--space-2) var(--space-3) var(--space-2) !important;
+  padding: 8px 14px 10px !important;
   display: flex !important;
   flex-direction: column !important;
-  gap: 2px !important;
-  background: var(--ppc-bg, var(--md-sys-color-surface-container-low)) !important;
+  gap: 4px !important;
+  background: transparent !important;   /* card bg already set on shell */
   flex: 1 !important;
 }
 
-/* Category micro-label */
+/* Merge separator inside body */
+.pp-cmap-merge-sep {
+  height: 1px !important;
+  background: var(--ppc-border, var(--md-sys-color-outline-variant)) !important;
+  opacity: .25 !important;
+  margin: 4px 0 !important;
+}
+
+/* Category micro-caps tag — "CATS · TAGS" */
 .pp-cmap-cell-cat {
+  font-family: var(--font-family) !important;
   font-size: 9px !important;
   font-weight: var(--font-weight-medium) !important;
   letter-spacing: var(--letter-spacing-caps) !important;
   text-transform: uppercase !important;
-  color: var(--md-sys-color-on-surface-variant) !important;
+  color: var(--ppc-border, var(--md-sys-color-on-surface-variant)) !important;
+  opacity: .7 !important;
   margin-bottom: 1px !important;
 }
 
-/* Main keyword text */
+/* Main concept text — large italic serif, like the editorial headline */
 .pp-cmap-cell-text {
-  font-size: 14px !important;
-  font-weight: var(--font-weight-bold) !important;
-  letter-spacing: -0.02em !important;
-  line-height: 1.2 !important;
-  color: var(--md-sys-color-on-surface) !important;
+  font-family: var(--font-family-serif) !important;
+  font-size: 15px !important;
+  font-weight: 400 !important;
+  font-style: italic !important;
+  line-height: 1.28 !important;
+  letter-spacing: -0.01em !important;
+  color: var(--ppc-border, var(--md-sys-color-on-surface)) !important;
   word-break: break-word !important;
   overflow-wrap: break-word !important;
 }
 
-/* Footer (similarity bars) */
-.pp-cmap-card-footer {
-  padding: var(--space-1) var(--space-3) var(--space-2) !important;
-  border-top: 1px solid var(--md-sys-color-outline-variant) !important;
-  display: flex !important;
-  flex-direction: column !important;
-  gap: 3px !important;
-  background: var(--ppc-bg, var(--md-sys-color-surface-container-low)) !important;
-}
-
-/* Leaf-node descriptor badge */
-.pp-cmap-leaf-badge {
+/* Split-origin badge (replaces cat-num top area for split cards) */
+.pp-cmap-split-num {
+  font-family: var(--font-family) !important;
   font-size: 9px !important;
   font-weight: var(--font-weight-medium) !important;
   letter-spacing: var(--letter-spacing-caps) !important;
   text-transform: uppercase !important;
-  color: var(--md-sys-color-outline) !important;
-  padding: var(--space-1) var(--space-3) var(--space-2) !important;
+  color: var(--ppc-border, var(--md-sys-color-outline)) !important;
+  opacity: .7 !important;
+}
+
+
+/* ── 16e. Footer — plain-text similarity lines (no bars) ──────────────── */
+
+.pp-cmap-card-footer {
+  padding: 6px 14px 10px !important;
+  border-top: 1px solid var(--ppc-border, var(--md-sys-color-outline-variant)) !important;
+  border-top-color: color-mix(in srgb, var(--ppc-border, var(--md-sys-color-outline-variant)) 30%, transparent) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 2px !important;
+  background: transparent !important;
+}
+
+/* Each sim line: "↑ 84%  to parent" */
+.pp-cmap-sim-line {
+  font-family: var(--font-family) !important;
+  font-size: 10px !important;
+  font-weight: var(--font-weight-medium) !important;
+  color: var(--ppc-border, var(--md-sys-color-outline)) !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  letter-spacing: .02em !important;
+}
+.pp-cmap-sim-pct {
+  font-weight: var(--font-weight-bold) !important;
+  color: var(--ppc-border, var(--md-sys-color-on-surface)) !important;
+  opacity: .8 !important;
+}
+
+/* Leaf badge */
+.pp-cmap-leaf-badge {
+  font-family: var(--font-family) !important;
+  font-size: 9px !important;
+  font-weight: var(--font-weight-medium) !important;
+  letter-spacing: var(--letter-spacing-caps) !important;
+  text-transform: uppercase !important;
+  color: var(--ppc-border, var(--md-sys-color-outline)) !important;
+  opacity: .6 !important;
+  padding: 6px 14px 10px !important;
   display: block !important;
+  background: transparent !important;
+}
+
+/* Hide old bar-based sim elements (replaced by sim-line) */
+.pp-cmap-sim-row,
+.pp-cmap-sim-bar,
+.pp-cmap-sim-fill,
+.pp-cmap-sim-arrow,
+.pp-cmap-sim-label { display: none !important; }
+
+/* Hide old head strip (replaced by card-top) */
+.pp-cmap-card-head { display: none !important; }
+
+/* Hide old level/split badges that lived in the head */
+.pp-cmap-level-badge,
+.pp-cmap-split-badge,
+.pp-cmap-split-fraction,
+.pp-cmap-parent-count,
+.pp-cmap-merged-count { display: none !important; }
+
+
+/* ── 16f. Cluster cards — same editorial style ───────────────────────────
+   Cluster cards are simpler: no hierarchy, just category + text.
+   --ppc-bg / --ppc-border are set by the patched buildCard() JS.          */
+
+.pp-cl-card {
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+  border-radius: var(--radius-lg) !important;
+  border: 1px solid var(--ppc-border, var(--md-sys-color-outline-variant)) !important;
   background: var(--ppc-bg, var(--md-sys-color-surface-container-low)) !important;
+  box-shadow: var(--md-elev-1) !important;
+  cursor: pointer !important;
+  transition: box-shadow var(--transition-fast), transform var(--transition-fast) !important;
+  /* Kill the injected left border override */
+  border-left-width: 1px !important;
+}
+.pp-cl-card::before {
+  /* Completely disable the injected hover state-layer pseudo */
+  display: none !important;
+}
+.pp-cl-card:hover {
+  box-shadow: var(--md-elev-3) !important;
+  transform: translateY(-1px) !important;
 }
 
-/* Similarity bar fill colour matches the accent */
-.pp-cmap-sim-fill {
-  background: var(--ppc-border, var(--md-sys-color-primary)) !important;
+.pp-cl-card-body {
+  padding: 14px 14px 12px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 3px !important;
+  background: transparent !important;
+  flex: 1 !important;
 }
 
-/* Accent bottom stripe */
-.pp-cmap-card {
-  border-bottom: 2px solid var(--ppc-border, var(--md-sys-color-outline-variant)) !important;
-  background: var(--md-sys-color-surface-container-lowest) !important;
+/* Category label — "STRATEGY · VISION" */
+.pp-cl-card-cat {
+  font-family: var(--font-family) !important;
+  font-size: 9px !important;
+  font-weight: var(--font-weight-medium) !important;
+  letter-spacing: var(--letter-spacing-caps) !important;
+  text-transform: uppercase !important;
+  color: var(--ppc-border, var(--md-sys-color-on-surface-variant)) !important;
+  opacity: .7 !important;
+  margin-bottom: 3px !important;
+}
+
+/* Main text — italic serif headline */
+.pp-cl-card-text {
+  font-family: var(--font-family-serif) !important;
+  font-size: 15px !important;
+  font-weight: 400 !important;
+  font-style: italic !important;
+  line-height: 1.28 !important;
+  letter-spacing: -0.01em !important;
+  color: var(--ppc-border, var(--md-sys-color-on-surface)) !important;
+  display: -webkit-box !important;
+  -webkit-line-clamp: 3 !important;
+  -webkit-box-orient: vertical !important;
+  overflow: hidden !important;
+}
+
+/* Segment label */
+.pp-cl-card-split {
+  font-family: var(--font-family) !important;
+  font-size: 9px !important;
+  font-weight: var(--font-weight-medium) !important;
+  letter-spacing: var(--letter-spacing-caps) !important;
+  text-transform: uppercase !important;
+  color: var(--ppc-border, var(--md-sys-color-outline)) !important;
+  opacity: .6 !important;
+  margin-top: 4px !important;
 }
 
 
-/* ── 16f. Side-panel mini-cards (.pp-cl-scard) ────────────────────────────
-   These appear inside the cluster spreadsheet table. Left-border accent is
-   already set inline by JS (scard.style.borderLeftColor = c.col.accent).  */
+/* ── 16g. Side-panel mini-cards (.pp-cl-scard) ───────────────────────────  */
 
 .pp-cl-scard {
   border-radius: var(--radius-sm) !important;
@@ -1573,31 +1648,4 @@ mark.pkw {
 .pp-cl-scard:hover {
   background: color-mix(in srgb, var(--md-sys-color-primary) 5%, var(--md-sys-color-surface)) !important;
   box-shadow: var(--md-elev-1) !important;
-}
-
-
-/* ── 16g. Dark-mode blank zone ────────────────────────────────────────────
-   MD3 tokens flip automatically in dark mode. Only the hard-coded white
-   background on ::before needs an explicit override.                      */
-
-@media (prefers-color-scheme: dark) {
-  .pp-cl-card::before,
-  .pp-cmap-card::before {
-    background: var(--md-sys-color-surface-container-lowest) !important;
-    border-bottom-color: var(--md-sys-color-outline-variant) !important;
-  }
-  .pp-cl-card,
-  .pp-cmap-card {
-    background: var(--md-sys-color-surface-container-lowest) !important;
-  }
-}
-
-html.dark .pp-cl-card::before,
-html.dark .pp-cmap-card::before {
-  background: var(--md-sys-color-surface-container-lowest) !important;
-  border-bottom-color: var(--md-sys-color-outline-variant) !important;
-}
-html.dark .pp-cl-card,
-html.dark .pp-cmap-card {
-  background: var(--md-sys-color-surface-container-lowest) !important;
 }
