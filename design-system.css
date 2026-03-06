@@ -733,9 +733,10 @@ input, textarea, select {
   text-transform: uppercase;
   color: var(--md-sys-color-on-surface-variant);
   line-height: 1;
+   flex-shrink: 0;
   margin-bottom: 2px;
-   width: 18px;
-   margin-right: 4px;
+   width: 30px;
+   margin-right: 10px;
    
 }
 
