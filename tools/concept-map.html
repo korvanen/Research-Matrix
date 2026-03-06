@@ -3,12 +3,12 @@
 <head>
 
 <script>window.__BRIDGE_GUEST = true;</script>
-<script defer src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js?v=4"></script>
-<script defer src="../utilities/embedding-bridge.js?v=4"></script>
-<script defer src="../utilities/utils-shared.js?v=4"></script>
-<script defer src="../utilities/utils-panel.js?v=4"></script>
-<script defer src="../utilities/utils-concept-map.js?v=4"></script>
-  
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js?v=6"></script>
+<script defer src="../utilities/embedding-bridge.js?v=6"></script>
+<script defer src="../utilities/utils-shared.js?v=6"></script>
+<script defer src="../utilities/utils-panel.js?v=6"></script>
+<script defer src="../utilities/utils-concept-map.js?v=6"></script>
+
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Concept Map — Dimensional Framework</title>
@@ -67,7 +67,7 @@
     </div>
   </div>
 
-<script>
+  <script>
     document.addEventListener('DOMContentLoaded', function() {
 
       var _bridgeRows = null;
@@ -77,9 +77,9 @@
       }
 
       window.EmbeddingUtils = {
-        isReady:             function() { return !!_bridgeRows; },
-        getCachedEmbedding:  function(text) { return Promise.resolve(null); },
-        getVectorSync:       function() { return null; }
+        isReady:            function() { return false; },
+        getCachedEmbedding: function(text) { return Promise.resolve(null); },
+        getVectorSync:      function() { return null; }
       };
 
       var badgeEl   = document.getElementById('cm-connection-badge');
@@ -99,17 +99,15 @@
         defaultFraction:    0.35,
         minFraction:        0,
         snapCloseFraction:  0.10,
-        onResize: function() { cmTool.resize(); },
-        onOpen:   function() { cmTool.resize(); },
-        onClose:  function() { cmTool.resize(); },
+        onResize: function() { if (cmTool.resize) cmTool.resize(); },
+        onOpen:   function() { if (cmTool.resize) cmTool.resize(); },
+        onClose:  function() { if (cmTool.resize) cmTool.resize(); },
       });
 
       EmbeddingBridge.guest(function(rows) {
         noHost.classList.remove('visible');
         setBadge('connected', rows.length + ' entries live');
         _bridgeRows = rows;
-
-        window.EmbeddingUtils.isReady = function() { return true; };
 
         var textToVec = new Map();
         rows.forEach(function(r) {
@@ -129,11 +127,9 @@
           return Promise.resolve(found || null);
         };
 
+        window.EmbeddingUtils.isReady = function() { return true; };
         cmTool.reset();
-        window.dispatchEvent(new CustomEvent('embedder-ready'));
-        setTimeout(function() {
-          window.dispatchEvent(new CustomEvent('embedding-complete', { detail: { total: rows.length } }));
-        }, 100);
+        cmTool.start();
       });
 
       window.addEventListener('bridge-no-host', function() {
