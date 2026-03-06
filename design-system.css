@@ -734,6 +734,9 @@ input, textarea, select {
   color: var(--md-sys-color-on-surface-variant);
   line-height: 1;
   margin-bottom: 2px;
+   width: 18px;
+   margin-right: 4px;
+   
 }
 
 .ds-slider-row, .pp-range-row {
