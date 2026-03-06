@@ -1,41 +1,170 @@
 /* ============================================================
-   DIMENSIONAL FRAMEWORK — Design System
-   design-system.css
+   DIMENSIONAL FRAMEWORK — Design System v3
+   Material Design 3  ·  Light + Dark  ·  design-system.css
 
    CONTENTS
    ─────────
-   1. Fonts
-   2. CSS Custom Properties (tokens)
-      2a. Base palette (raw colors)
-      2b. Theme tokens (mapped from palette)
-      2c. Tab themes
-   3. Reset & Base
-   4. Typography scale
-   5. Layout primitives
-      5a. Topbar
-      5b. Page shell
-   6. Components
-      6a. Buttons
-      6b. Pill / segmented control
-      6c. Range sliders
-      6d. Cards
-      6e. Badge / status pill
-      6f. Tables
-      6g. Scrollbars
-      6h. Tooltips
-      6i. Empty states
-   7. Animations
-   8. Utilities
+   1.  Fonts
+   2.  MD3 System Color Tokens  (light)
+   3.  MD3 System Color Tokens  (dark)
+   4.  Raw palette  (brand colors — unchanged)
+   5.  Semantic tokens  (mapped to MD3)
+   6.  Per-tab / sheet theme variables
+   7.  MD3 Elevation
+   8.  MD3 Shape tokens
+   9.  MD3 Typography scale
+   10. Reset & Base
+   11. Layout primitives   (topbar, shell)
+   12. Components
+       12a. Buttons
+       12b. Pill / segmented control
+       12c. Range sliders
+       12d. Cards
+       12e. Badge / status pill
+       12f. Tables
+       12g. Scrollbars
+       12h. Tooltips
+       12i. Empty / no-host states
+   13. Panel (draggable side panel)
+   14. Animations
+   15. Utilities
    ============================================================ */
 
 
 /* ── 1. Fonts ─────────────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,300;0,400;0,500;0,700;1,400&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap');
 
 
-/* ── 2. CSS Custom Properties ─────────────────────────────── */
+/* ══════════════════════════════════════════════════════════
+   2. MD3 System Color Tokens — LIGHT
+   Derived from brand palette:
+     Primary   = Relational blue  #4a56c8
+     Secondary = Visions green    #2e7d5e
+     Tertiary  = Org purple       #5e3d9e
+     Error     = Physical red     #c44035
+   ══════════════════════════════════════════════════════════ */
+:root {
+  /* Primary */
+  --md-sys-color-primary:                #4a56c8;
+  --md-sys-color-on-primary:             #ffffff;
+  --md-sys-color-primary-container:      #dfe0ff;
+  --md-sys-color-on-primary-container:   #00006e;
 
-/* 2a. Base palette (raw color values — do not use directly in components) */
+  /* Secondary */
+  --md-sys-color-secondary:              #2e7d5e;
+  --md-sys-color-on-secondary:           #ffffff;
+  --md-sys-color-secondary-container:    #b6edd8;
+  --md-sys-color-on-secondary-container: #00210f;
+
+  /* Tertiary */
+  --md-sys-color-tertiary:               #5e3d9e;
+  --md-sys-color-on-tertiary:            #ffffff;
+  --md-sys-color-tertiary-container:     #e9ddff;
+  --md-sys-color-on-tertiary-container:  #20005e;
+
+  /* Error */
+  --md-sys-color-error:                  #c44035;
+  --md-sys-color-on-error:               #ffffff;
+  --md-sys-color-error-container:        #ffdad6;
+  --md-sys-color-on-error-container:     #410002;
+
+  /* Background */
+  --md-sys-color-background:             #fdfbff;
+  --md-sys-color-on-background:          #1b1b1f;
+
+  /* Surface family */
+  --md-sys-color-surface:                #fdfbff;
+  --md-sys-color-on-surface:             #1b1b1f;
+  --md-sys-color-surface-variant:        #e4e1ec;
+  --md-sys-color-on-surface-variant:     #47464f;
+  --md-sys-color-surface-container-highest: #e6e0e9;
+  --md-sys-color-surface-container-high:    #ece6f0;
+  --md-sys-color-surface-container:         #f3edf7;
+  --md-sys-color-surface-container-low:     #f7f2fa;
+  --md-sys-color-surface-container-lowest:  #ffffff;
+  --md-sys-color-surface-tint:           var(--md-sys-color-primary);
+
+  /* Outline */
+  --md-sys-color-outline:                #787680;
+  --md-sys-color-outline-variant:        #cac4d0;
+
+  /* Inverse */
+  --md-sys-color-inverse-surface:        #313033;
+  --md-sys-color-inverse-on-surface:     #f4eff4;
+  --md-sys-color-inverse-primary:        #bcc2ff;
+
+  /* Misc */
+  --md-sys-color-shadow:                 #000000;
+  --md-sys-color-scrim:                  #000000;
+
+  /* State layer opacities (MD3 spec) */
+  --md-sys-state-hover-opacity:          0.08;
+  --md-sys-state-pressed-opacity:        0.12;
+  --md-sys-state-focus-opacity:          0.12;
+  --md-sys-state-dragged-opacity:        0.16;
+}
+
+
+/* ══════════════════════════════════════════════════════════
+   3. MD3 System Color Tokens — DARK
+   ══════════════════════════════════════════════════════════ */
+@media (prefers-color-scheme: dark) {
+  :root {
+    /* Primary */
+    --md-sys-color-primary:                #bcc2ff;
+    --md-sys-color-on-primary:             #1b1f8a;
+    --md-sys-color-primary-container:      #3140b0;
+    --md-sys-color-on-primary-container:   #dfe0ff;
+
+    /* Secondary */
+    --md-sys-color-secondary:              #9ad5b9;
+    --md-sys-color-on-secondary:           #003828;
+    --md-sys-color-secondary-container:    #005139;
+    --md-sys-color-on-secondary-container: #b6edd8;
+
+    /* Tertiary */
+    --md-sys-color-tertiary:               #cfbdff;
+    --md-sys-color-on-tertiary:            #3b0093;
+    --md-sys-color-tertiary-container:     #532da1;
+    --md-sys-color-on-tertiary-container:  #e9ddff;
+
+    /* Error */
+    --md-sys-color-error:                  #ffb4ab;
+    --md-sys-color-on-error:               #690005;
+    --md-sys-color-error-container:        #93000a;
+    --md-sys-color-on-error-container:     #ffdad6;
+
+    /* Background */
+    --md-sys-color-background:             #1b1b1f;
+    --md-sys-color-on-background:          #e5e1e6;
+
+    /* Surface family */
+    --md-sys-color-surface:                #1b1b1f;
+    --md-sys-color-on-surface:             #e5e1e6;
+    --md-sys-color-surface-variant:        #47464f;
+    --md-sys-color-on-surface-variant:     #cac4d0;
+    --md-sys-color-surface-container-highest: #36343b;
+    --md-sys-color-surface-container-high:    #2b2930;
+    --md-sys-color-surface-container:         #211f26;
+    --md-sys-color-surface-container-low:     #1d1b20;
+    --md-sys-color-surface-container-lowest:  #0f0d13;
+
+    /* Outline */
+    --md-sys-color-outline:                #938f99;
+    --md-sys-color-outline-variant:        #47464f;
+
+    /* Inverse */
+    --md-sys-color-inverse-surface:        #e5e1e6;
+    --md-sys-color-inverse-on-surface:     #313033;
+    --md-sys-color-inverse-primary:        #4a56c8;
+  }
+}
+
+
+/* ══════════════════════════════════════════════════════════
+   4. Raw Palette  (brand colors — unchanged from v2)
+   ══════════════════════════════════════════════════════════ */
 :root {
   /* Neutrals */
   --raw-black:       #111111;
@@ -48,157 +177,193 @@
   --raw-grey-600:    #9898aa;
   --raw-grey-700:    #767676;
 
-  /* Brand palette — each theme color in 5 tints */
+  /* Visions */
   --raw-visions-dark:   #1a4a3a;
   --raw-visions:        #346754;
   --raw-visions-mid:    #2e7d5e;
   --raw-visions-light:  #a8cfc0;
   --raw-visions-bg:     #f4faf7;
 
+  /* Relational */
   --raw-relational-dark:  #2e3899;
   --raw-relational:       #535fc1;
   --raw-relational-mid:   #4a56c8;
   --raw-relational-light: #b0b6e8;
   --raw-relational-bg:    #f4f5fd;
 
+  /* Org */
   --raw-org-dark:   #3d2868;
   --raw-org:        #5a3f86;
   --raw-org-mid:    #5e3d9e;
   --raw-org-light:  #c0a8e0;
   --raw-org-bg:     #f6f3fb;
 
+  /* Physical */
   --raw-physical-dark:  #8a2820;
   --raw-physical:       #bb463c;
   --raw-physical-mid:   #c44035;
   --raw-physical-light: #e0a8a4;
   --raw-physical-bg:    #fdf5f4;
 
+  /* Yellow */
   --raw-yellow-dark:  #9a7010;
   --raw-yellow:       #D4AF37;
   --raw-yellow-mid:   #c8991a;
   --raw-yellow-light: #e8d080;
   --raw-yellow-bg:    #fffdf5;
+}
 
-  /* 2b. Semantic / component tokens */
-  --color-text-primary:    var(--raw-black);
-  --color-text-secondary:  var(--raw-grey-700);
-  --color-text-muted:      rgba(0,0,0,0.35);
-  --color-text-disabled:   rgba(0,0,0,0.25);
 
-  --color-bg-page:         var(--raw-white);
-  --color-bg-surface:      var(--raw-grey-100);
-  --color-bg-overlay:      rgba(247,247,248,0.96);
+/* ══════════════════════════════════════════════════════════
+   5. Semantic tokens  — mapped to MD3 system colors
+      All legacy names preserved for backward compatibility
+   ══════════════════════════════════════════════════════════ */
+:root {
+  /* Text */
+  --color-text-primary:     var(--md-sys-color-on-background);
+  --color-text-secondary:   var(--md-sys-color-on-surface-variant);
+  --color-text-muted:       var(--md-sys-color-outline);
+  --color-text-disabled:    color-mix(in srgb, var(--md-sys-color-on-surface) 38%, transparent);
+  --color-text-default:     var(--md-sys-color-on-surface);
+  --color-text-placeholder: var(--md-sys-color-outline);
 
-  --color-border-subtle:   var(--raw-grey-300);
-  --color-border-strong:   var(--raw-grey-400);
+  /* Backgrounds */
+  --color-bg-page:          var(--md-sys-color-background);
+  --color-bg-surface:       var(--md-sys-color-surface-container-low);
+  --color-bg-overlay:       color-mix(in srgb, var(--md-sys-color-surface) 96%, transparent);
+  --color-bg-hover:         color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent);
+  --color-bg-pressed:       color-mix(in srgb, var(--md-sys-color-on-surface) 12%, transparent);
+
+  /* Borders */
+  --color-border-subtle:    var(--md-sys-color-outline-variant);
+  --color-border-default:   var(--md-sys-color-outline-variant);
+  --color-border-strong:    var(--md-sys-color-outline);
+
+  /* Accent (maps to MD3 primary) */
+  --color-accent:           var(--md-sys-color-primary);
+  --color-accent-fg:        var(--md-sys-color-on-primary);
+  --color-accent-hover:     color-mix(in srgb, var(--md-sys-color-primary) 92%, black);
+  --color-accent-subtle:    color-mix(in srgb, var(--md-sys-color-primary) 12%, transparent);
 
   /* Topbar */
-  --topbar-height:          48px;
-  --topbar-bg:              var(--raw-white);
-  --topbar-border:          var(--raw-grey-300);
-  --topbar-shadow:          0 1px 4px rgba(0,0,0,0.06);
-  --topbar-title-color:     var(--raw-black);
-  --topbar-global-color:    rgba(0,0,0,0.35);
+  --topbar-height:          56px;   /* MD3 top app bar = 64px, tool bars 56px */
+  --topbar-bg:              var(--md-sys-color-surface);
+  --topbar-border:          var(--md-sys-color-outline-variant);
+  --topbar-shadow:          var(--md-elev-1);
+  --topbar-title-color:     var(--md-sys-color-on-surface);
+  --topbar-global-color:    var(--md-sys-color-on-surface-variant);
 
-  /* Tool page shared */
-  --tool-pane-bg:           var(--raw-grey-100);
+  /* Tool pane */
+  --tool-pane-bg:           var(--md-sys-color-surface-container-low);
 
-  /* Sidebar / panel */
-  --panel-bg:               var(--raw-grey-100);
-  --panel-box-bg:           rgba(0,0,0,0.04);
-  --panel-box-border:       rgba(0,0,0,0.10);
-  --panel-border:           var(--raw-grey-300);
+  /* Panel / sidebar */
+  --panel-bg:               var(--md-sys-color-surface-container);
+  --panel-box-bg:           color-mix(in srgb, var(--md-sys-color-on-surface) 5%, transparent);
+  --panel-box-border:       var(--md-sys-color-outline-variant);
+  --panel-border:           var(--md-sys-color-outline-variant);
 
   /* Scrollbar */
-  --scrollbar-track:        var(--raw-grey-200);
-  --scrollbar-thumb:        var(--raw-grey-500);
-  --scrollbar-thumb-hover:  var(--raw-grey-600);
+  --scrollbar-track:        transparent;
+  --scrollbar-thumb:        var(--md-sys-color-outline-variant);
+  --scrollbar-thumb-hover:  var(--md-sys-color-outline);
 
   /* Focus ring */
-  --focus-ring:             0 0 0 3px rgba(0,0,0,0.10);
+  --focus-ring: 0 0 0 3px color-mix(in srgb, var(--md-sys-color-primary) 30%, transparent);
 
-  /* Transitions */
-  --transition-fast:   0.12s ease;
-  --transition-base:   0.18s ease;
-  --transition-slow:   0.28s ease;
-  --transition-bounce: 0.22s cubic-bezier(0.34, 1.4, 0.64, 1);
-
-  /* Radius */
-  --radius-xs:   4px;
-  --radius-sm:   6px;
-  --radius-md:   8px;
-  --radius-lg:   10px;
-  --radius-xl:   12px;
-  --radius-full: 9999px;
-
-  /* Spacing */
-  --space-1:  4px;
-  --space-2:  8px;
-  --space-3:  12px;
-  --space-4:  16px;
-  --space-5:  20px;
-  --space-6:  24px;
+  /* Transitions (MD3 motion tokens) */
+  --transition-fast:   0.1s cubic-bezier(0.2, 0, 0, 1);
+  --transition-base:   0.2s cubic-bezier(0.2, 0, 0, 1);
+  --transition-slow:   0.3s cubic-bezier(0.2, 0, 0, 1);
+  --transition-bounce: 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  /* MD3 named easing */
+  --md-motion-easing-standard:          cubic-bezier(0.2, 0, 0, 1);
+  --md-motion-easing-standard-decel:    cubic-bezier(0, 0, 0, 1);
+  --md-motion-easing-standard-accel:    cubic-bezier(0.3, 0, 1, 1);
+  --md-motion-easing-emphasized:        cubic-bezier(0.2, 0, 0, 1);
+  --md-motion-easing-emphasized-decel:  cubic-bezier(0.05, 0.7, 0.1, 1);
+  --md-motion-easing-emphasized-accel:  cubic-bezier(0.3, 0, 0.8, 0.15);
 
   /* Typography */
-  --font-family:         'Instrument Sans', system-ui, sans-serif;
-  --font-size-xs:        8px;
-  --font-size-sm:        10px;
-  --font-size-base:      13px;
-  --font-size-md:        14px;
-  --font-size-lg:        16px;
+  --font-family:          'Roboto', 'Instrument Sans', system-ui, sans-serif;
+  --font-family-display:  'Roboto', system-ui, sans-serif;
 
-  --font-weight-normal:  400;
-  --font-weight-medium:  500;
-  --font-weight-semibold:600;
-  --font-weight-bold:    700;
-  --font-weight-black:   800;
+  /* MD3 type scale sizes */
+  --font-size-xs:         11px;  /* Label Small */
+  --font-size-sm:         12px;  /* Label Medium / Body Small */
+  --font-size-base:       14px;  /* Body Medium */
+  --font-size-md:         14px;
+  --font-size-lg:         16px;  /* Body Large */
+  --font-size-title-sm:   14px;  /* Title Small */
+  --font-size-title-md:   16px;  /* Title Medium */
+  --font-size-title-lg:   22px;  /* Title Large */
+  --font-size-headline-sm: 24px;
+  --font-size-headline-md: 28px;
+  --font-size-headline-lg: 32px;
+  --font-size-display-sm:  36px;
+  --font-size-display-md:  45px;
+  --font-size-display-lg:  57px;
 
-  --letter-spacing-wide:  0.06em;
-  --letter-spacing-wider: 0.10em;
-  --letter-spacing-caps:  0.12em;
+  --font-weight-normal:   400;
+  --font-weight-medium:   500;
+  --font-weight-semibold: 600;
+  --font-weight-bold:     700;
+  --font-weight-black:    900;
+
+  --letter-spacing-wide:  0.04em;
+  --letter-spacing-wider: 0.08em;
+  --letter-spacing-caps:  0.1em;
 }
 
-/* 2c. Per-tab theme overrides — set by JS on <html> or used as data-theme */
-/* These are the variables that sheet-specific code reads */
+/* Dark mode semantic token overrides */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --raw-black: #e5e1e6;
+    --raw-white: #1b1b1f;
+  }
+}
+
+
+/* ══════════════════════════════════════════════════════════
+   6. Per-tab / sheet theme variables  (unchanged names)
+   ══════════════════════════════════════════════════════════ */
 :root {
-  --bg-topbar:              var(--topbar-bg);
-  --bg-bottombar:           var(--raw-grey-200);
-  --bg-header:              var(--raw-grey-100);
-  --bg-cat:                 var(--raw-grey-100);
-  --bg-corner:              var(--raw-grey-100);
-  --bg-data:                var(--raw-white);
-  --bg-sidebar:             var(--raw-grey-100);
-  --color-data:             rgba(0,0,0,0.65);
-  --color-cat:              rgba(0,0,0,0.50);
-  --color-header:           rgba(0,0,0,0.50);
-  --color-topbar-global:    rgba(0,0,0,0.35);
-  --color-topbar-sheet:     var(--raw-black);
-  --border-main:            var(--raw-grey-300);
-  --border-group:           var(--raw-grey-400);
-  --border-strong:          var(--raw-grey-400);
-  --border-corner:          var(--raw-grey-400);
-  --border-sticky:          var(--raw-grey-400);
-  --border-sidebar:         var(--raw-grey-300);
-  --border-content-surround:var(--raw-grey-300);
-  --highlight-cell:         #ebebff;
-  --highlight-group:        #f0f0ff;
-  --selected-cell:          #c7c7ff;
-  --selected-group:         #d8d8ff;
-  --tab-bg:                 var(--raw-grey-300);
-  --tab-border:             var(--raw-grey-400);
-  --tab-active-bg:          var(--raw-white);
-  --tab-color:              rgba(0,0,0,0.45);
-  --tab-active-color:       var(--raw-black);
-  --drag-handle:            rgba(107,107,240,0.33);
-  --sidebar-box-bg:         rgba(0,0,0,0.04);
-  --sidebar-box-border:     rgba(0,0,0,0.10);
-  --tab-arrow-bg:           var(--raw-grey-400);
-  --tab-arrow-color:        #333;
-  --bg-content-surround:    var(--raw-grey-200);
+  --bg-topbar:               var(--topbar-bg);
+  --bg-bottombar:            var(--md-sys-color-surface-container);
+  --bg-header:               var(--md-sys-color-surface-container-low);
+  --bg-cat:                  var(--md-sys-color-surface-container-low);
+  --bg-corner:               var(--md-sys-color-surface-container-low);
+  --bg-data:                 var(--md-sys-color-surface);
+  --bg-sidebar:              var(--md-sys-color-surface-container);
+  --color-data:              color-mix(in srgb, var(--md-sys-color-on-surface) 80%, transparent);
+  --color-cat:               var(--md-sys-color-on-surface-variant);
+  --color-header:            var(--md-sys-color-on-surface-variant);
+  --color-topbar-global:     var(--md-sys-color-on-surface-variant);
+  --color-topbar-sheet:      var(--md-sys-color-on-surface);
+  --border-main:             var(--md-sys-color-outline-variant);
+  --border-group:            var(--md-sys-color-outline);
+  --border-strong:           var(--md-sys-color-outline);
+  --border-corner:           var(--md-sys-color-outline);
+  --border-sticky:           var(--md-sys-color-outline);
+  --border-sidebar:          var(--md-sys-color-outline-variant);
+  --border-content-surround: var(--md-sys-color-outline-variant);
+  --highlight-cell:          color-mix(in srgb, var(--md-sys-color-primary) 10%, transparent);
+  --highlight-group:         color-mix(in srgb, var(--md-sys-color-primary) 7%, transparent);
+  --selected-cell:           color-mix(in srgb, var(--md-sys-color-primary) 25%, transparent);
+  --selected-group:          color-mix(in srgb, var(--md-sys-color-primary) 18%, transparent);
+  --tab-bg:                  var(--md-sys-color-surface-container);
+  --tab-border:              var(--md-sys-color-outline-variant);
+  --tab-active-bg:           var(--md-sys-color-surface);
+  --tab-color:               var(--md-sys-color-on-surface-variant);
+  --tab-active-color:        var(--md-sys-color-on-surface);
+  --drag-handle:             color-mix(in srgb, var(--md-sys-color-primary) 33%, transparent);
+  --sidebar-box-bg:          color-mix(in srgb, var(--md-sys-color-on-surface) 5%, transparent);
+  --sidebar-box-border:      var(--md-sys-color-outline-variant);
+  --tab-arrow-bg:            var(--md-sys-color-surface-container-high);
+  --tab-arrow-color:         var(--md-sys-color-on-surface);
+  --bg-content-surround:     var(--md-sys-color-surface-container);
 }
 
-/* Global shared palette (also set by script.js as window.PP_PALETTE for JS) */
-/* Index: 0=visions, 1=relational, 2=org, 3=physical, 4=yellow, 5=default */
+/* Shared palette tokens */
 :root {
   --palette-0-accent: var(--raw-visions-mid);
   --palette-0-bg:     var(--raw-visions-bg);
@@ -210,12 +375,91 @@
   --palette-3-bg:     var(--raw-physical-bg);
   --palette-4-accent: var(--raw-yellow-mid);
   --palette-4-bg:     var(--raw-yellow-bg);
-  --palette-5-accent: var(--raw-grey-600);
-  --palette-5-bg:     var(--raw-grey-100);
+  --palette-5-accent: var(--md-sys-color-outline);
+  --palette-5-bg:     var(--md-sys-color-surface-container-low);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --raw-visions-bg:    color-mix(in srgb, #2e7d5e 15%, #1b1b1f);
+    --raw-relational-bg: color-mix(in srgb, #4a56c8 15%, #1b1b1f);
+    --raw-org-bg:        color-mix(in srgb, #5e3d9e 15%, #1b1b1f);
+    --raw-physical-bg:   color-mix(in srgb, #c44035 15%, #1b1b1f);
+    --raw-yellow-bg:     color-mix(in srgb, #c8991a 15%, #1b1b1f);
+  }
 }
 
 
-/* ── 3. Reset & Base ──────────────────────────────────────── */
+/* ══════════════════════════════════════════════════════════
+   7. MD3 Elevation
+   MD3 uses tonal color overlays + shadows
+   ══════════════════════════════════════════════════════════ */
+:root {
+  --md-elev-0: none;
+  --md-elev-1: 0px 1px 2px rgba(0,0,0,0.3), 0px 1px 3px 1px rgba(0,0,0,0.15);
+  --md-elev-2: 0px 1px 2px rgba(0,0,0,0.3), 0px 2px 6px 2px rgba(0,0,0,0.15);
+  --md-elev-3: 0px 4px 8px 3px rgba(0,0,0,0.15), 0px 1px 3px rgba(0,0,0,0.3);
+  --md-elev-4: 0px 6px 10px 4px rgba(0,0,0,0.15), 0px 2px 3px rgba(0,0,0,0.3);
+  --md-elev-5: 0px 8px 12px 6px rgba(0,0,0,0.15), 0px 4px 4px rgba(0,0,0,0.3);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --md-elev-1: 0px 1px 2px rgba(0,0,0,0.5), 0px 1px 3px 1px rgba(0,0,0,0.25);
+    --md-elev-2: 0px 1px 2px rgba(0,0,0,0.5), 0px 2px 6px 2px rgba(0,0,0,0.25);
+    --md-elev-3: 0px 4px 8px 3px rgba(0,0,0,0.25), 0px 1px 3px rgba(0,0,0,0.5);
+    --md-elev-4: 0px 6px 10px 4px rgba(0,0,0,0.25), 0px 2px 3px rgba(0,0,0,0.5);
+    --md-elev-5: 0px 8px 12px 6px rgba(0,0,0,0.25), 0px 4px 4px rgba(0,0,0,0.5);
+  }
+}
+
+
+/* ══════════════════════════════════════════════════════════
+   8. MD3 Shape tokens
+   ══════════════════════════════════════════════════════════ */
+:root {
+  --radius-xs:   4px;   /* Extra Small */
+  --radius-sm:   8px;   /* Small */
+  --radius-md:   12px;  /* Medium */
+  --radius-lg:   16px;  /* Large */
+  --radius-xl:   28px;  /* Extra Large */
+  --radius-full: 9999px;
+
+  /* Spacing (MD3 uses 4px base grid) */
+  --space-1:  4px;
+  --space-2:  8px;
+  --space-3:  12px;
+  --space-4:  16px;
+  --space-5:  20px;
+  --space-6:  24px;
+  --space-7:  28px;
+  --space-8:  32px;
+}
+
+
+/* ══════════════════════════════════════════════════════════
+   9. MD3 Typography utility classes
+   ══════════════════════════════════════════════════════════ */
+.md-display-lg   { font-size:57px; line-height:64px; font-weight:400; letter-spacing:-0.25px; }
+.md-display-md   { font-size:45px; line-height:52px; font-weight:400; letter-spacing:0; }
+.md-display-sm   { font-size:36px; line-height:44px; font-weight:400; letter-spacing:0; }
+.md-headline-lg  { font-size:32px; line-height:40px; font-weight:400; letter-spacing:0; }
+.md-headline-md  { font-size:28px; line-height:36px; font-weight:400; letter-spacing:0; }
+.md-headline-sm  { font-size:24px; line-height:32px; font-weight:400; letter-spacing:0; }
+.md-title-lg     { font-size:22px; line-height:28px; font-weight:400; letter-spacing:0; }
+.md-title-md     { font-size:16px; line-height:24px; font-weight:500; letter-spacing:0.15px; }
+.md-title-sm     { font-size:14px; line-height:20px; font-weight:500; letter-spacing:0.1px; }
+.md-body-lg      { font-size:16px; line-height:24px; font-weight:400; letter-spacing:0.5px; }
+.md-body-md      { font-size:14px; line-height:20px; font-weight:400; letter-spacing:0.25px; }
+.md-body-sm      { font-size:12px; line-height:16px; font-weight:400; letter-spacing:0.4px; }
+.md-label-lg     { font-size:14px; line-height:20px; font-weight:500; letter-spacing:0.1px; }
+.md-label-md     { font-size:12px; line-height:16px; font-weight:500; letter-spacing:0.5px; }
+.md-label-sm     { font-size:11px; line-height:16px; font-weight:500; letter-spacing:0.5px; }
+
+
+/* ══════════════════════════════════════════════════════════
+   10. Reset & Base
+   ══════════════════════════════════════════════════════════ */
 *, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
@@ -226,13 +470,15 @@ html {
   font-size: 14px;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  color-scheme: light dark;
 }
 
 body {
   font-family: var(--font-family);
-  font-size: var(--font-size-md);
-  color: var(--color-text-primary);
-  background: var(--color-bg-page);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-normal);
+  color: var(--md-sys-color-on-background);
+  background: var(--md-sys-color-background);
   line-height: 1.5;
 }
 
@@ -248,91 +494,102 @@ button {
 
 input, textarea, select {
   font-family: var(--font-family);
+  color-scheme: light dark;
 }
 
 
-/* ── 4. Typography scale ──────────────────────────────────── */
+/* ── Legacy DS typography classes (kept for compatibility) ── */
 .ds-label-caps {
   font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-black);
+  font-weight: var(--font-weight-medium);
   letter-spacing: var(--letter-spacing-caps);
   text-transform: uppercase;
-  color: var(--color-text-muted);
+  color: var(--md-sys-color-on-surface-variant);
   line-height: 1;
 }
-
 .ds-label-sm {
-  font-size: 9px;
-  font-weight: var(--font-weight-bold);
+  font-size: 11px;
+  font-weight: var(--font-weight-medium);
   letter-spacing: var(--letter-spacing-wide);
   text-transform: uppercase;
 }
-
 .ds-body-sm {
   font-size: var(--font-size-sm);
   line-height: 1.4;
-  color: var(--color-text-secondary);
+  color: var(--md-sys-color-on-surface-variant);
 }
-
 .ds-body {
   font-size: var(--font-size-base);
   line-height: 1.5;
 }
-
 .ds-mono {
   font-variant-numeric: tabular-nums;
   letter-spacing: 0;
 }
 
 
-/* ── 5. Layout primitives ────────────────────────────────── */
+/* ══════════════════════════════════════════════════════════
+   11. Layout Primitives
+   ══════════════════════════════════════════════════════════ */
 
-/* 5a. Topbar — shared across ALL pages */
+/* 11a. Topbar — MD3 Top App Bar */
 .ds-topbar {
   flex-shrink: 0;
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 0 18px;
+  gap: 8px;
+  padding: 0 16px 0 4px;
   height: var(--topbar-height);
-  background: var(--topbar-bg);
-  border-bottom: 1px solid var(--topbar-border);
-  box-shadow: var(--topbar-shadow);
+  background: var(--md-sys-color-surface);
+  border-bottom: 1px solid var(--md-sys-color-outline-variant);
+  box-shadow: none; /* MD3 top bars use tonal surface, not shadow by default */
   z-index: 10;
+  /* MD3 surface tint at elevation 2 */
+  background-image: linear-gradient(
+    color-mix(in srgb, var(--md-sys-color-primary) 8%, transparent),
+    color-mix(in srgb, var(--md-sys-color-primary) 8%, transparent)
+  );
 }
 
 .ds-topbar-back {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
   border: none;
   background: transparent;
   cursor: pointer;
   font-family: var(--font-family);
   font-size: 12px;
-  font-weight: var(--font-weight-semibold);
-  letter-spacing: 0.04em;
-  color: var(--color-text-muted);
-  padding: 4px 8px;
-  border-radius: var(--radius-sm);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: 0.5px;
+  color: var(--md-sys-color-on-surface-variant);
+  padding: 8px 12px;
+  border-radius: var(--radius-full);
   transition: background var(--transition-fast), color var(--transition-fast);
   flex-shrink: 0;
   text-decoration: none;
+  /* MD3 icon button ripple */
+  position: relative;
+  overflow: hidden;
 }
-.ds-topbar-back:hover {
-  background: rgba(0,0,0,0.06);
-  color: rgba(0,0,0,0.7);
+.ds-topbar-back::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--md-sys-color-on-surface);
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+  border-radius: inherit;
 }
-.ds-topbar-back svg {
-  flex-shrink: 0;
-  display: block;
-}
+.ds-topbar-back:hover::before { opacity: var(--md-sys-state-hover-opacity); }
+.ds-topbar-back:hover { color: var(--md-sys-color-on-surface); }
+.ds-topbar-back svg { flex-shrink: 0; display: block; }
 
 .ds-topbar-title {
-  font-size: 13px;
-  font-weight: var(--font-weight-bold);
-  color: var(--color-text-primary);
-  letter-spacing: 0.02em;
+  font-size: var(--font-size-title-lg);
+  font-weight: var(--font-weight-normal);
+  color: var(--md-sys-color-on-surface);
+  letter-spacing: 0;
   flex: 1;
   white-space: nowrap;
   overflow: hidden;
@@ -342,87 +599,109 @@ input, textarea, select {
 .ds-topbar-global {
   font-size: 11px;
   font-weight: var(--font-weight-medium);
-  color: var(--topbar-global-color);
-  letter-spacing: 0.08em;
+  color: var(--md-sys-color-on-surface-variant);
+  letter-spacing: var(--letter-spacing-wide);
   text-transform: uppercase;
   white-space: nowrap;
 }
 
-/* 5b. Tool page shell — flex column, full viewport */
+/* 11b. Tool page shell */
 .ds-tool-shell {
   display: flex;
   flex-direction: column;
   height: 100vh;
   height: 100dvh;
   overflow: hidden;
-  background: var(--tool-pane-bg);
+  background: var(--md-sys-color-background);
   font-family: var(--font-family);
-  font-size: var(--font-size-md);
+  font-size: var(--font-size-base);
 }
 
 
-/* ── 6. Components ───────────────────────────────────────── */
+/* ══════════════════════════════════════════════════════════
+   12. Components
+   ══════════════════════════════════════════════════════════ */
 
-/* 6a. Buttons */
+/* ── 12a. Buttons — MD3 filled / tonal / outlined / text ── */
 .ds-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 5px;
+  gap: 8px;
   border: none;
-  border-radius: var(--radius-sm);
-  padding: 5px 12px;
+  border-radius: var(--radius-full); /* MD3 buttons are fully rounded */
+  padding: 0 24px;
+  height: 40px;
   font-family: var(--font-family);
-  font-size: 9px;
-  font-weight: var(--font-weight-bold);
-  letter-spacing: var(--letter-spacing-wide);
-  text-transform: uppercase;
+  font-size: var(--font-size-title-sm);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: 0.1px;
   cursor: pointer;
-  transition: background var(--transition-fast), color var(--transition-fast);
+  transition: box-shadow var(--transition-fast), background var(--transition-fast);
   white-space: nowrap;
+  position: relative;
+  overflow: hidden;
 }
+.ds-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  border-radius: inherit;
+  transition: opacity var(--transition-fast);
+}
+.ds-btn:hover::before  { opacity: var(--md-sys-state-hover-opacity); }
+.ds-btn:active::before { opacity: var(--md-sys-state-pressed-opacity); }
 
-.ds-btn-ghost {
-  background: rgba(0,0,0,0.07);
-  color: rgba(0,0,0,0.45);
-}
-.ds-btn-ghost:hover {
-  background: rgba(0,0,0,0.13);
-  color: rgba(0,0,0,0.75);
-}
-.ds-btn-ghost:disabled {
-  background: rgba(0,0,0,0.04);
-  color: rgba(0,0,0,0.25);
-  cursor: default;
-}
-
+/* Filled (primary) */
 .ds-btn-solid {
-  background: var(--raw-black);
-  color: var(--raw-white);
+  background: var(--md-sys-color-primary);
+  color: var(--md-sys-color-on-primary);
+  box-shadow: var(--md-elev-0);
 }
-.ds-btn-solid:hover {
-  background: rgba(0,0,0,0.75);
+.ds-btn-solid::before { background: var(--md-sys-color-on-primary); }
+.ds-btn-solid:hover { box-shadow: var(--md-elev-1); }
+.ds-btn-solid:disabled {
+  background: color-mix(in srgb, var(--md-sys-color-on-surface) 12%, transparent);
+  color: color-mix(in srgb, var(--md-sys-color-on-surface) 38%, transparent);
+  box-shadow: none;
+  cursor: not-allowed;
 }
 
-/* 6b. Pill / segmented control */
+/* Tonal (ghost) */
+.ds-btn-ghost {
+  background: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
+}
+.ds-btn-ghost::before { background: var(--md-sys-color-on-secondary-container); }
+.ds-btn-ghost:hover { box-shadow: var(--md-elev-1); }
+.ds-btn-ghost:disabled {
+  background: color-mix(in srgb, var(--md-sys-color-on-surface) 12%, transparent);
+  color: color-mix(in srgb, var(--md-sys-color-on-surface) 38%, transparent);
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+
+/* ── 12b. Pill / segmented control — MD3 Segmented Button ── */
 .ds-pill {
   position: relative;
   display: inline-flex;
   align-items: center;
-  background: rgba(0,0,0,0.07);
+  border: 1px solid var(--md-sys-color-outline);
   border-radius: var(--radius-full);
-  padding: 2px;
-  box-sizing: border-box;
+  padding: 0;
+  overflow: hidden;
 }
 
 .ds-pill-indicator {
   position: absolute;
-  top: 2px;
-  bottom: 2px;
-  background: var(--raw-white);
+  top: 0;
+  bottom: 0;
+  background: var(--md-sys-color-secondary-container);
   border-radius: var(--radius-full);
-  box-shadow: 0 1px 4px rgba(0,0,0,0.15);
-  transition: left 0.6s ease, width 0.6s ease;
+  transition: left 0.3s var(--md-motion-easing-emphasized),
+              width 0.3s var(--md-motion-easing-emphasized);
   pointer-events: none;
 }
 
@@ -433,60 +712,57 @@ input, textarea, select {
   border: none;
   background: transparent;
   border-radius: var(--radius-full);
-  padding: 4px 5px;
+  padding: 6px 16px;
   font-family: var(--font-family);
-  font-size: 9px;
-  font-weight: var(--font-weight-bold);
-  letter-spacing: var(--letter-spacing-wide);
-  text-transform: uppercase;
-  color: rgba(0,0,0,0.35);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: 0.1px;
+  color: var(--md-sys-color-on-surface-variant);
   cursor: pointer;
   transition: color var(--transition-fast);
   white-space: nowrap;
 }
-.ds-pill-btn.active { color: rgba(0,0,0,0.75); }
+.ds-pill-btn.active { color: var(--md-sys-color-on-secondary-container); }
 
 
-/* 6c. Range sliders */
-/* Shared label row */
-.ds-slider-group-label {
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-black);
+/* ── 12c. Range sliders ── */
+.ds-slider-group-label, .pp-group-label {
+  font-size: 11px;
+  font-weight: var(--font-weight-medium);
   letter-spacing: var(--letter-spacing-caps);
   text-transform: uppercase;
-  color: rgba(0,0,0,0.28);
+  color: var(--md-sys-color-on-surface-variant);
   line-height: 1;
-  margin-bottom: 1px;
+  margin-bottom: 2px;
 }
 
-.ds-slider-row {
+.ds-slider-row, .pp-range-row {
   display: flex;
   align-items: center;
-  gap: 3px;
+  gap: 4px;
 }
 
-.ds-slider-label {
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-bold);
+.ds-slider-label, .pp-range-label {
+  font-size: 11px;
+  font-weight: var(--font-weight-medium);
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: rgba(0,0,0,0.35);
+  color: var(--md-sys-color-on-surface-variant);
   flex-shrink: 0;
   width: 18px;
 }
 
-.ds-slider-val {
-  font-size: 9px;
-  font-weight: var(--font-weight-bold);
-  color: rgba(0,0,0,0.55);
+.ds-slider-val, .pp-range-val {
+  font-size: 11px;
+  font-weight: var(--font-weight-medium);
+  color: var(--md-sys-color-on-surface-variant);
   flex-shrink: 0;
-  width: 22px;
+  width: 26px;
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
 
-/* Native input: hidden, overlaid on custom track */
-.ds-range-input {
+.ds-range-input, .pp-range {
   -webkit-appearance: none;
   appearance: none;
   position: absolute;
@@ -500,172 +776,182 @@ input, textarea, select {
   z-index: 2;
 }
 
-.ds-range-wrap {
+.ds-range-wrap, .pp-range-wrap {
   position: relative;
   flex: 1;
   min-width: 0;
-  height: 18px;
+  height: 20px;
 }
 
-.ds-range-track {
+/* MD3 slider track: 4px tall, rounded */
+.ds-range-track, .pp-range-track {
   position: absolute;
   top: 50%;
   left: 0;
   right: 0;
-  height: 3px;
+  height: 4px;
   transform: translateY(-50%);
-  border-radius: 2px;
-  background: rgba(0,0,0,0.12);
+  border-radius: var(--radius-full);
+  background: var(--md-sys-color-surface-variant);
   overflow: hidden;
   pointer-events: none;
   transition: background var(--transition-base);
 }
-.ds-range-wrap:hover .ds-range-track { background: rgba(0,0,0,0.18); }
 
-.ds-range-fill {
+.ds-range-fill, .pp-range-fill {
   position: absolute;
   left: 0;
   top: 0;
   bottom: 0;
   width: 0%;
-  border-radius: 2px;
-  background: var(--color-topbar-sheet, var(--raw-black));
-  opacity: 0.30;
+  border-radius: var(--radius-full);
+  background: var(--md-sys-color-primary);
+  opacity: 1;
   pointer-events: none;
   transition: width var(--transition-bounce);
 }
 
-.ds-range-thumb {
+/* MD3 slider thumb: 20px, uses primary color */
+.ds-range-thumb, .pp-range-thumb {
   position: absolute;
   top: 50%;
   left: 0%;
-  width: 11px;
-  height: 11px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
-  background: var(--color-topbar-sheet, var(--raw-black));
-  box-shadow: 0 1px 3px rgba(0,0,0,0.22);
+  background: var(--md-sys-color-primary);
+  box-shadow: var(--md-elev-1);
   transform: translate(-50%, -50%);
   pointer-events: none;
   transition: left var(--transition-bounce),
               transform var(--transition-fast),
               box-shadow var(--transition-fast);
 }
-.ds-range-wrap:hover .ds-range-thumb {
-  transform: translate(-50%, -50%) scale(1.28);
-  box-shadow: 0 2px 6px rgba(0,0,0,0.28);
+.ds-range-wrap:hover .ds-range-thumb,
+.pp-range-wrap:hover .pp-range-thumb {
+  transform: translate(-50%, -50%) scale(1.1);
+  box-shadow: var(--md-elev-2);
 }
-.ds-range-wrap.dragging .ds-range-thumb {
+.ds-range-wrap.dragging .ds-range-thumb,
+.pp-range-wrap.pp-range-dragging .pp-range-thumb {
   transition: transform var(--transition-fast), box-shadow var(--transition-fast);
-  transform: translate(-50%, -50%) scale(1.28);
+  transform: translate(-50%, -50%) scale(1.15);
+  box-shadow: var(--md-elev-2);
 }
-.ds-range-wrap.dragging .ds-range-fill { transition: none; }
+.ds-range-wrap.dragging .ds-range-fill,
+.pp-range-wrap.pp-range-dragging .pp-range-fill { transition: none; }
 
-/* Accent variant (purple) */
-.ds-range-wrap--accent .ds-range-thumb {
-  background: #7c5cbf;
-  box-shadow: 0 1px 4px rgba(124,92,191,0.35);
+/* Accent variant (tertiary) */
+.ds-range-wrap--accent .ds-range-thumb,
+.pp-range-wrap--accent .pp-range-thumb {
+  background: var(--md-sys-color-tertiary);
+  box-shadow: 0 1px 4px color-mix(in srgb, var(--md-sys-color-tertiary) 40%, transparent);
 }
-.ds-range-wrap--accent .ds-range-fill { background: #7c5cbf; }
+.ds-range-wrap--accent .ds-range-fill,
+.pp-range-wrap--accent .pp-range-fill { background: var(--md-sys-color-tertiary); }
 
 /* Muted variant */
-.ds-range-wrap--muted .ds-range-thumb {
-  background: rgba(0,0,0,0.38);
-  box-shadow: 0 1px 2px rgba(0,0,0,0.15);
+.ds-range-wrap--muted .ds-range-thumb,
+.pp-range-wrap--muted .pp-range-thumb {
+  background: var(--md-sys-color-outline);
+  box-shadow: var(--md-elev-1);
 }
-.ds-range-wrap--muted .ds-range-fill { background: rgba(0,0,0,0.38); }
-
-/* Legacy aliases (keep backward compat with existing JS) */
-.pp-group-label    { font-size:var(--font-size-xs); font-weight:800; letter-spacing:var(--letter-spacing-caps); text-transform:uppercase; color:rgba(0,0,0,.28); line-height:1; margin-bottom:1px; }
-.pp-range-row      { display:flex; align-items:center; gap:3px; }
-.pp-range-label    { font-size:var(--font-size-xs); font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:rgba(0,0,0,.35); flex-shrink:0; width:18px; }
-.pp-range-val      { font-size:9px; font-weight:700; color:rgba(0,0,0,.55); flex-shrink:0; width:22px; text-align:right; font-variant-numeric:tabular-nums; }
-.pp-range          { -webkit-appearance:none; appearance:none; position:absolute; inset:0; width:100%; height:100%; opacity:0; cursor:pointer; margin:0; padding:0; z-index:2; }
-.pp-range-wrap     { position:relative; flex:1; min-width:0; height:18px; }
-.pp-range-track    { position:absolute; top:50%; left:0; right:0; height:3px; transform:translateY(-50%); border-radius:2px; background:rgba(0,0,0,.12); overflow:hidden; pointer-events:none; transition:background .18s ease; }
-.pp-range-wrap:hover .pp-range-track { background:rgba(0,0,0,.18); }
-.pp-range-fill     { position:absolute; left:0; top:0; bottom:0; width:0%; border-radius:2px; background:var(--color-topbar-sheet,#111); opacity:.30; pointer-events:none; transition:width .22s cubic-bezier(0.34,1.4,0.64,1); }
-.pp-range-thumb    { position:absolute; top:50%; left:0%; width:11px; height:11px; border-radius:50%; background:var(--color-topbar-sheet,#111); box-shadow:0 1px 3px rgba(0,0,0,.22); transform:translate(-50%,-50%); pointer-events:none; transition:left .22s cubic-bezier(0.34,1.4,0.64,1),transform .12s ease,box-shadow .12s ease; }
-.pp-range-wrap:hover .pp-range-thumb { transform:translate(-50%,-50%) scale(1.28); box-shadow:0 2px 6px rgba(0,0,0,.28); }
-.pp-range-wrap.pp-range-dragging .pp-range-thumb { transition:transform .12s ease,box-shadow .12s ease; transform:translate(-50%,-50%) scale(1.28); }
-.pp-range-wrap.pp-range-dragging .pp-range-fill  { transition:none; }
-.pp-range-wrap--accent .pp-range-thumb { background:#7c5cbf; box-shadow:0 1px 4px rgba(124,92,191,.35); }
-.pp-range-wrap--accent .pp-range-fill  { background:#7c5cbf; }
-.pp-range-wrap--muted .pp-range-thumb  { background:rgba(0,0,0,.38); box-shadow:0 1px 2px rgba(0,0,0,.15); }
-.pp-range-wrap--muted .pp-range-fill   { background:rgba(0,0,0,.38); }
+.ds-range-wrap--muted .ds-range-fill,
+.pp-range-wrap--muted .pp-range-fill { background: var(--md-sys-color-outline); }
 
 
-/* 6d. Cards — base card used in all tools */
+/* ── 12d. Cards — MD3 Filled Card / Elevated Card ── */
 .ds-card {
   border-radius: var(--radius-md);
-  border: 1.5px solid var(--ppc-border, rgba(0,0,0,0.12));
-  background: var(--ppc-bg, var(--raw-white));
+  border: none;
+  background: var(--md-sys-color-surface-container-low);
+  box-shadow: var(--md-elev-1);
   transition: box-shadow var(--transition-fast), transform var(--transition-fast);
+  position: relative;
+  overflow: hidden;
+}
+.ds-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--md-sys-color-on-surface);
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+  pointer-events: none;
 }
 .ds-card:hover {
-  box-shadow: 0 4px 16px rgba(0,0,0,0.10);
+  box-shadow: var(--md-elev-2);
   transform: translateY(-1px);
 }
+.ds-card:hover::before { opacity: var(--md-sys-state-hover-opacity); }
 
 .ds-card-head {
   display: flex;
   align-items: center;
-  gap: 7px;
-  padding: 6px 10px 5px;
-  border-bottom: 1px solid rgba(0,0,0,0.06);
+  gap: 8px;
+  padding: 12px 16px 8px;
+  border-bottom: 1px solid var(--md-sys-color-outline-variant);
 }
 
 .ds-card-body {
-  padding: 8px 10px 10px;
+  padding: 12px 16px 16px;
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 6px;
 }
 
 .ds-card-accent-bar {
   width: 3px;
-  height: 14px;
-  border-radius: 2px;
+  height: 16px;
+  border-radius: var(--radius-full);
   flex-shrink: 0;
 }
 
-/* 6e. Badge / status pill */
+
+/* ── 12e. Badge / status pill — MD3 Assist Chip style ── */
 .ds-badge {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 3px 8px;
+  gap: 6px;
+  padding: 4px 12px;
   border-radius: var(--radius-full);
-  font-size: 9px;
-  font-weight: var(--font-weight-bold);
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
+  font-size: 11px;
+  font-weight: var(--font-weight-medium);
+  letter-spacing: 0.5px;
   flex-shrink: 0;
   transition: background var(--transition-slow), color var(--transition-slow);
+  border: 1px solid var(--md-sys-color-outline-variant);
 }
 
 .ds-badge--connected {
-  background: rgba(40,180,80,0.12);
-  color: rgba(20,140,50,0.9);
+  background: color-mix(in srgb, var(--md-sys-color-secondary) 12%, transparent);
+  color: var(--md-sys-color-secondary);
+  border-color: color-mix(in srgb, var(--md-sys-color-secondary) 30%, transparent);
 }
 .ds-badge--waiting {
-  background: rgba(0,0,0,0.06);
-  color: rgba(0,0,0,0.4);
+  background: color-mix(in srgb, var(--md-sys-color-on-surface) 5%, transparent);
+  color: var(--md-sys-color-on-surface-variant);
+  border-color: var(--md-sys-color-outline-variant);
 }
 .ds-badge--disconnected {
-  background: rgba(200,60,60,0.10);
-  color: rgba(160,30,30,0.9);
+  background: color-mix(in srgb, var(--md-sys-color-error) 12%, transparent);
+  color: var(--md-sys-color-error);
+  border-color: color-mix(in srgb, var(--md-sys-color-error) 30%, transparent);
 }
 .ds-badge--loading {
-  background: rgba(0,0,0,0.06);
-  color: rgba(0,0,0,0.4);
+  background: color-mix(in srgb, var(--md-sys-color-on-surface) 5%, transparent);
+  color: var(--md-sys-color-on-surface-variant);
+  border-color: var(--md-sys-color-outline-variant);
 }
 .ds-badge--ready {
-  background: rgba(60,180,100,0.12);
-  color: rgba(30,130,60,0.9);
+  background: color-mix(in srgb, var(--md-sys-color-secondary) 12%, transparent);
+  color: var(--md-sys-color-secondary);
+  border-color: color-mix(in srgb, var(--md-sys-color-secondary) 30%, transparent);
 }
 .ds-badge--error {
-  background: rgba(200,60,60,0.10);
-  color: rgba(180,40,40,0.85);
+  background: color-mix(in srgb, var(--md-sys-color-error) 12%, transparent);
+  color: var(--md-sys-color-error);
+  border-color: color-mix(in srgb, var(--md-sys-color-error) 30%, transparent);
 }
 
 .ds-badge-dot {
@@ -675,162 +961,287 @@ input, textarea, select {
   flex-shrink: 0;
   transition: background var(--transition-slow);
 }
-.ds-badge--waiting   .ds-badge-dot,
-.ds-badge--loading   .ds-badge-dot { background: rgba(0,0,0,0.25); animation: ds-pulse 1.2s ease-in-out infinite; }
+.ds-badge--waiting .ds-badge-dot,
+.ds-badge--loading .ds-badge-dot {
+  background: var(--md-sys-color-outline);
+  animation: ds-pulse 1.2s ease-in-out infinite;
+}
 .ds-badge--connected .ds-badge-dot,
-.ds-badge--ready     .ds-badge-dot { background: rgba(40,160,80,0.9); }
+.ds-badge--ready     .ds-badge-dot { background: var(--md-sys-color-secondary); }
 .ds-badge--disconnected .ds-badge-dot,
-.ds-badge--error     .ds-badge-dot { background: rgba(180,40,40,0.85); }
+.ds-badge--error     .ds-badge-dot { background: var(--md-sys-color-error); }
 
-/* 6f. Shared table (inside cluster sheet panel) */
+
+/* ── 12f. Tables — MD3 Data Table ── */
 .ds-table {
   border-collapse: collapse;
   width: 100%;
-  font-size: 9px;
+  font-size: var(--font-size-sm);
 }
 .ds-table thead tr { position: sticky; top: 0; z-index: 10; }
 .ds-table th {
-  background: var(--raw-white);
-  padding: 6px 8px 5px;
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-black);
-  letter-spacing: 0.09em;
+  background: var(--md-sys-color-surface-container);
+  padding: 14px 16px 12px;
+  font-size: 11px;
+  font-weight: var(--font-weight-medium);
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   text-align: left;
   white-space: nowrap;
-  border-right: 1px solid rgba(0,0,0,0.08);
-  border-bottom: 2px solid rgba(0,0,0,0.10);
+  color: var(--md-sys-color-on-surface-variant);
+  border-right: 1px solid var(--md-sys-color-outline-variant);
+  border-bottom: 1px solid var(--md-sys-color-outline);
 }
 .ds-table td {
-  padding: 4px;
+  padding: 10px 16px;
   vertical-align: top;
-  border-right: 1px solid rgba(0,0,0,0.07);
-  border-bottom: 1px solid rgba(0,0,0,0.07);
+  border-right: 1px solid var(--md-sys-color-outline-variant);
+  border-bottom: 1px solid var(--md-sys-color-outline-variant);
+  color: var(--md-sys-color-on-surface);
+}
+.ds-table tbody tr:hover {
+  background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent);
 }
 
-/* 6g. Scrollbars */
+
+/* ── 12g. Scrollbars ── */
 .ds-scroll {
   scrollbar-width: thin;
-  scrollbar-color: var(--scrollbar-thumb) transparent;
+  scrollbar-color: var(--md-sys-color-outline-variant) transparent;
 }
-.ds-scroll::-webkit-scrollbar { width: 5px; height: 5px; }
-.ds-scroll::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 3px; }
+.ds-scroll::-webkit-scrollbar { width: 4px; height: 4px; }
+.ds-scroll::-webkit-scrollbar-thumb {
+  background: var(--md-sys-color-outline-variant);
+  border-radius: var(--radius-full);
+}
 .ds-scroll::-webkit-scrollbar-track { background: transparent; }
 
-/* 6h. Tooltip */
+
+/* ── 12h. Tooltip — MD3 Plain Tooltip ── */
 .ds-tooltip {
   position: fixed;
   z-index: 9999;
   pointer-events: none;
-  background: var(--raw-white);
-  border: 1px solid rgba(0,0,0,0.12);
-  border-radius: var(--radius-lg);
-  padding: 8px 11px;
-  max-width: 240px;
-  box-shadow: 0 6px 22px rgba(0,0,0,0.16);
+  background: var(--md-sys-color-inverse-surface);
+  color: var(--md-sys-color-inverse-on-surface);
+  border-radius: var(--radius-xs);
+  padding: 6px 12px;
+  max-width: 200px;
+  box-shadow: var(--md-elev-2);
   opacity: 0;
-  transition: opacity 0.14s;
+  transition: opacity 0.15s var(--md-motion-easing-standard);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-normal);
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
+  line-height: 1.4;
 }
 .ds-tooltip.visible {
   opacity: 1;
   pointer-events: auto;
 }
 
-/* 6i. Empty states */
+
+/* ── 12i. Empty / no-host states ── */
 .ds-empty {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  padding: 32px;
+  gap: 12px;
+  padding: 40px;
   text-align: center;
-  color: rgba(0,0,0,0.25);
-  font-size: 11px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: var(--font-size-sm);
   line-height: 1.5;
 }
 
-/* No-host overlay used in tool pages */
 .ds-no-host {
   display: none;
   position: absolute;
   inset: 0;
-  background: rgba(247,247,248,0.92);
-  backdrop-filter: blur(4px);
+  background: color-mix(in srgb, var(--md-sys-color-surface) 92%, transparent);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   z-index: 50;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 10px;
+  gap: 12px;
   text-align: center;
-  padding: 32px;
+  padding: 40px;
 }
 .ds-no-host.visible { display: flex; }
 .ds-no-host h2 {
-  font-size: 14px;
-  font-weight: var(--font-weight-bold);
-  color: rgba(0,0,0,0.6);
-  letter-spacing: 0.02em;
+  font-size: var(--font-size-title-md);
+  font-weight: var(--font-weight-medium);
+  color: var(--md-sys-color-on-surface);
+  letter-spacing: 0.15px;
 }
 .ds-no-host p {
-  font-size: 12px;
-  color: rgba(0,0,0,0.4);
+  font-size: var(--font-size-base);
+  color: var(--md-sys-color-on-surface-variant);
   line-height: 1.5;
-  max-width: 280px;
+  max-width: 300px;
 }
 .ds-no-host a {
-  font-size: 12px;
-  font-weight: var(--font-weight-semibold);
-  color: #5b7fa6;
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-medium);
+  color: var(--md-sys-color-primary);
   text-decoration: none;
 }
 .ds-no-host a:hover { text-decoration: underline; }
 
-/* Citation pill (used in match cards) */
+/* Citation pill */
 .pp-cite-pill {
   display: inline-block;
   margin-top: 4px;
-  padding: 3px 7px;
+  padding: 2px 8px;
   border-radius: var(--radius-full);
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-normal);
-  letter-spacing: 0.07em;
-  line-height: 1.35;
+  letter-spacing: 0.06em;
+  line-height: 1.4;
   white-space: nowrap;
   vertical-align: middle;
   opacity: 0.85;
 }
 
-/* Keyword highlight mark */
+/* Keyword highlight */
 mark.pkw {
   background: transparent;
   border-bottom: 2px solid currentColor;
-  font-weight: var(--font-weight-bold);
+  font-weight: var(--font-weight-medium);
   padding: 0;
   color: inherit;
-  transition: border-bottom-color var(--transition-fast),
-              font-weight var(--transition-fast);
+  transition: border-bottom-color var(--transition-fast);
 }
 
 
-/* ── 7. Animations ───────────────────────────────────────── */
+/* ══════════════════════════════════════════════════════════
+   13. Panel — draggable/resizable side panel
+   ══════════════════════════════════════════════════════════ */
+.ds-panel {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  overflow: hidden;
+  position: relative;
+  z-index: 15;
+  flex-shrink: 0;
+}
+.ds-panel--right { flex-direction: row; }
+.ds-panel--left  { flex-direction: row-reverse; }
+
+.ds-panel.is-overlapping {
+  position: absolute;
+  top: 0; bottom: 0;
+  z-index: 30;
+  box-shadow: var(--md-elev-3);
+}
+.ds-panel--right.is-overlapping { right: 0; }
+.ds-panel--left.is-overlapping  { left: 0; }
+.ds-panel.is-fullscreen { z-index: 40; }
+
+.ds-panel-handle {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  min-width: 16px;
+  background: var(--md-sys-color-surface-container);
+  border-left: 1px solid var(--md-sys-color-outline-variant);
+  cursor: col-resize;
+  gap: 4px;
+  user-select: none;
+  transition: background var(--transition-fast);
+}
+.ds-panel-handle:hover {
+  background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, var(--md-sys-color-surface-container));
+}
+.ds-panel-handle.dragging { cursor: col-resize; }
+.ds-panel--left .ds-panel-handle {
+  border-left: none;
+  border-right: 1px solid var(--md-sys-color-outline-variant);
+}
+
+.ds-panel-handle--fixed {
+  position: fixed;
+  z-index: 50;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: col-resize;
+  background: var(--md-sys-color-surface-container);
+  border-left: 1px solid var(--md-sys-color-outline-variant);
+  user-select: none;
+}
+.ds-panel-handle--fixed.active { display: flex; }
+.ds-panel-handle--fixed.ds-panel--left {
+  border-left: none;
+  border-right: 1px solid var(--md-sys-color-outline-variant);
+}
+
+.ds-panel-arrows { display: flex; flex-direction: column; gap: 4px; }
+
+.ds-panel-arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: none;
+  border-radius: var(--radius-full);
+  background: none;
+  color: var(--md-sys-color-on-surface-variant);
+  cursor: pointer;
+  padding: 0;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--transition-fast),
+              color var(--transition-fast),
+              background var(--transition-fast);
+}
+.ds-panel-arrow.visible { opacity: 1; pointer-events: auto; }
+.ds-panel-arrow:hover {
+  color: var(--md-sys-color-on-surface);
+  background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent);
+}
+.ds-panel-arrow svg { width: 8px; height: 13px; pointer-events: none; }
+
+.ds-panel-body {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: var(--md-sys-color-surface-container);
+  border-left: 1px solid var(--md-sys-color-outline-variant);
+}
+.ds-panel--left .ds-panel-body {
+  border-left: none;
+  border-right: 1px solid var(--md-sys-color-outline-variant);
+}
+
+
+/* ══════════════════════════════════════════════════════════
+   14. Animations
+   ══════════════════════════════════════════════════════════ */
 @keyframes ds-pulse {
-  0%, 100% { opacity: 0.25; transform: scale(0.85); }
-  50%       { opacity: 1;   transform: scale(1.1); }
+  0%, 100% { opacity: 0.3; transform: scale(0.85); }
+  50%       { opacity: 1;  transform: scale(1.1); }
 }
 
 @keyframes ds-fade-up {
-  from { opacity: 0; transform: translateY(6px); }
+  from { opacity: 0; transform: translateY(8px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 
 @keyframes ds-card-in {
-  from { opacity: 0; transform: translateY(4px); }
+  from { opacity: 0; transform: translateY(4px) scale(0.98); }
   to   { opacity: 1; transform: none; }
 }
 
@@ -839,8 +1250,16 @@ mark.pkw {
   to   { opacity: 1; transform: scale(1) translateY(0); }
 }
 
+/* MD3 ripple */
+@keyframes ds-ripple {
+  from { transform: scale(0); opacity: 0.3; }
+  to   { transform: scale(2.5); opacity: 0; }
+}
 
-/* ── 8. Utilities ────────────────────────────────────────── */
+
+/* ══════════════════════════════════════════════════════════
+   15. Utilities
+   ══════════════════════════════════════════════════════════ */
 .ds-truncate {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -856,154 +1275,32 @@ mark.pkw {
   white-space: nowrap;
 }
 
-.ds-flex-center {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
+.ds-flex-center  { display: flex; align-items: center; justify-content: center; }
+.ds-flex-between { display: flex; align-items: center; justify-content: space-between; }
 
-.ds-flex-between {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-/* Zoom hint — used in canvas-based tools */
 .ds-zoom-hint {
   position: absolute;
-  bottom: 7px;
-  right: 9px;
-  font-size: 9px;
-  font-weight: var(--font-weight-semibold);
+  bottom: 8px;
+  right: 12px;
+  font-size: 11px;
+  font-weight: var(--font-weight-medium);
   letter-spacing: 0.05em;
-  color: rgba(0,0,0,0.22);
+  color: var(--md-sys-color-outline);
   pointer-events: none;
   z-index: 20;
 }
-/* ════════════════════════════════════════════════════════════════
-   PANEL — reusable draggable/resizable side panel
-   Used by: tools/spreadsheet.html and any future tool
-   ════════════════════════════════════════════════════════════════ */
 
-.ds-panel {
-  display: flex;
-  flex-direction: row;
-  align-items: stretch;
-  overflow: hidden;
-  position: relative;
-  z-index: 15;
-  flex-shrink: 0;
-}
+/* MD3 surface tint helper */
+.md-tint-1 { background-image: linear-gradient(color-mix(in srgb, var(--md-sys-color-primary)  5%, transparent), color-mix(in srgb, var(--md-sys-color-primary)  5%, transparent)); }
+.md-tint-2 { background-image: linear-gradient(color-mix(in srgb, var(--md-sys-color-primary)  8%, transparent), color-mix(in srgb, var(--md-sys-color-primary)  8%, transparent)); }
+.md-tint-3 { background-image: linear-gradient(color-mix(in srgb, var(--md-sys-color-primary) 11%, transparent), color-mix(in srgb, var(--md-sys-color-primary) 11%, transparent)); }
+.md-tint-4 { background-image: linear-gradient(color-mix(in srgb, var(--md-sys-color-primary) 12%, transparent), color-mix(in srgb, var(--md-sys-color-primary) 12%, transparent)); }
+.md-tint-5 { background-image: linear-gradient(color-mix(in srgb, var(--md-sys-color-primary) 14%, transparent), color-mix(in srgb, var(--md-sys-color-primary) 14%, transparent)); }
 
-.ds-panel--right { flex-direction: row; }
-.ds-panel--left  { flex-direction: row-reverse; }
-
-/* ── Overlap states ─────────────────────────────────────────────── */
-.ds-panel.is-overlapping {
-  position: absolute;
-  top: 0; bottom: 0;
-  z-index: 30;
-}
-.ds-panel--right.is-overlapping { right: 0; }
-.ds-panel--left.is-overlapping  { left: 0; }
-
-.ds-panel.is-fullscreen {
-  z-index: 40;
-}
-
-/* ── Drag handle ────────────────────────────────────────────────── */
-.ds-panel-handle {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  min-width: 16px;
-  background: var(--color-bg-surface);
-  border-left: 1px solid var(--color-border-subtle);
-  cursor: col-resize;
-  gap: 4px;
-  user-select: none;
-  transition: background var(--transition-fast);
-}
-.ds-panel-handle:hover { background: var(--color-bg-hover); }
-.ds-panel-handle.dragging { cursor: col-resize; }
-
-.ds-panel--left .ds-panel-handle {
-  border-left: none;
-  border-right: 1px solid var(--color-border-subtle);
-}
-
-/* ── Fixed handle (shown when panel is too narrow) ──────────────── */
-.ds-panel-handle--fixed {
-  position: fixed;
-  z-index: 50;
-  display: none;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  cursor: col-resize;
-  background: var(--color-bg-surface);
-  border-left: 1px solid var(--color-border-subtle);
-  user-select: none;
-}
-.ds-panel-handle--fixed.active { display: flex; }
-
-.ds-panel-handle--fixed.ds-panel--left {
-  border-left: none;
-  border-right: 1px solid var(--color-border-subtle);
-}
-
-/* ── Arrow buttons ──────────────────────────────────────────────── */
-.ds-panel-arrows {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.ds-panel-arrow {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 18px;
-  height: 18px;
-  border: none;
-  border-radius: var(--radius-sm);
-  background: none;
-  color: var(--color-text-muted);
-  cursor: pointer;
-  padding: 0;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity var(--transition-fast),
-              color var(--transition-fast),
-              background var(--transition-fast);
-}
-.ds-panel-arrow.visible {
-  opacity: 1;
-  pointer-events: auto;
-}
-.ds-panel-arrow:hover {
-  color: var(--color-text-default);
-  background: var(--color-bg-hover);
-}
-.ds-panel-arrow svg {
-  width: 8px;
-  height: 13px;
-  pointer-events: none;
-}
-
-/* ── Body ───────────────────────────────────────────────────────── */
-.ds-panel-body {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  background: var(--color-bg-surface);
-  border-left: 1px solid var(--color-border-subtle);
-}
-.ds-panel--left .ds-panel-body {
-  border-left: none;
-  border-right: 1px solid var(--color-border-subtle);
-}
+/* MD3 elevation utility classes */
+.md-elev-0 { box-shadow: var(--md-elev-0); }
+.md-elev-1 { box-shadow: var(--md-elev-1); }
+.md-elev-2 { box-shadow: var(--md-elev-2); }
+.md-elev-3 { box-shadow: var(--md-elev-3); }
+.md-elev-4 { box-shadow: var(--md-elev-4); }
+.md-elev-5 { box-shadow: var(--md-elev-5); }
