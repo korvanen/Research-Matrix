@@ -358,37 +358,117 @@ function initConceptMapTool(paneEl, sidebarEl) {
     applyTransform();
   }, {passive:false});
 
-  let _pinchD=null, _touchMidX=0, _touchMidY=0;
-  canvas.addEventListener('touchstart', ev => {
-    if (ev.touches.length === 2) {
-      _pinchD    = Math.hypot(ev.touches[0].clientX-ev.touches[1].clientX, ev.touches[0].clientY-ev.touches[1].clientY);
-      _touchMidX = (ev.touches[0].clientX+ev.touches[1].clientX)/2;
-      _touchMidY = (ev.touches[0].clientY+ev.touches[1].clientY)/2;
-    }
-  }, {passive:true});
-  canvas.addEventListener('touchmove', ev => {
-    if (ev.touches.length !== 2 || !_pinchD) return;
-    ev.preventDefault();
-    const mx  = (ev.touches[0].clientX+ev.touches[1].clientX)/2;
-    const my  = (ev.touches[0].clientY+ev.touches[1].clientY)/2;
-    const d   = Math.hypot(ev.touches[0].clientX-ev.touches[1].clientX, ev.touches[0].clientY-ev.touches[1].clientY);
-    const rect = canvas.getBoundingClientRect();
-    const cmx = mx-rect.left, cmy = my-rect.top;
-    const nz = Math.max(0.15, Math.min(4, _zoom * d / _pinchD));
-    _panX = cmx-(cmx-_panX)*nz/_zoom; _panY = cmy-(cmy-_panY)*nz/_zoom;
-    _zoom = nz; _pinchD = d;
-    _panX += mx-_touchMidX; _panY += my-_touchMidY;
-    _touchMidX = mx; _touchMidY = my;
-    applyTransform();
-  }, {passive:false});
-  canvas.addEventListener('touchend', () => { _pinchD=null; });
+  // Touch pinch/pan handled by Pointer Events in makeDraggable block above
 
-  // ── Card drag ─────────────────────────────────────────────────────────────
+  // ── Card drag — Pointer Events API (works on touch + mouse) ──────────────
+  // One finger on a card = drag card. Two fingers = pan/zoom canvas.
+  const _pointers = new Map(); // pointerId → {x,y}
+  let _cardDrag   = null;      // {el, cid, pointerId, ox, oy, sx, sy}
+  let _pinchState = null;      // {midX, midY, dist, panX, panY, zoom}
+
+  canvas.style.touchAction = 'none';
+
+  canvas.addEventListener('pointerdown', ev => {
+    canvas.setPointerCapture(ev.pointerId);
+    _pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+
+    const card = ev.target.closest('.pp-cmap-card');
+
+    // Single finger on a card — start card drag
+    if (card && _pointers.size === 1 && !_cardDrag) {
+      ev.preventDefault();
+      const cid = parseInt(card.dataset.cid, 10);
+      const r   = _liveRects.get(cid) || { x: 0, y: 0 };
+      _cardDrag = { el: card, cid, pointerId: ev.pointerId, ox: ev.clientX, oy: ev.clientY, sx: r.x, sy: r.y };
+      card.style.zIndex = String(++_topZ);
+      return;
+    }
+
+    // Two fingers — start pan/zoom, cancel any card drag
+    if (_pointers.size === 2) {
+      if (_cardDrag) { _cardDrag = null; }
+      const pts = [..._pointers.values()];
+      _pinchState = {
+        midX: (pts[0].x + pts[1].x) / 2, midY: (pts[0].y + pts[1].y) / 2,
+        dist: Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y),
+        panX: _panX, panY: _panY, zoom: _zoom,
+      };
+    }
+  });
+
+  canvas.addEventListener('pointermove', ev => {
+    if (!_pointers.has(ev.pointerId)) return;
+    _pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+
+    // Card drag — single pointer
+    if (_cardDrag && ev.pointerId === _cardDrag.pointerId && _pointers.size === 1) {
+      ev.preventDefault();
+      const dx  = (ev.clientX - _cardDrag.ox) / _zoom;
+      const dy  = (ev.clientY - _cardDrag.oy) / _zoom;
+      const nx  = _cardDrag.sx + dx;
+      const ny  = _cardDrag.sy + dy;
+      const r   = _liveRects.get(_cardDrag.cid) || { w: CARD_W, h: 80 };
+      _cardDrag.el.style.left = nx + 'px';
+      _cardDrag.el.style.top  = ny + 'px';
+      _liveRects.set(_cardDrag.cid, { x: nx, y: ny, w: r.w, h: r.h });
+      redrawConnectors();
+      return;
+    }
+
+    // Two-finger pan + zoom
+    if (_pinchState && _pointers.size >= 2) {
+      ev.preventDefault();
+      const pts    = [..._pointers.values()];
+      const newMidX = (pts[0].x + pts[1].x) / 2;
+      const newMidY = (pts[0].y + pts[1].y) / 2;
+      const newDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+      const rect    = canvas.getBoundingClientRect();
+      const cmx     = newMidX - rect.left;
+      const cmy     = newMidY - rect.top;
+      const sf      = newDist / _pinchState.dist;
+      const nz      = Math.max(0.15, Math.min(4, _pinchState.zoom * sf));
+      const origCmx = (_pinchState.midX - rect.left);
+      const origCmy = (_pinchState.midY - rect.top);
+      _zoom = nz;
+      _panX = cmx - (origCmx - _pinchState.panX) * nz / _pinchState.zoom + (newMidX - _pinchState.midX);
+      _panY = cmy - (origCmy - _pinchState.panY) * nz / _pinchState.zoom + (newMidY - _pinchState.midY);
+      applyTransform();
+      redrawConnectors();
+    }
+  });
+
+  function _pointerEnd(ev) {
+    _pointers.delete(ev.pointerId);
+    if (_cardDrag && ev.pointerId === _cardDrag.pointerId) { _cardDrag = null; redrawConnectors(); }
+    if (_pointers.size < 2) { _pinchState = null; }
+  }
+  canvas.addEventListener('pointerup',     _pointerEnd);
+  canvas.addEventListener('pointercancel', _pointerEnd);
+
   function makeDraggable(el, cid) {
-    let on=false, ox=0, oy=0, sx=0, sy=0;
-    el.addEventListener('mousedown', e => { if (e.button!==0) return; on=true; ox=e.clientX; oy=e.clientY; const r=_liveRects.get(cid)||{x:0,y:0}; sx=r.x; sy=r.y; el.style.zIndex=String(++_topZ); e.stopPropagation(); e.preventDefault(); });
-    document.addEventListener('mousemove', e => { if (!on) return; const r=_liveRects.get(cid)||{w:CARD_W,h:80}; const nx=sx+(e.clientX-ox)/_zoom, ny=sy+(e.clientY-oy)/_zoom; el.style.left=nx+'px'; el.style.top=ny+'px'; _liveRects.set(cid,{x:nx,y:ny,w:r.w,h:r.h}); redrawConnectors(); });
-    document.addEventListener('mouseup', ()=>{ on=false; });
+    el.dataset.cid = String(cid);
+    // Pointer events on the canvas handle everything — just mark touch-action
+    el.style.touchAction = 'none';
+    // Mouse fallback (desktop, in case pointer capture isn't supported)
+    let _mon = false, _mox = 0, _moy = 0, _msx = 0, _msy = 0;
+    el.addEventListener('mousedown', e => {
+      if (e.button !== 0) return;
+      _mon = true; _mox = e.clientX; _moy = e.clientY;
+      const r = _liveRects.get(cid) || { x: 0, y: 0 };
+      _msx = r.x; _msy = r.y;
+      el.style.zIndex = String(++_topZ);
+      e.stopPropagation(); e.preventDefault();
+    });
+    document.addEventListener('mousemove', e => {
+      if (!_mon) return;
+      const r  = _liveRects.get(cid) || { w: CARD_W, h: 80 };
+      const nx = _msx + (e.clientX - _mox) / _zoom;
+      const ny = _msy + (e.clientY - _moy) / _zoom;
+      el.style.left = nx + 'px'; el.style.top = ny + 'px';
+      _liveRects.set(cid, { x: nx, y: ny, w: r.w, h: r.h });
+      redrawConnectors();
+    });
+    document.addEventListener('mouseup', () => { _mon = false; });
   }
 
   // ── Cosine similarity ─────────────────────────────────────────────────────
@@ -603,62 +683,104 @@ function initConceptMapTool(paneEl, sidebarEl) {
       const card=document.createElement('div');
       card.className='pp-cmap-card';
       card.style.cssText=`width:${CARD_W}px;position:absolute;z-index:${++_topZ}`;
-      card.style.setProperty('--ppc-border',accent); card.style.setProperty('--ppc-bg',bg);
+      card.style.setProperty('--ppc-border',accent);
+      card.style.setProperty('--ppc-bg',bg);
 
-      const head=document.createElement('div');
-      head.className='pp-cmap-card-head'; head.style.background=accent; head.style.color=lc;
-
+      // ── Top row: big category letter (left) + level block (right) ──────
       const primaryRow=rows[i], isSplit=!!primaryRow._splitFrom;
-      if (isSplit) {
-        const badge=document.createElement('span'); badge.className='pp-cmap-split-badge'; badge.textContent=`Split from \u2018${primaryRow._splitFrom}\u2019`; head.appendChild(badge);
-        const frac=document.createElement('span'); frac.className='pp-cmap-split-fraction'; frac.style.cssText=`background:${lc}28;color:${lc}`; frac.textContent=`${primaryRow._splitN}\u2009/\u2009${primaryRow._splitT}`; head.appendChild(frac);
-      } else {
-        const badge=document.createElement('span'); badge.className='pp-cmap-level-badge'; badge.textContent='Level '+level; head.appendChild(badge);
-      }
-
       const numParents=(parentsOf.get(i)||[]).length;
-      if (numParents>1) {
-        const pb=document.createElement('span'); pb.className='pp-cmap-parent-count'; pb.title=numParents+' parent connections'; pb.textContent=numParents+' parents'; head.appendChild(pb);
-      }
 
+      const topRow=document.createElement('div');
+      topRow.className='pp-cmap-card-top';
+
+      // Category letter/number — big italic serif, like the reference "31"
+      const catNumEl=document.createElement('div');
+      catNumEl.className='pp-cmap-card-cat-num';
+      // Use outer cluster/category letter if available, else level numeral
+      const catChar = primaryRow.row?.cats?.filter(c=>c.trim())?.[0]?.slice(0,2).toUpperCase() || String(level);
+      catNumEl.textContent = catChar;
+
+      // Level block — top right
+      const levelBlock=document.createElement('div');
+      levelBlock.className='pp-cmap-card-level-block';
+      const levelNum=document.createElement('div');
+      levelNum.className='pp-cmap-card-level-num';
+      levelNum.textContent = isSplit ? (primaryRow._splitN+'/'+primaryRow._splitT) : String(level);
+      const levelLbl=document.createElement('div');
+      levelLbl.className='pp-cmap-card-level-label';
+      levelLbl.textContent = isSplit ? 'Split' : 'Level';
+      levelBlock.appendChild(levelNum);
+      levelBlock.appendChild(levelLbl);
+
+      topRow.appendChild(catNumEl);
+      topRow.appendChild(levelBlock);
+      card.appendChild(topRow);
+
+      // Merged indicator (if card absorbed siblings)
       if (extras.length>0) {
-        const mc=document.createElement('span'); mc.className='pp-cmap-merged-count'; mc.style.cssText=`background:${lc}28;color:${lc}`; mc.textContent='\u00d7'+allRows.length; head.appendChild(mc);
+        const mg=document.createElement('div');
+        mg.className='pp-cmap-card-merged';
+        mg.textContent='\u00d7'+allRows.length+' merged';
+        card.appendChild(mg);
       }
-      card.appendChild(head);
 
-      const body=document.createElement('div'); body.className='pp-cmap-card-body';
+      // ── Thin rule ──────────────────────────────────────────────────────
+      const rule=document.createElement('div');
+      rule.className='pp-cmap-card-rule';
+      card.appendChild(rule);
+
+      // ── Body: category tags + main concept text ────────────────────────
+      const body=document.createElement('div');
+      body.className='pp-cmap-card-body';
       allRows.forEach((ri,idx)=>{
         if (idx>0) { const sep=document.createElement('div'); sep.className='pp-cmap-merge-sep'; body.appendChild(sep); }
         const r=rows[ri], cells=r.row?.cells||r.cells||[], cats=r.row?.cats?r.row.cats.filter(c=>c.trim()):[];
         const best=cells.reduce((b,c)=>c.trim().length>b.length?c.trim():b,'');
         const parsed=typeof parseCitation==='function'?parseCitation(best):{body:best};
-        if (cats.length) { const ce=document.createElement('div'); ce.className='pp-cmap-cell-cat'; ce.textContent=cats.join(' \u00b7 '); body.appendChild(ce); }
-        const te=document.createElement('div'); te.className='pp-cmap-cell-text'; te.textContent=parsed.body; body.appendChild(te);
+        if (cats.length) {
+          const ce=document.createElement('div');
+          ce.className='pp-cmap-cell-cat';
+          ce.textContent=cats.join(' \u00b7 ');
+          body.appendChild(ce);
+        }
+        const te=document.createElement('div');
+        te.className='pp-cmap-cell-text';
+        te.textContent=parsed.body;
+        body.appendChild(te);
       });
       card.appendChild(body);
 
+      // ── Footer: plain-text similarity percentages (no bars) ───────────
       const hasChildren=childrenOf[i].length>0;
-      const hasParents=(parentsOf.get(i)||[]).length>0;
+      const hasParents=numParents>0;
 
-      if (hasChildren || hasParents) {
-        const footer=document.createElement('div'); footer.className='pp-cmap-card-footer';
+      if (hasChildren||hasParents) {
+        const footer=document.createElement('div');
+        footer.className='pp-cmap-card-footer';
 
-        function makeSimRow(arrow, sim, label, barColor) {
+        function makeSimLine(arrow, sim, label) {
           const pct=Math.round(sim*100);
-          const row=document.createElement('div'); row.className='pp-cmap-sim-row';
-          const arr=document.createElement('span'); arr.className='pp-cmap-sim-arrow'; arr.textContent=arrow; row.appendChild(arr);
-          const bar=document.createElement('div'); bar.className='pp-cmap-sim-bar';
-          const fill=document.createElement('div'); fill.className='pp-cmap-sim-fill'; fill.style.width=pct+'%'; fill.style.background=barColor;
-          bar.appendChild(fill); row.appendChild(bar);
-          const lbl=document.createElement('span'); lbl.className='pp-cmap-sim-label'; lbl.textContent=pct+'% '+label; row.appendChild(lbl);
-          return row;
+          const line=document.createElement('div');
+          line.className='pp-cmap-sim-line';
+          const pctEl=document.createElement('span');
+          pctEl.className='pp-cmap-sim-pct';
+          pctEl.textContent=pct+'%';
+          line.innerHTML='<span>'+arrow+'</span>';
+          line.appendChild(pctEl);
+          const lblEl=document.createElement('span');
+          lblEl.textContent=' '+label;
+          line.appendChild(lblEl);
+          return line;
         }
 
-        if (hasParents) footer.appendChild(makeSimRow('\u2191', simToParents[i], 'to parent', accent+'88'));
-        if (hasChildren) footer.appendChild(makeSimRow('\u2193', simToChildren[i], 'to children', accent+'cc'));
+        if (hasParents) footer.appendChild(makeSimLine('\u2191', simToParents[i], numParents>1?numParents+' parents':'to parent'));
+        if (hasChildren) footer.appendChild(makeSimLine('\u2193', simToChildren[i], 'to children'));
         card.appendChild(footer);
       } else {
-        const leaf=document.createElement('span'); leaf.className='pp-cmap-leaf-badge'; leaf.textContent='Terminal concept'; card.appendChild(leaf);
+        const leaf=document.createElement('span');
+        leaf.className='pp-cmap-leaf-badge';
+        leaf.textContent='Terminal concept';
+        card.appendChild(leaf);
       }
 
       world.appendChild(card); cardEls.set(i,card); _liveRects.set(i,{x:0,y:0,w:CARD_W,h:80});
