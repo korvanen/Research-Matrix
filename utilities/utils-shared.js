@@ -358,6 +358,7 @@ function buildRowIndex() {
 window.TABS = window.TABS || [];
 
 (async () => {
+  if (window.__BRIDGE_GUEST) return;
   try {
     const urlToLoad = getSavedSheetUrl();
     console.log('[utils-shared] Loading sheet:', urlToLoad);
