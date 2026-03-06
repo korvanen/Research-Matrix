@@ -67,77 +67,81 @@
     </div>
   </div>
 
-  <script>
-    var _bridgeRows = null;
-    function buildRowIndex() { return _bridgeRows || []; }
-    function panelGoTo(match, colIdx) {
-      window.open('../tools/spreadsheet.html#goto=' + match.tabIdx + ':' + match.rowIdx + ':' + (colIdx || 0), '_blank');
-    }
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
 
-    window.EmbeddingUtils = {
-      isReady:             function() { return !!_bridgeRows; },
-      getCachedEmbedding:  function(text) { return Promise.resolve(null); },
-      getVectorSync:       function() { return null; }
-    };
+      var _bridgeRows = null;
+      function buildRowIndex() { return _bridgeRows || []; }
+      function panelGoTo(match, colIdx) {
+        window.open('../tools/spreadsheet.html#goto=' + match.tabIdx + ':' + match.rowIdx + ':' + (colIdx || 0), '_blank');
+      }
 
-    var badgeEl   = document.getElementById('cm-connection-badge');
-    var badgeText = document.getElementById('cm-badge-text');
-    var noHost    = document.getElementById('cm-no-host');
-
-    function setBadge(state, text) {
-      badgeEl.className = 'ds-badge ds-badge--' + state;
-      badgeText.textContent = text;
-    }
-
-    var paneEl = document.getElementById('cm-pane');
-    var cmTool = initConceptMapTool(paneEl, null);
-
-    var panel = createSidePanel(document.querySelector('.cm-layout'), {
-      side:               'left',
-      defaultFraction:    0.35,
-      minFraction:        0,
-      snapCloseFraction:  0.10,
-      onResize: function() { cmTool.resize(); },
-      onOpen:   function() { cmTool.resize(); },
-      onClose:  function() { cmTool.resize(); },
-    });
-
-    EmbeddingBridge.guest(function(rows) {
-      noHost.classList.remove('visible');
-      setBadge('connected', rows.length + ' entries live');
-      _bridgeRows = rows;
-
-      window.EmbeddingUtils.isReady = function() { return true; };
-
-      var textToVec = new Map();
-      rows.forEach(function(r) {
-        if (!r.vec) return;
-        var cells = (r.row && r.row.cells) ? r.row.cells : (r.cells || []);
-        var text  = cells.join(' ').trim();
-        if (text) textToVec.set(text, r.vec);
-        cells.forEach(function(c) { if (c && c.trim()) textToVec.set(c.trim(), r.vec); });
-      });
-
-      window.EmbeddingUtils.getCachedEmbedding = function(text) {
-        var vec = textToVec.get(text) || textToVec.get(text.trim());
-        if (vec) return Promise.resolve(vec);
-        var t = text.trim().slice(0, 40);
-        var found = null;
-        textToVec.forEach(function(v, k) { if (!found && k.startsWith(t)) found = v; });
-        return Promise.resolve(found || null);
+      window.EmbeddingUtils = {
+        isReady:             function() { return !!_bridgeRows; },
+        getCachedEmbedding:  function(text) { return Promise.resolve(null); },
+        getVectorSync:       function() { return null; }
       };
 
-      cmTool.reset();
-      window.dispatchEvent(new CustomEvent('embedder-ready'));
-      setTimeout(function() {
-        window.dispatchEvent(new CustomEvent('embedding-complete', { detail: { total: rows.length } }));
-      }, 100);
-    });
+      var badgeEl   = document.getElementById('cm-connection-badge');
+      var badgeText = document.getElementById('cm-badge-text');
+      var noHost    = document.getElementById('cm-no-host');
 
-    window.addEventListener('bridge-no-host', function() {
-      setBadge('disconnected', 'No data — visit home page first');
-      noHost.classList.add('visible');
-    });
+      function setBadge(state, text) {
+        badgeEl.className = 'ds-badge ds-badge--' + state;
+        badgeText.textContent = text;
+      }
+
+      var paneEl = document.getElementById('cm-pane');
+      var cmTool = initConceptMapTool(paneEl, null);
+
+      var panel = createSidePanel(document.querySelector('.cm-layout'), {
+        side:               'left',
+        defaultFraction:    0.35,
+        minFraction:        0,
+        snapCloseFraction:  0.10,
+        onResize: function() { cmTool.resize(); },
+        onOpen:   function() { cmTool.resize(); },
+        onClose:  function() { cmTool.resize(); },
+      });
+
+      EmbeddingBridge.guest(function(rows) {
+        noHost.classList.remove('visible');
+        setBadge('connected', rows.length + ' entries live');
+        _bridgeRows = rows;
+
+        window.EmbeddingUtils.isReady = function() { return true; };
+
+        var textToVec = new Map();
+        rows.forEach(function(r) {
+          if (!r.vec) return;
+          var cells = (r.row && r.row.cells) ? r.row.cells : (r.cells || []);
+          var text  = cells.join(' ').trim();
+          if (text) textToVec.set(text, r.vec);
+          cells.forEach(function(c) { if (c && c.trim()) textToVec.set(c.trim(), r.vec); });
+        });
+
+        window.EmbeddingUtils.getCachedEmbedding = function(text) {
+          var vec = textToVec.get(text) || textToVec.get(text.trim());
+          if (vec) return Promise.resolve(vec);
+          var t = text.trim().slice(0, 40);
+          var found = null;
+          textToVec.forEach(function(v, k) { if (!found && k.startsWith(t)) found = v; });
+          return Promise.resolve(found || null);
+        };
+
+        cmTool.reset();
+        window.dispatchEvent(new CustomEvent('embedder-ready'));
+        setTimeout(function() {
+          window.dispatchEvent(new CustomEvent('embedding-complete', { detail: { total: rows.length } }));
+        }, 100);
+      });
+
+      window.addEventListener('bridge-no-host', function() {
+        setBadge('disconnected', 'No data — visit home page first');
+        noHost.classList.add('visible');
+      });
+
+    }); // end DOMContentLoaded
   </script>
 
 </body>
