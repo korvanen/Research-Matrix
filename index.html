@@ -309,7 +309,7 @@
       display: flex;
       flex-direction: row;
       justify-content: space-between;
-      align-items: flex-end;
+      align-items: center;
       padding-bottom: 4px;
     }
 
@@ -320,6 +320,56 @@
       letter-spacing: -0.01em;
     }
     .footer-version { letter-spacing: 0.04em; font-variant-numeric: tabular-nums; }
+
+    /* ── Dark mode toggle ── */
+    .theme-toggle {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: none;
+      border: 1px solid rgba(128,128,128,0.25);
+      border-radius: var(--radius-full);
+      padding: 5px 12px 5px 8px;
+      cursor: pointer;
+      font-family: var(--font-family);
+      font-size: 12px;
+      font-weight: var(--font-weight-medium);
+      color: var(--color-text-muted);
+      letter-spacing: -0.01em;
+      transition: border-color var(--transition-fast), color var(--transition-fast), background var(--transition-fast);
+    }
+    .theme-toggle:hover {
+      border-color: rgba(128,128,128,0.5);
+      color: var(--color-text-default);
+    }
+
+    /* The pill track */
+    .theme-toggle-track {
+      width: 28px;
+      height: 16px;
+      border-radius: 8px;
+      background: rgba(128,128,128,0.2);
+      position: relative;
+      flex-shrink: 0;
+      transition: background var(--transition-fast);
+    }
+    /* The sliding thumb */
+    .theme-toggle-thumb {
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--color-text-muted);
+      transition: transform var(--transition-fast), background var(--transition-fast);
+    }
+
+    /* Dark state */
+    html.dark .theme-toggle-track  { background: rgba(255,255,255,0.25); }
+    html.dark .theme-toggle-thumb  { transform: translateX(12px); background: #fff; }
+    html.dark .theme-toggle        { color: rgba(255,255,255,0.5); border-color: rgba(255,255,255,0.15); }
+    html.dark .theme-toggle:hover  { border-color: rgba(255,255,255,0.35); color: rgba(255,255,255,0.9); }
 
     /* ── Animations ── */
     .fade-in {
@@ -342,7 +392,7 @@
     @media (max-width: 600px) {
       .nav-links { gap: 20px; }
       .tool-name { font-size: 22px; }
-      .footer-bottom { flex-direction: column; gap: 8px; }
+      .footer-bottom { flex-direction: column; gap: 12px; align-items: flex-start; }
     }
   </style>
 </head>
@@ -363,7 +413,6 @@
     <div class="intro-content fade-in">
       <h1 class="hero-headline">A research tool for<br>navigating complex<br>dimensional data.</h1>
 
-      <!-- right column: subtitle + sheet loader stacked -->
       <div class="hero-right">
         <p class="hero-sub">Spreadsheet analytical tool</p>
 
@@ -453,6 +502,15 @@
     <div class="footer-section">
       <div class="footer-bottom">
         <span class="footer-copy">Dimensional Framework</span>
+
+        <!-- Dark mode toggle -->
+        <button class="theme-toggle" id="theme-toggle" aria-label="Toggle dark mode">
+          <div class="theme-toggle-track">
+            <div class="theme-toggle-thumb"></div>
+          </div>
+          <span id="theme-toggle-label">Dark mode</span>
+        </button>
+
         <span class="footer-version">v2.0 — 2026</span>
       </div>
     </div>
@@ -465,6 +523,32 @@
 <script type="module" src="utilities/utils-embedding.js?v=4"></script>
 
   <script>
+    // ── Dark mode toggle ──────────────────────────────────────────────────────
+    (function() {
+      var STORAGE_KEY = 'df-theme';
+      var html        = document.documentElement;
+      var btn         = document.getElementById('theme-toggle');
+      var lbl         = document.getElementById('theme-toggle-label');
+
+      function applyTheme(dark) {
+        html.classList.toggle('dark', dark);
+        lbl.textContent = dark ? 'Light mode' : 'Dark mode';
+      }
+
+      // Restore saved preference; fall back to OS preference
+      var saved = localStorage.getItem(STORAGE_KEY);
+      var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      var isDark = saved !== null ? saved === 'dark' : prefersDark;
+      applyTheme(isDark);
+
+      btn.addEventListener('click', function() {
+        isDark = !isDark;
+        applyTheme(isDark);
+        localStorage.setItem(STORAGE_KEY, isDark ? 'dark' : 'light');
+      });
+    })();
+
+    // ── Sheet loader ──────────────────────────────────────────────────────────
     var input      = document.getElementById('sheet-url-input');
     var loadBtn    = document.getElementById('sheet-load-btn');
     var defaultBtn = document.getElementById('sheet-default-btn');
@@ -477,7 +561,6 @@
       statusEl.className   = 'sheet-loader-status' + (type ? ' ' + type : '');
     }
 
-    // Show current active sheet on load
     (function() {
       if (!isUsingDefaultSheet()) input.value = getSavedSheetUrl();
       labelEl.textContent = isUsingDefaultSheet()
@@ -485,7 +568,6 @@
         : 'Using custom sheet — loading…';
     })();
 
-    // Update dot when data arrives
     window.addEventListener('sheet-loaded', function(e) {
       var count = e.detail.tabCount;
       dotEl.className     = 'sheet-active-dot';
@@ -497,10 +579,9 @@
       labelEl.textContent = 'Failed to load sheet';
     });
 
-    // Load button
     loadBtn.addEventListener('click', function() {
       var val = input.value.trim();
-      if (!val)            return setStatus('Paste a Google Sheets URL first.', 'error');
+      if (!val)             return setStatus('Paste a Google Sheets URL first.', 'error');
       if (!isSheetUrl(val)) return setStatus("That doesn't look like a Google Sheets link.", 'error');
       if (!sheetExportUrl(val)) return setStatus('Could not parse the sheet ID.', 'error');
 
@@ -528,7 +609,6 @@
         });
     });
 
-    // Use default button
     defaultBtn.addEventListener('click', function() {
       if (isUsingDefaultSheet()) return setStatus('Already using the default sheet.', '');
       clearSavedSheetUrl();
