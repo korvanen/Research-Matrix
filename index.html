@@ -1,170 +1,101 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" href="favicon.ico" type="image/x-icon">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dimensional Framework</title>
-  <link rel="icon" href="data:,">
   <link rel="stylesheet" href="design-system.css">
   <style>
-    *, *::before, *::after { box-sizing: border-box; }
-
     body {
+      overflow-x: hidden;
       min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      background: var(--color-bg-page);
-      font-family: var(--font-family);
-      color: var(--color-text-default);
-      font-size: var(--font-size-sm);
     }
 
-    /* ── Nav ───────────────────────────────────────────────────── */
-    .nav {
+    /* ── Nav ── */
+    .nav-contain {
       display: flex;
-      align-items: center;
+      flex-direction: row;
       justify-content: space-between;
-      padding: 0 24px;
-      height: 48px;
-      background: var(--color-bg-surface);
-      border-bottom: 1px solid var(--color-border-subtle);
-      flex-shrink: 0;
+      align-items: flex-end;
+      padding: 50px 24px 10px;
+      width: 100%;
+      max-width: 1280px;
+      margin: 0 auto;
     }
-    .nav-brand {
-      font-size: var(--font-size-sm);
-      font-weight: 600;
-      color: var(--color-text-default);
-      text-decoration: none;
-      letter-spacing: -0.01em;
+
+    .logo-text {
+      font-size: 15px;
+      font-weight: var(--font-weight-semibold);
+      letter-spacing: -0.02em;
     }
+
     .nav-links {
       display: flex;
-      align-items: center;
-      gap: 4px;
+      gap: 40px;
+      align-items: flex-end;
+      padding-bottom: 2px;
     }
+
     .nav-link {
-      padding: 5px 10px;
-      border-radius: var(--radius-md);
-      font-size: var(--font-size-xs);
-      font-weight: 500;
+      font-size: 15px;
+      font-weight: var(--font-weight-medium);
       color: var(--color-text-muted);
       text-decoration: none;
-      transition: background var(--transition-fast), color var(--transition-fast);
-    }
-    .nav-link:hover {
-      background: var(--color-bg-hover);
-      color: var(--color-text-default);
-    }
-
-    /* ── Page content ──────────────────────────────────────────── */
-    .page {
-      flex: 1;
-      max-width: 680px;
-      width: 100%;
-      margin: 0 auto;
-      padding: 48px 24px 64px;
-    }
-
-    /* ── Hero ──────────────────────────────────────────────────── */
-    .hero {
-      margin-bottom: 40px;
-    }
-    .hero-label {
-      font-size: var(--font-size-xs);
-      font-weight: 600;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--color-text-placeholder);
-      margin-bottom: 10px;
-    }
-    .hero-title {
-      font-size: clamp(22px, 4vw, 30px);
-      font-weight: 700;
       letter-spacing: -0.02em;
-      color: var(--color-text-default);
-      margin: 0 0 10px;
-      line-height: 1.2;
+      transition: color var(--transition-fast);
     }
-    .hero-desc {
-      font-size: var(--font-size-sm);
-      color: var(--color-text-muted);
-      line-height: 1.6;
-      margin: 0;
-      max-width: 520px;
+    .nav-link:hover { color: var(--raw-black); }
+
+    /* ── Hero ── */
+    .hero-section {
+      padding: 15px 24px 0;
+      max-width: 1280px;
+      margin: 0 auto;
     }
 
-    /* ── Section heading ───────────────────────────────────────── */
-    .section-heading {
-      font-size: var(--font-size-xs);
-      font-weight: 600;
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-      color: var(--color-text-placeholder);
-      margin: 0 0 10px;
+    .intro-content {
+      display: flex;
+      flex-direction: row;
+      justify-content: space-between;
+      align-items: flex-end;
+      padding: 10px 0 120px;
+      border-bottom: 1px solid var(--raw-black);
+      width: 100%;
     }
 
-    /* ── Tool list ─────────────────────────────────────────────── */
-    .tool-list {
+    .hero-headline {
+      font-size: clamp(42px, 5vw, 64px);
+      font-weight: var(--font-weight-normal);
+      letter-spacing: -0.04em;
+      line-height: 1.08;
+      max-width: 680px;
+    }
+
+    .hero-right {
       display: flex;
       flex-direction: column;
-      gap: 2px;
-      margin-bottom: 32px;
-    }
-    .tool-row {
-      display: flex;
-      align-items: center;
+      align-items: flex-end;
       gap: 14px;
-      padding: 13px 16px;
-      border-radius: var(--radius-md);
-      border: 1px solid transparent;
-      text-decoration: none;
-      color: inherit;
-      transition: background var(--transition-fast), border-color var(--transition-fast);
-    }
-    .tool-row:hover {
-      background: var(--color-bg-surface);
-      border-color: var(--color-border-subtle);
-    }
-    .tool-icon {
-      width: 34px;
-      height: 34px;
-      border-radius: var(--radius-md);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
-      font-size: 16px;
-    }
-    .tool-info { flex: 1; min-width: 0; }
-    .tool-name {
-      font-size: var(--font-size-sm);
-      font-weight: 600;
-      color: var(--color-text-default);
-      margin-bottom: 2px;
-    }
-    .tool-desc {
-      font-size: var(--font-size-xs);
-      color: var(--color-text-muted);
-      line-height: 1.4;
-    }
-    .tool-arrow {
-      color: var(--color-text-placeholder);
-      flex-shrink: 0;
+      align-self: flex-end;
+      max-width: 300px;
     }
 
-    /* ── Sheet URL input ───────────────────────────────────────── */
-    .sheet-loader {
-      margin: 6px 0 0 0;
-      padding: 12px 16px 14px;
-      background: var(--color-bg-hover);
-      border-radius: var(--radius-md);
-      border: 1px solid var(--color-border-subtle);
-    }
-    .sheet-loader-label {
-      font-size: var(--font-size-xs);
-      font-weight: 500;
+    .hero-sub {
+      font-size: var(--font-size-lg);
+      font-weight: var(--font-weight-normal);
       color: var(--color-text-muted);
-      margin-bottom: 8px;
+      letter-spacing: -0.02em;
+      line-height: 1.5;
+      text-align: right;
+    }
+
+    /* ── Sheet loader ── */
+    .sheet-loader {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
     }
     .sheet-loader-row {
       display: flex;
@@ -174,300 +105,304 @@
     .sheet-url-input {
       flex: 1;
       min-width: 0;
-      height: 32px;
-      padding: 0 10px;
-      border: 1px solid var(--color-border-default);
+      height: 30px;
+      padding: 0 9px;
+      border: 1px solid rgba(0,0,0,0.18);
       border-radius: var(--radius-md);
       background: var(--color-bg-page);
       font-family: var(--font-family);
-      font-size: var(--font-size-xs);
+      font-size: 12px;
       color: var(--color-text-default);
       outline: none;
-      transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+      transition: border-color var(--transition-fast);
     }
-    .sheet-url-input:focus {
-      border-color: var(--color-accent);
-      box-shadow: 0 0 0 2px var(--color-accent-subtle);
-    }
+    .sheet-url-input:focus { border-color: rgba(0,0,0,0.5); }
     .sheet-url-input::placeholder { color: var(--color-text-placeholder); }
 
     .sheet-btn {
-      height: 32px;
-      padding: 0 12px;
+      height: 30px;
+      padding: 0 11px;
       border-radius: var(--radius-md);
-      border: 1px solid var(--color-border-default);
-      background: var(--color-bg-surface);
+      border: 1px solid rgba(0,0,0,0.18);
+      background: transparent;
       font-family: var(--font-family);
-      font-size: var(--font-size-xs);
-      font-weight: 500;
-      color: var(--color-text-default);
+      font-size: 12px;
+      font-weight: var(--font-weight-medium);
+      color: var(--color-text-muted);
       cursor: pointer;
       white-space: nowrap;
       flex-shrink: 0;
-      transition: background var(--transition-fast), border-color var(--transition-fast);
+      letter-spacing: -0.01em;
+      transition: border-color var(--transition-fast), color var(--transition-fast);
     }
     .sheet-btn:hover:not(:disabled) {
-      background: var(--color-bg-hover);
-      border-color: var(--color-border-strong);
+      border-color: rgba(0,0,0,0.4);
+      color: var(--raw-black);
     }
-    .sheet-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+    .sheet-btn:disabled { opacity: 0.4; cursor: not-allowed; }
     .sheet-btn--primary {
-      background: var(--color-accent);
-      color: var(--color-accent-fg);
-      border-color: var(--color-accent);
+      background: var(--raw-black);
+      color: #fff;
+      border-color: var(--raw-black);
     }
     .sheet-btn--primary:hover:not(:disabled) {
-      background: var(--color-accent-hover);
-      border-color: var(--color-accent-hover);
+      background: #222;
+      border-color: #222;
+      color: #fff;
     }
 
     .sheet-loader-status {
-      margin-top: 7px;
-      font-size: var(--font-size-xs);
+      font-size: 11px;
       color: var(--color-text-muted);
-      min-height: 16px;
+      text-align: right;
+      min-height: 14px;
+      letter-spacing: -0.01em;
     }
-    .sheet-loader-status.error { color: var(--color-error, #c0392b); }
-    .sheet-loader-status.success { color: var(--color-success, #27ae60); }
+    .sheet-loader-status.error   { color: #c0392b; }
+    .sheet-loader-status.success { color: #27ae60; }
 
-    /* Active sheet indicator */
     .sheet-active-url {
-      margin-top: 6px;
-      font-size: 10px;
+      font-size: 11px;
       color: var(--color-text-placeholder);
       display: flex;
       align-items: center;
+      justify-content: flex-end;
       gap: 5px;
     }
     .sheet-active-dot {
       width: 6px; height: 6px;
       border-radius: 50%;
-      background: var(--color-success, #27ae60);
+      background: #27ae60;
       flex-shrink: 0;
     }
-    .sheet-active-dot.loading { background: var(--color-warning, #f39c12); }
-    .sheet-active-dot.error   { background: var(--color-error,   #c0392b); }
+    .sheet-active-dot.loading { background: #f39c12; }
+    .sheet-active-dot.error   { background: #c0392b; }
 
-    /* ── Load status badge on tool rows ────────────────────────── */
-    .load-badge {
-      font-size: 10px;
-      padding: 2px 7px;
-      border-radius: var(--radius-full);
-      background: var(--color-bg-hover);
+    /* ── Tools section ── */
+    .tools-section {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding: 20px 24px 20px;
+      max-width: 1280px;
+      margin: 0 auto;
+    }
+
+    .section-label {
+      font-size: 24px;
+      font-weight: var(--font-weight-normal);
+      letter-spacing: -0.02em;
+    }
+
+    .tools-content {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      padding-bottom: 80px;
+      width: 100%;
+    }
+
+    .tool-row {
+      display: flex;
+      flex-direction: row;
+      justify-content: space-between;
+      align-items: flex-start;
+      padding: 28px 0;
+      border-bottom: 1px solid rgba(0,0,0,0.12);
+      gap: 40px;
+      cursor: pointer;
+      text-decoration: none;
+      color: inherit;
+      transition: background var(--transition-fast);
+    }
+    .tool-row:hover { background: rgba(0,0,0,0.02); }
+    .tool-row:first-child { border-top: 1px solid rgba(0,0,0,0.12); }
+
+    .tool-left {
+      display: flex;
+      flex-direction: row;
+      align-items: flex-start;
+      gap: 32px;
+      flex: 1;
+    }
+
+    .tool-number {
+      font-size: 11px;
+      font-weight: var(--font-weight-semibold);
+      letter-spacing: 0.06em;
       color: var(--color-text-muted);
-      border: 1px solid var(--color-border-subtle);
-      white-space: nowrap;
+      padding-top: 3px;
+      min-width: 24px;
+    }
+
+    .tool-accent {
+      width: 4px;
+      border-radius: 2px;
+      align-self: stretch;
+      min-height: 60px;
       flex-shrink: 0;
     }
-    .load-badge.ready {
-      background: var(--color-success-subtle, #eafaf1);
-      color: var(--color-success, #27ae60);
-      border-color: currentColor;
+
+    .tool-info {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .tool-name {
+      font-size: 28px;
+      font-weight: var(--font-weight-normal);
+      letter-spacing: -0.03em;
+      line-height: 1.1;
+    }
+
+    .tool-desc {
+      font-size: 14px;
+      font-weight: var(--font-weight-normal);
+      color: var(--color-text-muted);
+      letter-spacing: -0.02em;
+      line-height: 1.5;
+      max-width: 380px;
+    }
+
+    .tool-tags {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 4px;
+    }
+
+    .tool-tag {
+      font-size: 10px;
+      font-weight: var(--font-weight-semibold);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--color-text-muted);
+      border: 1px solid rgba(0,0,0,0.15);
+      border-radius: var(--radius-full);
+      padding: 3px 10px;
+    }
+
+    .tool-arrow {
+      font-size: 20px;
+      color: var(--color-text-muted);
+      align-self: center;
+      transition: transform var(--transition-base), color var(--transition-fast);
+    }
+    .tool-row:hover .tool-arrow {
+      transform: translate(4px, -4px);
+      color: var(--raw-black);
+    }
+
+    /* ── Footer ── */
+    footer { border-top: 1px solid var(--raw-black); }
+
+    .footer-section {
+      display: flex;
+      flex-direction: column;
+      padding: 20px 24px;
+      max-width: 1280px;
+      margin: 0 auto;
+    }
+
+    .footer-bottom {
+      display: flex;
+      flex-direction: row;
+      justify-content: space-between;
+      align-items: flex-end;
+      padding-bottom: 4px;
+    }
+
+    .footer-copy,
+    .footer-version {
+      font-size: 13px;
+      color: var(--color-text-muted);
+      letter-spacing: -0.01em;
+    }
+    .footer-version { letter-spacing: 0.04em; font-variant-numeric: tabular-nums; }
+
+    /* ── Animations ── */
+    .fade-in {
+      opacity: 0;
+      transform: translateY(16px);
+      animation: ds-fade-up 0.6s ease forwards;
+    }
+    .fade-in:nth-child(1) { animation-delay: 0.05s; }
+    .fade-in:nth-child(2) { animation-delay: 0.12s; }
+    .fade-in:nth-child(3) { animation-delay: 0.20s; }
+
+    /* ── Responsive ── */
+    @media (max-width: 900px) {
+      .intro-content { flex-direction: column; gap: 30px; }
+      .hero-right { align-items: flex-start; text-align: left; max-width: 100%; }
+      .hero-sub { text-align: left; }
+      .sheet-loader-status,
+      .sheet-active-url { justify-content: flex-start; text-align: left; }
+    }
+    @media (max-width: 600px) {
+      .nav-links { gap: 20px; }
+      .tool-name { font-size: 22px; }
+      .footer-bottom { flex-direction: column; gap: 8px; }
     }
   </style>
 </head>
 <body>
 
-  <!-- ── Nav ─────────────────────────────────────────────────────── -->
-  <nav class="nav">
-    <span class="nav-brand">Dimensional Framework</span>
-    <div class="nav-links">
-      <a class="nav-link" href="tools/spreadsheet.html">Spreadsheet</a>
-      <a class="nav-link" href="tools/find-matches.html">Find Matches</a>
-      <a class="nav-link" href="tools/concept-map.html">Concept Map</a>
-      <a class="nav-link" href="tools/clusters.html">Clusters</a>
+  <nav>
+    <div class="nav-contain">
+      <span class="logo-text">Dimensional Framework</span>
+      <div class="nav-links">
+        <a class="nav-link" href="tools/find-matches.html">Find Matches</a>
+        <a class="nav-link" href="tools/concept-map.html">Concept Map</a>
+        <a class="nav-link" href="tools/clusters.html">Clusters</a>
+      </div>
     </div>
   </nav>
 
-  <!-- ── Page ─────────────────────────────────────────────────────── -->
-  <main class="page">
+  <section class="hero-section">
+    <div class="intro-content fade-in">
+      <h1 class="hero-headline">A research tool for<br>navigating complex<br>dimensional data.</h1>
 
-    <!-- Hero -->
-    <div class="hero">
-      <div class="hero-label">Research Tool</div>
-      <h1 class="hero-title">Dimensional Framework</h1>
-      <p class="hero-desc">
-        A structured analytical tool for exploring relational, organisational,
-        and perceptual dimensions. Load your spreadsheet below, then open any
-        tool to explore the data.
-      </p>
-    </div>
+      <!-- right column: subtitle + sheet loader stacked -->
+      <div class="hero-right">
+        <p class="hero-sub">Spreadsheet analytical tool</p>
 
-    <!-- Tools -->
-    <p class="section-heading">Tools</p>
-    <div class="tool-list">
-
-      <!-- Spreadsheet -->
-      <div>
-        <a class="tool-row" href="tools/spreadsheet.html">
-          <div class="tool-icon" style="background:#f0f0f0">📊</div>
-          <div class="tool-info">
-            <div class="tool-name">Spreadsheet</div>
-            <div class="tool-desc">Browse the raw data matrix with frozen headers and category columns.</div>
-          </div>
-          <span class="load-badge" id="load-badge">Loading…</span>
-          <svg class="tool-arrow" width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h8M7 3l4 4-4 4"/></svg>
-        </a>
-
-        <!-- ── Sheet URL loader ── -->
         <div class="sheet-loader">
-          <div class="sheet-loader-label">Data source — Google Sheets</div>
           <div class="sheet-loader-row">
             <input
               class="sheet-url-input"
               id="sheet-url-input"
               type="text"
-              placeholder="Paste a Google Sheets share link…"
+              placeholder="Paste a Google Sheets link…"
               autocomplete="off"
               spellcheck="false"
             />
             <button class="sheet-btn sheet-btn--primary" id="sheet-load-btn">Load</button>
-            <button class="sheet-btn" id="sheet-default-btn" title="Use the built-in default sheet">Use default</button>
+            <button class="sheet-btn" id="sheet-default-btn">Use default</button>
           </div>
           <div class="sheet-loader-status" id="sheet-status"></div>
-          <div class="sheet-active-url" id="sheet-active-url">
+          <div class="sheet-active-url">
             <div class="sheet-active-dot loading" id="sheet-dot"></div>
             <span id="sheet-active-label">Fetching data…</span>
           </div>
         </div>
       </div>
 
-      <!-- Find Matches -->
-      <a class="tool-row" href="tools/find-matches.html">
-        <div class="tool-icon" style="background:#eef2ff">🔍</div>
-        <div class="tool-info">
-          <div class="tool-name">Find Matches</div>
-          <div class="tool-desc">Semantic search — describe what you're looking for in plain language.</div>
-        </div>
-        <svg class="tool-arrow" width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h8M7 3l4 4-4 4"/></svg>
-      </a>
-
-      <!-- Concept Map -->
-      <a class="tool-row" href="tools/concept-map.html">
-        <div class="tool-icon" style="background:#e8f8f2">🗺️</div>
-        <div class="tool-info">
-          <div class="tool-name">Concept Map</div>
-          <div class="tool-desc">Visualise connections between concepts as an interactive network.</div>
-        </div>
-        <svg class="tool-arrow" width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h8M7 3l4 4-4 4"/></svg>
-      </a>
-
-      <!-- Clusters -->
-      <a class="tool-row" href="tools/clusters.html">
-        <div class="tool-icon" style="background:#fdf3e7">🫧</div>
-        <div class="tool-info">
-          <div class="tool-name">Clusters</div>
-          <div class="tool-desc">Group entries by semantic similarity to discover themes and patterns.</div>
-        </div>
-        <svg class="tool-arrow" width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h8M7 3l4 4-4 4"/></svg>
-      </a>
-
     </div>
-  </main>
+  </section>
 
-  <!-- ── Scripts ─────────────────────────────────────────────────── -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  <script src="utilities/embedding-bridge.js"></script>
-  <script src="utilities/utils-keywords.js"></script>
-  <script src="utilities/utils-shared.js"></script>
-  <script type="module" src="utilities/utils-embedding.js"></script>
+  <section class="tools-section fade-in">
+    <span class="section-label">Tools</span>
+    <div class="tools-content">
 
-  <script>
-    // ── DOM refs ──────────────────────────────────────────────────
-    var input       = document.getElementById('sheet-url-input');
-    var loadBtn     = document.getElementById('sheet-load-btn');
-    var defaultBtn  = document.getElementById('sheet-default-btn');
-    var statusEl    = document.getElementById('sheet-status');
-    var dotEl       = document.getElementById('sheet-dot');
-    var labelEl     = document.getElementById('sheet-active-label');
-    var badgeEl     = document.getElementById('load-badge');
-
-    // ── Show which sheet is currently active ──────────────────────
-    function showActiveSheet() {
-      var url = getSavedSheetUrl();
-      var isDefault = isUsingDefaultSheet();
-      dotEl.className  = 'sheet-active-dot loading';
-      labelEl.textContent = isDefault
-        ? 'Using default sheet — loading…'
-        : 'Using custom sheet — loading…';
-      if (!isDefault) input.value = url;
-    }
-    showActiveSheet();
-
-    // ── Badge & dot update on load ────────────────────────────────
-    window.addEventListener('sheet-loaded', function(e) {
-      var count = e.detail.tabCount;
-      dotEl.className     = 'sheet-active-dot';
-      labelEl.textContent = isUsingDefaultSheet()
-        ? 'Default sheet — ' + count + ' tab' + (count === 1 ? '' : 's') + ' loaded'
-        : 'Custom sheet — ' + count + ' tab' + (count === 1 ? '' : 's') + ' loaded';
-      badgeEl.textContent = count + ' tabs ready';
-      badgeEl.className   = 'load-badge ready';
-    });
-
-    window.addEventListener('sheet-load-error', function() {
-      dotEl.className     = 'sheet-active-dot error';
-      labelEl.textContent = 'Failed to load sheet';
-      badgeEl.textContent = 'Load failed';
-      badgeEl.className   = 'load-badge';
-    });
-
-    // ── Status helpers ────────────────────────────────────────────
-    function setStatus(msg, type) {
-      statusEl.textContent = msg;
-      statusEl.className   = 'sheet-loader-status' + (type ? ' ' + type : '');
-    }
-
-    // ── Load button ───────────────────────────────────────────────
-    loadBtn.addEventListener('click', function() {
-      var val = input.value.trim();
-      if (!val) return setStatus('Paste a Google Sheets URL first.', 'error');
-      if (!isSheetUrl(val)) return setStatus("That doesn't look like a Google Sheets link.", 'error');
-      if (!sheetExportUrl(val)) return setStatus('Could not parse the sheet ID from that URL.', 'error');
-
-      setStatus('Fetching sheet…');
-      loadBtn.disabled = true;
-
-      fetchODS(val)
-        .then(function(all) {
-          var tabs = all.filter(function(s) { return s.name.includes('MX'); });
-          if (!tabs.length) {
-            loadBtn.disabled = false;
-            return setStatus('Sheet loaded but no MX tabs found — check the tab names.', 'error');
-          }
-          saveSheetUrl(val);
-          setStatus('Loaded ' + tabs.length + ' tab' + (tabs.length === 1 ? '' : 's') + '. Reloading…', 'success');
-          setTimeout(function() { location.reload(); }, 700);
-        })
-        .catch(function(e) {
-          loadBtn.disabled = false;
-          if (e.message.includes('403') || e.message.includes('401')) {
-            setStatus('Access denied — set the sheet to "Anyone with the link can view".', 'error');
-          } else if (e.message.includes('Failed to fetch')) {
-            setStatus('Could not reach the sheet. Check your connection or sharing settings.', 'error');
-          } else {
-            setStatus('Error: ' + e.message, 'error');
-          }
-        });
-    });
-
-    // ── Use default button ────────────────────────────────────────
-    defaultBtn.addEventListener('click', function() {
-      if (isUsingDefaultSheet()) {
-        setStatus('Already using the default sheet.', '');
-        return;
-      }
-      clearSavedSheetUrl();
-      input.value = '';
-      setStatus('Switched to default sheet. Reloading…', 'success');
-      setTimeout(function() { location.reload(); }, 700);
-    });
-
-    // ── Enter key in input ────────────────────────────────────────
-    input.addEventListener('keydown', function(e) {
-      if (e.key === 'Enter') loadBtn.click();
-    });
-  </script>
-
-</body>
-</html>
+      <a class="tool-row" href="tools/find-matches.html">
+        <div class="tool-left">
+          <span class="tool-number">01</span>
+          <div class="tool-accent" style="background:var(--raw-visions);"></div>
+          <div class="tool-info">
+            <span class="tool-name">Find Matches</span>
+            <span class="tool-desc">Search across all dimensions simultaneously. Surface related cells, highlight category groups, and trace connections between disparate entries using semantic similarity.</span>
+            <div class="tool-tags">
+              <span class="tool-tag">Search</span>
+              <span class="tool-tag">Semantic</span>
+              <span class="tool-tag">Cross-dimension
