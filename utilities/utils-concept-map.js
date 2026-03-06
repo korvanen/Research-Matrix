@@ -5,7 +5,7 @@
 //     globals then hardcoded CMAP_FALLBACK_PALETTE for standalone/bridge mode.
 //   • CMAP_FALLBACK_PALETTE upgraded from 5 plain hex strings to 7 full
 //     { accent, bg, label } objects matching the global theme palette.
-console.log('[sidepanel-concept-map.js [v.17]');
+console.log('[sidepanel-concept-map.js [v.18]');
 // Level themes (used by THEMES fallback path only):
 const CMAP_LEVEL_THEMES = ['yellow','visions','relational','organizational','physical','yellow'];
 
@@ -799,6 +799,8 @@ function initConceptMapTool(paneEl, sidebarEl) {
     reset() {
       _rendered=false; _rows=null; _liveRects.clear(); _connEdges=[]; _connSvg=null;
       world.innerHTML=''; emptyEl.style.display='flex'; _panX=0; _panY=0; _zoom=1; applyTransform();
+    },
+    resize() {
+      if (_rendered) fitAll();
     }
   };
-}
