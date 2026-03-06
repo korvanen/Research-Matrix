@@ -2,9 +2,46 @@
 // utils-shared.js — shared data, theme, and UI utilities
 // Loaded by: index.html, tools/spreadsheet.html, tools/*.html
 // ════════════════════════════════════════════════════════════════
-console.log('[utils-shared.js]');
+console.log('[utils-shared.js v5]');
 
-const XLSX_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRKom5SD7yrnPoGV4pzsf4f20uv0nkrZXEDRA6_-g_ZTogUVBNPzeDAr4Przl7WA9Y07ev5XNuZbhTz/pub?output=xlsx';
+// ════════════════════════════════════════════════════════════════
+// SHEET URL HANDLING
+// ════════════════════════════════════════════════════════════════
+
+var DEFAULT_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1iX0AbN6fy3Sc0sb2arMDSu9NE7fV00Uqg82yRgzs1QI/edit?usp=sharing';
+
+function sheetIdFromUrl(url) {
+  var m = String(url || '').match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/);
+  return m ? m[1] : null;
+}
+
+function sheetExportUrl(url) {
+  var id = sheetIdFromUrl(url);
+  if (!id) return null;
+  return 'https://docs.google.com/spreadsheets/d/' + id + '/export?format=xlsx';
+}
+
+function isSheetUrl(url) {
+  return /docs\.google\.com\/spreadsheets/.test(String(url || ''));
+}
+
+function getSavedSheetUrl() {
+  try { return localStorage.getItem('df_sheet_url') || DEFAULT_SHEET_URL; }
+  catch(e) { return DEFAULT_SHEET_URL; }
+}
+
+function saveSheetUrl(url) {
+  try { localStorage.setItem('df_sheet_url', url); } catch(e) {}
+}
+
+function clearSavedSheetUrl() {
+  try { localStorage.removeItem('df_sheet_url'); } catch(e) {}
+}
+
+function isUsingDefaultSheet() {
+  try { return !localStorage.getItem('df_sheet_url'); }
+  catch(e) { return true; }
+}
 
 // ════════════════════════════════════════════════════════════════
 // HTML / TEXT UTILITIES
@@ -15,7 +52,6 @@ function panelEscH(t) {
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-// Wraps whole-word keyword matches in <mark class="pkw">
 function panelHighlight(text, kwSet) {
   if (!kwSet || !kwSet.size) return panelEscH(text);
   const pat = new RegExp(
@@ -28,18 +64,13 @@ function panelHighlight(text, kwSet) {
 // CITATION PARSING
 // ════════════════════════════════════════════════════════════════
 
-// Extracts a trailing (Author, Year) from the end of cell text only —
-// mid-sentence parens like "(between elements)" are never matched.
 var _citationRe = /\s*\(([^)]+)\)\s*\.?\s*$/;
 
 function parseCitation(text) {
   text = String(text == null ? '' : text);
   var m = _citationRe.exec(text);
   if (!m) return { body: text, citation: null };
-  return {
-    body:     text.slice(0, m.index).trimEnd(),
-    citation: m[1],
-  };
+  return { body: text.slice(0, m.index).trimEnd(), citation: m[1] };
 }
 
 function citationPillHtml(citation, accentColor, textColor) {
@@ -164,14 +195,7 @@ const THEMES = {
   yellow:         makeTheme('#D4AF37'),
 };
 
-const TAB_THEMES = [
-  'yellow',
-  'visions',
-  'relational',
-  'organizational',
-  'physical',
-  'yellow',
-];
+const TAB_THEMES = ['yellow', 'visions', 'relational', 'organizational', 'physical', 'yellow'];
 
 window.PP_PALETTE = ['visions', 'relational', 'organizational', 'physical', 'yellow', 'default']
   .map(name => {
@@ -183,7 +207,6 @@ window.PP_PALETTE = ['visions', 'relational', 'organizational', 'physical', 'yel
     };
   });
 
-// Returns the THEMES entry for a given tab index
 function panelThemeVars(tabIdx) {
   const name = TAB_THEMES[tabIdx] || 'default';
   return THEMES[name] || THEMES.default;
@@ -193,10 +216,6 @@ function panelThemeVars(tabIdx) {
 // UI COMPONENTS
 // ════════════════════════════════════════════════════════════════
 
-// Animated segmented pill toggle.
-// options: [{ label, value }, ...]
-// onSwitch: called with the selected value on change
-// Returns: { el, setValue }
 function buildPill(options, onSwitch) {
   const wrap = document.createElement('div');
   wrap.className = 'pp-pill';
@@ -229,47 +248,24 @@ function buildPill(options, onSwitch) {
   return { el: wrap, setValue };
 }
 
-// Replaces a native range input's thumb with a custom animated one.
-// The native <input> stays in the DOM so all existing IDs and events work.
-// Call after the input is attached to the DOM.
 function upgradeSlider(input) {
   const variant = input.classList.contains('pp-range--accent') ? 'accent'
-                : input.classList.contains('pp-range--muted')  ? 'muted'
-                : '';
-
+                : input.classList.contains('pp-range--muted')  ? 'muted' : '';
   const wrap  = document.createElement('div');
   wrap.className = 'pp-range-wrap' + (variant ? ' pp-range-wrap--' + variant : '');
-
-  const track = document.createElement('div');
-  track.className = 'pp-range-track';
-  const fill  = document.createElement('div');
-  fill.className = 'pp-range-fill';
-  const thumb = document.createElement('div');
-  thumb.className = 'pp-range-thumb';
-
-  track.appendChild(fill);
-  wrap.appendChild(track);
-  wrap.appendChild(thumb);
-  input.parentNode.insertBefore(wrap, input);
-  wrap.appendChild(input);
-
+  const track = document.createElement('div'); track.className = 'pp-range-track';
+  const fill  = document.createElement('div'); fill.className  = 'pp-range-fill';
+  const thumb = document.createElement('div'); thumb.className = 'pp-range-thumb';
+  track.appendChild(fill); wrap.appendChild(track); wrap.appendChild(thumb);
+  input.parentNode.insertBefore(wrap, input); wrap.appendChild(input);
   function update() {
-    const min = +input.min || 0;
-    const max = +input.max || 100;
-    const pct = ((+input.value - min) / (max - min)) * 100;
-    thumb.style.left = pct + '%';
-    fill.style.width = pct + '%';
+    const pct = ((+input.value - (+input.min || 0)) / ((+input.max || 100) - (+input.min || 0))) * 100;
+    thumb.style.left = pct + '%'; fill.style.width = pct + '%';
   }
-
-  // Initial position without bounce
-  thumb.style.transition = 'none';
-  fill.style.transition  = 'none';
+  thumb.style.transition = fill.style.transition = 'none';
   update();
-  requestAnimationFrame(() => { thumb.style.transition = ''; fill.style.transition = ''; });
-
+  requestAnimationFrame(() => { thumb.style.transition = fill.style.transition = ''; });
   input.addEventListener('input', update);
-
-  // Disable bounce while actively dragging
   input.addEventListener('mousedown',  () => wrap.classList.add('pp-range-dragging'));
   input.addEventListener('touchstart', () => wrap.classList.add('pp-range-dragging'), { passive: true });
   document.addEventListener('mouseup',  () => wrap.classList.remove('pp-range-dragging'));
@@ -280,9 +276,12 @@ function upgradeSlider(input) {
 // XLSX FETCH & PARSE
 // ════════════════════════════════════════════════════════════════
 
-async function fetchODS() {
-  const res = await fetch(XLSX_URL);
-  if (!res.ok) throw new Error(`Failed to fetch XLSX: ${res.status}`);
+async function fetchODS(sheetUrl) {
+  var raw = sheetUrl || getSavedSheetUrl();
+  var url = isSheetUrl(raw) ? sheetExportUrl(raw) : raw;
+  if (!url) throw new Error('No valid sheet URL');
+  const res = await fetch(url);
+  if (!res.ok) throw new Error('Failed to fetch sheet: ' + res.status);
   const workbook = XLSX.read(await res.arrayBuffer(), {
     type: 'array', cellText: true, cellNF: false, cellHTML: false,
   });
@@ -320,8 +319,7 @@ function processSheetData(grid) {
   let title = '';
   for (let r = 0; r < grid.length; r++) {
     if ((grid[r][0] || '').trim() === 'TITLE') {
-      title = grid[r].slice(1).filter(c => c.trim()).join(' ');
-      break;
+      title = grid[r].slice(1).filter(c => c.trim()).join(' '); break;
     }
   }
   const rows = [];
@@ -346,7 +344,7 @@ function buildRowIndex() {
         tabIdx, rowIdx, row,
         headers: data.headers,
         title:   data.title || tab.name,
-        kws:     new Set(typeof panelExtractKW === 'function' ? panelExtractKW(row.cells.join(' ')) : []),
+        kws: new Set(typeof panelExtractKW === 'function' ? panelExtractKW(row.cells.join(' ')) : []),
       });
     });
   });
@@ -355,21 +353,22 @@ function buildRowIndex() {
 
 // ════════════════════════════════════════════════════════════════
 // BACKGROUND DATA LOADER
-// Fetches the spreadsheet, populates window.TABS, then kicks off
-// embeddings and the bridge. Safe to call on any page.
 // ════════════════════════════════════════════════════════════════
 
 window.TABS = window.TABS || [];
 
 (async () => {
   try {
-    const all = await fetchODS();
+    const urlToLoad = getSavedSheetUrl();
+    console.log('[utils-shared] Loading sheet:', urlToLoad);
+    const all = await fetchODS(urlToLoad);
     window.TABS = all.filter(s => s.name.includes('MX'));
     console.log('[utils-shared] Loaded', window.TABS.length, 'tabs');
-
     if (typeof EmbeddingBridge !== 'undefined') EmbeddingBridge.host();
     if (typeof initEmbeddings  === 'function')  initEmbeddings();
+    window.dispatchEvent(new CustomEvent('sheet-loaded', { detail: { tabCount: window.TABS.length } }));
   } catch(e) {
     console.warn('[utils-shared] Data load failed:', e);
+    window.dispatchEvent(new CustomEvent('sheet-load-error', { detail: { error: e } }));
   }
 })();
