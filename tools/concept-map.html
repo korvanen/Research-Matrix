@@ -1,14 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-
-<script>window.__BRIDGE_GUEST = true;</script>
-<script defer src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js?v=6"></script>
-<script defer src="../utilities/embedding-bridge.js?v=6"></script>
-<script defer src="../utilities/utils-shared.js?v=6"></script>
-<script defer src="../utilities/utils-panel.js?v=6"></script>
-<script defer src="../utilities/utils-concept-map.js?v=6"></script>
-
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Concept Map — Dimensional Framework</title>
@@ -20,7 +12,10 @@
       overflow: hidden;
       display: flex;
       flex-direction: column;
-      background: var(--tool-pane-bg);
+      background: var(--md-sys-color-background);
+      font-family: var(--font-family);
+      font-size: var(--font-size-base);
+      color: var(--md-sys-color-on-background);
     }
 
     .cm-layout {
@@ -46,7 +41,9 @@
 
   <div class="ds-topbar">
     <a class="ds-topbar-back" href="../index.html">
-      <svg viewBox="0 0 14 14" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <svg viewBox="0 0 14 14" width="12" height="12" fill="none"
+           stroke="currentColor" stroke-width="2"
+           stroke-linecap="round" stroke-linejoin="round">
         <path d="M9 2L4 7l5 5"/>
       </svg>
       Back
@@ -67,77 +64,118 @@
     </div>
   </div>
 
+  <!--
+    Load scripts SYNCHRONOUSLY (no defer / async).
+    With defer, execution order vs DOMContentLoaded is unreliable — the
+    inline script below would run before initConceptMapTool / createSidePanel
+    are defined.  Sync loading guarantees everything is available immediately.
+  -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="../utilities/utils-shared.js?v=7"></script>
+  <script src="../utilities/utils-panel.js?v=7"></script>
+  <script src="../utilities/embedding-bridge.js?v=7"></script>
+  <script src="../utilities/utils-concept-map.js?v=7"></script>
+
   <script>
-    document.addEventListener('DOMContentLoaded', function() {
+    // ── buildRowIndex MUST be on window ──────────────────────────────────────
+    // utils-concept-map.js calls:  typeof buildRowIndex === 'function'
+    // If it is scoped inside DOMContentLoaded it is invisible to the utility.
+    window._cmBridgeRows = null;
 
-      var _bridgeRows = null;
-      function buildRowIndex() { return _bridgeRows || []; }
-      function panelGoTo(match, colIdx) {
-        window.open('../tools/spreadsheet.html#goto=' + match.tabIdx + ':' + match.rowIdx + ':' + (colIdx || 0), '_blank');
-      }
+    window.buildRowIndex = function() {
+      return window._cmBridgeRows || [];
+    };
 
-      window.EmbeddingUtils = {
-        isReady:            function() { return false; },
-        getCachedEmbedding: function(text) { return Promise.resolve(null); },
-        getVectorSync:      function() { return null; }
+    // parseCitation fallback (utils-shared.js normally provides this)
+    if (typeof parseCitation === 'undefined') {
+      window.parseCitation = function(text) {
+        return { body: String(text || ''), citation: null };
+      };
+    }
+
+    // ── EmbeddingUtils stub — replaced once bridge fires ─────────────────────
+    window.EmbeddingUtils = {
+      isReady:            function() { return false; },
+      getCachedEmbedding: function()  { return Promise.resolve(null); },
+      getVectorSync:      function()  { return null; }
+    };
+
+    // ── DOM refs ─────────────────────────────────────────────────────────────
+    var badgeEl   = document.getElementById('cm-connection-badge');
+    var badgeText = document.getElementById('cm-badge-text');
+    var noHost    = document.getElementById('cm-no-host');
+    var paneEl    = document.getElementById('cm-pane');
+    var layout    = document.querySelector('.cm-layout');
+
+    function setBadge(state, text) {
+      badgeEl.className     = 'ds-badge ds-badge--' + state;
+      badgeText.textContent = text;
+    }
+
+    // ── Init concept map — paneEl is in the DOM at this point ────────────────
+    var cmTool = initConceptMapTool(paneEl, null);
+
+    // ── Side panel ───────────────────────────────────────────────────────────
+    // Placed on the right so it doesn't obscure the map controls on the left.
+    // The panel starts closed (defaultFraction: 0 would hide it immediately;
+    // we use 0.35 so the user can drag it open, and snap-close at 10%).
+    // On every resize/open/close we call cmTool.resize() so fitAll() uses the
+    // correct canvas dimensions.
+    var cmPanel = createSidePanel(layout, {
+      side:              'right',
+      defaultFraction:   0,          // start closed — user drags to open
+      minFraction:       0,
+      maxFraction:       0.65,
+      snapCloseFraction: 0.10,
+      onResize: function() { if (cmTool && cmTool.resize) cmTool.resize(); },
+      onOpen:   function() { if (cmTool && cmTool.resize) cmTool.resize(); },
+      onClose:  function() { if (cmTool && cmTool.resize) cmTool.resize(); },
+    });
+
+    // ── EmbeddingBridge guest ─────────────────────────────────────────────────
+    EmbeddingBridge.guest(function(rows) {
+      noHost.classList.remove('visible');
+      setBadge('connected', rows.length + ' entries live');
+
+      // Store rows so window.buildRowIndex() returns them
+      window._cmBridgeRows = rows;
+
+      // Build text→vector lookup from pre-computed bridge vectors
+      var textToVec = new Map();
+      rows.forEach(function(r) {
+        if (!r.vec) return;
+        var cells = (r.row && r.row.cells) ? r.row.cells : (r.cells || []);
+        var fullText = cells.join(' ').trim();
+        if (fullText) textToVec.set(fullText, r.vec);
+        cells.forEach(function(c) {
+          if (c && c.trim()) textToVec.set(c.trim(), r.vec);
+        });
+      });
+
+      window.EmbeddingUtils.isReady = function() { return true; };
+
+      window.EmbeddingUtils.getCachedEmbedding = function(text) {
+        var t   = text ? text.trim() : '';
+        var vec = textToVec.get(t);
+        if (vec) return Promise.resolve(vec);
+        // prefix-match fallback for split segments
+        var prefix = t.slice(0, 40);
+        var found  = null;
+        textToVec.forEach(function(v, k) {
+          if (!found && k.startsWith(prefix)) found = v;
+        });
+        return Promise.resolve(found || null);
       };
 
-      var badgeEl   = document.getElementById('cm-connection-badge');
-      var badgeText = document.getElementById('cm-badge-text');
-      var noHost    = document.getElementById('cm-no-host');
+      // Reset stale state then render
+      cmTool.reset();
+      cmTool.start();
+    });
 
-      function setBadge(state, text) {
-        badgeEl.className = 'ds-badge ds-badge--' + state;
-        badgeText.textContent = text;
-      }
-
-      var paneEl = document.getElementById('cm-pane');
-      var cmTool = initConceptMapTool(paneEl, null);
-
-      var panel = createSidePanel(document.querySelector('.cm-layout'), {
-        side:               'left',
-        defaultFraction:    0.35,
-        minFraction:        0,
-        snapCloseFraction:  0.10,
-        onResize: function() { if (cmTool.resize) cmTool.resize(); },
-        onOpen:   function() { if (cmTool.resize) cmTool.resize(); },
-        onClose:  function() { if (cmTool.resize) cmTool.resize(); },
-      });
-
-      EmbeddingBridge.guest(function(rows) {
-        noHost.classList.remove('visible');
-        setBadge('connected', rows.length + ' entries live');
-        _bridgeRows = rows;
-
-        var textToVec = new Map();
-        rows.forEach(function(r) {
-          if (!r.vec) return;
-          var cells = (r.row && r.row.cells) ? r.row.cells : (r.cells || []);
-          var text  = cells.join(' ').trim();
-          if (text) textToVec.set(text, r.vec);
-          cells.forEach(function(c) { if (c && c.trim()) textToVec.set(c.trim(), r.vec); });
-        });
-
-        window.EmbeddingUtils.getCachedEmbedding = function(text) {
-          var vec = textToVec.get(text) || textToVec.get(text.trim());
-          if (vec) return Promise.resolve(vec);
-          var t = text.trim().slice(0, 40);
-          var found = null;
-          textToVec.forEach(function(v, k) { if (!found && k.startsWith(t)) found = v; });
-          return Promise.resolve(found || null);
-        };
-
-        window.EmbeddingUtils.isReady = function() { return true; };
-        cmTool.reset();
-        cmTool.start();
-      });
-
-      window.addEventListener('bridge-no-host', function() {
-        setBadge('disconnected', 'No data — visit home page first');
-        noHost.classList.add('visible');
-      });
-
-    }); // end DOMContentLoaded
+    window.addEventListener('bridge-no-host', function() {
+      setBadge('disconnected', 'No data — visit home page first');
+      noHost.classList.add('visible');
+    });
   </script>
 
 </body>
