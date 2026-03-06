@@ -2,7 +2,7 @@
 // utils-shared.js — shared data, theme, and UI utilities
 // Loaded by: index.html, tools/spreadsheet.html, tools/*.html
 // ════════════════════════════════════════════════════════════════
-console.log('[utils-shared.js v5]');
+console.log('[utils-shared.js v.6]');
 
 // ════════════════════════════════════════════════════════════════
 // SHEET URL HANDLING
