@@ -1385,7 +1385,11 @@ mark.pkw {
   color: var(--ppc-border, var(--md-sys-color-on-surface)) !important;
   letter-spacing: -0.03em !important;
   opacity: .85 !important;
-  flex-shrink: 0 !important;
+  flex: 1 !important;
+  min-width: 0 !important;
+  /* Scale down gracefully when category string is longer */
+  overflow: hidden !important;
+  word-break: break-word !important;
 }
 
 /* Level block — top right, like "31 / NOV '20" */
