@@ -733,10 +733,8 @@ input, textarea, select {
   text-transform: uppercase;
   color: var(--md-sys-color-on-surface-variant);
   line-height: 1;
-   flex-shrink: 0;
   margin-bottom: 2px;
-   width: 30px;
-   margin-right: 10px;
+  
    
 }
 
@@ -746,6 +744,7 @@ input, textarea, select {
   gap: 4px;
 }
 
+/* ── The individual slider style */
 .ds-slider-label, .pp-range-label {
   font-size: 11px;
   font-weight: var(--font-weight-medium);
@@ -753,7 +752,8 @@ input, textarea, select {
   text-transform: uppercase;
   color: var(--md-sys-color-on-surface-variant);
   flex-shrink: 0;
-  width: 18px;
+    width: 30px;
+   margin-right: 10px;
 }
 
 .ds-slider-val, .pp-range-val {
