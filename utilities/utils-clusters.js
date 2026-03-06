@@ -90,7 +90,7 @@ var CL_MIN_SPLIT_LENGTH = 60;
 #pp-cl-controls { display: flex; flex-direction: column; gap: var(--space-1); }
 #pp-cl-sliders  {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr 72px;
+  grid-template-columns: 1fr 1fr 1fr 100px;
   gap: var(--space-2);
   align-items: center;
 }
