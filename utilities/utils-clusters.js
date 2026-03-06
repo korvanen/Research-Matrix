@@ -1132,6 +1132,8 @@ function initClustersTool(paneEl, sidebarEl) {
     // Tint the left border with the cluster accent colour
     card.style.borderLeftColor = col.accent;
     card.style.borderLeftWidth = '3px';
+    card.style.setProperty('--ppc-bg',     col.bg);
+    card.style.setProperty('--ppc-border', col.accent);
     if (delay) card.style.animationDelay = delay + 'ms';
     const body = document.createElement('div'); body.className = 'pp-cl-card-body';
     if (cats.length) {
