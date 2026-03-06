@@ -361,64 +361,51 @@ function initConceptMapTool(paneEl, sidebarEl) {
   // Touch pinch/pan handled by Pointer Events in makeDraggable block above
 
   // ── Card drag — Pointer Events API (works on touch + mouse) ──────────────
-  // One finger on a card = drag card. Two fingers = pan/zoom canvas.
+  // Per-card pointerdown + capture → only that card's events route here.
+  // Canvas pointerdown only fires when NOT hitting a card → canvas pan only.
   const _pointers = new Map(); // pointerId → {x,y}
   let _cardDrag   = null;      // {el, cid, pointerId, ox, oy, sx, sy}
   let _pinchState = null;      // {midX, midY, dist, panX, panY, zoom}
 
   canvas.style.touchAction = 'none';
 
+  // ── Canvas pan (bare canvas touch, not on a card) ──────────────────────
   canvas.addEventListener('pointerdown', ev => {
+    // If the pointer landed on a card, card's own handler takes over
+    if (ev.target.closest('.pp-cmap-card')) return;
     canvas.setPointerCapture(ev.pointerId);
     _pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
 
-    const card = ev.target.closest('.pp-cmap-card');
-
-    // Single finger on a card — start card drag
-    if (card && _pointers.size === 1 && !_cardDrag) {
-      ev.preventDefault();
-      const cid = parseInt(card.dataset.cid, 10);
-      const r   = _liveRects.get(cid) || { x: 0, y: 0 };
-      _cardDrag = { el: card, cid, pointerId: ev.pointerId, ox: ev.clientX, oy: ev.clientY, sx: r.x, sy: r.y };
-      card.style.zIndex = String(++_topZ);
-      return;
-    }
-
-    // Two fingers — start pan/zoom, cancel any card drag
     if (_pointers.size === 2) {
-      if (_cardDrag) { _cardDrag = null; }
       const pts = [..._pointers.values()];
       _pinchState = {
         midX: (pts[0].x + pts[1].x) / 2, midY: (pts[0].y + pts[1].y) / 2,
         dist: Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y),
         panX: _panX, panY: _panY, zoom: _zoom,
       };
+    } else {
+      // Single finger on bare canvas = pan
+      _pinchState = null;
     }
   });
 
   canvas.addEventListener('pointermove', ev => {
     if (!_pointers.has(ev.pointerId)) return;
+    const prev = _pointers.get(ev.pointerId);
     _pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
 
-    // Card drag — single pointer
-    if (_cardDrag && ev.pointerId === _cardDrag.pointerId && _pointers.size === 1) {
+    if (_pointers.size === 1 && !_pinchState) {
+      // Single-finger pan on bare canvas
       ev.preventDefault();
-      const dx  = (ev.clientX - _cardDrag.ox) / _zoom;
-      const dy  = (ev.clientY - _cardDrag.oy) / _zoom;
-      const nx  = _cardDrag.sx + dx;
-      const ny  = _cardDrag.sy + dy;
-      const r   = _liveRects.get(_cardDrag.cid) || { w: CARD_W, h: 80 };
-      _cardDrag.el.style.left = nx + 'px';
-      _cardDrag.el.style.top  = ny + 'px';
-      _liveRects.set(_cardDrag.cid, { x: nx, y: ny, w: r.w, h: r.h });
-      redrawConnectors();
+      _panX += ev.clientX - prev.x;
+      _panY += ev.clientY - prev.y;
+      applyTransform();
       return;
     }
 
-    // Two-finger pan + zoom
     if (_pinchState && _pointers.size >= 2) {
       ev.preventDefault();
-      const pts    = [..._pointers.values()];
+      const pts     = [..._pointers.values()];
       const newMidX = (pts[0].x + pts[1].x) / 2;
       const newMidY = (pts[0].y + pts[1].y) / 2;
       const newDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
@@ -427,8 +414,8 @@ function initConceptMapTool(paneEl, sidebarEl) {
       const cmy     = newMidY - rect.top;
       const sf      = newDist / _pinchState.dist;
       const nz      = Math.max(0.15, Math.min(4, _pinchState.zoom * sf));
-      const origCmx = (_pinchState.midX - rect.left);
-      const origCmy = (_pinchState.midY - rect.top);
+      const origCmx = _pinchState.midX - rect.left;
+      const origCmy = _pinchState.midY - rect.top;
       _zoom = nz;
       _panX = cmx - (origCmx - _pinchState.panX) * nz / _pinchState.zoom + (newMidX - _pinchState.midX);
       _panY = cmy - (origCmy - _pinchState.panY) * nz / _pinchState.zoom + (newMidY - _pinchState.midY);
@@ -437,38 +424,44 @@ function initConceptMapTool(paneEl, sidebarEl) {
     }
   });
 
-  function _pointerEnd(ev) {
+  function _canvasPointerEnd(ev) {
     _pointers.delete(ev.pointerId);
-    if (_cardDrag && ev.pointerId === _cardDrag.pointerId) { _cardDrag = null; redrawConnectors(); }
     if (_pointers.size < 2) { _pinchState = null; }
   }
-  canvas.addEventListener('pointerup',     _pointerEnd);
-  canvas.addEventListener('pointercancel', _pointerEnd);
+  canvas.addEventListener('pointerup',     _canvasPointerEnd);
+  canvas.addEventListener('pointercancel', _canvasPointerEnd);
 
   function makeDraggable(el, cid) {
     el.dataset.cid = String(cid);
-    // Pointer events on the canvas handle everything — just mark touch-action
     el.style.touchAction = 'none';
-    // Mouse fallback (desktop, in case pointer capture isn't supported)
-    let _mon = false, _mox = 0, _moy = 0, _msx = 0, _msy = 0;
-    el.addEventListener('mousedown', e => {
-      if (e.button !== 0) return;
-      _mon = true; _mox = e.clientX; _moy = e.clientY;
+
+    // Each card captures its own pointer — completely isolated from canvas pan
+    el.addEventListener('pointerdown', ev => {
+      if (ev.button !== undefined && ev.button !== 0) return;
+      ev.stopPropagation(); // prevent canvas pointerdown from also firing
+      el.setPointerCapture(ev.pointerId);
       const r = _liveRects.get(cid) || { x: 0, y: 0 };
-      _msx = r.x; _msy = r.y;
+      _cardDrag = { el, cid, pointerId: ev.pointerId, ox: ev.clientX, oy: ev.clientY, sx: r.x, sy: r.y };
       el.style.zIndex = String(++_topZ);
-      e.stopPropagation(); e.preventDefault();
+      ev.preventDefault();
     });
-    document.addEventListener('mousemove', e => {
-      if (!_mon) return;
+
+    el.addEventListener('pointermove', ev => {
+      if (!_cardDrag || ev.pointerId !== _cardDrag.pointerId) return;
+      ev.preventDefault();
+      const dx = (ev.clientX - _cardDrag.ox) / _zoom;
+      const dy = (ev.clientY - _cardDrag.oy) / _zoom;
+      const nx = _cardDrag.sx + dx;
+      const ny = _cardDrag.sy + dy;
       const r  = _liveRects.get(cid) || { w: CARD_W, h: 80 };
-      const nx = _msx + (e.clientX - _mox) / _zoom;
-      const ny = _msy + (e.clientY - _moy) / _zoom;
-      el.style.left = nx + 'px'; el.style.top = ny + 'px';
+      el.style.left = nx + 'px';
+      el.style.top  = ny + 'px';
       _liveRects.set(cid, { x: nx, y: ny, w: r.w, h: r.h });
       redrawConnectors();
     });
-    document.addEventListener('mouseup', () => { _mon = false; });
+
+    el.addEventListener('pointerup',     ev => { if (_cardDrag && ev.pointerId === _cardDrag.pointerId) _cardDrag = null; });
+    el.addEventListener('pointercancel', ev => { if (_cardDrag && ev.pointerId === _cardDrag.pointerId) _cardDrag = null; });
   }
 
   // ── Cosine similarity ─────────────────────────────────────────────────────
@@ -697,7 +690,9 @@ function initConceptMapTool(paneEl, sidebarEl) {
       const catNumEl=document.createElement('div');
       catNumEl.className='pp-cmap-card-cat-num';
       // Use outer cluster/category letter if available, else level numeral
-      const catChar = primaryRow.row?.cats?.filter(c=>c.trim())?.[0]?.slice(0,2).toUpperCase() || String(level);
+      // Use all category tags joined — e.g. "4110", not sliced
+      const allCats = primaryRow.row?.cats?.filter(c => c.trim()) || [];
+      const catChar = allCats.length ? allCats.join(' · ') : String(level);
       catNumEl.textContent = catChar;
 
       // Level block — top right
