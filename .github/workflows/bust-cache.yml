@@ -1,0 +1,64 @@
+name: Bust cache versions on changed files
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '**/*.js'
+      - '**/*.css'
+
+jobs:
+  bust:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Update ?v= in HTML files
+        run: |
+          # Get list of JS and CSS files changed in this commit
+          CHANGED=$(git diff --name-only HEAD~1 HEAD | grep -E '\.(js|css)$' || true)
+
+          if [ -z "$CHANGED" ]; then
+            echo "No JS or CSS files changed, skipping."
+            exit 0
+          fi
+
+          echo "Changed files:"
+          echo "$CHANGED"
+
+          # Find all HTML files in the repo
+          HTML_FILES=$(find . -name "*.html" -not -path "./.git/*")
+
+          for FILE in $CHANGED; do
+            # Get just the filename without path prefix variations
+            BASENAME=$(basename "$FILE")
+
+            # Generate a short hash from the file content
+            HASH=$(git hash-object "$FILE" | cut -c1-8)
+
+            echo "Updating references to $BASENAME → v=$HASH"
+
+            for HTML in $HTML_FILES; do
+              # Match src or href referencing this file, with or without existing ?v=...
+              # Handles: src="../utilities/foo.js" or src="utilities/foo.js?v=3" etc.
+              sed -i -E \
+                "s|(src|href)=\"([^\"]*/${BASENAME})(\?v=[^\"]*)?\"|\1=\"\2?v=${HASH}\"|g" \
+                "$HTML"
+            done
+          done
+
+      - name: Commit updated HTML files
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git diff --quiet && echo "No changes to commit." || (
+            git add -A
+            git commit -m "chore: bust cache for changed assets [skip ci]"
+            git push
+          )
