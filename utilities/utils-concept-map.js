@@ -795,7 +795,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
   window.addEventListener('embedding-progress',ev=>{ if(!_rendered) setStatus('loading','Indexing\u2026 '+ev.detail.pct+'%'); });
   window.addEventListener('embedder-ready',()=>setTimeout(tryRender,120));
 
-  return {
+return {
     reset() {
       _rendered=false; _rows=null; _liveRects.clear(); _connEdges=[]; _connSvg=null;
       world.innerHTML=''; emptyEl.style.display='flex'; _panX=0; _panY=0; _zoom=1; applyTransform();
@@ -804,3 +804,4 @@ function initConceptMapTool(paneEl, sidebarEl) {
       if (_rendered) fitAll();
     }
   };
+}
