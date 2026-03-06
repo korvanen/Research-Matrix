@@ -28,6 +28,7 @@
    13. Panel (draggable side panel)
    14. Animations
    15. Utilities
+   16. Product-label card system  (clusters + concept map)
    ============================================================ */
 
 
@@ -1308,3 +1309,305 @@ mark.pkw {
 .md-elev-3 { box-shadow: var(--md-elev-3); }
 .md-elev-4 { box-shadow: var(--md-elev-4); }
 .md-elev-5 { box-shadow: var(--md-elev-5); }
+
+
+/* ══════════════════════════════════════════════════════════════════════════
+   16. Product-label card system
+   ══════════════════════════════════════════════════════════════════════════
+
+   Visual anatomy (mirrors the FYODOR deodorant label):
+
+     ┌──────────────────────────┐
+     │                          │  ← blank white zone  (::before pseudo)
+     │                          │
+     ├──────────────────────────┤  ← thin rule
+     │  BRAND / LEVEL           │  ← .pp-cl-card-cat  /  .pp-cmap-card-head
+     │  KEYWORD                 │  ← .pp-cl-card-text /  .pp-cmap-cell-text  (large bold)
+     │  descriptor · sub-label  │  ← .pp-cl-card-split / .pp-cmap-leaf-badge
+     └──────────────────────────┘
+          coloured tinted band  ← var(--ppc-bg) set per-card by JS
+
+   Implementation notes
+   ────────────────────
+   • Injected <style> blocks (pp-cluster-styles, pp-cmap-styles) are appended
+     to <head> by JS at runtime — they load AFTER this stylesheet and therefore
+     win without !important. Every property we override here must use !important.
+   • Cluster cards: JS sets borderLeftColor=col.accent inline. After our patch
+     to utils-clusters.js, it also sets --ppc-bg / --ppc-border on the card.
+   • Concept map cards: JS already sets --ppc-bg / --ppc-border on the card,
+     and head.style.background = accent inline on .pp-cmap-card-head.
+   • ::before creates the blank zone by being a flex child above the body/head.
+     Both card types must be display:flex + flex-direction:column for this.
+   • Dark mode inherits automatically — all colours use MD3 CSS tokens.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+
+/* ─── 16a. Shared card shell ──────────────────────────────────────────────
+   Make both card types flex-column so ::before stacks above the content.
+   Keep position:relative and overflow:hidden (already set by injected styles,
+   but we reinforce here in case specificity changes).                      */
+
+.pp-cl-card,
+.pp-cmap-card {
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+  position: relative !important;
+  /* Shape: larger radius matches the FYODOR rounded-rect silhouette */
+  border-radius: var(--radius-lg) !important;
+  /* Thin, neutral border — colour accent comes from the band, not the border */
+  border: 1px solid var(--md-sys-color-outline-variant) !important;
+  border-left-width: 1px !important;  /* override the inline 3px left border JS sets */
+  /* Subtle elevation */
+  box-shadow: var(--md-elev-1) !important;
+  /* Lift on hover */
+  transition: box-shadow var(--transition-base), transform var(--transition-base) !important;
+  cursor: pointer !important;
+}
+
+.pp-cl-card:hover,
+.pp-cmap-card:hover {
+  box-shadow: var(--md-elev-3) !important;
+  transform: translateY(-2px) !important;
+}
+
+/* Remove the ::before state-layer that the injected cluster style adds
+   (it sets background:var(--md-sys-color-on-surface) + opacity transition
+   for hover — we keep the hover effect via box-shadow instead)           */
+.pp-cl-card::before {
+  /* Reset the hover overlay injected by pp-cluster-styles */
+  position: static !important;
+  background: none !important;
+  opacity: 1 !important;
+  transition: none !important;
+  /* Now use it as the blank white zone */
+  content: '' !important;
+  display: block !important;
+  width: 100% !important;
+  flex-shrink: 0 !important;
+  height: 72px !important;          /* ← blank upper zone height for cluster cards */
+  background: var(--md-sys-color-surface-container-lowest) !important;
+  border-bottom: 1px solid var(--md-sys-color-outline-variant) !important;
+  pointer-events: none !important;
+}
+
+/* Concept map cards are narrower/shorter — smaller blank zone */
+.pp-cmap-card::before {
+  content: '' !important;
+  display: block !important;
+  width: 100% !important;
+  flex-shrink: 0 !important;
+  height: 52px !important;          /* ← blank upper zone height for concept map cards */
+  background: var(--md-sys-color-surface-container-lowest) !important;
+  border-bottom: 1px solid var(--md-sys-color-outline-variant) !important;
+  pointer-events: none !important;
+}
+
+
+/* ─── 16b. Cluster card — label band ─────────────────────────────────────
+   .pp-cl-card-body sits directly after ::before.
+   --ppc-bg is set per-card by JS (after our utils-clusters.js patch).    */
+
+.pp-cl-card-body {
+  padding: var(--space-2) var(--space-3) var(--space-3) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 1px !important;
+  background: var(--ppc-bg, var(--md-sys-color-surface-container-low)) !important;
+  flex: 1 !important;
+}
+
+/* "FYODOR" — category / brand line */
+.pp-cl-card-cat {
+  font-size: 10px !important;
+  font-weight: var(--font-weight-medium) !important;
+  letter-spacing: var(--letter-spacing-caps) !important;
+  text-transform: uppercase !important;
+  color: var(--md-sys-color-on-surface-variant) !important;
+  line-height: 1.2 !important;
+  margin-bottom: 0 !important;
+}
+
+/* "STONE" — main keyword label (large, bold, tight) */
+.pp-cl-card-text {
+  font-size: 18px !important;
+  font-weight: var(--font-weight-bold) !important;
+  letter-spacing: -0.02em !important;
+  line-height: 1.1 !important;
+  color: var(--md-sys-color-on-surface) !important;
+  /* Clamp long strings to 2 lines */
+  display: -webkit-box !important;
+  -webkit-line-clamp: 2 !important;
+  -webkit-box-orient: vertical !important;
+  overflow: hidden !important;
+}
+
+/* "DEODORANT · ALUMINUM FREE" — sub-descriptor */
+.pp-cl-card-split {
+  font-size: 9px !important;
+  font-weight: var(--font-weight-medium) !important;
+  letter-spacing: var(--letter-spacing-caps) !important;
+  text-transform: uppercase !important;
+  color: var(--md-sys-color-outline) !important;
+  margin-top: 3px !important;
+  line-height: 1.1 !important;
+}
+
+/* Accent bottom stripe replaces the left border */
+.pp-cl-card {
+  border-bottom: 3px solid var(--ppc-border, var(--md-sys-color-outline-variant)) !important;
+}
+
+
+/* ─── 16c. Concept map card — label band ─────────────────────────────────
+   Structure: ::before (blank) → .pp-cmap-card-head (accent strip, inline bg)
+              → .pp-cmap-card-body (tinted bg, var(--ppc-bg))
+              → .pp-cmap-card-footer (optional)                           */
+
+/* Accent strip: "FYODOR" — level/category label */
+.pp-cmap-card-head {
+  padding: 5px var(--space-3) 5px !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: var(--space-1) !important;
+  flex-wrap: wrap !important;
+  flex-shrink: 0 !important;
+  /* background is set inline by JS (accent colour) — we keep that */
+}
+
+/* Level badge — "FYODOR" text inside the strip */
+.pp-cmap-level-badge,
+.pp-cmap-split-badge {
+  font-size: 9px !important;
+  font-weight: var(--font-weight-bold) !important;
+  letter-spacing: var(--letter-spacing-caps) !important;
+  text-transform: uppercase !important;
+  line-height: 1.2 !important;
+  opacity: 1 !important;
+  flex: 1 !important;
+  min-width: 0 !important;
+}
+
+/* Body: the tinted label band containing the main text */
+.pp-cmap-card-body {
+  padding: var(--space-2) var(--space-3) var(--space-2) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 2px !important;
+  background: var(--ppc-bg, var(--md-sys-color-surface-container-low)) !important;
+  flex: 1 !important;
+}
+
+/* Category micro-label above the main text */
+.pp-cmap-cell-cat {
+  font-size: 9px !important;
+  font-weight: var(--font-weight-medium) !important;
+  letter-spacing: var(--letter-spacing-caps) !important;
+  text-transform: uppercase !important;
+  color: var(--md-sys-color-on-surface-variant) !important;
+  margin-bottom: 1px !important;
+}
+
+/* Main keyword — "STONE" */
+.pp-cmap-cell-text {
+  font-size: 15px !important;
+  font-weight: var(--font-weight-bold) !important;
+  letter-spacing: -0.02em !important;
+  line-height: 1.15 !important;
+  color: var(--md-sys-color-on-surface) !important;
+  word-break: break-word !important;
+  overflow-wrap: break-word !important;
+}
+
+/* Footer */
+.pp-cmap-card-footer {
+  padding: var(--space-1) var(--space-3) var(--space-2) !important;
+  border-top: 1px solid var(--md-sys-color-outline-variant) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 3px !important;
+  background: var(--ppc-bg, var(--md-sys-color-surface-container-low)) !important;
+}
+
+/* Leaf badge — sub-descriptor at bottom of leaf nodes */
+.pp-cmap-leaf-badge {
+  font-size: 9px !important;
+  font-weight: var(--font-weight-medium) !important;
+  letter-spacing: var(--letter-spacing-caps) !important;
+  text-transform: uppercase !important;
+  color: var(--md-sys-color-outline) !important;
+  padding: var(--space-1) var(--space-3) var(--space-2) !important;
+  display: block !important;
+  background: var(--ppc-bg, var(--md-sys-color-surface-container-low)) !important;
+}
+
+/* Similarity bar fill colour */
+.pp-cmap-sim-fill {
+  background: var(--ppc-border, var(--md-sys-color-primary)) !important;
+}
+
+/* Concept map: add accent bottom stripe matching the head colour */
+.pp-cmap-card {
+  border-bottom: 2px solid var(--ppc-border, var(--md-sys-color-outline-variant)) !important;
+}
+
+
+/* ─── 16d. Cluster nest — inherits MD3 tokens (no !important needed) ─────
+   These weren't overridden by injected styles so regular specificity works. */
+
+.pp-cl-nest-label {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.pp-cl-nest-count {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: var(--letter-spacing-caps);
+  text-transform: uppercase;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+
+/* ─── 16e. Cluster side-panel mini-cards (.pp-cl-scard) ──────────────────
+   These appear inside the spreadsheet table. Keep compact but themed.     */
+
+.pp-cl-scard {
+  border-radius: var(--radius-sm) !important;
+  border: 1px solid var(--md-sys-color-outline-variant) !important;
+  border-left: 3px solid var(--ppc-border, var(--md-sys-color-primary)) !important;
+  background: var(--md-sys-color-surface) !important;
+  padding: var(--space-1) var(--space-2) !important;
+  font-size: var(--font-size-sm) !important;
+  font-weight: var(--font-weight-normal) !important;
+  line-height: 1.4 !important;
+  color: var(--md-sys-color-on-surface) !important;
+  transition: background var(--transition-fast), box-shadow var(--transition-fast) !important;
+}
+
+.pp-cl-scard:hover {
+  background: color-mix(in srgb, var(--md-sys-color-primary) 6%, var(--md-sys-color-surface)) !important;
+  box-shadow: var(--md-elev-1) !important;
+}
+
+
+/* ─── 16f. Dark-mode surface adjustments ─────────────────────────────────
+   MD3 tokens flip automatically. We only need to ensure the ::before
+   blank zone uses the correct dark surface token.
+   html.dark class is used when the tool forces dark mode via JS.         */
+
+@media (prefers-color-scheme: dark) {
+  .pp-cl-card::before,
+  .pp-cmap-card::before {
+    background: var(--md-sys-color-surface-container-lowest) !important;
+    border-bottom-color: var(--md-sys-color-outline-variant) !important;
+  }
+}
+
+html.dark .pp-cl-card::before,
+html.dark .pp-cmap-card::before {
+  background: var(--md-sys-color-surface-container-lowest) !important;
+  border-bottom-color: var(--md-sys-color-outline-variant) !important;
+}
