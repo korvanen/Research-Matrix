@@ -405,4 +405,140 @@
             <div class="tool-tags">
               <span class="tool-tag">Search</span>
               <span class="tool-tag">Semantic</span>
-              <span class="tool-tag">Cross-dimension
+              <span class="tool-tag">Cross-dimensional</span>
+            </div>
+          </div>
+        </div>
+        <span class="tool-arrow">↗</span>
+      </a>
+
+      <a class="tool-row" href="tools/concept-map.html">
+        <div class="tool-left">
+          <span class="tool-number">02</span>
+          <div class="tool-accent" style="background:var(--raw-relational);"></div>
+          <div class="tool-info">
+            <span class="tool-name">Concept Map</span>
+            <span class="tool-desc">Automatically build a multi-level concept hierarchy from your data. Parent-child relationships are inferred by semantic distance — drag, zoom, and explore the structure.</span>
+            <div class="tool-tags">
+              <span class="tool-tag">Hierarchy</span>
+              <span class="tool-tag">DAG</span>
+              <span class="tool-tag">Embeddings</span>
+            </div>
+          </div>
+        </div>
+        <span class="tool-arrow">↗</span>
+      </a>
+
+      <a class="tool-row" href="tools/clusters.html">
+        <div class="tool-left">
+          <span class="tool-number">03</span>
+          <div class="tool-accent" style="background:var(--raw-org);"></div>
+          <div class="tool-info">
+            <span class="tool-name">Clusters</span>
+            <span class="tool-desc">Group entries by thematic similarity into nested clusters. Inner and outer groupings are labelled hierarchically — view as cards or explore the collapsible spreadsheet sidebar.</span>
+            <div class="tool-tags">
+              <span class="tool-tag">Clustering</span>
+              <span class="tool-tag">Grouping</span>
+              <span class="tool-tag">Spreadsheet view</span>
+            </div>
+          </div>
+        </div>
+        <span class="tool-arrow">↗</span>
+      </a>
+
+    </div>
+  </section>
+
+  <footer>
+    <div class="footer-section">
+      <div class="footer-bottom">
+        <span class="footer-copy">Dimensional Framework</span>
+        <span class="footer-version">v2.0 — 2026</span>
+      </div>
+    </div>
+  </footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="utilities/embedding-bridge.js?v=4"></script>
+<script src="utilities/utils-keywords.js?v=4"></script>
+<script src="utilities/utils-shared.js?v=4"></script>
+<script type="module" src="utilities/utils-embedding.js?v=4"></script>
+
+  <script>
+    var input      = document.getElementById('sheet-url-input');
+    var loadBtn    = document.getElementById('sheet-load-btn');
+    var defaultBtn = document.getElementById('sheet-default-btn');
+    var statusEl   = document.getElementById('sheet-status');
+    var dotEl      = document.getElementById('sheet-dot');
+    var labelEl    = document.getElementById('sheet-active-label');
+
+    function setStatus(msg, type) {
+      statusEl.textContent = msg;
+      statusEl.className   = 'sheet-loader-status' + (type ? ' ' + type : '');
+    }
+
+    // Show current active sheet on load
+    (function() {
+      if (!isUsingDefaultSheet()) input.value = getSavedSheetUrl();
+      labelEl.textContent = isUsingDefaultSheet()
+        ? 'Using default sheet — loading…'
+        : 'Using custom sheet — loading…';
+    })();
+
+    // Update dot when data arrives
+    window.addEventListener('sheet-loaded', function(e) {
+      var count = e.detail.tabCount;
+      dotEl.className     = 'sheet-active-dot';
+      labelEl.textContent = (isUsingDefaultSheet() ? 'Default' : 'Custom') +
+        ' sheet — ' + count + ' tab' + (count === 1 ? '' : 's') + ' loaded';
+    });
+    window.addEventListener('sheet-load-error', function() {
+      dotEl.className     = 'sheet-active-dot error';
+      labelEl.textContent = 'Failed to load sheet';
+    });
+
+    // Load button
+    loadBtn.addEventListener('click', function() {
+      var val = input.value.trim();
+      if (!val)            return setStatus('Paste a Google Sheets URL first.', 'error');
+      if (!isSheetUrl(val)) return setStatus("That doesn't look like a Google Sheets link.", 'error');
+      if (!sheetExportUrl(val)) return setStatus('Could not parse the sheet ID.', 'error');
+
+      setStatus('Fetching…');
+      loadBtn.disabled = true;
+
+      fetchODS(val)
+        .then(function(all) {
+          var tabs = all.filter(function(s) { return s.name.includes('MX'); });
+          if (!tabs.length) {
+            loadBtn.disabled = false;
+            return setStatus('No MX tabs found — check the tab names.', 'error');
+          }
+          saveSheetUrl(val);
+          setStatus('Loaded ' + tabs.length + ' tab' + (tabs.length === 1 ? '' : 's') + '. Reloading…', 'success');
+          setTimeout(function() { location.reload(); }, 700);
+        })
+        .catch(function(e) {
+          loadBtn.disabled = false;
+          if (e.message.includes('403') || e.message.includes('401')) {
+            setStatus('Access denied — set sharing to "Anyone with the link can view".', 'error');
+          } else {
+            setStatus('Error: ' + e.message, 'error');
+          }
+        });
+    });
+
+    // Use default button
+    defaultBtn.addEventListener('click', function() {
+      if (isUsingDefaultSheet()) return setStatus('Already using the default sheet.', '');
+      clearSavedSheetUrl();
+      input.value = '';
+      setStatus('Switched to default. Reloading…', 'success');
+      setTimeout(function() { location.reload(); }, 700);
+    });
+
+    input.addEventListener('keydown', function(e) { if (e.key === 'Enter') loadBtn.click(); });
+  </script>
+
+</body>
+</html>
