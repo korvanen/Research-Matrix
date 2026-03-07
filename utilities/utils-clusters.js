@@ -11,7 +11,7 @@
 //   • buildCard: --ppc-on now = contrastFor(col.accent) (white/#1a1a1a, same as concept-map)
 //   • buildCard: removed manual border-left accent stripe (concept-map doesn't use it)
 //   • CSS color-mix expressions in card text/cat/split now driven by --ppc-on/--ppc-bg
-console.log('[utils-clusters.js v99999999999900000000000]');
+console.log('[utils-clusters.js v3000000000000]');
 
 var CL_MIN_SPLIT_LENGTH = 60;
 
@@ -995,12 +995,18 @@ function initClustersTool(paneEl, sidebarEl) {
   });
 
   // ── Utilities ─────────────────────────────────────────────
+  // Split text into meaningful segments on sentence boundaries, colons, dashes, newlines
   function sentenceSplit(text) {
     return text
-      .replace(/([.!?;])\s+/g, '$1\n')
+      .replace(/\r\n|\r/g, '\n')
+      .replace(/([.!?])\s+(?=[A-Z])/g, '$1\n')   // sentence end before capital
+      .replace(/([;])\s+/g, '$1\n')               // semicolons
+      .replace(/\n{2,}/g, '\n')                    // collapse blank lines
+      .replace(/:\s{1,3}(?=\S)/g, ':\n')           // colons introducing new topic
+      .replace(/\s+[—–]\s+/g, '\n')               // em/en dash as separator
       .split('\n')
       .map(s => s.trim())
-      .filter(s => s.length >= CL_MIN_SPLIT_LENGTH);
+      .filter(s => s.length >= 30);               // lowered from 60 — short sentences still meaningful
   }
 
   function avgVec(vecs) {
@@ -1016,7 +1022,8 @@ function initClustersTool(paneEl, sidebarEl) {
     const cats  = row.row && row.row.cats  ? row.row.cats.filter(c => c.trim()) : [];
     let bestText = '', bestIdx = 0;
     cells.forEach((c, i) => { if (c.trim().length > bestText.length) { bestText = c.trim(); bestIdx = i; } });
-    if (bestText.length < CL_MIN_SPLIT_LENGTH * 2) return [row];
+    // Lowered gate: just needs to be long enough to contain 2 meaningful segments
+    if (bestText.length < 60) return [row];
     const segments = sentenceSplit(bestText);
     if (segments.length <= 1) return [row];
     let segVecs;
@@ -1026,18 +1033,25 @@ function initClustersTool(paneEl, sidebarEl) {
       .map((s, i) => ({ text: s, vec: segVecs[i] }))
       .filter(x => x.vec && x.vec.length);
     if (valid.length <= 1) return [row];
-    const n = valid.length, threshold = 0.55;
+
+    // Fixed split threshold — independent of the UI link threshold slider
+    const SPLIT_THRESHOLD = 0.55;
+    const n = valid.length;
     const sim = Array.from({length: n}, (_, i) =>
       Array.from({length: n}, (_, j) => i === j ? 1 : cosineSim(valid[i].vec, valid[j].vec))
     );
+
+    // Complete-linkage grouping: j only joins group g if it's similar to ALL members of g
+    // (prevents chaining where A~B and B~C wrongly merge A and C into one group)
     const groupOf = new Array(n).fill(-1); let numGroups = 0;
     for (let i = 0; i < n; i++) {
-      if (groupOf[i] !== -1) continue; const g = numGroups++; groupOf[i] = g;
-      for (let j = i+1; j < n; j++) {
+      if (groupOf[i] !== -1) continue;
+      const g = numGroups++; groupOf[i] = g;
+      for (let j = i + 1; j < n; j++) {
         if (groupOf[j] !== -1) continue;
-        let linked = false;
-        for (let k = 0; k < j; k++) { if (groupOf[k] === g && sim[k][j] >= threshold) { linked=true; break; } }
-        if (linked) groupOf[j] = g;
+        const membersOfG = valid.map((_, k) => k).filter(k => groupOf[k] === g);
+        const allSimilar = membersOfG.every(k => sim[k][j] >= SPLIT_THRESHOLD);
+        if (allSimilar) groupOf[j] = g;
       }
     }
     if (numGroups <= 1) return [row];
