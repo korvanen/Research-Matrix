@@ -541,8 +541,8 @@ function initClustersTool(paneEl, sidebarEl) {
   const iMaxSlider   = paneEl.querySelector('#pp-cl-imax'), iMaxVal = paneEl.querySelector('#pp-cl-imax-val');
   const depthSlider  = paneEl.querySelector('#pp-cl-depth'), depthVal = paneEl.querySelector('#pp-cl-depth-val');
 
-  const CARD_W       = 120;
-  const RESIZE_MIN_W = 120;
+  const CARD_W       = 200;
+  const RESIZE_MIN_W = 200;
   const RESIZE_MIN_H = 60;
   const NEST_GAP     = 20;
   const DRAG_DELAY   = 600;
