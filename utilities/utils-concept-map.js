@@ -674,7 +674,7 @@ function contrastFor(hex) {
         g = parseInt(c.slice(2,4),16),
         b = parseInt(c.slice(4,6),16);
   const brightness = (0.299*r + 0.587*g + 0.114*b) / 255;
-  return brightness > 0.55 ? '#fff' : '#000'; // inverted
+  return brightness > 0.55 ?'#000':'#fff'; // inverted
 }
 
 
