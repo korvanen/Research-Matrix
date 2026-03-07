@@ -240,11 +240,11 @@ var CL_MIN_SPLIT_LENGTH = 60;
 }
 .pp-cl-nest:hover .pp-cl-resize-handle { opacity: 1; }
 
-/* ── Cards — MD3 Filled Card ────────────────────────────── */
+/* ── Cards ──────────────────────────────────────────────── */
 .pp-cl-card {
   border-radius: var(--radius-sm);
   border: 1px solid var(--md-sys-color-outline-variant);
-  background: var(--md-sys-color-surface);
+  background: var(--ppc-bg, var(--md-sys-color-surface));
   cursor: pointer;
   flex: 1 1 100px; min-width: 100px;
   transition: transform var(--transition-fast), box-shadow var(--transition-fast);
@@ -269,6 +269,14 @@ var CL_MIN_SPLIT_LENGTH = 60;
   from { opacity: 0; transform: translateY(4px); }
   to   { opacity: 1; transform: none; }
 }
+
+/* ── Solid-colour card: text always white (bg = hardcoded accent) ── */
+.pp-cl-card .pp-cmap-card-cat-num     { color: rgba(255,255,255,.92) !important; }
+.pp-cl-card .pp-cmap-card-level-label { color: rgba(255,255,255,.55) !important; }
+.pp-cl-card .pp-cmap-card-rule        { background: rgba(255,255,255,.22) !important; opacity: 1 !important; }
+.pp-cl-card .pp-cl-card-cat           { color: rgba(255,255,255,.60) !important; }
+.pp-cl-card .pp-cl-card-text          { color: rgba(255,255,255,.92) !important; }
+.pp-cl-card .pp-cl-card-split         { color: rgba(255,255,255,.50) !important; }
 
 .pp-cl-card-body        { padding: var(--space-1) var(--space-2) var(--space-2); }
 .pp-cl-card-cat {
@@ -341,20 +349,14 @@ var CL_MIN_SPLIT_LENGTH = 60;
 .pp-cl-tooltip-goto:hover { opacity: 1; }
 
 /* ── Cluster Spreadsheet Side Panel ─────────────────────── */
-/*
-  The sheet panel is now created via createSidePanel() from utils-panel.js.
-  All ds-panel-* classes come from design-system.css.
-  We only need a thin wrapper to position it absolutely inside #pp-cl-canvas.
-*/
 #pp-cl-sheet-host {
   position: absolute;
   top: 0; right: 0; bottom: 0;
-  /* width controlled by createSidePanel */
   display: flex;
   flex-direction: row;
   align-items: stretch;
   z-index: 60;
-  pointer-events: none; /* children re-enable */
+  pointer-events: none;
 }
 #pp-cl-sheet-host > .ds-panel {
   pointer-events: all;
@@ -398,7 +400,6 @@ var CL_MIN_SPLIT_LENGTH = 60;
 }
 #pp-cl-sheet-body::-webkit-scrollbar-track { background: transparent; }
 
-/* Empty state inside panel */
 .pp-cl-panel-empty {
   padding: var(--space-6) var(--space-4);
   font-size: var(--font-size-sm);
@@ -519,7 +520,6 @@ function initClustersTool(paneEl, sidebarEl) {
       '<div class="pp-cl-tooltip-goto" id="pp-cl-tt-goto">Go to \u2197</div>' +
     '</div>';
 
-  // Upgrade sliders with bounce animation
   if (typeof upgradeSlider === 'function') {
     paneEl.querySelectorAll('.pp-range').forEach(upgradeSlider);
   }
@@ -555,7 +555,6 @@ function initClustersTool(paneEl, sidebarEl) {
   let _topZ=10;
   let _clusterState=null;
 
-  // ── Label helpers ────────────────────────────────────────────────────────
   function outerLabel(i) {
     let label = '', n = i;
     do { label = String.fromCharCode(65 + (n % 26)) + label; n = Math.floor(n / 26) - 1; } while (n >= 0);
@@ -571,7 +570,6 @@ function initClustersTool(paneEl, sidebarEl) {
     if (state === 'ready') setTimeout(() => { statusEl.style.opacity = '0'; }, 3200);
   }
 
-  // ── Sliders ──────────────────────────────────────────────────────────────
   function syncSliders() {
     if (+oMinSlider.value > +oMaxSlider.value) oMaxSlider.value = oMinSlider.value;
     if (+iMinSlider.value > +iMaxSlider.value) iMaxSlider.value = iMinSlider.value;
@@ -618,24 +616,10 @@ function initClustersTool(paneEl, sidebarEl) {
 
   reclusterBtn.addEventListener('click', () => { clearTimeout(_reclusterTimer); _rendered = false; tryRender(); });
 
-  // ════════════════════════════════════════════════════════════════════════
-  // ── Sheet Side Panel via createSidePanel() ───────────────────────────────
-  //
-  //  The panel sits as an absolutely-positioned overlay on the right edge of
-  //  #pp-cl-canvas.  We create a host element, append it to the canvas, then
-  //  call createSidePanel() on it.
-  //
-  //  Direction: RIGHT panel → handle on the LEFT edge of the panel body.
-  //  Dragging LEFT  expands the panel (more content visible).
-  //  Dragging RIGHT shrinks the panel.
-  //  Arrow --open  (←)  shown when panel is fully closed → click opens it.
-  //  Arrow --close (→) shown when panel is fully open   → click closes it.
-  // ════════════════════════════════════════════════════════════════════════
   const sheetHost = document.createElement('div');
   sheetHost.id = 'pp-cl-sheet-host';
   canvas.appendChild(sheetHost);
 
-  // Build panel body content
   const sheetPanelContent = document.createElement('div');
   sheetPanelContent.style.cssText = 'display:flex;flex-direction:column;height:100%;';
 
@@ -656,17 +640,15 @@ function initClustersTool(paneEl, sidebarEl) {
   sheetPanelContent.appendChild(sheetPHead);
   sheetPanelContent.appendChild(sheetBody);
 
-  // Prevent canvas scroll events leaking into the sheet panel
   sheetBody.addEventListener('wheel', ev => ev.stopPropagation(), { passive: true });
 
-  // Create panel — starts closed (width 0)
   const sheetPanel = createSidePanel(sheetHost, {
     side:               'right',
-    defaultFraction:    0.40,   // 40% of sheetHost width when opened
+    defaultFraction:    0.40,
     minFraction:        0,
     maxFraction:        0.88,
     snapCloseFraction:  0.10,
-    overlapFraction:    0,      // always overlapping (it's inside canvas)
+    overlapFraction:    0,
     fullscreenFraction: 0.88,
     twoPosition:        false,
     animDuration:       260,
@@ -677,7 +659,6 @@ function initClustersTool(paneEl, sidebarEl) {
 
   sheetPanel.setContent(sheetPanelContent);
 
-  // ── Build the spreadsheet table from current cluster state ─────────────
   function updateSheetPanel() {
     if (!_clusterState) return;
     const { nonEmpty, alignedAsgns } = _clusterState;
@@ -696,12 +677,11 @@ function initClustersTool(paneEl, sidebarEl) {
     });
 
     const maxRows = Math.max(...cols.map(c => c.groups.length));
-    sheetDesc.textContent = cols.length + ' col · ' + maxRows + ' row' + (maxRows === 1 ? '' : 's');
+    sheetDesc.textContent = cols.length + ' col \u00b7 ' + maxRows + ' row' + (maxRows === 1 ? '' : 's');
 
     const table = document.createElement('table');
     table.className = 'pp-cl-table';
 
-    // Header
     const thead = document.createElement('thead');
     const hrow  = document.createElement('tr');
     const thC   = document.createElement('th');
@@ -717,7 +697,6 @@ function initClustersTool(paneEl, sidebarEl) {
     thead.appendChild(hrow);
     table.appendChild(thead);
 
-    // Body
     const tbody = document.createElement('tbody');
     for (let ri = 0; ri < maxRows; ri++) {
       const tr = document.createElement('tr');
@@ -729,7 +708,7 @@ function initClustersTool(paneEl, sidebarEl) {
         const td      = document.createElement('td');
         const members = c.groups[ri] || [];
         if (!members.length) {
-          td.className = 'pp-cl-td-empty'; td.textContent = '—';
+          td.className = 'pp-cl-td-empty'; td.textContent = '\u2014';
         } else {
           members.forEach(r => {
             const cells  = r.row && r.row.cells ? r.row.cells : (r.cells || []);
@@ -754,9 +733,6 @@ function initClustersTool(paneEl, sidebarEl) {
     sheetBody.appendChild(table);
   }
 
-  // ════════════════════════════════════════════════════════════════════════
-  // ── Canvas pan & zoom ─────────────────────────────────────────────────────
-  // ════════════════════════════════════════════════════════════════════════
   let _panning=false, _panSX=0, _panSY=0, _panBX=0, _panBY=0;
 
   canvas.addEventListener('mousedown', ev => {
@@ -790,7 +766,6 @@ function initClustersTool(paneEl, sidebarEl) {
     applyWorldTransform();
   }, { passive: false });
 
-  // Touch pinch/pan
   let _pinchD=null, _touchMidX=0, _touchMidY=0;
   canvas.addEventListener('touchstart', ev => {
     if (ev.touches.length === 2) {
@@ -816,7 +791,6 @@ function initClustersTool(paneEl, sidebarEl) {
   }, { passive: false });
   canvas.addEventListener('touchend', () => { _pinchD = null; });
 
-  // ── Nest drag ─────────────────────────────────────────────────────────────
   let _nestDrag = null;
   function makeNestDraggable(nestEl) {
     const head = nestEl.querySelector(':scope > .pp-cl-nest-head');
@@ -853,7 +827,6 @@ function initClustersTool(paneEl, sidebarEl) {
     if (!_nestDrag) return; _nestDrag.el.classList.remove('pp-cl-nest-lifted'); _nestDrag = null;
   });
 
-  // ── Nest resize ───────────────────────────────────────────────────────────
   function makeResizable(nestEl) {
     const handle = document.createElement('div');
     handle.className = 'pp-cl-resize-handle';
@@ -871,7 +844,6 @@ function initClustersTool(paneEl, sidebarEl) {
     document.addEventListener('mouseup', () => { resizing = false; });
   }
 
-  // ── Tooltip ───────────────────────────────────────────────────────────────
   function showTooltip(ev, r, text, accentColor, clusterLabel) {
     _ttRow = r;
     ttCluster.textContent = clusterLabel || '';
@@ -894,8 +866,6 @@ function initClustersTool(paneEl, sidebarEl) {
     hideTooltip();
   });
 
-  // ════════════════════════════════════════════════════════════════════════
-  // ── Cell splitting ───────────────────────────────────────────────────────
   function sentenceSplit(text) {
     return text
       .replace(/([.!?;])\s+/g, '$1\n')
@@ -911,7 +881,7 @@ function initClustersTool(paneEl, sidebarEl) {
     return Array.from(sum).map(x => x / valid.length);
   }
 
-  async function maybeSplitRow(row) {
+  async function maybySplitRow(row) {
     if (!window.EmbeddingUtils || typeof window.EmbeddingUtils.getCachedEmbedding !== 'function') return [row];
     const cells = row.row && row.row.cells ? row.row.cells : (row.cells || []);
     const cats  = row.row && row.row.cats  ? row.row.cats.filter(c => c.trim()) : [];
@@ -957,14 +927,12 @@ function initClustersTool(paneEl, sidebarEl) {
   async function splitAllRows(rows) {
     const result = [];
     for (const row of rows) {
-      const parts = await maybeSplitRow(row);
+      const parts = await maybySplitRow(row);
       parts.forEach(r => result.push(r));
     }
     return result;
   }
 
-  // ════════════════════════════════════════════════════════════════════════
-  // ── Collision resolution ─────────────────────────────────────────────────
   function resolveCollisions(rects, gap, maxPasses) {
     gap = gap || 0; maxPasses = maxPasses || 160;
     for (let pass = 0; pass < maxPasses; pass++) {
@@ -994,8 +962,6 @@ function initClustersTool(paneEl, sidebarEl) {
     }
   }
 
-  // ════════════════════════════════════════════════════════════════════════
-  // ── Clustering algorithms ─────────────────────────────────────────────────
   function cosineSim(a, b) {
     let d=0, na=0, nb=0;
     for (let i=0; i<a.length; i++) { d+=a[i]*b[i]; na+=a[i]*a[i]; nb+=b[i]*b[i]; }
@@ -1107,7 +1073,6 @@ function initClustersTool(paneEl, sidebarEl) {
     });
   }
 
-  // ── Color palette ─────────────────────────────────────────────────────────
   const FALLBACK_PALETTE = [
     { accent: '#2e7d5e', bg: '#f4faf7', label: '#fff' },
     { accent: '#4a56c8', bg: '#f4f5fd', label: '#fff' },
@@ -1121,7 +1086,6 @@ function initClustersTool(paneEl, sidebarEl) {
     return pal[i % pal.length];
   }
 
-  // ── Card builder ──────────────────────────────────────────────────────────
   function buildCard(r, col, delay, clusterLabel) {
     const cells = r.row && r.row.cells ? r.row.cells : (r.cells || []);
     const cats  = r.row && r.row.cats  ? r.row.cats.filter(c => c.trim()) : [];
@@ -1133,12 +1097,11 @@ function initClustersTool(paneEl, sidebarEl) {
     card.style.setProperty('--ppc-border', col.accent);
     if (delay) card.style.animationDelay = delay + 'ms';
 
-    // ── Top row: big cat number (left) + cluster label block (right) ──
     const topRow = document.createElement('div');
-    topRow.className = 'pp-cmap-card-top'; // reuse same class — same layout
+    topRow.className = 'pp-cmap-card-top';
     const catNumEl = document.createElement('div');
     catNumEl.className = 'pp-cmap-card-cat-num';
-    catNumEl.textContent = cats.length ? cats[0] : (clusterLabel ? clusterLabel.slice(0, 6) : '·');
+    catNumEl.textContent = cats.length ? cats[0] : (clusterLabel ? clusterLabel.slice(0, 6) : '\u00b7');
     const levelBlock = document.createElement('div');
     levelBlock.className = 'pp-cmap-card-level-block';
     const levelLbl = document.createElement('div');
@@ -1149,15 +1112,13 @@ function initClustersTool(paneEl, sidebarEl) {
     topRow.appendChild(levelBlock);
     card.appendChild(topRow);
 
-    // ── Thin rule ──
     const rule = document.createElement('div');
     rule.className = 'pp-cmap-card-rule';
     card.appendChild(rule);
 
-    // ── Body: category tag + main text ──
     const body = document.createElement('div'); body.className = 'pp-cl-card-body';
     if (cats.length) {
-      const ce = document.createElement('div'); ce.className = 'pp-cl-card-cat'; ce.textContent = cats.join(' · '); body.appendChild(ce);
+      const ce = document.createElement('div'); ce.className = 'pp-cl-card-cat'; ce.textContent = cats.join(' \u00b7 '); body.appendChild(ce);
     }
     const te = document.createElement('div'); te.className = 'pp-cl-card-text'; te.textContent = parsed.body; body.appendChild(te);
     if (r._splitN && r._splitT && r._splitT > 1) {
@@ -1172,7 +1133,6 @@ function initClustersTool(paneEl, sidebarEl) {
     return card;
   }
 
-  // ── Inner tiles with optional sub-cluster strips ──────────────────────────
   function buildInnerTiles(rows, subAsgn, col, outerLbl) {
     const frag = document.createDocumentFragment();
     if (!subAsgn || _depth <= 1) {
@@ -1209,7 +1169,6 @@ function initClustersTool(paneEl, sidebarEl) {
     return frag;
   }
 
-  // ── Outer nest builder ────────────────────────────────────────────────────
   function buildOuterNest(members, outerIdx, subAsgn) {
     const col = colForIndex(outerIdx);
     const lbl = outerLabel(outerIdx);
@@ -1219,7 +1178,7 @@ function initClustersTool(paneEl, sidebarEl) {
     nest.style.borderTopWidth  = '3px';
 
     const subCount = subAsgn ? (Math.max(...subAsgn, 0) + 1) : 0;
-    const subLabel = subAsgn && _depth > 1 ? ' · ' + subCount + ' group' + (subCount === 1 ? '' : 's') : '';
+    const subLabel = subAsgn && _depth > 1 ? ' \u00b7 ' + subCount + ' group' + (subCount === 1 ? '' : 's') : '';
 
     const head = document.createElement('div'); head.className = 'pp-cl-nest-head';
     head.style.background = col.accent + '18';
@@ -1251,7 +1210,6 @@ function initClustersTool(paneEl, sidebarEl) {
     return nest;
   }
 
-  // ── Main render ───────────────────────────────────────────────────────────
   function render(rows) {
     Array.from(world.children).forEach(c => c.remove());
     emptyEl.style.display = 'none';
@@ -1300,14 +1258,13 @@ function initClustersTool(paneEl, sidebarEl) {
     const clusterNames = nestEls.map((_, i) => outerLabel(i)).join(', ');
     subtitle.textContent =
       numTop + ' cluster' + (numTop === 1 ? '' : 's') +
-      ' (' + clusterNames + ') · ' + rows.length + ' entries' +
-      (splitCount > 0 ? ' · ' + splitCount + ' split' : '');
+      ' (' + clusterNames + ') \u00b7 ' + rows.length + ' entries' +
+      (splitCount > 0 ? ' \u00b7 ' + splitCount + ' split' : '');
 
     _clusterState = { nonEmpty, alignedAsgns: (_depth > 1 ? alignedAsgns : null) };
     updateSheetPanel();
   }
 
-  // ── Embedding + split pipeline ────────────────────────────────────────────
   function tryRender() {
     if (_rendered) return;
     if (typeof buildRowIndex !== 'function') return;
@@ -1363,10 +1320,9 @@ function initClustersTool(paneEl, sidebarEl) {
   window.addEventListener('embedder-ready',    () => setTimeout(tryRender, 120));
   window.addEventListener('embedding-progress', ev => { if (!_rendered) setStatus('loading', 'Indexing\u2026 ' + ev.detail.pct + '%'); });
   window.addEventListener('embedding-complete', ev => {
-    if (!_rendered) { subtitle.textContent = 'Indexed ' + ev.detail.total + ' entries — building clusters\u2026'; tryRender(); }
+    if (!_rendered) { subtitle.textContent = 'Indexed ' + ev.detail.total + ' entries \u2014 building clusters\u2026'; tryRender(); }
   });
 
-  // Re-render cards when dark/light mode changes so palette colours update
   window.addEventListener('df-theme-change', () => { _rendered = false; tryRender(); });
 
   return {
