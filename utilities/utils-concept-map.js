@@ -681,7 +681,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
              || CMAP_FALLBACK_PALETTE;
 
     if (pal && pal.length >= 5) {
-      const rotated = [pal[4], pal[0], pal[1], pal[2], pal[3], pal[4], pal[5] || pal[0]];
+      const rotated = [pal[0], pal[1], pal[2], pal[3], pal[4], pal[5] || pal[0], pal[6] || pal[0]];
       return rotated[Math.min(idx, rotated.length - 1)];
     }
 
