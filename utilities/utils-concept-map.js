@@ -5,7 +5,7 @@
 //     globals then hardcoded CMAP_FALLBACK_PALETTE for standalone/bridge mode.
 //   • CMAP_FALLBACK_PALETTE upgraded from 5 plain hex strings to 7 full
 //     { accent, bg, label } objects matching the global theme palette.
-console.log('[sidepanel-concept-map.js [v.9]');
+console.log('[sidepanel-concept-map.js [v.10]');
 // Level themes (used by THEMES fallback path only):
 const CMAP_LEVEL_THEMES = ['yellow','visions','relational','organizational','physical','yellow'];
 
@@ -666,6 +666,13 @@ function initConceptMapTool(paneEl, sidebarEl) {
     { accent: '#888888', bg: '#f7f7f8', label: '#fff' },
   ];
 
+  // Returns '#fff' or '#000' based on luminance of a hex accent colour
+  function contrastFor(hex) {
+    const c = hex.replace('#','');
+    const r = parseInt(c.slice(0,2),16), g = parseInt(c.slice(2,4),16), b = parseInt(c.slice(4,6),16);
+    return (0.299*r + 0.587*g + 0.114*b) / 255 > 0.55 ? '#000' : '#fff';
+  }
+
   function depthColor(level) {
     const idx = level - 1;
     const pal = (typeof getPalette === 'function' ? getPalette() : null)
@@ -673,7 +680,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
              || CMAP_FALLBACK_PALETTE;
 
     if (pal && pal.length >= 5) {
-      const rotated = [pal[0], pal[1], pal[2], pal[3], pal[4], pal[5], pal[0] || pal[1]];
+      const rotated = [pal[4], pal[0], pal[1], pal[2], pal[3], pal[4], pal[5] || pal[0]];
       return rotated[Math.min(idx, rotated.length - 1)];
     }
 
@@ -714,7 +721,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
       card.style.cssText=`width:${CARD_W}px;position:absolute;z-index:${++_topZ}`;
       card.style.setProperty('--ppc-border',accent);
       card.style.setProperty('--ppc-bg',accent);
-      card.style.setProperty('--ppc-on', lc);
+      card.style.setProperty('--ppc-on', contrastFor(accent));
 
       // ── Top row: big category letter (left) + level block (right) ──────
       const primaryRow=rows[i], isSplit=!!primaryRow._splitFrom;
