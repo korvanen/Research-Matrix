@@ -6,7 +6,7 @@
 //   • Cluster cannot shrink below the minimum space needed to tile all its cards
 //   • makeResizable receives per-nest minW/minH — enforced during resize drag
 //   • Drag threshold (4 px) prevents accidental drags on short card clicks
-console.log('[utils-clusters.js V99]');
+console.log('[utils-clusters.js V100000000000000000000000000]');
 
 var CL_MIN_SPLIT_LENGTH = 60;
 
@@ -233,23 +233,17 @@ var CL_MIN_SPLIT_LENGTH = 60;
   white-space: nowrap;
 }
 
-/* ── Nest body: CSS grid, fixed-width columns, auto-height rows ─
-   Column count is set via --pp-nest-cols (JS-controlled).
-   Rows grow to fit each card's text content.                     */
+/* ── Nest body: JS masonry — absolute positioned cards ──────
+   Height is set by JS after measuring card content heights.   */
 .pp-cl-nest-body {
+  position: relative;  /* anchor for absolute cards */
   overflow: hidden;
   padding: var(--space-3);
-  display: grid;
-  grid-template-columns: repeat(var(--pp-nest-cols, 3), var(--pp-card-w, 180px));
-  grid-auto-rows: auto;
-  gap: var(--space-2);
-  align-items: start;
   pointer-events: all;
+  /* height injected by doMasonry() */
 }
 
-.pp-cl-tile-row {
-  display: contents;
-}
+.pp-cl-tile-row { display: contents; }
 
 /* Resize handle */
 .pp-cl-resize-handle {
@@ -258,31 +252,24 @@ var CL_MIN_SPLIT_LENGTH = 60;
   cursor: nwse-resize;
   background: linear-gradient(135deg, transparent 50%, var(--md-sys-color-outline) 50%);
   border-radius: 0 0 var(--radius-sm) 0;
-  z-index: 5;
-  opacity: 0;
+  z-index: 5; opacity: 0;
   transition: opacity var(--transition-fast);
 }
 .pp-cl-nest:hover .pp-cl-resize-handle { opacity: 0.6; }
 .pp-cl-nest:hover .pp-cl-resize-handle:hover { opacity: 1; }
 
-/* ── Cards — fixed WIDTH only, height grows with text ────────
-   The grid uses auto-rows so each row is as tall as its tallest card. */
+/* ── Cards — fixed width, height = content, absolute in masonry ── */
 .pp-cl-card {
+  position: absolute;          /* placed by doMasonry() */
+  width: var(--pp-card-w, 180px);
+  box-sizing: border-box;
   border-radius: var(--radius-md);
   border: 1px solid var(--md-sys-color-outline-variant);
   background: var(--ppc-bg, var(--md-sys-color-surface));
   cursor: grab;
-  width:     var(--pp-card-w, 180px);
-  min-width: var(--pp-card-w, 180px);
-  max-width: var(--pp-card-w, 180px);
-  height: auto;
-  box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  position: relative;
   overflow: hidden;
-  flex-shrink: 0;
-  align-self: start;
   transition: box-shadow var(--transition-fast);
   animation: pp-cl-card-in .22s var(--md-motion-easing-emphasized-decel) both;
 }
@@ -298,7 +285,6 @@ var CL_MIN_SPLIT_LENGTH = 60;
 }
 
 .pp-cl-card:hover {
-  transform: translateY(-2px) scale(1.02);
   box-shadow: var(--md-elev-3);
   z-index: 10;
 }
@@ -944,41 +930,21 @@ function initClustersTool(paneEl, sidebarEl) {
     _nestDrag = null;
   });
 
-  // ── Resize handle — free drag in both axes, FLIP on col change ─
-  function makeResizable(nestEl, cardCount, minW, minH) {
+  // ── Resize handle — doMasonry on col change, measured min-size ─
+  function makeResizable(nestEl, cardCount) {
     const handle = document.createElement('div');
     handle.className = 'pp-cl-resize-handle';
     nestEl.appendChild(handle);
 
+    // Minimum width = 1 column
+    const minW = CARD_W + BODY_PAD * 2;
+    // Minimum height = measured content height (set after first doMasonry)
+    let minH = 0;
+
     let resizing = false, sw = 0, sh = 0, sx = 0, sy = 0, lastCols = -1;
 
-    // FLIP: snapshot → apply → animate from delta
-    function flipCards(applyFn) {
-      const cards  = Array.from(nestEl.querySelectorAll('.pp-cl-card'));
-      const before = cards.map(el => {
-        const r = el.getBoundingClientRect();
-        return { x: r.left, y: r.top };
-      });
-      applyFn();
-      requestAnimationFrame(() => {
-        const after = cards.map(el => {
-          const r = el.getBoundingClientRect();
-          return { x: r.left, y: r.top };
-        });
-        cards.forEach((el, i) => {
-          const dx = before[i].x - after[i].x;
-          const dy = before[i].y - after[i].y;
-          if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return;
-          el.animate(
-            [
-              { transform: `translate(${dx}px, ${dy}px)`, easing: 'cubic-bezier(0.4,0,0.2,1)' },
-              { transform: 'translate(0, 0)' }
-            ],
-            { duration: 260, fill: 'none' }
-          );
-        });
-      });
-    }
+    // Store the measured min height on the element for use during resize
+    nestEl._setMasonryMinH = function(h) { minH = HEAD_H + h + BODY_PAD * 2; };
 
     handle.addEventListener('mousedown', ev => {
       resizing = true;
@@ -987,6 +953,8 @@ function initClustersTool(paneEl, sidebarEl) {
       sx       = ev.clientX;
       sy       = ev.clientY;
       lastCols = colsFromWidth(nestEl);
+      // Snapshot current height as explicit value so resize math works
+      nestEl.style.height = sh + 'px';
       ev.stopPropagation(); ev.preventDefault();
     });
 
@@ -994,25 +962,22 @@ function initClustersTool(paneEl, sidebarEl) {
       if (!resizing) return;
 
       const newW    = Math.max(minW, sw + (ev.clientX - sx) / _zoom);
-      const newH    = Math.max(minH, sh + (ev.clientY - sy) / _zoom);
+      const newH    = Math.max(minH || sh, sh + (ev.clientY - sy) / _zoom);
       const newCols = Math.max(1, Math.min(
         Math.floor((newW - BODY_PAD * 2 + CARD_GAP) / (CARD_W + CARD_GAP)),
         cardCount
       ));
 
-      // FLIP animate only when column count changes
-      if (newCols !== lastCols) {
-        flipCards(() => {
-          nestEl.style.width = newW + 'px';
-          applyNestCols(nestEl, newCols);
-        });
-        lastCols = newCols;
-      } else {
-        nestEl.style.width = newW + 'px';
-      }
-
-      // Height is always freely draggable — no row snapping
+      nestEl.style.width  = newW + 'px';
       nestEl.style.height = newH + 'px';
+
+      // Re-run masonry with FLIP animation only when column count changes
+      if (newCols !== lastCols) {
+        const { contentH } = doMasonry(nestEl, true);
+        // Update min height to actual content height
+        nestEl._setMasonryMinH(contentH);
+        lastCols = newCols;
+      }
     });
 
     document.addEventListener('mouseup', () => { resizing = false; lastCols = -1; });
@@ -1258,20 +1223,19 @@ function initClustersTool(paneEl, sidebarEl) {
     { accent: '#888888', bg: '#f7f7f8', label: '#fff' },
   ];
 
+  // ── Text contrast — exact same logic as concept-map ─────────
+  // Concept-map uses luminance threshold 0.5 → '#1a1a1a' or '#ffffff'
   function contrastFor(hex) {
-    let c = String(hex).trim();
-    if (c[0] === '#') c = c.slice(1);
+    let c = String(hex).trim().replace('#', '');
     if (c.length === 3) c = c.split('').map(ch => ch + ch).join('');
     if (c.length === 8) c = c.slice(0, 6);
-    if (c.length !== 6) return '#fff';
-    const r = parseInt(c.slice(0, 2), 16) / 255;
-    const g = parseInt(c.slice(2, 4), 16) / 255;
-    const b = parseInt(c.slice(4, 6), 16) / 255;
-    const toLinear = v => (v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4));
-    const L = 0.2126 * toLinear(r) + 0.7152 * toLinear(g) + 0.0722 * toLinear(b);
-    const cW = 1.05 / (L + 0.05);
-    const cB = (L + 0.05) / 0.05;
-    return cW >= cB ? '#fff' : '#000';
+    if (c.length !== 6) return '#ffffff';
+    const r = parseInt(c.slice(0,2),16)/255;
+    const g = parseInt(c.slice(2,4),16)/255;
+    const b = parseInt(c.slice(4,6),16)/255;
+    const toLinear = v => v <= 0.03928 ? v/12.92 : Math.pow((v+0.055)/1.055, 2.4);
+    const L = 0.2126*toLinear(r) + 0.7152*toLinear(g) + 0.0722*toLinear(b);
+    return L > 0.5 ? '#1a1a1a' : '#ffffff';
   }
 
   function colForIndex(i) {
@@ -1366,31 +1330,74 @@ function initClustersTool(paneEl, sidebarEl) {
   }
 
   // ── Nest initial size ─────────────────────────────────────
-  function calcNestDims(cardCount) {
-    const idealCols = Math.min(Math.max(2, Math.ceil(Math.sqrt(cardCount * 1.5))), 6);
-    const rows      = Math.ceil(cardCount / idealCols);
+  // ── Masonry layout engine ─────────────────────────────────
+  // Places cards absolutely in a shortest-column order.
+  // Returns the total content height so the nest can size itself.
+  // If animate=true, FLIP-animates cards from their previous positions.
+  function doMasonry(nestEl, animate) {
+    const body  = nestEl.querySelector('.pp-cl-nest-body');
+    const cols  = colsFromWidth(nestEl);
+    const cards = Array.from(body.querySelectorAll('.pp-cl-card'));
+    if (!cards.length) return { contentH: 0, cols };
 
-    const nestW = idealCols * CARD_W + (idealCols - 1) * CARD_GAP + BODY_PAD * 2;
-    // Initial height estimate — rows × average card height
-    const AVG_H = 140;
-    const nestH = HEAD_H + rows * AVG_H + (rows - 1) * CARD_GAP + BODY_PAD * 2;
+    // FLIP — snapshot before positions
+    let before = null;
+    if (animate) {
+      before = cards.map(el => {
+        const r = el.getBoundingClientRect();
+        return { x: r.left, y: r.top };
+      });
+    }
 
-    // Min width: 1 column; min height: 1 row estimate
-    const minW = CARD_W + BODY_PAD * 2;
-    const minH = HEAD_H + AVG_H + BODY_PAD * 2;
+    // Shortest-column placement
+    const colHeights = new Array(cols).fill(0);
+    cards.forEach(card => {
+      const minH = Math.min(...colHeights);
+      const col  = colHeights.indexOf(minH);
+      card.style.left = (col * (CARD_W + CARD_GAP)) + 'px';
+      card.style.top  = colHeights[col] + 'px';
+      colHeights[col] += card.offsetHeight + CARD_GAP;
+    });
 
-    return { nestW, nestH, idealCols, minW, minH };
+    const contentH = Math.max(...colHeights) - CARD_GAP;
+    body.style.height = contentH + 'px';
+
+    // FLIP — animate from snapshots to new positions
+    if (animate && before) {
+      requestAnimationFrame(() => {
+        cards.forEach((el, i) => {
+          const after = el.getBoundingClientRect();
+          const dx = before[i].x - after.left;
+          const dy = before[i].y - after.top;
+          if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return;
+          el.animate(
+            [
+              { transform: `translate(${dx}px,${dy}px)`, easing: 'cubic-bezier(0.4,0,0.2,1)' },
+              { transform: 'translate(0,0)' }
+            ],
+            { duration: 280, fill: 'none' }
+          );
+        });
+      });
+    }
+
+    return { contentH, cols };
   }
 
-  // Helper: derive column count from current nest pixel width
+  // Column count from current nest pixel width
   function colsFromWidth(nestEl) {
     const innerW = nestEl.offsetWidth - BODY_PAD * 2;
     return Math.max(1, Math.floor((innerW + CARD_GAP) / (CARD_W + CARD_GAP)));
   }
 
-  // Apply column count to the nest body's CSS variable
-  function applyNestCols(nestEl, cols) {
-    nestEl.querySelector('.pp-cl-nest-body').style.setProperty('--pp-nest-cols', cols);
+  // Initial nest width estimate (real height set after first doMasonry)
+  function calcNestDims(cardCount) {
+    const idealCols = Math.min(Math.max(2, Math.ceil(Math.sqrt(cardCount * 1.5))), 6);
+    const nestW = idealCols * CARD_W + (idealCols - 1) * CARD_GAP + BODY_PAD * 2;
+    const AVG_H = 120;
+    const rows  = Math.ceil(cardCount / idealCols);
+    const estH  = HEAD_H + rows * AVG_H + (rows - 1) * CARD_GAP + BODY_PAD * 2;
+    return { nestW, estH };
   }
 
   // ── Outer nest builder ────────────────────────────────────
@@ -1404,7 +1411,6 @@ function initClustersTool(paneEl, sidebarEl) {
     const subCount = subAsgn ? (Math.max(...subAsgn, 0) + 1) : 0;
     const subLabel = subAsgn && _depth > 1 ? ' \u00b7 ' + subCount + ' group' + (subCount === 1 ? '' : 's') : '';
 
-    // Header (cosmetic only — drag is on whole nest)
     const head = document.createElement('div');
     head.className = 'pp-cl-nest-head';
     head.style.background = col.accent + '18';
@@ -1432,18 +1438,14 @@ function initClustersTool(paneEl, sidebarEl) {
     nest.appendChild(body);
     body.appendChild(buildInnerTiles(members, subAsgn, col, lbl));
 
-    // Set exact grid dimensions
-    const { nestW, nestH, idealCols, minW, minH } = calcNestDims(members.length);
-    nest.style.width  = nestW + 'px';
-    nest.style.height = nestH + 'px';
+    // Set initial width; height set after masonry runs post-DOM-insert
+    const { nestW, estH } = calcNestDims(members.length);
+    nest.style.width = nestW + 'px';
     nest._estW = nestW;
-    nest._estH = nestH;
-
-    // Tell the grid how many columns to use
-    applyNestCols(nest, idealCols);
+    nest._estH = estH;   // used for collision layout only
 
     makeNestDraggable(nest);
-    makeResizable(nest, members.length, minW, minH);
+    makeResizable(nest, members.length);
     return nest;
   }
 
@@ -1475,24 +1477,41 @@ function initClustersTool(paneEl, sidebarEl) {
       nestEls.push(nest);
     });
 
-    const cols = Math.max(1, Math.ceil(Math.sqrt(nestEls.length)));
-    const topRects = nestEls.map((n, i) => ({
-      x: NEST_GAP + (i % cols) * ((n._estW || 200) + NEST_GAP * 2),
-      y: NEST_GAP + Math.floor(i / cols) * ((n._estH || 200) + NEST_GAP * 2),
-      w: n._estW || 200,
-      h: n._estH || 200,
-      el: n,
-    }));
+    // Run masonry now that cards are in DOM and have real heights.
+    // Use two rAFs: first lets browser paint initial state, second reads heights.
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        nestEls.forEach(nest => {
+          const { contentH } = doMasonry(nest, false);
+          // Store measured content height as resize minimum
+          if (nest._setMasonryMinH) nest._setMasonryMinH(contentH);
+          // Snap nest height to actual content
+          const realH = HEAD_H + contentH + BODY_PAD * 2;
+          nest.style.height = realH + 'px';
+          nest._estH = realH;
+        });
 
-    resolveCollisions(topRects, NEST_GAP, 160);
+        // Now position with accurate heights
+        const cols = Math.max(1, Math.ceil(Math.sqrt(nestEls.length)));
+        const topRects = nestEls.map((n, i) => ({
+          x: NEST_GAP + (i % cols) * ((n._estW || 200) + NEST_GAP * 2),
+          y: NEST_GAP + Math.floor(i / cols) * ((n._estH || 200) + NEST_GAP * 2),
+          w: n._estW || 200,
+          h: n._estH || 200,
+          el: n,
+        }));
 
-    const minX = Math.min(...topRects.map(r => r.x));
-    const minY = Math.min(...topRects.map(r => r.y));
-    const offX = minX < NEST_GAP ? NEST_GAP - minX : 0;
-    const offY = minY < NEST_GAP ? NEST_GAP - minY : 0;
-    topRects.forEach(r => {
-      r.el.style.left = (r.x + offX) + 'px';
-      r.el.style.top  = (r.y + offY) + 'px';
+        resolveCollisions(topRects, NEST_GAP, 160);
+
+        const minX = Math.min(...topRects.map(r => r.x));
+        const minY = Math.min(...topRects.map(r => r.y));
+        const offX = minX < NEST_GAP ? NEST_GAP - minX : 0;
+        const offY = minY < NEST_GAP ? NEST_GAP - minY : 0;
+        topRects.forEach(r => {
+          r.el.style.left = (r.x + offX) + 'px';
+          r.el.style.top  = (r.y + offY) + 'px';
+        });
+      });
     });
 
     const splitCount   = rows.filter(r => r._splitN && r._splitN > 1).length;
