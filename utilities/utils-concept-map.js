@@ -668,27 +668,15 @@ function initConceptMapTool(paneEl, sidebarEl) {
 
 // Returns '#fff' or '#000' to maximize contrast against the given hex background color
 function contrastFor(hex) {
-  let c = String(hex).trim();
-  if (c[0] === '#') c = c.slice(1);
-
-  // Expand 3-digit shorthand, ignore alpha in 8-digit
+  let c = hex.replace('#','');
   if (c.length === 3) c = c.split('').map(ch => ch + ch).join('');
-  if (c.length === 8) c = c.slice(0, 6);
-  if (c.length !== 6) throw new Error('Invalid hex color: ' + hex);
-
-  const r = parseInt(c.slice(0, 2), 16) / 255;
-  const g = parseInt(c.slice(2, 4), 16) / 255;
-  const b = parseInt(c.slice(4, 6), 16) / 255;
-
-  const toLinear = v => (v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4));
-  const rl = toLinear(r), gl = toLinear(g), bl = toLinear(b);
-  const L = 0.2126 * rl + 0.7152 * gl + 0.0722 * bl;
-
-  const contrastWithWhite = (1.0 + 0.05) / (L + 0.05);
-  const contrastWithBlack = (L + 0.05) / 0.05;
-
-  return contrastWithWhite >= contrastWithBlack ? '#fff' : '#000';
+  const r = parseInt(c.slice(0,2),16),
+        g = parseInt(c.slice(2,4),16),
+        b = parseInt(c.slice(4,6),16);
+  const brightness = (0.299*r + 0.587*g + 0.114*b) / 255;
+  return brightness > 0.55 ? '#fff' : '#000'; // inverted
 }
+
 
 
   function depthColor(level) {
