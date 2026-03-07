@@ -1,11 +1,11 @@
-// utils-concept-map.js — Concept Map v21
+// utils-concept-map.js — Concept Map v1
 // v19 → v20 changes:
 //   • Fixed light/dark mode support: depthColor() now reads live CSS custom
 //     properties instead of static THEMES object values
 //   • Text color (--ppc-on) now adapts based on html.dark/html.light class
 //   • Background and accent colors read from --raw-{theme}-bg and --raw-{theme}-mid
 //     which update automatically when theme changes
-console.log('[utils-concept-map.js [v.21]');
+console.log('[utils-concept-map.js [v.1]');
 
 // Level themes — must match order/names in THEMES (utils-shared.js)
 const CMAP_LEVEL_THEMES = ['yellow','visions','relational','organizational','physical','yellow'];
@@ -852,16 +852,42 @@ function initConceptMapTool(paneEl, sidebarEl) {
             redrawConnectors();
           });
           
+          // Run collision detection after a short delay
+          setTimeout(() => {
+            for (let pass=0;pass<30;pass++) {
+              let moved=false;
+              _liveRects.forEach((ra,ka)=>{ _liveRects.forEach((rb,kb)=>{ if(ka===kb) return; if(ra.x<rb.x+rb.w+MM_PAD&&ra.x+ra.w+MM_PAD>rb.x&&ra.y<rb.y+rb.h+MM_PAD&&ra.y+ra.h+MM_PAD>rb.y){ const dR=rb.x+rb.w+MM_PAD-ra.x, dL=ra.x+ra.w+MM_PAD-rb.x, dD=rb.y+rb.h+MM_PAD-ra.y, dU=ra.y+ra.h+MM_PAD-rb.y; if(Math.min(dR,dL)<=Math.min(dD,dU)) ra.x+=dR<dL?dR:-dL; else ra.y+=dD<dU?dD:-dU; const el=cardEls.get(ka); if(el){el.style.left=ra.x+'px';el.style.top=ra.y+'px';} moved=true; } }); });
+              if (!moved) break;
+            }
+            redrawConnectors();
+          }, 50);
+          
         } else {
           // Layout change: smooth transition from current position to new position
+          
+          // First, apply collision detection to the TARGET positions (before animating)
+          // This ensures we animate to collision-free positions
+          const targetRects = new Map();
           posMap.forEach((pos, id) => {
+            targetRects.set(id, { x: pos.x, y: pos.y, w: CARD_W, h: cH(id) });
+          });
+          
+          // Run collision detection on target positions
+          for (let pass=0;pass<30;pass++) {
+            let moved=false;
+            targetRects.forEach((ra,ka)=>{ targetRects.forEach((rb,kb)=>{ if(ka===kb) return; if(ra.x<rb.x+rb.w+MM_PAD&&ra.x+ra.w+MM_PAD>rb.x&&ra.y<rb.y+rb.h+MM_PAD&&ra.y+ra.h+MM_PAD>rb.y){ const dR=rb.x+rb.w+MM_PAD-ra.x, dL=ra.x+ra.w+MM_PAD-rb.x, dD=rb.y+rb.h+MM_PAD-ra.y, dU=ra.y+ra.h+MM_PAD-rb.y; if(Math.min(dR,dL)<=Math.min(dD,dU)) ra.x+=dR<dL?dR:-dL; else ra.y+=dD<dU?dD:-dU; moved=true; } }); });
+            if (!moved) break;
+          }
+          
+          // Now animate to the collision-free target positions
+          targetRects.forEach((pos, id) => {
             const el = cardEls.get(id);
             if (!el) return;
             
-            el.style.transition = `left ${ANIMATE_DURATION}ms cubic-bezier(0.2, 0, 0, 1), top ${ANIMATE_DURATION}ms cubic-bezier(0.2, 0, 0, 1)`;
+            el.style.transition = `left ${ANIMATE_DURATION}ms cubic-bezier(0.4, 0, 0.2, 1), top ${ANIMATE_DURATION}ms cubic-bezier(0.4, 0, 0.2, 1)`;
             el.style.left = pos.x + 'px';
             el.style.top = pos.y + 'px';
-            _liveRects.set(id, { x: pos.x, y: pos.y, w: CARD_W, h: cH(id) });
+            _liveRects.set(id, { x: pos.x, y: pos.y, w: pos.w, h: pos.h });
           });
           
           // Animate connectors during transition
@@ -881,16 +907,6 @@ function initConceptMapTool(paneEl, sidebarEl) {
           }
           requestAnimationFrame(animateConnectors);
         }
-        
-        // Collision detection runs after animation/placement completes
-        setTimeout(() => {
-          for (let pass=0;pass<30;pass++) {
-            let moved=false;
-            _liveRects.forEach((ra,ka)=>{ _liveRects.forEach((rb,kb)=>{ if(ka===kb) return; if(ra.x<rb.x+rb.w+MM_PAD&&ra.x+ra.w+MM_PAD>rb.x&&ra.y<rb.y+rb.h+MM_PAD&&ra.y+ra.h+MM_PAD>rb.y){ const dR=rb.x+rb.w+MM_PAD-ra.x, dL=ra.x+ra.w+MM_PAD-rb.x, dD=rb.y+rb.h+MM_PAD-ra.y, dU=ra.y+ra.h+MM_PAD-rb.y; if(Math.min(dR,dL)<=Math.min(dD,dU)) ra.x+=dR<dL?dR:-dL; else ra.y+=dD<dU?dD:-dU; const el=cardEls.get(ka); if(el){el.style.left=ra.x+'px';el.style.top=ra.y+'px';} moved=true; } }); });
-            if (!moved) break;
-          }
-          redrawConnectors();
-        }, isInitialRender ? 50 : ANIMATE_DURATION + 50);
       }
 
       function layoutRadial() {
