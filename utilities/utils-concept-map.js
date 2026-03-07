@@ -9,7 +9,7 @@
 //   • depthColor: added missing paletteIdx + theme variable (was ReferenceError)
 //   • depthColor: rewrote getLuminance without array destructuring (was SyntaxError)
 //   • Removed dead CMAP_LEVEL_THEMES constant
-console.log('[utils-concept-map.js v.4]');
+console.log('[utils-concept-map.js v.5]');
 
 const CMAP_PARENT_CHILD_THRESHOLD = 0.50;
 const CMAP_MIN_SPLIT_LENGTH = 60;
@@ -861,14 +861,27 @@ function initConceptMapTool(paneEl, sidebarEl) {
             targetRects.forEach(function(ra,ka){ targetRects.forEach(function(rb,kb){ if(ka===kb) return; if(ra.x<rb.x+rb.w+MM_PAD&&ra.x+ra.w+MM_PAD>rb.x&&ra.y<rb.y+rb.h+MM_PAD&&ra.y+ra.h+MM_PAD>rb.y){ var dR=rb.x+rb.w+MM_PAD-ra.x, dL=ra.x+ra.w+MM_PAD-rb.x, dD=rb.y+rb.h+MM_PAD-ra.y, dU=ra.y+ra.h+MM_PAD-rb.y; if(Math.min(dR,dL)<=Math.min(dD,dU)) ra.x+=dR<dL?dR:-dL; else ra.y+=dD<dU?dD:-dU; moved=true; } }); });
             if (!moved) break;
           }
-          targetRects.forEach(function(pos, id) {
-            var el = cardEls.get(id);
-            if (!el) return;
-            el.style.transition = 'left '+ANIMATE_DURATION+'ms cubic-bezier(0.4,0,0.2,1), top '+ANIMATE_DURATION+'ms cubic-bezier(0.4,0,0.2,1)';
-            el.style.left = pos.x + 'px';
-            el.style.top = pos.y + 'px';
-            _liveRects.set(id, { x: pos.x, y: pos.y, w: pos.w, h: pos.h });
-          });
+// Step 1: ensure cards are at 0,0 with no transition
+targetRects.forEach(function(pos, id) {
+  var el = cardEls.get(id);
+  if (!el) return;
+  el.style.transition = 'none';
+  el.style.left = '0px';
+  el.style.top = '0px';
+});
+
+// Step 2: force reflow so browser registers the 0,0 position as "from"
+cardEls.forEach(function(el) { el.offsetHeight; });
+
+// Step 3: now set transition + target — browser animates from 0,0
+targetRects.forEach(function(pos, id) {
+  var el = cardEls.get(id);
+  if (!el) return;
+  el.style.transition = 'left '+ANIMATE_DURATION+'ms cubic-bezier(0.4,0,0.2,1), top '+ANIMATE_DURATION+'ms cubic-bezier(0.4,0,0.2,1)';
+  el.style.left = pos.x + 'px';
+  el.style.top = pos.y + 'px';
+  _liveRects.set(id, { x: pos.x, y: pos.y, w: pos.w, h: pos.h });
+});
           var startTime = performance.now();
           function animateConnectors(currentTime) {
             var elapsed = currentTime - startTime;
