@@ -2,7 +2,7 @@
 // utils-shared.js — shared data, theme, and UI utilities
 // Loaded by: index.html, tools/spreadsheet.html, tools/*.html
 // ════════════════════════════════════════════════════════════════
-console.log('[utils-shared.js v.10]');
+console.log('[utils-shared.js v.11]');
 
 // ════════════════════════════════════════════════════════════════
 // DARK / LIGHT MODE
@@ -228,7 +228,7 @@ function modifyColor(hex, { lightness = 0, saturation = 0, hue = 0, alpha } = {}
 
 const THEME_DEFS = [
   { name: 'yellow',         base: '#D4AF37', tabIndex: 0 },
-  { name: 'visions',        base: '#800020', tabIndex: 1 },
+  { name: 'visions',        base: '#222021', tabIndex: 1 },
   { name: 'relational',     base: '#535fc1', tabIndex: 2 },
   { name: 'organizational', base: '#5a3f86', tabIndex: 3 },
   { name: 'physical',       base: '#bb463c', tabIndex: 4 },
