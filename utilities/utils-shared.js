@@ -227,14 +227,14 @@ function modifyColor(hex, { lightness = 0, saturation = 0, hue = 0, alpha } = {}
 // ════════════════════════════════════════════════════════════════
 
 const THEME_DEFS = [
-  { name: 'Bubblegum',      base: '#EDBOCB', tabIndex: 0 },
-  { name: 'Dark Berry',     base: '#GELESA', tabIndex: 1 },
+  { name: 'Bubblegum',      base: '#EDB0CB', tabIndex: 0 },
+  { name: 'Dark Berry',     base: '#6E1E3A', tabIndex: 1 },
   { name: 'Carrot',         base: '#076A40', tabIndex: 2 },
   { name: 'Lemon Curd', base: '#FADD8B', tabIndex: 3 },
-  { name: 'Baby Blue',       base: '#A4BDEO', tabIndex: 4 },
+  { name: 'Baby Blue',       base: '#A4BDE0', tabIndex: 4 },
   { name: 'Sailor Blue',       base: '#274FBB', tabIndex: 5 },
   { name: 'Forest',       base: '#25533F', tabIndex: 6 },
-  { name: 'Limeade',       base: '##C90763', tabIndex: 7 },
+  { name: 'Limeade',       base: '#C90763', tabIndex: 7 },
   { name: 'default',        base: '#a1a1a1'               },
 ];
 
