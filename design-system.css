@@ -1383,7 +1383,7 @@ mark.pkw {
   line-height: 1 !important;
   font-weight: 400 !important;
   font-style: italic !important;
-  color: var(--ppc-border, var(--md-sys-color-on-surface)) !important;
+  color: var(--md-sys-color-on-surface) !important;
   letter-spacing: -0.03em !important;
   opacity: .85 !important;
   flex: 1 !important;
@@ -1405,7 +1405,7 @@ mark.pkw {
   font-size: 22px !important;
   font-weight: var(--font-weight-bold) !important;
   line-height: 1 !important;
-  color: var(--ppc-border, var(--md-sys-color-on-surface)) !important;
+  color: var(--md-sys-color-on-surface) !important;
   letter-spacing: -0.02em !important;
 }
 .pp-cmap-card-level-label {
@@ -1414,7 +1414,7 @@ mark.pkw {
   font-weight: var(--font-weight-medium) !important;
   letter-spacing: var(--letter-spacing-caps) !important;
   text-transform: uppercase !important;
-  color: var(--ppc-border, var(--md-sys-color-outline)) !important;
+  color: var(--md-sys-color-outline) !important;
   opacity: .7 !important;
   margin-top: 3px !important;
 }
@@ -1425,7 +1425,7 @@ mark.pkw {
   font-size: 9px !important;
   font-weight: var(--font-weight-bold) !important;
   letter-spacing: .05em !important;
-  color: var(--ppc-border, var(--md-sys-color-outline)) !important;
+  color: var(--md-sys-color-outline) !important;
   opacity: .65 !important;
   text-align: right !important;
   padding: 0 14px 0 !important;
@@ -1471,7 +1471,7 @@ mark.pkw {
   font-weight: var(--font-weight-medium) !important;
   letter-spacing: var(--letter-spacing-caps) !important;
   text-transform: uppercase !important;
-  color: var(--ppc-border, var(--md-sys-color-on-surface-variant)) !important;
+  color: var(--md-sys-color-on-surface-variant) !important;
   opacity: .7 !important;
   margin-bottom: 1px !important;
 }
@@ -1484,7 +1484,7 @@ mark.pkw {
   font-style: normal !important;
   line-height: 1.28 !important;
   letter-spacing: -0.01em !important;
-  color: var(--ppc-border, var(--md-sys-color-on-surface)) !important;
+  color: var(--md-sys-color-on-surface) !important;
   word-break: break-word !important;
   overflow-wrap: break-word !important;
 }
@@ -1496,7 +1496,7 @@ mark.pkw {
   font-weight: var(--font-weight-medium) !important;
   letter-spacing: var(--letter-spacing-caps) !important;
   text-transform: uppercase !important;
-  color: var(--ppc-border, var(--md-sys-color-outline)) !important;
+  color: var(--md-sys-color-outline) !important;
   opacity: .7 !important;
 }
 
@@ -1518,7 +1518,7 @@ mark.pkw {
   font-family: var(--font-family) !important;
   font-size: 10px !important;
   font-weight: var(--font-weight-medium) !important;
-  color: var(--ppc-border, var(--md-sys-color-outline)) !important;
+  color: var(--md-sys-color-outline) !important;
   display: flex !important;
   align-items: center !important;
   gap: 4px !important;
@@ -1526,7 +1526,7 @@ mark.pkw {
 }
 .pp-cmap-sim-pct {
   font-weight: var(--font-weight-bold) !important;
-  color: var(--ppc-border, var(--md-sys-color-on-surface)) !important;
+  color: var(--md-sys-color-on-surface) !important;
   opacity: .8 !important;
 }
 
@@ -1537,7 +1537,7 @@ mark.pkw {
   font-weight: var(--font-weight-medium) !important;
   letter-spacing: var(--letter-spacing-caps) !important;
   text-transform: uppercase !important;
-  color: var(--ppc-border, var(--md-sys-color-outline)) !important;
+  color: var(--md-sys-color-outline) !important;
   opacity: .6 !important;
   padding: 6px 14px 10px !important;
   display: block !important;
@@ -1604,7 +1604,7 @@ mark.pkw {
   font-weight: var(--font-weight-medium) !important;
   letter-spacing: var(--letter-spacing-caps) !important;
   text-transform: uppercase !important;
-  color: var(--ppc-border, var(--md-sys-color-on-surface-variant)) !important;
+  color: var(--md-sys-color-on-surface-variant) !important;
   opacity: .7 !important;
   margin-bottom: 3px !important;
 }
@@ -1617,7 +1617,7 @@ mark.pkw {
   font-style: normal !important;
   line-height: 1.28 !important;
   letter-spacing: -0.01em !important;
-  color: var(--ppc-border, var(--md-sys-color-on-surface)) !important;
+  color: var(--md-sys-color-on-surface) !important;
   display: -webkit-box !important;
   -webkit-line-clamp: 3 !important;
   -webkit-box-orient: vertical !important;
@@ -1631,7 +1631,7 @@ mark.pkw {
   font-weight: var(--font-weight-medium) !important;
   letter-spacing: var(--letter-spacing-caps) !important;
   text-transform: uppercase !important;
-  color: var(--ppc-border, var(--md-sys-color-outline)) !important;
+  color: var(--md-sys-color-outline) !important;
   opacity: .6 !important;
   margin-top: 4px !important;
 }
