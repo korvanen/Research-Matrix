@@ -1475,12 +1475,12 @@ mark.pkw {
   margin-bottom: 1px !important;
 }
 
-/* Main concept text — large italic serif, like the editorial headline */
+/* Main concept text — large serif, like the editorial headline */
 .pp-cmap-cell-text {
   font-family: var(--font-family-serif) !important;
   font-size: 15px !important;
   font-weight: 400 !important;
-  font-style: italic !important;
+  font-style: normal !important;
   line-height: 1.28 !important;
   letter-spacing: -0.01em !important;
   color: var(--ppc-border, var(--md-sys-color-on-surface)) !important;
@@ -1608,12 +1608,12 @@ mark.pkw {
   margin-bottom: 3px !important;
 }
 
-/* Main text — italic serif headline */
+/* Main text — serif headline */
 .pp-cl-card-text {
   font-family: var(--font-family-serif) !important;
   font-size: 15px !important;
   font-weight: 400 !important;
-  font-style: italic !important;
+  font-style: normal !important;
   line-height: 1.28 !important;
   letter-spacing: -0.01em !important;
   color: var(--ppc-border, var(--md-sys-color-on-surface)) !important;
