@@ -227,11 +227,14 @@ function modifyColor(hex, { lightness = 0, saturation = 0, hue = 0, alpha } = {}
 // ════════════════════════════════════════════════════════════════
 
 const THEME_DEFS = [
-  { name: 'yellow',         base: '#D4AF37', tabIndex: 0 },
-  { name: 'visions',        base: '#222021', tabIndex: 1 },
-  { name: 'relational',     base: '#535fc1', tabIndex: 2 },
-  { name: 'organizational', base: '#5a3f86', tabIndex: 3 },
-  { name: 'physical',       base: '#bb463c', tabIndex: 4 },
+  { name: 'Bubblegum',      base: '#EDBOCB', tabIndex: 0 },
+  { name: 'Dark Berry',     base: '#GELESA', tabIndex: 1 },
+  { name: 'Carrot',         base: '#076A40', tabIndex: 2 },
+  { name: 'Lemon Curd', base: '#FADD8B', tabIndex: 3 },
+  { name: 'Baby Blue',       base: '#A4BDEO', tabIndex: 4 },
+  { name: 'Sailor Blue',       base: '#274FBB', tabIndex: 5 },
+  { name: 'Forest',       base: '#25533F', tabIndex: 6 },
+  { name: 'Limeade',       base: '##C90763', tabIndex: 7 },
   { name: 'default',        base: '#a1a1a1'               },
 ];
 
