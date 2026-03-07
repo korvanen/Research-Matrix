@@ -1081,7 +1081,7 @@ function initClustersTool(paneEl, sidebarEl) {
     { accent: '#c8991a', bg: '#fffdf5', label: '#fff' },
     { accent: '#888888', bg: '#f7f7f8', label: '#fff' },
   ];
-// Returns '#fff' or '#000' based on WCAG contrast against the given hex color
+// Returns '#fff' or '#000' to maximize contrast against the given hex background color
 function contrastFor(hex) {
   let c = String(hex).trim();
   if (c[0] === '#') c = c.slice(1);
@@ -1097,7 +1097,6 @@ function contrastFor(hex) {
 
   const toLinear = v => (v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4));
   const rl = toLinear(r), gl = toLinear(g), bl = toLinear(b);
-
   const L = 0.2126 * rl + 0.7152 * gl + 0.0722 * bl;
 
   const contrastWithWhite = (1.0 + 0.05) / (L + 0.05);
@@ -1105,6 +1104,7 @@ function contrastFor(hex) {
 
   return contrastWithWhite >= contrastWithBlack ? '#fff' : '#000';
 }
+
 
   function colForIndex(i) {
     const pal = (typeof getPalette === 'function' ? getPalette() : null) || window.PP_PALETTE || FALLBACK_PALETTE;
