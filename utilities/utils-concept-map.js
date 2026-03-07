@@ -5,7 +5,7 @@
 //     globals then hardcoded CMAP_FALLBACK_PALETTE for standalone/bridge mode.
 //   • CMAP_FALLBACK_PALETTE upgraded from 5 plain hex strings to 7 full
 //     { accent, bg, label } objects matching the global theme palette.
-console.log('[sidepanel-concept-map.js [v.6]');
+console.log('[sidepanel-concept-map.js [v.9]');
 // Level themes (used by THEMES fallback path only):
 const CMAP_LEVEL_THEMES = ['yellow','visions','relational','organizational','physical','yellow'];
 
@@ -632,14 +632,17 @@ function initConceptMapTool(paneEl, sidebarEl) {
   function depthColor(level) {
     const idx = level - 1; // 0-based
 
-    // 1. Best: window.PP_PALETTE from script.js — rotate so yellow (index 4) is level 1
-    if (window.PP_PALETTE && window.PP_PALETTE.length >= 5) {
-      const pal = window.PP_PALETTE;
+    // Use getPalette() if available (dark-mode aware), else fall back to PP_PALETTE
+    const pal = (typeof getPalette === 'function' ? getPalette() : null)
+             || window.PP_PALETTE
+             || CMAP_FALLBACK_PALETTE;
+
+    if (pal && pal.length >= 5) {
       const rotated = [pal[4], pal[0], pal[1], pal[2], pal[3], pal[4], pal[5] || pal[0]];
       return rotated[Math.min(idx, rotated.length - 1)];
     }
 
-    // 2. THEMES globals (same-page context, PP_PALETTE not yet available)
+    // THEMES globals fallback
     if (typeof THEMES !== 'undefined') {
       const tname = (idx < CMAP_LEVEL_THEMES.length) ? CMAP_LEVEL_THEMES[idx] : 'default';
       const theme = THEMES[tname] || THEMES.default || {};
@@ -651,7 +654,6 @@ function initConceptMapTool(paneEl, sidebarEl) {
       };
     }
 
-    // 3. Hardcoded fallback (standalone / bridge mode)
     return CMAP_FALLBACK_PALETTE[Math.min(idx, CMAP_FALLBACK_PALETTE.length - 1)];
   }
 
@@ -911,6 +913,9 @@ function initConceptMapTool(paneEl, sidebarEl) {
   document.addEventListener('embeddings-ready',()=>setTimeout(tryRender,120));
   window.addEventListener('embedding-progress',ev=>{ if(!_rendered) setStatus('loading','Indexing\u2026 '+ev.detail.pct+'%'); });
   window.addEventListener('embedder-ready',()=>setTimeout(tryRender,120));
+
+  // Re-render cards when dark/light mode changes so palette colours update
+  window.addEventListener('df-theme-change', () => { _rendered=false; tryRender(); });
 
 return {
     reset() {
