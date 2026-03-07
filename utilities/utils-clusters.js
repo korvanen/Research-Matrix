@@ -6,7 +6,7 @@
 //   • Cluster cannot shrink below the minimum space needed to tile all its cards
 //   • makeResizable receives per-nest minW/minH — enforced during resize drag
 //   • Drag threshold (4 px) prevents accidental drags on short card clicks
-console.log('[utils-clusters.js V50]');
+console.log('[utils-clusters.js V1]');
 
 var CL_MIN_SPLIT_LENGTH = 60;
 
@@ -233,16 +233,15 @@ var CL_MIN_SPLIT_LENGTH = 60;
   white-space: nowrap;
 }
 
-/* ── Nest body: CSS grid auto-fills fixed-width, auto-height cards ── */
+/* ── Nest body: CSS columns — masonry/bento tiling ─────────
+   Cards stack in columns; each card is only as tall as its text.
+   Shorter cards do not leave wasted row space.                   */
 .pp-cl-nest-body {
-  flex: 1; 
-  overflow: visible;         /* cards auto-size; nest wraps them */
+  overflow: visible;
   padding: var(--space-3);
-  display: grid;
-  grid-template-columns: repeat(auto-fill, var(--pp-card-w, 180px));
-  gap: var(--space-2);
-  align-content: start;
-  align-items: start;        /* each card grows to its own content height */
+  columns: var(--pp-card-w, 180px);
+  column-gap: var(--space-2);
+  column-fill: balance;
   pointer-events: all;
 }
 
@@ -270,20 +269,19 @@ var CL_MIN_SPLIT_LENGTH = 60;
   border: 1px solid var(--md-sys-color-outline-variant);
   background: var(--ppc-bg, var(--md-sys-color-surface));
   cursor: grab;
-  /* Fixed width only */
-  width:     var(--pp-card-w, 180px);
-  min-width: var(--pp-card-w, 180px);
-  max-width: var(--pp-card-w, 180px);
-  /* Height is auto — grows to fit content */
-  height: auto;
-  /* Layout */
+  /* Fixed width — columns layout sets it to 100% of column */
+  width: 100%;
+  box-sizing: border-box;
+  /* Height grows with content */
   display: flex;
   flex-direction: column;
   position: relative;
   overflow: visible;
-  box-sizing: border-box;
-  flex-shrink: 0;
-  align-self: start;          /* grid: don't stretch to tallest sibling */
+  /* Column layout: prevent card breaking across columns */
+  break-inside: avoid;
+  -webkit-column-break-inside: avoid;
+  /* Gap between cards in same column */
+  margin-bottom: var(--space-2);
   /* Animation */
   transition: transform var(--transition-fast), box-shadow var(--transition-fast);
   animation: pp-cl-card-in .22s var(--md-motion-easing-emphasized-decel) both;
@@ -619,7 +617,7 @@ function initClustersTool(paneEl, sidebarEl) {
   const depthSlider  = paneEl.querySelector('#pp-cl-depth'), depthVal = paneEl.querySelector('#pp-cl-depth-val');
 
   // ── Fixed card width ──────────────────────────────────────
-  const CARD_W       = 300;   // px — constant card width; height is auto
+  const CARD_W       = 180;   // px — constant card width; height is auto
   const CARD_GAP     = 8;     // px — gap between cards in grid
   const BODY_PAD     = 12;    // px — padding inside nest body
   const HEAD_H       = 40;    // px — nest header height (estimated)
@@ -949,26 +947,96 @@ function initClustersTool(paneEl, sidebarEl) {
     _nestDrag = null;
   });
 
-  // ── Resize handle — enforces minimum width only ───────────
+  // ── Resize handle — FLIP animation + measured min in both axes ──
   function makeResizable(nestEl, minW) {
     const handle = document.createElement('div');
     handle.className = 'pp-cl-resize-handle';
     nestEl.appendChild(handle);
-    let resizing=false, sw=0, sh=0, sx=0, sy=0;
+
+    let resizing = false, sw = 0, sh = 0, sx = 0, sy = 0;
+    let minH = 0;  // measured after first render
+
+    // Measure the nest's natural content height after it has rendered
+    // and store it as the minimum for vertical resizing.
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        minH = nestEl.offsetHeight;
+        nestEl._measuredMinH = minH;
+      });
+    });
+
+    // FLIP helper: records rect of every card, applies a width change,
+    // then animates each card from its old position to its new one.
+    function flipReflow(applyFn) {
+      const cards = Array.from(nestEl.querySelectorAll('.pp-cl-card'));
+      // (1) Record before positions
+      const before = cards.map(el => el.getBoundingClientRect());
+      // (2) Apply the change
+      applyFn();
+      // (3) Read after positions and animate
+      requestAnimationFrame(() => {
+        const after = cards.map(el => el.getBoundingClientRect());
+        cards.forEach((el, i) => {
+          const dx = before[i].left - after[i].left;
+          const dy = before[i].top  - after[i].top;
+          if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return;
+          el.animate(
+            [{ transform: `translate(${dx}px,${dy}px)` }, { transform: 'translate(0,0)' }],
+            { duration: 220, easing: 'cubic-bezier(0.4,0,0.2,1)', fill: 'none' }
+          );
+        });
+        // Update measured minH after reflow
+        requestAnimationFrame(() => {
+          const natural = nestEl.offsetHeight;
+          if (!nestEl.style.height || nestEl.offsetHeight < natural) {
+            minH = natural;
+            nestEl._measuredMinH = natural;
+          }
+        });
+      });
+    }
+
     handle.addEventListener('mousedown', ev => {
-      resizing=true;
-      sw=nestEl.offsetWidth; sh=nestEl.offsetHeight;
-      sx=ev.clientX; sy=ev.clientY;
+      resizing = true;
+      sw = nestEl.offsetWidth;
+      sh = nestEl.offsetHeight;
+      // If no explicit height yet, snapshot current rendered height as start
+      if (!nestEl.style.height) nestEl.style.height = sh + 'px';
+      minH = nestEl._measuredMinH || sh;
+      sx = ev.clientX; sy = ev.clientY;
       ev.stopPropagation(); ev.preventDefault();
     });
+
+    let _lastW = -1;
     document.addEventListener('mousemove', ev => {
       if (!resizing) return;
-      nestEl.style.width = Math.max(minW, sw + (ev.clientX - sx) / _zoom) + 'px';
-      // Height: if user drags vertically, allow explicit override; otherwise leave auto
-      const newH = sh + (ev.clientY - sy) / _zoom;
-      if (newH > 40) nestEl.style.height = newH + 'px';
+      const newW = Math.max(minW, sw + (ev.clientX - sx) / _zoom);
+      const newH = Math.max(minH, sh + (ev.clientY - sy) / _zoom);
+
+      // Only FLIP-animate on width changes that cross a column boundary
+      const colsBefore = Math.floor((_lastW || sw) / (CARD_W + CARD_GAP));
+      const colsAfter  = Math.floor(newW / (CARD_W + CARD_GAP));
+      if (colsBefore !== colsAfter && _lastW !== -1) {
+        flipReflow(() => { nestEl.style.width = newW + 'px'; });
+      } else {
+        nestEl.style.width = newW + 'px';
+      }
+      nestEl.style.height = newH + 'px';
+      _lastW = newW;
     });
-    document.addEventListener('mouseup', () => { resizing = false; });
+
+    document.addEventListener('mouseup', () => {
+      if (!resizing) return;
+      resizing = false;
+      _lastW = -1;
+      // After letting go, if the content overflows the explicit height,
+      // snap back to auto so nothing is clipped.
+      requestAnimationFrame(() => {
+        if (nestEl.scrollHeight > nestEl.offsetHeight + 4) {
+          nestEl.style.height = '';
+        }
+      });
+    });
   }
 
   // ── Tooltip ───────────────────────────────────────────────
@@ -1318,16 +1386,16 @@ function initClustersTool(paneEl, sidebarEl) {
     return frag;
   }
 
-  // ── Nest size math — width only, height is auto ──────────
+  // ── Nest initial width — columns layout, height is auto ──
   function calcNestDims(cardCount) {
-    // Columns: aim for a roughly square grid, capped at 6
+    // Use CSS column-count heuristic: aim for ~1.5:1 aspect ratio
     const idealCols = Math.min(Math.max(2, Math.ceil(Math.sqrt(cardCount * 1.5))), 6);
-    const nestW = idealCols * CARD_W + (idealCols - 1) * CARD_GAP + BODY_PAD * 2;
+    // nestW drives the column count via css `columns: <width>`
+    // We add BODY_PAD*2 + a little breathing room so the column fits cleanly
+    const nestW = idealCols * (CARD_W + CARD_GAP) + BODY_PAD * 2 - CARD_GAP;
+    const minW  = CARD_W + BODY_PAD * 2;
 
-    // Minimum width: single column
-    const minW = CARD_W + BODY_PAD * 2;
-
-    // Estimated height for initial collision layout (cards ~120px avg)
+    // Estimated height for the initial collision-avoidance pass only
     const AVG_CARD_H = 120;
     const rows = Math.ceil(cardCount / idealCols);
     const estH = HEAD_H + rows * AVG_CARD_H + (rows - 1) * CARD_GAP + BODY_PAD * 2;
