@@ -2,7 +2,7 @@
 // utils-shared.js — shared data, theme, and UI utilities
 // Loaded by: index.html, tools/spreadsheet.html, tools/*.html
 // ════════════════════════════════════════════════════════════════
-console.log('[utils-shared.js v.11]');
+console.log('[utils-shared.js v.12]');
 
 // ════════════════════════════════════════════════════════════════
 // DARK / LIGHT MODE
@@ -76,12 +76,10 @@ console.log('[utils-shared.js v.11]');
     window.dispatchEvent(new CustomEvent('df-theme-change', { detail: { dark: isDark } }));
   });
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
-  } else {
-    // Script loaded after DOM is ready (bottom of body) — call directly
-    init();
-  }
+  // Wire up the button. setTimeout(0) guarantees the DOM is ready regardless
+  // of whether DOMContentLoaded has fired yet — works whether the script loads
+  // synchronously mid-body or is deferred.
+  setTimeout(init, 0);
 })();
 
 // ════════════════════════════════════════════════════════════════
