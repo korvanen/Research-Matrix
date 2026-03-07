@@ -9,7 +9,7 @@
 //   • depthColor: added missing paletteIdx + theme variable (was ReferenceError)
 //   • depthColor: rewrote getLuminance without array destructuring (was SyntaxError)
 //   • Removed dead CMAP_LEVEL_THEMES constant
-console.log('[utils-concept-map.js v.3333]');
+console.log('[utils-concept-map.js v.666]');
 
 const CMAP_PARENT_CHILD_THRESHOLD = 0.50;
 const CMAP_MIN_SPLIT_LENGTH = 60;
@@ -117,7 +117,7 @@ const ORPHAN_RECOVERY_THRESHOLD = 0.85;
   position:absolute; border-radius:9px;
   border:none; background:var(--ppc-bg,#fff);
   box-shadow:var(--md-elev-2); cursor:grab; user-select:none;
-  overflow:hidden; transition:box-shadow .15s, opacity .5s ease, transform .5s ease;
+  overflow:hidden; transition:box-shadow .15s;
 }
 .pp-cmap-card:active { cursor:grabbing; }
 .pp-cmap-card:hover  { box-shadow:var(--md-elev-4); }
@@ -550,7 +550,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
 
   async function splitAllRows(rows) {
     var result=[];
-    for (var i=0; i<rows.length; i++) { var parts=await maybeSplitRow(rows[i]); parts.forEach(function(r){ result.push(r); }); }
+    for (var i=0; i<rows.length; i++) { var parts=await maybySplitRow(rows[i]); parts.forEach(function(r){ result.push(r); }); }
     return result;
   }
 
@@ -707,7 +707,8 @@ function initConceptMapTool(paneEl, sidebarEl) {
 
       var card=document.createElement('div');
       card.className='pp-cmap-card';
-      card.style.cssText='width:'+CARD_W+'px;position:absolute;z-index:'+(++_topZ)+';opacity:0;transform:scale(0.85)';
+      var _cW = canvas.clientWidth||500, _cH = canvas.clientHeight||500;
+      card.style.cssText='width:'+CARD_W+'px;position:absolute;z-index:'+(++_topZ)+';left:'+(_cW/2-CARD_W/2)+'px;top:'+(_cH/2-40)+'px;transition:none';
       card.style.setProperty('--ppc-border', accent);
       card.style.setProperty('--ppc-bg',     accent);
       card.style.setProperty('--ppc-on',     lc);
@@ -839,7 +840,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
       var GAP_X=MM_PAD+10, GAP_Y=MM_PAD+20;
 
       function applyPositions(posMap) {
-        var ANIMATE_DURATION = 500;
+        var ANIMATE_DURATION = 700;
 
         // Collision detection on target positions
         var targetRects = new Map();
@@ -866,42 +867,38 @@ function initConceptMapTool(paneEl, sidebarEl) {
 
         var ids = Array.from(targetRects.keys());
 
-        // Cards were created with opacity:0, transform:scale(0.85) — already hidden.
-        // Step 1: set final positions with no transition (cards still invisible)
+        // Cards were created at canvas center (visible). Force browser to
+        // paint them there first by reading offsetLeft, then animate to final.
         ids.forEach(function(id) {
+          var el = cardEls.get(id);
+          if (el) el.offsetLeft; // force reflow — commits center position
+        });
+
+        // Now set transitions and slide each card to its final position
+        ids.forEach(function(id, i) {
           var el = cardEls.get(id);
           if (!el) return;
           var pos = targetRects.get(id);
-          el.style.transition = 'none';
+          var delay = Math.min(i * 20, 200);
+          el.style.transition =
+            'left ' + ANIMATE_DURATION + 'ms cubic-bezier(0.25,1,0.5,1) ' + delay + 'ms, ' +
+            'top '  + ANIMATE_DURATION + 'ms cubic-bezier(0.25,1,0.5,1) ' + delay + 'ms';
           el.style.left = pos.x + 'px';
           el.style.top  = pos.y + 'px';
           _liveRects.set(id, { x: pos.x, y: pos.y, w: CARD_W, h: pos.h });
         });
 
-        // Step 2: rAF1 — let browser commit positioned-but-hidden state to render tree
-        requestAnimationFrame(function() {
-          // Step 3: rAF2 — browser now has a committed "from" state, trigger animation
-          requestAnimationFrame(function() {
-            ids.forEach(function(id, i) {
-              var el = cardEls.get(id);
-              if (!el) return;
-              var delay = Math.min(i * 25, 250);
-              el.style.transition =
-                'opacity ' + ANIMATE_DURATION + 'ms ease ' + delay + 'ms, ' +
-                'transform ' + ANIMATE_DURATION + 'ms cubic-bezier(0.34,1.56,0.64,1) ' + delay + 'ms';
-              el.style.opacity = '1';
-              el.style.transform = 'scale(1)';
-            });
+        // Animate connectors while cards are moving
+        var startTime = performance.now();
+        function animateConn(now) {
+          redrawConnectors();
+          if (now - startTime < ANIMATE_DURATION + 250) requestAnimationFrame(animateConn);
+          else {
+            cardEls.forEach(function(el) { el.style.transition = ''; });
             redrawConnectors();
-            setTimeout(function() {
-              redrawConnectors();
-              cardEls.forEach(function(el) {
-                el.style.transition = '';
-                el.style.transform  = '';
-              });
-            }, ANIMATE_DURATION + 300);
-          });
-        });
+          }
+        }
+        requestAnimationFrame(animateConn);
 
         _everRendered = true;
       }
