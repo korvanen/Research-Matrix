@@ -5,7 +5,7 @@
 //     globals then hardcoded CMAP_FALLBACK_PALETTE for standalone/bridge mode.
 //   • CMAP_FALLBACK_PALETTE upgraded from 5 plain hex strings to 7 full
 //     { accent, bg, label } objects matching the global theme palette.
-console.log('[utils-concept-map.js [v.18]');
+console.log('[utils-concept-map.js [v.19]');
 // Level themes (used by THEMES fallback path only):
 const CMAP_LEVEL_THEMES = ['yellow','visions','relational','organizational','physical','yellow'];
 
@@ -405,20 +405,14 @@ function initConceptMapTool(paneEl, sidebarEl) {
     applyTransform();
   }, {passive:false});
 
-  // Touch pinch/pan handled by Pointer Events in makeDraggable block above
-
   // ── Card drag — Pointer Events API (works on touch + mouse) ──────────────
-  // Per-card pointerdown + capture → only that card's events route here.
-  // Canvas pointerdown only fires when NOT hitting a card → canvas pan only.
-  const _pointers = new Map(); // pointerId → {x,y}
-  let _cardDrag   = null;      // {el, cid, pointerId, ox, oy, sx, sy}
-  let _pinchState = null;      // {midX, midY, dist, panX, panY, zoom}
+  const _pointers = new Map();
+  let _cardDrag   = null;
+  let _pinchState = null;
 
   canvas.style.touchAction = 'none';
 
-  // ── Canvas pan (bare canvas touch, not on a card) ──────────────────────
   canvas.addEventListener('pointerdown', ev => {
-    // If the pointer landed on a card, card's own handler takes over
     if (ev.target.closest('.pp-cmap-card')) return;
     canvas.setPointerCapture(ev.pointerId);
     _pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
@@ -431,7 +425,6 @@ function initConceptMapTool(paneEl, sidebarEl) {
         panX: _panX, panY: _panY, zoom: _zoom,
       };
     } else {
-      // Single finger on bare canvas = pan
       _pinchState = null;
     }
   });
@@ -442,7 +435,6 @@ function initConceptMapTool(paneEl, sidebarEl) {
     _pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
 
     if (_pointers.size === 1 && !_pinchState) {
-      // Single-finger pan on bare canvas
       ev.preventDefault();
       _panX += ev.clientX - prev.x;
       _panY += ev.clientY - prev.y;
@@ -482,10 +474,9 @@ function initConceptMapTool(paneEl, sidebarEl) {
     el.dataset.cid = String(cid);
     el.style.touchAction = 'none';
 
-    // Each card captures its own pointer — completely isolated from canvas pan
     el.addEventListener('pointerdown', ev => {
       if (ev.button !== undefined && ev.button !== 0) return;
-      ev.stopPropagation(); // prevent canvas pointerdown from also firing
+      ev.stopPropagation();
       el.setPointerCapture(ev.pointerId);
       const r = _liveRects.get(cid) || { x: 0, y: 0 };
       _cardDrag = { el, cid, pointerId: ev.pointerId, ox: ev.clientX, oy: ev.clientY, sx: r.x, sy: r.y };
@@ -666,18 +657,22 @@ function initConceptMapTool(paneEl, sidebarEl) {
     { accent: '#888888', bg: '#f7f7f8', label: '#fff' },
   ];
 
-// Returns '#fff' or '#000' to maximize contrast against the given hex background color
-function contrastFor(hex) {
-  let c = hex.replace('#','');
-  if (c.length === 3) c = c.split('').map(ch => ch + ch).join('');
-  const r = parseInt(c.slice(0,2),16),
-        g = parseInt(c.slice(2,4),16),
-        b = parseInt(c.slice(4,6),16);
-  const brightness = (0.299*r + 0.587*g + 0.114*b) / 255;
-  return brightness > 0.55 ?'#000':'#fff'; // inverted
-}
-
-
+  // Returns '#fff' or '#000' to maximize contrast against the given hex background color
+  function contrastFor(hex) {
+    let c = String(hex).trim();
+    if (c[0] === '#') c = c.slice(1);
+    if (c.length === 3) c = c.split('').map(ch => ch + ch).join('');
+    if (c.length === 8) c = c.slice(0, 6);
+    if (c.length !== 6) return '#fff';
+    const r = parseInt(c.slice(0, 2), 16) / 255;
+    const g = parseInt(c.slice(2, 4), 16) / 255;
+    const b = parseInt(c.slice(4, 6), 16) / 255;
+    const toLinear = v => (v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4));
+    const L = 0.2126 * toLinear(r) + 0.7152 * toLinear(g) + 0.0722 * toLinear(b);
+    const contrastWithWhite = (1.05) / (L + 0.05);
+    const contrastWithBlack = (L + 0.05) / 0.05;
+    return contrastWithWhite >= contrastWithBlack ? '#fff' : '#000';
+  }
 
   function depthColor(level) {
     const idx = level - 1;
@@ -729,7 +724,6 @@ function contrastFor(hex) {
       card.style.setProperty('--ppc-bg',accent);
       card.style.setProperty('--ppc-on', contrastFor(accent));
 
-      // ── Top row: big category letter (left) + level block (right) ──────
       const primaryRow=rows[i], isSplit=!!primaryRow._splitFrom;
       const numParents=(parentsOf.get(i)||[]).length;
 
