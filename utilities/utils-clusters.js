@@ -1,13 +1,12 @@
-// utils-clusters.js — Clusters tool v37 (BENTO-BOX FIXED)
-// v36 → v37 changes:
-//   • Bento-box card layout with flexible 140-280px card widths
-//   • CSS Grid layout replaces flexbox for card tiling
-//   • Full text wrapping - removed line-clamp truncation
-//   • Invisible cluster boundaries with hover-reveal
-//   • REMOVED sub-cluster strips/headers - cards flow freely by color
-//   • Fixed text contrast using --ppc-on variable
-//   • Fixed card height auto-expansion
-console.log('[utils-clusters.js V37 - BENTO BOX FIXED]');
+// utils-clusters.js — Clusters tool v38
+// v37 → v38 changes:
+//   • Fixed card width AND height — CARD_W × CARD_H constants, no auto-sizing
+//   • Text color mixes now use `black` (not var(--ppc-bg)) — matches concept-map exactly
+//   • Cluster drag activates on ANY card hover, not just the header strip
+//   • Cluster cannot shrink below the minimum space needed to tile all its cards
+//   • makeResizable receives per-nest minW/minH — enforced during resize drag
+//   • Drag threshold (4 px) prevents accidental drags on short card clicks
+console.log('[utils-clusters.js V40]');
 
 var CL_MIN_SPLIT_LENGTH = 60;
 
@@ -39,7 +38,7 @@ var CL_MIN_SPLIT_LENGTH = 60;
   white-space: nowrap;
 }
 
-/* Status chip — MD3 Assist Chip style */
+/* Status chip */
 #pp-cl-status {
   display: inline-flex;
   align-items: center;
@@ -98,7 +97,7 @@ var CL_MIN_SPLIT_LENGTH = 60;
 .pp-cl-slider-col { display: flex; flex-direction: column; gap: 2px; }
 .pp-cl-btn-col    { display: flex; align-items: stretch; justify-content: stretch; align-self: stretch; height: 100%; }
 
-/* Re-cluster button — MD3 Tonal Button */
+/* Re-cluster button */
 #pp-cl-recluster {
   flex: 1;
   border: none;
@@ -171,7 +170,7 @@ var CL_MIN_SPLIT_LENGTH = 60;
   pointer-events: none; z-index: 20;
 }
 
-/* ── Nests — Invisible until hover, MD3 styled (BENTO-BOX) ──────────────────────────── */
+/* ── Nests — invisible border until hover ──────────────── */
 .pp-cl-nest {
   position: absolute;
   border-radius: var(--radius-md);
@@ -180,36 +179,38 @@ var CL_MIN_SPLIT_LENGTH = 60;
   display: flex; flex-direction: column;
   overflow: visible;
   box-shadow: none;
-  transition: all var(--transition-base);
-  pointer-events: none; /* Allow click-through to cards */
+  transition: border-color var(--transition-base), background var(--transition-base), box-shadow var(--transition-base);
+  /* pointer-events always on so cards receive hover */
+  pointer-events: all;
+  cursor: grab;
 }
+.pp-cl-nest:active { cursor: grabbing; }
 
-/* Reveal nest on hover over any card inside */
 .pp-cl-nest:hover,
 .pp-cl-nest.pp-cl-nest-reveal {
   border-color: var(--md-sys-color-outline-variant);
   background: var(--md-sys-color-surface-container-lowest);
   box-shadow: var(--md-elev-2);
-  pointer-events: all;
 }
 .pp-cl-nest.pp-cl-nest-lifted { box-shadow: var(--md-elev-3); }
 
 .pp-cl-nest-head {
   display: flex; align-items: center; gap: var(--space-2);
   padding: var(--space-2) var(--space-3);
-  cursor: grab; flex-shrink: 0; user-select: none;
-  background: var(--md-sys-color-surface-container);
-  border-bottom: 1px solid var(--md-sys-color-outline-variant);
+  flex-shrink: 0; user-select: none;
+  background: transparent;
+  border-bottom: 1px solid transparent;
   opacity: 0;
-  transition: opacity var(--transition-base);
+  transition: opacity var(--transition-base), background var(--transition-base), border-color var(--transition-base);
+  pointer-events: none; /* head is cosmetic; drag handled by nest itself */
 }
 
 .pp-cl-nest:hover .pp-cl-nest-head,
 .pp-cl-nest.pp-cl-nest-reveal .pp-cl-nest-head {
   opacity: 1;
+  background: var(--md-sys-color-surface-container);
+  border-bottom-color: var(--md-sys-color-outline-variant);
 }
-
-.pp-cl-nest-head:active { cursor: grabbing; }
 
 .pp-cl-nest-label {
   font-size: var(--font-size-title-sm);
@@ -232,32 +233,24 @@ var CL_MIN_SPLIT_LENGTH = 60;
   white-space: nowrap;
 }
 
+/* ── Nest body: CSS grid auto-fills fixed-width, auto-height cards ── */
 .pp-cl-nest-body {
   flex: 1; 
-  min-height: 0; 
-  overflow: visible;
+  overflow: visible;         /* cards auto-size; nest wraps them */
   padding: var(--space-3);
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  grid-template-columns: repeat(auto-fill, var(--pp-card-w, 180px));
   gap: var(--space-2);
   align-content: start;
-  align-items: start; /* FIXED: allows cards to expand vertically */
-  scrollbar-width: thin;
-  scrollbar-color: var(--md-sys-color-outline-variant) transparent;
+  align-items: start;        /* each card grows to its own content height */
   pointer-events: all;
 }
 
-.pp-cl-nest-body::-webkit-scrollbar       { width: 4px; }
-.pp-cl-nest-body::-webkit-scrollbar-thumb {
-  background: var(--md-sys-color-outline-variant);
-  border-radius: var(--radius-full);
-}
-.pp-cl-nest-body::-webkit-scrollbar-track { background: transparent; }
-
 .pp-cl-tile-row {
-  display: contents; /* Flatten into grid */
+  display: contents;
 }
 
+/* Resize handle */
 .pp-cl-resize-handle {
   position: absolute; bottom: 0; right: 0;
   width: 16px; height: 16px;
@@ -271,27 +264,26 @@ var CL_MIN_SPLIT_LENGTH = 60;
 .pp-cl-nest:hover .pp-cl-resize-handle { opacity: 0.6; }
 .pp-cl-nest:hover .pp-cl-resize-handle:hover { opacity: 1; }
 
-/* ── Cards — Bento box style with flexible sizing (BENTO-BOX FIXED) ──────────────────────────── */
+/* ── Cards — fixed width, height grows with text ──────────── */
 .pp-cl-card {
   border-radius: var(--radius-md);
   border: 1px solid var(--md-sys-color-outline-variant);
   background: var(--ppc-bg, var(--md-sys-color-surface));
-  cursor: pointer;
-  /* Flexible sizing between 140px and 280px */
-  min-width: 140px;
-  max-width: 280px;
-  /* Height auto-adjusts to content */
-  min-height: 80px;
+  cursor: grab;
+  /* Fixed width only */
+  width:     var(--pp-card-w, 180px);
+  min-width: var(--pp-card-w, 180px);
+  max-width: var(--pp-card-w, 180px);
+  /* Height is auto — grows to fit content */
   height: auto;
-  /* Grid alignment - FIXED */
-  align-self: start; /* Allows vertical expansion */
-  justify-self: stretch;
   /* Layout */
   display: flex;
   flex-direction: column;
-  position: relative; 
+  position: relative;
   overflow: visible;
   box-sizing: border-box;
+  flex-shrink: 0;
+  align-self: start;          /* grid: don't stretch to tallest sibling */
   /* Animation */
   transition: transform var(--transition-fast), box-shadow var(--transition-fast);
   animation: pp-cl-card-in .22s var(--md-motion-easing-emphasized-decel) both;
@@ -319,59 +311,61 @@ var CL_MIN_SPLIT_LENGTH = 60;
   to   { opacity: 1; transform: none; }
 }
 
-/* ── Card text with PROPER CONTRAST (FIXED - uses --ppc-on set by JS) ── */
-.pp-cl-card .pp-cmap-card-cat-num     { 
+/* ── Card text — IDENTICAL color-mix pattern to concept-map ── */
+/* Uses `black` as the mix target, not var(--ppc-bg), so colours
+   adapt correctly to both light and dark themes.                */
+.pp-cl-card .pp-cmap-card-cat-num { 
   font-family: var(--font-family-serif);
-  font-size: 28px;
+  font-size: 26px;
   line-height: 1;
   font-weight: 400;
   font-style: italic;
-  color: color-mix(in srgb, var(--ppc-on,#fff) 92%, var(--ppc-bg, transparent)); 
+  color: color-mix(in srgb, var(--ppc-on, #fff) 92%, black);
   letter-spacing: -0.02em;
   flex: 1;
   min-width: 0;
   overflow: hidden;
-  word-break: break-word;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .pp-cl-card .pp-cmap-card-level-label { 
   font-size: 8px;
   font-weight: var(--font-weight-medium);
   letter-spacing: var(--letter-spacing-caps);
   text-transform: uppercase;
-  color: color-mix(in srgb, var(--ppc-on,#fff) 55%, var(--ppc-bg, transparent)); 
+  color: color-mix(in srgb, var(--ppc-on, #fff) 55%, black);
 }
-.pp-cl-card .pp-cmap-card-rule        { 
+.pp-cl-card .pp-cmap-card-rule { 
   height: 1px;
-  background: color-mix(in srgb, var(--ppc-on,#fff) 20%, var(--ppc-bg, transparent)); 
+  background: color-mix(in srgb, var(--ppc-on, #fff) 22%, black);
   margin: 8px 14px 0;
   flex-shrink: 0;
-  opacity: 1; 
+  opacity: 1;
 }
 .pp-cl-card .pp-cl-card-cat {
-  color: color-mix(in srgb, var(--ppc-on,#fff) 65%, var(--ppc-bg, transparent));
+  color: color-mix(in srgb, var(--ppc-on, #fff) 60%, black);
 }
 .pp-cl-card .pp-cl-card-text { 
   font-family: var(--font-family-serif);
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 400;
   line-height: 1.35;
   letter-spacing: -0.01em;
-  color: color-mix(in srgb, var(--ppc-on,#fff) 95%, var(--ppc-bg, transparent));
-  /* FULL TEXT WRAPPING */
+  color: color-mix(in srgb, var(--ppc-on, #fff) 92%, black);
+  /* Full text — no clamp */
   display: block;
   overflow-wrap: break-word;
   word-break: break-word;
 }
 .pp-cl-card .pp-cl-card-split {
-  color: color-mix(in srgb, var(--ppc-on,#fff) 50%, var(--ppc-bg, transparent));
+  color: color-mix(in srgb, var(--ppc-on, #fff) 50%, black);
 }
 
 .pp-cl-card-body {
-  padding: 10px 14px 14px;
+  padding: 8px 14px 10px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  flex: 1; /* Expands to fill card height */
+  gap: 5px;
 }
 
 .pp-cl-card-cat {
@@ -380,6 +374,9 @@ var CL_MIN_SPLIT_LENGTH = 60;
   letter-spacing: var(--letter-spacing-caps);
   text-transform: uppercase;
   margin-bottom: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .pp-cl-card-split {
@@ -387,10 +384,11 @@ var CL_MIN_SPLIT_LENGTH = 60;
   font-weight: var(--font-weight-medium);
   letter-spacing: var(--letter-spacing-caps);
   text-transform: uppercase;
-  margin-top: 4px;
+  margin-top: auto;
+  flex-shrink: 0;
 }
 
-/* ── Tooltip — MD3 Plain Tooltip ────────────────────────── */
+/* ── Tooltip ─────────────────────────────────────────────── */
 #pp-cl-tooltip {
   position: fixed; z-index: 9999; pointer-events: none;
   background: var(--md-sys-color-inverse-surface);
@@ -444,7 +442,6 @@ var CL_MIN_SPLIT_LENGTH = 60;
   height: 100%;
 }
 
-/* Panel header */
 #pp-cl-sheet-phead {
   flex-shrink: 0;
   padding: var(--space-3) var(--space-3) var(--space-2);
@@ -488,7 +485,7 @@ var CL_MIN_SPLIT_LENGTH = 60;
   letter-spacing: .05em;
 }
 
-/* ── Cluster table — MD3 Data Table ─────────────────────── */
+/* ── Cluster table ─────────────────────────────────────── */
 .pp-cl-table {
   border-collapse: collapse;
   width: 100%;
@@ -545,7 +542,6 @@ var CL_MIN_SPLIT_LENGTH = 60;
   background: color-mix(in srgb, var(--md-sys-color-on-surface) 5%, transparent);
 }
 
-/* Mini cards inside table cells */
 .pp-cl-scard {
   background: var(--md-sys-color-surface);
   border: 1px solid var(--md-sys-color-outline-variant);
@@ -622,11 +618,16 @@ function initClustersTool(paneEl, sidebarEl) {
   const iMaxSlider   = paneEl.querySelector('#pp-cl-imax'), iMaxVal = paneEl.querySelector('#pp-cl-imax-val');
   const depthSlider  = paneEl.querySelector('#pp-cl-depth'), depthVal = paneEl.querySelector('#pp-cl-depth-val');
 
-  const CARD_W       = 200;
-  const RESIZE_MIN_W = 200;
+  // ── Fixed card width ──────────────────────────────────────
+  const CARD_W       = 300;   // px — constant card width; height is auto
+  const CARD_GAP     = 8;     // px — gap between cards in grid
+  const BODY_PAD     = 12;    // px — padding inside nest body
+  const HEAD_H       = 40;    // px — nest header height (estimated)
+  const RESIZE_MIN_W = CARD_W + BODY_PAD * 2;
   const RESIZE_MIN_H = 60;
   const NEST_GAP     = 20;
   const DRAG_DELAY   = 600;
+  const DRAG_THRESHOLD = 4;   // px — minimum mouse movement to start a drag
 
   let _outerMin=2, _outerMax=12, _innerMin=2, _innerMax=4, _depth=2;
   let _rendered=false, _ttRow=null;
@@ -635,6 +636,11 @@ function initClustersTool(paneEl, sidebarEl) {
   let _panX=0, _panY=0, _zoom=1;
   let _topZ=10;
   let _clusterState=null;
+
+  // Inject card-width CSS variable once
+  (function setCSSCardDims() {
+    document.documentElement.style.setProperty('--pp-card-w', CARD_W + 'px');
+  })();
 
   function outerLabel(i) {
     let label = '', n = i;
@@ -697,6 +703,7 @@ function initClustersTool(paneEl, sidebarEl) {
 
   reclusterBtn.addEventListener('click', () => { clearTimeout(_reclusterTimer); _rendered = false; tryRender(); });
 
+  // ── Side-panel sheet (unchanged from v37) ─────────────────
   const sheetHost = document.createElement('div');
   sheetHost.id = 'pp-cl-sheet-host';
   canvas.appendChild(sheetHost);
@@ -720,24 +727,14 @@ function initClustersTool(paneEl, sidebarEl) {
 
   sheetPanelContent.appendChild(sheetPHead);
   sheetPanelContent.appendChild(sheetBody);
-
   sheetBody.addEventListener('wheel', ev => ev.stopPropagation(), { passive: true });
 
   const sheetPanel = createSidePanel(sheetHost, {
-    side:               'right',
-    defaultFraction:    0.40,
-    minFraction:        0,
-    maxFraction:        0.88,
-    snapCloseFraction:  0.10,
-    overlapFraction:    0,
-    fullscreenFraction: 0.88,
-    twoPosition:        false,
-    animDuration:       260,
-    onResize: () => {},
-    onOpen:   () => {},
-    onClose:  () => {},
+    side: 'right', defaultFraction: 0.40, minFraction: 0, maxFraction: 0.88,
+    snapCloseFraction: 0.10, overlapFraction: 0, fullscreenFraction: 0.88,
+    twoPosition: false, animDuration: 260,
+    onResize: () => {}, onOpen: () => {}, onClose: () => {},
   });
-
   sheetPanel.setContent(sheetPanelContent);
 
   function updateSheetPanel() {
@@ -771,8 +768,8 @@ function initClustersTool(paneEl, sidebarEl) {
     cols.forEach(c => {
       const th = document.createElement('th');
       th.textContent = c.label + ' cluster';
-      th.style.color      = c.col.accent;
-      th.style.borderTop  = '3px solid ' + c.col.accent;
+      th.style.color     = c.col.accent;
+      th.style.borderTop = '3px solid ' + c.col.accent;
       hrow.appendChild(th);
     });
     thead.appendChild(hrow);
@@ -796,7 +793,7 @@ function initClustersTool(paneEl, sidebarEl) {
             const best   = cells.reduce((b, x) => x.length > b.length ? x : b, '');
             const parsed = typeof parseCitation === 'function' ? parseCitation(best) : { body: best };
             const scard  = document.createElement('div');
-            scard.className          = 'pp-cl-scard';
+            scard.className             = 'pp-cl-scard';
             scard.style.borderLeftColor = c.col.accent;
             const txt = parsed.body || best;
             scard.textContent = txt.length > 130 ? txt.slice(0, 130) + '\u2026' : txt;
@@ -814,6 +811,7 @@ function initClustersTool(paneEl, sidebarEl) {
     sheetBody.appendChild(table);
   }
 
+  // ── Canvas pan (RMB drag) ─────────────────────────────────
   let _panning=false, _panSX=0, _panSY=0, _panBX=0, _panBY=0;
 
   canvas.addEventListener('mousedown', ev => {
@@ -831,6 +829,7 @@ function initClustersTool(paneEl, sidebarEl) {
   });
   canvas.addEventListener('contextmenu', ev => ev.preventDefault());
 
+  // ── Scroll/zoom ───────────────────────────────────────────
   canvas.addEventListener('wheel', ev => {
     ev.preventDefault();
     const rect = canvas.getBoundingClientRect();
@@ -872,59 +871,107 @@ function initClustersTool(paneEl, sidebarEl) {
   }, { passive: false });
   canvas.addEventListener('touchend', () => { _pinchD = null; });
 
+  // ── Nest dragging — fires on ANY card hover click ─────────
+  // We use a small movement threshold so quick card clicks still
+  // show the tooltip and don't accidentally move the cluster.
   let _nestDrag = null;
+
   function makeNestDraggable(nestEl) {
-    const head = nestEl.querySelector(':scope > .pp-cl-nest-head');
-    if (!head) return;
-    head.addEventListener('mousedown', ev => {
-      if (ev.button !== 0 || ev.target.closest('.pp-cl-resize-handle')) return;
-      ev.stopPropagation(); ev.preventDefault();
-      _nestDrag = { el: nestEl, sx: parseInt(nestEl.style.left)||0, sy: parseInt(nestEl.style.top)||0, cx: ev.clientX, cy: ev.clientY };
-      nestEl.style.zIndex = String(++_topZ); nestEl.classList.add('pp-cl-nest-lifted'); hideTooltip();
+    // Mousedown anywhere on the nest (including cards) starts a potential drag.
+    // Actual movement only commits once DRAG_THRESHOLD px have been covered.
+    nestEl.addEventListener('mousedown', ev => {
+      if (ev.button !== 0) return;
+      if (ev.target.closest('.pp-cl-resize-handle')) return;
+      const sx = parseInt(nestEl.style.left) || 0;
+      const sy = parseInt(nestEl.style.top)  || 0;
+      _nestDrag = {
+        el: nestEl,
+        sx, sy,
+        cx: ev.clientX,
+        cy: ev.clientY,
+        moved: false,
+      };
+      // Don't stop propagation — tooltip mouseenter still works.
+      // Don't preventDefault here either — prevents text selection only.
     });
-    head.addEventListener('touchstart', ev => {
-      if (ev.touches.length !== 1 || ev.target.closest('.pp-cl-resize-handle')) return;
-      ev.stopPropagation();
-      _nestDrag = { el: nestEl, sx: parseInt(nestEl.style.left)||0, sy: parseInt(nestEl.style.top)||0, cx: ev.touches[0].clientX, cy: ev.touches[0].clientY };
-      nestEl.style.zIndex = String(++_topZ); nestEl.classList.add('pp-cl-nest-lifted'); hideTooltip();
-    }, { passive: false });
+
+    // Touch: keep on head for touch since multi-touch is already handled above.
+    const head = nestEl.querySelector(':scope > .pp-cl-nest-head');
+    if (head) {
+      head.addEventListener('touchstart', ev => {
+        if (ev.touches.length !== 1 || ev.target.closest('.pp-cl-resize-handle')) return;
+        ev.stopPropagation();
+        const sx = parseInt(nestEl.style.left) || 0;
+        const sy = parseInt(nestEl.style.top)  || 0;
+        _nestDrag = { el: nestEl, sx, sy, cx: ev.touches[0].clientX, cy: ev.touches[0].clientY, moved: false };
+        nestEl.style.zIndex = String(++_topZ);
+        nestEl.classList.add('pp-cl-nest-lifted');
+        hideTooltip();
+      }, { passive: false });
+    }
   }
+
   document.addEventListener('mousemove', ev => {
     if (!_nestDrag) return;
-    _nestDrag.el.style.left = (_nestDrag.sx + (ev.clientX - _nestDrag.cx) / _zoom) + 'px';
-    _nestDrag.el.style.top  = (_nestDrag.sy + (ev.clientY - _nestDrag.cy) / _zoom) + 'px';
-  });
-  document.addEventListener('mouseup', () => {
-    if (!_nestDrag) return;
-    _nestDrag.el.classList.remove('pp-cl-nest-lifted'); _nestDrag = null;
-  });
-  document.addEventListener('touchmove', ev => {
-    if (!_nestDrag || ev.touches.length !== 1) return;
-    _nestDrag.el.style.left = (_nestDrag.sx + (ev.touches[0].clientX - _nestDrag.cx) / _zoom) + 'px';
-    _nestDrag.el.style.top  = (_nestDrag.sy + (ev.touches[0].clientY - _nestDrag.cy) / _zoom) + 'px';
-    ev.preventDefault();
-  }, { passive: false });
-  document.addEventListener('touchend', () => {
-    if (!_nestDrag) return; _nestDrag.el.classList.remove('pp-cl-nest-lifted'); _nestDrag = null;
+    const dx = ev.clientX - _nestDrag.cx;
+    const dy = ev.clientY - _nestDrag.cy;
+    // Only commit to drag after threshold
+    if (!_nestDrag.moved && Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
+    if (!_nestDrag.moved) {
+      // First time crossing threshold — take ownership
+      _nestDrag.moved = true;
+      _nestDrag.el.style.zIndex = String(++_topZ);
+      _nestDrag.el.classList.add('pp-cl-nest-lifted');
+      hideTooltip();
+    }
+    _nestDrag.el.style.left = (_nestDrag.sx + dx / _zoom) + 'px';
+    _nestDrag.el.style.top  = (_nestDrag.sy + dy / _zoom) + 'px';
   });
 
-  function makeResizable(nestEl) {
+  document.addEventListener('mouseup', () => {
+    if (!_nestDrag) return;
+    _nestDrag.el.classList.remove('pp-cl-nest-lifted');
+    _nestDrag = null;
+  });
+
+  document.addEventListener('touchmove', ev => {
+    if (!_nestDrag || ev.touches.length !== 1) return;
+    const dx = ev.touches[0].clientX - _nestDrag.cx;
+    const dy = ev.touches[0].clientY - _nestDrag.cy;
+    _nestDrag.el.style.left = (_nestDrag.sx + dx / _zoom) + 'px';
+    _nestDrag.el.style.top  = (_nestDrag.sy + dy / _zoom) + 'px';
+    ev.preventDefault();
+  }, { passive: false });
+
+  document.addEventListener('touchend', () => {
+    if (!_nestDrag) return;
+    _nestDrag.el.classList.remove('pp-cl-nest-lifted');
+    _nestDrag = null;
+  });
+
+  // ── Resize handle — enforces minimum width only ───────────
+  function makeResizable(nestEl, minW) {
     const handle = document.createElement('div');
     handle.className = 'pp-cl-resize-handle';
     nestEl.appendChild(handle);
     let resizing=false, sw=0, sh=0, sx=0, sy=0;
     handle.addEventListener('mousedown', ev => {
-      resizing=true; sw=nestEl.offsetWidth; sh=nestEl.offsetHeight; sx=ev.clientX; sy=ev.clientY;
+      resizing=true;
+      sw=nestEl.offsetWidth; sh=nestEl.offsetHeight;
+      sx=ev.clientX; sy=ev.clientY;
       ev.stopPropagation(); ev.preventDefault();
     });
     document.addEventListener('mousemove', ev => {
       if (!resizing) return;
-      nestEl.style.width  = Math.max(RESIZE_MIN_W, sw+(ev.clientX-sx)/_zoom)+'px';
-      nestEl.style.height = Math.max(RESIZE_MIN_H, sh+(ev.clientY-sy)/_zoom)+'px';
+      nestEl.style.width = Math.max(minW, sw + (ev.clientX - sx) / _zoom) + 'px';
+      // Height: if user drags vertically, allow explicit override; otherwise leave auto
+      const newH = sh + (ev.clientY - sy) / _zoom;
+      if (newH > 40) nestEl.style.height = newH + 'px';
     });
     document.addEventListener('mouseup', () => { resizing = false; });
   }
 
+  // ── Tooltip ───────────────────────────────────────────────
   function showTooltip(ev, r, text, accentColor, clusterLabel) {
     _ttRow = r;
     ttCluster.textContent = clusterLabel || '';
@@ -947,6 +994,7 @@ function initClustersTool(paneEl, sidebarEl) {
     hideTooltip();
   });
 
+  // ── Utilities ─────────────────────────────────────────────
   function sentenceSplit(text) {
     return text
       .replace(/([.!?;])\s+/g, '$1\n')
@@ -1163,7 +1211,6 @@ function initClustersTool(paneEl, sidebarEl) {
     { accent: '#888888', bg: '#f7f7f8', label: '#fff' },
   ];
 
-  // Returns '#fff' or '#000' to maximize contrast against the given hex background color
   function contrastFor(hex) {
     let c = String(hex).trim();
     if (c[0] === '#') c = c.slice(1);
@@ -1175,9 +1222,9 @@ function initClustersTool(paneEl, sidebarEl) {
     const b = parseInt(c.slice(4, 6), 16) / 255;
     const toLinear = v => (v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4));
     const L = 0.2126 * toLinear(r) + 0.7152 * toLinear(g) + 0.0722 * toLinear(b);
-    const contrastWithWhite = (1.05) / (L + 0.05);
-    const contrastWithBlack = (L + 0.05) / 0.05;
-    return contrastWithWhite >= contrastWithBlack ? '#fff' : '#000';
+    const cW = 1.05 / (L + 0.05);
+    const cB = (L + 0.05) / 0.05;
+    return cW >= cB ? '#fff' : '#000';
   }
 
   function colForIndex(i) {
@@ -1185,16 +1232,18 @@ function initClustersTool(paneEl, sidebarEl) {
     return pal[i % pal.length];
   }
 
+  // ── Card builder — fixed size, concept-map colour pattern ─
   function buildCard(r, col, delay, clusterLabel) {
-    const cells = r.row && r.row.cells ? r.row.cells : (r.cells || []);
-    const cats  = r.row && r.row.cats  ? r.row.cats.filter(c => c.trim()) : [];
-    const best  = cells.reduce((b, c) => c.length > b.length ? c : b, '');
+    const cells  = r.row && r.row.cells ? r.row.cells : (r.cells || []);
+    const cats   = r.row && r.row.cats  ? r.row.cats.filter(c => c.trim()) : [];
+    const best   = cells.reduce((b, c) => c.length > b.length ? c : b, '');
     const parsed = typeof parseCitation === 'function' ? parseCitation(best) : { body: best };
+
     const card = document.createElement('div');
     card.className = 'pp-cl-card';
-    card.style.setProperty('--ppc-bg',     col.accent);
-    card.style.setProperty('--ppc-border', col.accent);
-    card.style.setProperty('--ppc-on',     contrastFor(col.accent));
+    // --ppc-on set to WCAG-contrast colour so color-mix(…, black) always works correctly
+    card.style.setProperty('--ppc-bg',  col.accent);
+    card.style.setProperty('--ppc-on',  contrastFor(col.accent));
     if (delay) card.style.animationDelay = delay + 'ms';
 
     const topRow = document.createElement('div');
@@ -1216,133 +1265,128 @@ function initClustersTool(paneEl, sidebarEl) {
     rule.className = 'pp-cmap-card-rule';
     card.appendChild(rule);
 
-    const body = document.createElement('div'); body.className = 'pp-cl-card-body';
+    const body = document.createElement('div');
+    body.className = 'pp-cl-card-body';
     if (cats.length) {
-      const ce = document.createElement('div'); ce.className = 'pp-cl-card-cat'; ce.textContent = cats.join(' \u00b7 '); body.appendChild(ce);
+      const ce = document.createElement('div');
+      ce.className = 'pp-cl-card-cat';
+      ce.textContent = cats.join(' \u00b7 ');
+      body.appendChild(ce);
     }
-    const te = document.createElement('div'); te.className = 'pp-cl-card-text'; te.textContent = parsed.body; body.appendChild(te);
+    const te = document.createElement('div');
+    te.className = 'pp-cl-card-text';
+    te.textContent = parsed.body;
+    body.appendChild(te);
     if (r._splitN && r._splitT && r._splitT > 1) {
-      const sp = document.createElement('div'); sp.className = 'pp-cl-card-split';
-      sp.textContent = 'Segment ' + r._splitN + '\u2009/\u2009' + r._splitT;
+      const sp = document.createElement('div');
+      sp.className = 'pp-cl-card-split';
+      sp.textContent = 'Seg ' + r._splitN + '\u2009/\u2009' + r._splitT;
       body.appendChild(sp);
     }
     card.appendChild(body);
-    card.addEventListener('mouseenter', ev => showTooltip(ev, r, parsed.body, col.accent, clusterLabel || ''));
-    card.addEventListener('mousemove',  ev => moveTooltip(ev));
-    card.addEventListener('mouseleave', ()  => hideTooltip());
+
+    // Tooltip — only show when not mid-drag
+    card.addEventListener('mouseenter', ev => {
+      if (_nestDrag && _nestDrag.moved) return;
+      showTooltip(ev, r, parsed.body, col.accent, clusterLabel || '');
+    });
+    card.addEventListener('mousemove',  ev => {
+      if (_nestDrag && _nestDrag.moved) { hideTooltip(); return; }
+      moveTooltip(ev);
+    });
+    card.addEventListener('mouseleave', () => hideTooltip());
+
     return card;
   }
 
-  // FIXED: buildInnerTiles - NO SUB-CLUSTER STRIPS, cards flow freely by color
+  // ── Inner tiles (no sub-cluster dividers) ─────────────────
   function buildInnerTiles(rows, subAsgn, col, outerLbl) {
     const frag = document.createDocumentFragment();
-    
     if (!subAsgn || _depth <= 1) {
-      // Single-level: all cards same color
-      rows.forEach((r, ri) => {
-        frag.appendChild(buildCard(r, col, ri * 10, outerLbl));
-      });
+      rows.forEach((r, ri) => frag.appendChild(buildCard(r, col, ri * 10, outerLbl)));
     } else {
-      // Multi-level: each sub-cluster gets its own color, NO dividers
       const numSub = Math.max(...subAsgn, 0) + 1;
       const groups = Array.from({ length: numSub }, () => []);
       rows.forEach((r, i) => groups[subAsgn[i]].push(r));
-      
-      // Render cards grouped by sub-cluster, each group has its color
       groups.forEach((members, si) => {
         if (!members.length) return;
         const subCol = colForIndex(si);
         const subLbl = innerLabel(outerLbl, si);
-        
-        // Just add cards directly - they'll flow in the grid
-        members.forEach((r, ri) => {
-          frag.appendChild(buildCard(r, subCol, ri * 10, subLbl));
-        });
+        members.forEach((r, ri) => frag.appendChild(buildCard(r, subCol, ri * 10, subLbl)));
       });
     }
-    
     return frag;
   }
 
-  // FIXED: buildOuterNest with improved height calculation
+  // ── Nest size math — width only, height is auto ──────────
+  function calcNestDims(cardCount) {
+    // Columns: aim for a roughly square grid, capped at 6
+    const idealCols = Math.min(Math.max(2, Math.ceil(Math.sqrt(cardCount * 1.5))), 6);
+    const nestW = idealCols * CARD_W + (idealCols - 1) * CARD_GAP + BODY_PAD * 2;
+
+    // Minimum width: single column
+    const minW = CARD_W + BODY_PAD * 2;
+
+    // Estimated height for initial collision layout (cards ~120px avg)
+    const AVG_CARD_H = 120;
+    const rows = Math.ceil(cardCount / idealCols);
+    const estH = HEAD_H + rows * AVG_CARD_H + (rows - 1) * CARD_GAP + BODY_PAD * 2;
+
+    return { nestW, minW, estH };
+  }
+
+  // ── Outer nest builder ────────────────────────────────────
   function buildOuterNest(members, outerIdx, subAsgn) {
     const col = colForIndex(outerIdx);
     const lbl = outerLabel(outerIdx);
+
     const nest = document.createElement('div');
     nest.className = 'pp-cl-nest';
 
     const subCount = subAsgn ? (Math.max(...subAsgn, 0) + 1) : 0;
-    const subLabel = subAsgn && _depth > 1 ? ' · ' + subCount + ' group' + (subCount === 1 ? '' : 's') : '';
+    const subLabel = subAsgn && _depth > 1 ? ' \u00b7 ' + subCount + ' group' + (subCount === 1 ? '' : 's') : '';
 
-    const head = document.createElement('div'); 
+    // Header (cosmetic only — drag is on whole nest)
+    const head = document.createElement('div');
     head.className = 'pp-cl-nest-head';
     head.style.background = col.accent + '18';
 
-    const nestLblEl = document.createElement('span'); 
+    const nestLblEl = document.createElement('span');
     nestLblEl.className = 'pp-cl-nest-label';
-    nestLblEl.textContent = lbl; 
+    nestLblEl.textContent = lbl;
     nestLblEl.style.color = col.accent;
-    
-    const dot = document.createElement('span'); 
-    dot.className = 'pp-cl-nest-dot'; 
+
+    const dot = document.createElement('span');
+    dot.className = 'pp-cl-nest-dot';
     dot.style.background = col.accent;
-    
-    const cnt = document.createElement('span'); 
+
+    const cnt = document.createElement('span');
     cnt.className = 'pp-cl-nest-count';
     cnt.textContent = members.length + ' entr' + (members.length === 1 ? 'y' : 'ies') + subLabel;
-    
-    head.appendChild(nestLblEl); 
-    head.appendChild(dot); 
+
+    head.appendChild(nestLblEl);
+    head.appendChild(dot);
     head.appendChild(cnt);
     nest.appendChild(head);
 
-    const body = document.createElement('div'); 
+    const body = document.createElement('div');
     body.className = 'pp-cl-nest-body';
     nest.appendChild(body);
     body.appendChild(buildInnerTiles(members, subAsgn, col, lbl));
 
-    // BENTO-BOX LAYOUT: Calculate grid-based dimensions
-    const MIN_CARD_W = 140;
-    const GAP = 8;
-    const PADDING = 12;
-    const HEAD_H = 40;
-    
-    // Estimate how many columns we can fit
-    const totalCards = members.length; // Just count cards, no strips
-    const idealCols = Math.min(Math.max(3, Math.ceil(Math.sqrt(totalCards))), 6);
-    
-    // Calculate nest width to accommodate grid
-    const nestW = Math.max(
-      RESIZE_MIN_W, 
-      idealCols * MIN_CARD_W + (idealCols - 1) * GAP + PADDING * 2
-    );
-    
-    // FIXED: Increased height for wrapped text
-    const estimatedRows = Math.ceil(totalCards / idealCols);
-    const AVG_CARD_H = 140; // Increased from 120 to account for text wrapping
-    const nestH = Math.max(
-      RESIZE_MIN_H,
-      HEAD_H + estimatedRows * AVG_CARD_H + (estimatedRows - 1) * GAP + PADDING * 2 + 40
-    );
-    
-    nest.style.width  = nestW + 'px';
-    nest.style.height = nestH + 'px';
-    nest._estW = nestW; 
-    nest._estH = nestH;
-
-    // HOVER-REVEAL: Add hover behavior to show cluster boundaries
-    body.addEventListener('mouseenter', () => {
-      nest.classList.add('pp-cl-nest-reveal');
-    });
-    nest.addEventListener('mouseleave', () => {
-      nest.classList.remove('pp-cl-nest-reveal');
-    });
+    // Width set; height is auto (grows with card content)
+    const { nestW, minW, estH } = calcNestDims(members.length);
+    nest.style.width = nestW + 'px';
+    // No nest.style.height — auto
+    nest._estW = nestW;
+    nest._estH = estH;   // used only for initial collision layout
 
     makeNestDraggable(nest);
-    makeResizable(nest);
+    makeResizable(nest, minW);   // width-only minimum
     return nest;
   }
 
+  // ── Main render ───────────────────────────────────────────
   function render(rows) {
     Array.from(world.children).forEach(c => c.remove());
     emptyEl.style.display = 'none';
@@ -1366,14 +1410,17 @@ function initClustersTool(paneEl, sidebarEl) {
       const subAsgn = (alignedAsgns && _depth > 1) ? alignedAsgns[alignIdx++] : null;
       const nest = buildOuterNest(members, oi, subAsgn);
       nest.style.animationDelay = (oi * 55) + 'ms';
-      world.appendChild(nest); nestEls.push(nest);
+      world.appendChild(nest);
+      nestEls.push(nest);
     });
 
     const cols = Math.max(1, Math.ceil(Math.sqrt(nestEls.length)));
     const topRects = nestEls.map((n, i) => ({
       x: NEST_GAP + (i % cols) * ((n._estW || 200) + NEST_GAP * 2),
       y: NEST_GAP + Math.floor(i / cols) * ((n._estH || 200) + NEST_GAP * 2),
-      w: n._estW || 200, h: n._estH || 200, el: n
+      w: n._estW || 200,
+      h: n._estH || 200,
+      el: n,
     }));
 
     resolveCollisions(topRects, NEST_GAP, 160);
@@ -1387,7 +1434,7 @@ function initClustersTool(paneEl, sidebarEl) {
       r.el.style.top  = (r.y + offY) + 'px';
     });
 
-    const splitCount  = rows.filter(r => r._splitN && r._splitN > 1).length;
+    const splitCount   = rows.filter(r => r._splitN && r._splitN > 1).length;
     const clusterNames = nestEls.map((_, i) => outerLabel(i)).join(', ');
     subtitle.textContent =
       numTop + ' cluster' + (numTop === 1 ? '' : 's') +
@@ -1413,7 +1460,8 @@ function initClustersTool(paneEl, sidebarEl) {
     }
 
     if (!window.EmbeddingUtils || !window.EmbeddingUtils.isReady()) return;
-    setStatus('loading', 'Clustering ' + rows.length + ' entries\u2026'); emptyEl.style.display = 'none';
+    setStatus('loading', 'Clustering ' + rows.length + ' entries\u2026');
+    emptyEl.style.display = 'none';
     Promise.all(rows.map(r => {
       const text = (r.row?.cells || r.cells || []).join(' ').trim();
       if (!text) return Promise.resolve(null);
@@ -1421,7 +1469,8 @@ function initClustersTool(paneEl, sidebarEl) {
         .then(vec => ({ key: r.tabIdx+':'+r.rowIdx, vec }))
         .catch(() => null);
     })).then(results => {
-      const vectors = new Map(); results.forEach(res => { if (res?.vec) vectors.set(res.key, res.vec); });
+      const vectors = new Map();
+      results.forEach(res => { if (res?.vec) vectors.set(res.key, res.vec); });
       if (!vectors.size) { setStatus('error', 'No vectors available'); return; }
       const embedded = rows.filter(r => vectors.has(r.tabIdx+':'+r.rowIdx));
       if (embedded.length < 2) { setStatus('error', 'Not enough data'); return; }
@@ -1432,7 +1481,8 @@ function initClustersTool(paneEl, sidebarEl) {
   }
 
   async function doRender() {
-    reclusterBtn.classList.remove('pp-cl-reclustering'); reclusterBtn.textContent = 'Re-cluster';
+    reclusterBtn.classList.remove('pp-cl-reclustering');
+    reclusterBtn.textContent = 'Re-cluster';
     setStatus('loading', 'Splitting cells\u2026');
     let workRows = _cachedEmbedded;
     try {
@@ -1444,18 +1494,26 @@ function initClustersTool(paneEl, sidebarEl) {
     } catch(e) { console.warn('[clusters] split error:', e); }
 
     setTimeout(() => {
-      try { render(workRows); setStatus('ready', 'Done'); _rendered = true; }
-      catch (err) { console.error('[clusters]', err); setStatus('error', 'Clustering failed'); }
+      try {
+        render(workRows);
+        setStatus('ready', 'Done');
+        _rendered = true;
+      } catch (err) {
+        console.error('[clusters]', err);
+        setStatus('error', 'Clustering failed');
+      }
     }, 20);
   }
 
   if (window.EmbeddingUtils && window.EmbeddingUtils.isReady()) setTimeout(tryRender, 120);
-  window.addEventListener('embedder-ready',    () => setTimeout(tryRender, 120));
+  window.addEventListener('embedder-ready',     () => setTimeout(tryRender, 120));
   window.addEventListener('embedding-progress', ev => { if (!_rendered) setStatus('loading', 'Indexing\u2026 ' + ev.detail.pct + '%'); });
   window.addEventListener('embedding-complete', ev => {
-    if (!_rendered) { subtitle.textContent = 'Indexed ' + ev.detail.total + ' entries \u2014 building clusters\u2026'; tryRender(); }
+    if (!_rendered) {
+      subtitle.textContent = 'Indexed ' + ev.detail.total + ' entries \u2014 building clusters\u2026';
+      tryRender();
+    }
   });
-
   window.addEventListener('df-theme-change', () => { _rendered = false; tryRender(); });
 
   return {
