@@ -5,7 +5,7 @@
 //     globals then hardcoded CMAP_FALLBACK_PALETTE for standalone/bridge mode.
 //   • CMAP_FALLBACK_PALETTE upgraded from 5 plain hex strings to 7 full
 //     { accent, bg, label } objects matching the global theme palette.
-console.log('[sidepanel-concept-map.js [v.6]');
+console.log('[sidepanel-concept-map.js [v.8]');
 // Level themes (used by THEMES fallback path only):
 const CMAP_LEVEL_THEMES = ['yellow','visions','relational','organizational','physical','yellow'];
 
@@ -149,19 +149,19 @@ const ORPHAN_RECOVERY_THRESHOLD = 0.85;
   height:1px; margin:0 9px; background:var(--md-sys-color-outline-variant); opacity:.5;
 }
 
-/* ── Solid-color card: all text becomes white ── */
-.pp-cmap-card .pp-cmap-card-cat-num { color:rgba(255,255,255,0.92) !important; }
-.pp-cmap-card .pp-cmap-card-level-num { color:rgba(255,255,255,0.95) !important; }
-.pp-cmap-card .pp-cmap-card-level-label { color:rgba(255,255,255,0.55) !important; }
-.pp-cmap-card .pp-cmap-card-merged { color:rgba(255,255,255,0.5) !important; }
-.pp-cmap-card .pp-cmap-card-rule { background:rgba(255,255,255,0.22) !important; opacity:1 !important; }
-.pp-cmap-card .pp-cmap-cell-cat { color:rgba(255,255,255,0.6) !important; }
-.pp-cmap-card .pp-cmap-cell-text { color:rgba(255,255,255,0.92) !important; }
-.pp-cmap-card .pp-cmap-merge-sep { background:rgba(255,255,255,0.2) !important; border-color:transparent !important; }
-.pp-cmap-card .pp-cmap-card-footer { border-top-color:rgba(255,255,255,0.18) !important; }
-.pp-cmap-card .pp-cmap-sim-line { color:rgba(255,255,255,0.6) !important; }
-.pp-cmap-card .pp-cmap-sim-pct { color:rgba(255,255,255,0.92) !important; }
-.pp-cmap-card .pp-cmap-leaf-badge { color:rgba(255,255,255,0.55) !important; }
+/* ── Solid-color card: text driven by --ppc-on (set from palette label in JS) ── */
+.pp-cmap-card .pp-cmap-card-cat-num    { color: color-mix(in srgb, var(--ppc-on,#fff) 92%, transparent); }
+.pp-cmap-card .pp-cmap-card-level-num  { color: color-mix(in srgb, var(--ppc-on,#fff) 95%, transparent); }
+.pp-cmap-card .pp-cmap-card-level-label { color: color-mix(in srgb, var(--ppc-on,#fff) 55%, transparent); }
+.pp-cmap-card .pp-cmap-card-merged     { color: color-mix(in srgb, var(--ppc-on,#fff) 50%, transparent); }
+.pp-cmap-card .pp-cmap-card-rule       { background: color-mix(in srgb, var(--ppc-on,#fff) 22%, transparent); opacity: 1; }
+.pp-cmap-card .pp-cmap-cell-cat        { color: color-mix(in srgb, var(--ppc-on,#fff) 60%, transparent); }
+.pp-cmap-card .pp-cmap-cell-text       { color: color-mix(in srgb, var(--ppc-on,#fff) 92%, transparent); }
+.pp-cmap-card .pp-cmap-merge-sep       { background: color-mix(in srgb, var(--ppc-on,#fff) 20%, transparent); border-color: transparent; }
+.pp-cmap-card .pp-cmap-card-footer     { border-top-color: color-mix(in srgb, var(--ppc-on,#fff) 18%, transparent); }
+.pp-cmap-card .pp-cmap-sim-line        { color: color-mix(in srgb, var(--ppc-on,#fff) 60%, transparent); }
+.pp-cmap-card .pp-cmap-sim-pct         { color: color-mix(in srgb, var(--ppc-on,#fff) 92%, transparent); }
+.pp-cmap-card .pp-cmap-leaf-badge      { color: color-mix(in srgb, var(--ppc-on,#fff) 55%, transparent); }
 
 .pp-cmap-card-head { padding:5px 9px 4px; display:flex; align-items:flex-start; gap:5px; flex-wrap:wrap; }
 .pp-cmap-level-badge {
@@ -176,7 +176,7 @@ const ORPHAN_RECOVERY_THRESHOLD = 0.85;
 .pp-cmap-parent-count {
   font-size:8px; font-weight:700; letter-spacing:.06em; padding:1px 5px;
   border-radius:8px; flex-shrink:0; align-self:center;
-  background:rgba(255,255,255,.2); color:rgba(255,255,255,.9);
+  background:color-mix(in srgb, var(--ppc-on,#fff) 20%, transparent); color:color-mix(in srgb, var(--ppc-on,#fff) 90%, transparent);
 }
 .pp-cmap-merged-count {
   font-size:8px; font-weight:700; letter-spacing:.07em;
@@ -714,6 +714,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
       card.style.cssText=`width:${CARD_W}px;position:absolute;z-index:${++_topZ}`;
       card.style.setProperty('--ppc-border',accent);
       card.style.setProperty('--ppc-bg',accent);
+      card.style.setProperty('--ppc-on', lc);
 
       // ── Top row: big category letter (left) + level block (right) ──────
       const primaryRow=rows[i], isSplit=!!primaryRow._splitFrom;
