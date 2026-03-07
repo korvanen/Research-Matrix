@@ -9,7 +9,7 @@
 //   • depthColor: added missing paletteIdx + theme variable (was ReferenceError)
 //   • depthColor: rewrote getLuminance without array destructuring (was SyntaxError)
 //   • Removed dead CMAP_LEVEL_THEMES constant
-console.log('[utils-concept-map.js v.5]');
+console.log('[utils-concept-map.js v.6]');
 
 const CMAP_PARENT_CHILD_THRESHOLD = 0.50;
 const CMAP_MIN_SPLIT_LENGTH = 60;
@@ -331,13 +331,10 @@ function initConceptMapTool(paneEl, sidebarEl) {
       item.read();
       clearTimeout(_rebuildTimer);
       rebuildBtn.classList.add('pp-cmap-busy');
-      _rebuildTimer = setTimeout(function() { _rendered = false; tryRender(); }, DRAG_DELAY);
-    });
-    item.el.addEventListener('change', function() {
-      item.read();
-      clearTimeout(_rebuildTimer);
-      rebuildBtn.classList.remove('pp-cmap-busy');
-      _rendered = false; tryRender();
+      _rebuildTimer = setTimeout(function() {
+        rebuildBtn.classList.remove('pp-cmap-busy');
+        _rendered = false; tryRender();
+      }, DRAG_DELAY);
     });
   });
 
@@ -646,7 +643,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
   function depthColor(level) {
     var idx = level - 1;
     var palette = (typeof getPalette === 'function') ? getPalette() : (window.PP_PALETTE || []);
-    var paletteIdx = [0, 1, 2, 3, 4,5,6,7, 0][Math.min(idx, 7)];
+    var paletteIdx = [0, 1, 2, 3, 4, 0][Math.min(idx, 5)];
     var theme = palette[paletteIdx] || { accent: '#888888', bg: '#f7f7f8', label: '#ffffff' };
 
     // Compute contrast text color from accent luminance (no array destructuring)
@@ -827,74 +824,67 @@ function initConceptMapTool(paneEl, sidebarEl) {
       var GAP_X=MM_PAD+10, GAP_Y=MM_PAD+20;
 
       function applyPositions(posMap) {
-        var ANIMATE_DURATION = 600;
-        var isFirstEverRender = !_everRendered;
+        var ANIMATE_DURATION = 500;
 
-        if (isFirstEverRender) {
-          posMap.forEach(function(pos, id) {
-            var el = cardEls.get(id);
-            if (!el) return;
-            el.style.left = pos.x + 'px';
-            el.style.top = pos.y + 'px';
-            el.style.opacity = '1';
-            el.style.transform = 'scale(1)';
-            el.style.transition = 'none';
-            _liveRects.set(id, { x: pos.x, y: pos.y, w: CARD_W, h: cH(id) });
+        // Run collision detection on target positions first
+        var targetRects = new Map();
+        posMap.forEach(function(pos, id) {
+          targetRects.set(id, { x: pos.x, y: pos.y, w: CARD_W, h: cH(id) });
+        });
+        for (var pass = 0; pass < 30; pass++) {
+          var moved = false;
+          targetRects.forEach(function(ra, ka) {
+            targetRects.forEach(function(rb, kb) {
+              if (ka === kb) return;
+              if (ra.x < rb.x+rb.w+MM_PAD && ra.x+ra.w+MM_PAD > rb.x &&
+                  ra.y < rb.y+rb.h+MM_PAD && ra.y+ra.h+MM_PAD > rb.y) {
+                var dR=rb.x+rb.w+MM_PAD-ra.x, dL=ra.x+ra.w+MM_PAD-rb.x;
+                var dD=rb.y+rb.h+MM_PAD-ra.y, dU=ra.y+ra.h+MM_PAD-rb.y;
+                if (Math.min(dR,dL) <= Math.min(dD,dU)) ra.x += dR<dL ? dR : -dL;
+                else ra.y += dD<dU ? dD : -dU;
+                moved = true;
+              }
+            });
           });
-          requestAnimationFrame(function() { redrawConnectors(); });
-          setTimeout(function() {
-            for (var pass=0;pass<30;pass++) {
-              var moved=false;
-              _liveRects.forEach(function(ra,ka){ _liveRects.forEach(function(rb,kb){ if(ka===kb) return; if(ra.x<rb.x+rb.w+MM_PAD&&ra.x+ra.w+MM_PAD>rb.x&&ra.y<rb.y+rb.h+MM_PAD&&ra.y+ra.h+MM_PAD>rb.y){ var dR=rb.x+rb.w+MM_PAD-ra.x, dL=ra.x+ra.w+MM_PAD-rb.x, dD=rb.y+rb.h+MM_PAD-ra.y, dU=ra.y+ra.h+MM_PAD-rb.y; if(Math.min(dR,dL)<=Math.min(dD,dU)) ra.x+=dR<dL?dR:-dL; else ra.y+=dD<dU?dD:-dU; var el=cardEls.get(ka); if(el){el.style.left=ra.x+'px';el.style.top=ra.y+'px';} moved=true; } }); });
-              if (!moved) break;
-            }
-            redrawConnectors();
-          }, 50);
-          _everRendered = true;
-        } else {
-          var targetRects = new Map();
-          posMap.forEach(function(pos, id) {
-            targetRects.set(id, { x: pos.x, y: pos.y, w: CARD_W, h: cH(id) });
-          });
-          for (var pass=0;pass<30;pass++) {
-            var moved=false;
-            targetRects.forEach(function(ra,ka){ targetRects.forEach(function(rb,kb){ if(ka===kb) return; if(ra.x<rb.x+rb.w+MM_PAD&&ra.x+ra.w+MM_PAD>rb.x&&ra.y<rb.y+rb.h+MM_PAD&&ra.y+ra.h+MM_PAD>rb.y){ var dR=rb.x+rb.w+MM_PAD-ra.x, dL=ra.x+ra.w+MM_PAD-rb.x, dD=rb.y+rb.h+MM_PAD-ra.y, dU=ra.y+ra.h+MM_PAD-rb.y; if(Math.min(dR,dL)<=Math.min(dD,dU)) ra.x+=dR<dL?dR:-dL; else ra.y+=dD<dU?dD:-dU; moved=true; } }); });
-            if (!moved) break;
-          }
-// Step 1: ensure cards are at 0,0 with no transition
-targetRects.forEach(function(pos, id) {
-  var el = cardEls.get(id);
-  if (!el) return;
-  el.style.transition = 'none';
-  el.style.left = '0px';
-  el.style.top = '0px';
-});
-
-// Step 2: force reflow so browser registers the 0,0 position as "from"
-cardEls.forEach(function(el) { el.offsetHeight; });
-
-// Step 3: now set transition + target — browser animates from 0,0
-targetRects.forEach(function(pos, id) {
-  var el = cardEls.get(id);
-  if (!el) return;
-  el.style.transition = 'left '+ANIMATE_DURATION+'ms cubic-bezier(0.4,0,0.2,1), top '+ANIMATE_DURATION+'ms cubic-bezier(0.4,0,0.2,1)';
-  el.style.left = pos.x + 'px';
-  el.style.top = pos.y + 'px';
-  _liveRects.set(id, { x: pos.x, y: pos.y, w: pos.w, h: pos.h });
-});
-          var startTime = performance.now();
-          function animateConnectors(currentTime) {
-            var elapsed = currentTime - startTime;
-            if (elapsed < ANIMATE_DURATION) {
-              redrawConnectors();
-              requestAnimationFrame(animateConnectors);
-            } else {
-              redrawConnectors();
-              cardEls.forEach(function(el) { el.style.transition = ''; });
-            }
-          }
-          requestAnimationFrame(animateConnectors);
+          if (!moved) break;
         }
+
+        // Step 1: place all cards at their FINAL positions instantly, hidden
+        targetRects.forEach(function(pos, id) {
+          var el = cardEls.get(id);
+          if (!el) return;
+          el.style.transition = 'none';
+          el.style.left = pos.x + 'px';
+          el.style.top  = pos.y + 'px';
+          el.style.opacity = '0';
+          el.style.transform = 'scale(0.88)';
+          _liveRects.set(id, { x: pos.x, y: pos.y, w: CARD_W, h: pos.h });
+        });
+
+        // Step 2: force reflow so browser registers final positions as settled
+        cardEls.forEach(function(el) { el.offsetHeight; });
+
+        // Step 3: animate opacity+scale in, staggered per card
+        var ids = Array.from(targetRects.keys());
+        ids.forEach(function(id, i) {
+          var el = cardEls.get(id);
+          if (!el) return;
+          var delay = Math.min(i * 30, 300); // stagger, max 300ms total
+          el.style.transition =
+            'opacity ' + ANIMATE_DURATION + 'ms cubic-bezier(0.4,0,0.2,1) ' + delay + 'ms, ' +
+            'transform ' + ANIMATE_DURATION + 'ms cubic-bezier(0.4,0,0.2,1) ' + delay + 'ms';
+          el.style.opacity = '1';
+          el.style.transform = 'scale(1)';
+        });
+
+        // Draw connectors once cards are visible
+        redrawConnectors();
+        setTimeout(function() {
+          redrawConnectors();
+          cardEls.forEach(function(el) { el.style.transition = ''; el.style.transform = ''; });
+        }, ANIMATE_DURATION + 350);
+
+        _everRendered = true;
       }
 
       function layoutRadial() {
