@@ -2,7 +2,7 @@
 // utils-shared.js — shared data, theme, and UI utilities
 // Loaded by: index.html, tools/spreadsheet.html, tools/*.html
 // ════════════════════════════════════════════════════════════════
-console.log('[utils-shared.js v.8]');
+console.log('[utils-shared.js v.9]');
 
 // ════════════════════════════════════════════════════════════════
 // DARK / LIGHT MODE
@@ -149,6 +149,7 @@ console.log('[utils-shared.js v.8]');
       applyTheme(isDark);
       syncLabel();
       localStorage.setItem(STORAGE_KEY, isDark ? 'dark' : 'light');
+      window.dispatchEvent(new CustomEvent('df-theme-change', { detail: { dark: isDark } }));
     });
 
     // Follow OS if user has no explicit saved preference
@@ -168,11 +169,13 @@ console.log('[utils-shared.js v.8]');
     applyTheme(isDark);
     var lbl = document.getElementById('theme-toggle-label');
     if (lbl) lbl.textContent = isDark ? 'Light mode' : 'Dark mode';
+    window.dispatchEvent(new CustomEvent('df-theme-change', { detail: { dark: isDark } }));
   });
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
   } else {
+    // Script loaded after DOM is ready (bottom of body) — call directly
     init();
   }
 })();
@@ -370,15 +373,37 @@ const THEMES = {
 
 const TAB_THEMES = ['yellow', 'visions', 'relational', 'organizational', 'physical', 'yellow'];
 
-window.PP_PALETTE = ['visions', 'relational', 'organizational', 'physical', 'yellow', 'default']
-  .map(name => {
-    const t = THEMES[name] || THEMES.default || {};
-    return {
-      accent: t['--tab-active-bg']    || '#4f7af7',
-      bg:     t['--bg-data']          || '#f0f4ff',
-      label:  t['--tab-active-color'] || '#ffffff',
-    };
-  });
+// Light-mode palette (bg = very pale tint, accent = saturated mid)
+const _PALETTE_LIGHT = [
+  { accent: '#2e7d5e', bg: '#eef5f1', label: '#ffffff' }, // visions
+  { accent: '#4a56c8', bg: '#eef0fb', label: '#ffffff' }, // relational
+  { accent: '#5e3d9e', bg: '#f2eef9', label: '#ffffff' }, // org
+  { accent: '#bb463c', bg: '#faf0ef', label: '#ffffff' }, // physical
+  { accent: '#c8991a', bg: '#fdfaee', label: '#ffffff' }, // yellow
+  { accent: '#787680', bg: '#f4f4f6', label: '#ffffff' }, // default
+];
+
+// Dark-mode palette (bg = very dark tint, accent = lighter/more luminous)
+const _PALETTE_DARK = [
+  { accent: '#7ecfb0', bg: '#0e1f18', label: '#0e1f18' }, // visions
+  { accent: '#9ba4f0', bg: '#0d0f26', label: '#0d0f26' }, // relational
+  { accent: '#c0a8f0', bg: '#130b22', label: '#130b22' }, // org
+  { accent: '#f09090', bg: '#220c0b', label: '#220c0b' }, // physical
+  { accent: '#f0cc60', bg: '#1e1800', label: '#1e1800' }, // yellow
+  { accent: '#aaaabc', bg: '#1a1a1f', label: '#1a1a1f' }, // default
+];
+
+// Returns the right palette for the current theme mode
+function getPalette() {
+  return document.documentElement.classList.contains('dark')
+    ? _PALETTE_DARK
+    : _PALETTE_LIGHT;
+}
+
+// Legacy: static reference kept for any code that reads window.PP_PALETTE at load time
+window.PP_PALETTE = _PALETTE_LIGHT;
+// Dynamic accessor — tools should use this
+window.getPalette = getPalette;
 
 function panelThemeVars(tabIdx) {
   const name = TAB_THEMES[tabIdx] || 'default';
