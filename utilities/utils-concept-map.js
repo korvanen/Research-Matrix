@@ -1,663 +1,1079 @@
-// sidepanel-concept-map.js — Concept Map v17
-// v16 → v17 changes:
-//   • depthColor() now reads window.PP_PALETTE (set by script.js) as first
-//     priority so all tools share one color source. Falls back to THEMES
-//     globals then hardcoded CMAP_FALLBACK_PALETTE for standalone/bridge mode.
-//   • CMAP_FALLBACK_PALETTE upgraded from 5 plain hex strings to 7 full
-//     { accent, bg, label } objects matching the global theme palette.
-console.log('[sidepanel-concept-map.js [v.8]');
-// Level themes (used by THEMES fallback path only):
-const CMAP_LEVEL_THEMES = ['yellow','visions','relational','organizational','physical','yellow'];
+// utils-clusters.js — Clusters tool v35
+// v34 → v35 changes:
+//   • All inline CSS replaced with MD3 design-system.css tokens (--md-sys-color-*, --md-elev-*, --radius-*, etc.)
+//   • Sheet overlay panel replaced with createSidePanel() from utils-panel.js
+//     – correct drag direction (right edge drag expands leftward)
+//     – open/close arrow buttons wired to visible state via ds-panel-arrow--open / --close
+//   • Nest cards, tooltips, table cells, status badge all use semantic DS tokens
+//   • Dark-mode inherits automatically via CSS custom properties
+console.log('[utils-clusters.js V9]');
 
-const CMAP_PARENT_CHILD_THRESHOLD = 0.50;
-const CMAP_MIN_SPLIT_LENGTH = 60;
-const ORPHAN_RECOVERY_THRESHOLD = 0.85;
+var CL_MIN_SPLIT_LENGTH = 60;
 
-(function injectCmapStyles() {
-  if (document.getElementById('pp-cmap-styles')) return;
+(function injectClusterStyles() {
+  if (document.getElementById('pp-cluster-styles')) return;
   const s = document.createElement('style');
-  s.id = 'pp-cmap-styles';
+  s.id = 'pp-cluster-styles';
   s.textContent = `
-#pp-cmap-head {
-  flex-shrink:0; padding:10px 12px 8px;
-  border-bottom:1px solid var(--md-sys-color-outline-variant);
-  background:var(--md-sys-color-surface-container-low);
-  display:flex; flex-direction:column; gap:5px;
-}
-#pp-cmap-subtitle {
-  font-size:11px; font-weight:500; color:var(--md-sys-color-on-surface-variant);
-  letter-spacing:.04em; line-height:1.3; min-height:14px;
-  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
-}
-#pp-cmap-status {
-  display:inline-flex; align-items:center; gap:6px; padding:4px 8px;
-  border-radius:var(--radius-full); width:fit-content;
-  font-size:9px; font-weight:600; letter-spacing:.07em; text-transform:uppercase;
-  border:1px solid transparent;
-  transition:opacity .6s ease, background .4s ease;
-}
-#pp-cmap-status.cmap-loading { background:color-mix(in srgb, var(--md-sys-color-on-surface) 5%, transparent);color:var(--md-sys-color-on-surface-variant);border-color:var(--md-sys-color-outline-variant); }
-#pp-cmap-status.cmap-ready   { background:color-mix(in srgb, var(--md-sys-color-secondary) 12%, transparent);color:var(--md-sys-color-secondary);border-color:color-mix(in srgb, var(--md-sys-color-secondary) 30%, transparent); }
-#pp-cmap-status.cmap-error   { background:color-mix(in srgb, var(--md-sys-color-error) 12%, transparent);color:var(--md-sys-color-error);border-color:color-mix(in srgb, var(--md-sys-color-error) 30%, transparent); }
-.pp-cmap-dot { width:6px;height:6px;border-radius:50%;flex-shrink:0;transition:background .4s; }
-#pp-cmap-status.cmap-loading .pp-cmap-dot { background:var(--md-sys-color-outline);animation:pp-cmap-pulse 1.2s ease-in-out infinite; }
-#pp-cmap-status.cmap-ready .pp-cmap-dot   { background:var(--md-sys-color-secondary); }
-#pp-cmap-status.cmap-error .pp-cmap-dot   { background:var(--md-sys-color-error); }
-@keyframes pp-cmap-pulse { 0%,100%{opacity:.25;transform:scale(.85);}50%{opacity:1;transform:scale(1.1);} }
-
-/* ── Controls grid ── */
-#pp-cmap-controls {
-  display:grid; grid-template-columns:1fr 1fr 1fr auto auto; gap:6px; align-items:end;
-}
-.pp-cmap-ctrl-col { display:flex; flex-direction:column; gap:2px; }
-
-#pp-cmap-rebuild {
-  border:none; border-radius:var(--radius-full); padding:4px 12px; align-self:stretch;
-  font-size:9px; font-weight:600; letter-spacing:.07em; text-transform:uppercase;
-  background:var(--md-sys-color-secondary-container);color:var(--md-sys-color-on-secondary-container); cursor:pointer;
-  transition:background .15s,color .15s,box-shadow .15s; white-space:nowrap;
-}
-#pp-cmap-rebuild:hover { box-shadow:var(--md-elev-1); }
-#pp-cmap-rebuild.pp-cmap-busy { background:color-mix(in srgb, var(--md-sys-color-on-surface) 12%, transparent);color:color-mix(in srgb, var(--md-sys-color-on-surface) 38%, transparent);cursor:default; }
-
-#pp-cmap-layout-wrap { position:relative; align-self:stretch; }
-#pp-cmap-layout-btn {
-  height:100%; border:1px solid var(--md-sys-color-outline-variant); border-radius:var(--radius-full); padding:4px 10px;
-  font-size:9px; font-weight:600; letter-spacing:.07em; text-transform:uppercase;
-  background:var(--md-sys-color-surface-container);color:var(--md-sys-color-on-surface-variant); cursor:pointer;
-  transition:background .15s,color .15s,box-shadow .15s; white-space:nowrap;
-  display:flex; align-items:center; gap:4px;
-}
-#pp-cmap-layout-btn:hover, #pp-cmap-layout-btn.open { background:var(--md-sys-color-surface-container-high);color:var(--md-sys-color-on-surface);box-shadow:var(--md-elev-1); }
-#pp-cmap-layout-menu {
-  position:absolute; top:calc(100% + 5px); right:0; z-index:300;
-  background:var(--md-sys-color-surface-container-lowest);border:1px solid var(--md-sys-color-outline-variant); border-radius:var(--radius-md);
-  box-shadow:var(--md-elev-3); padding:5px; min-width:148px;
-  display:none; flex-direction:column; gap:1px;
-  animation:pp-cmap-menu-in .15s cubic-bezier(0.22,1,0.36,1) both;
-}
-@keyframes pp-cmap-menu-in { from{opacity:0;transform:scale(.92) translateY(-6px);}to{opacity:1;transform:scale(1) translateY(0);} }
-#pp-cmap-layout-menu.open { display:flex; }
-.pp-cmap-layout-opt {
-  display:flex; align-items:center; gap:6px; width:100%; border:none; background:transparent;
-  text-align:left; padding:5px 9px; border-radius:var(--radius-sm); cursor:pointer;
-  font-size:9px; font-weight:600; letter-spacing:.03em; color:var(--md-sys-color-on-surface-variant); transition:background .12s;
-}
-.pp-cmap-layout-opt:hover { background:var(--md-sys-color-surface-container); color:var(--md-sys-color-on-surface); }
-.pp-cmap-layout-opt.active { color:var(--md-sys-color-on-surface); background:var(--md-sys-color-surface-container); }
-.pp-cmap-layout-sep { height:1px; background:var(--md-sys-color-outline-variant); margin:3px 4px; }
-.pp-cmap-layout-group { font-size:7px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--md-sys-color-on-surface-variant);padding:4px 9px 2px; }
-
-#pp-cmap-canvas {
-  flex:1; min-height:0; position:relative; overflow:hidden; cursor:default; user-select:none;
-}
-#pp-cmap-canvas.pp-cmap-panning { cursor:grabbing !important; }
-#pp-cmap-world { position:absolute; top:0; left:0; width:100%; height:100%; transform-origin:0 0; }
-#pp-cmap-empty {
-  position:absolute; inset:0; display:flex; flex-direction:column;
-  align-items:center; justify-content:center; gap:8px;
-  font-size:11px; letter-spacing:.08em; text-transform:uppercase;
-  color:var(--md-sys-color-on-surface-variant); text-align:center; padding:24px; pointer-events:none;
-}
-#pp-cmap-zoom-hint {
-  position:absolute; bottom:7px; right:9px; font-size:9px; font-weight:600;
-  letter-spacing:.05em; color:var(--md-sys-color-outline); pointer-events:none; z-index:20;
-}
-#pp-cmap-fit {
-  position:absolute; bottom:28px; right:9px; z-index:25;
-  width:28px; height:28px; border:1px solid var(--md-sys-color-outline-variant); border-radius:var(--radius-sm); padding:0;
-  background:var(--md-sys-color-surface-container);color:var(--md-sys-color-on-surface-variant); cursor:pointer;
-  display:grid; place-items:center; transition:background .15s,color .15s,box-shadow .15s;
-}
-#pp-cmap-fit:hover { background:var(--md-sys-color-surface-container-high);color:var(--md-sys-color-on-surface);box-shadow:var(--md-elev-1); }
-
-.pp-cmap-card {
-  position:absolute; border-radius:9px;
-  border:none; background:var(--ppc-bg,#fff);
-  box-shadow:var(--md-elev-2); cursor:grab; user-select:none;
-  overflow:hidden; transition:box-shadow .15s;
-}
-.pp-cmap-card:active { cursor:grabbing; }
-.pp-cmap-card:hover  { box-shadow:var(--md-elev-4); }
-
-/* ── Card top layout (base styles shared with clusters) ── */
-.pp-cmap-card-top {
-  display:flex; align-items:flex-start; justify-content:space-between;
-  padding:5px 9px 4px; gap:6px;
-}
-.pp-cmap-card-cat-num {
-  font-size:11px; font-weight:800; letter-spacing:.02em; line-height:1.35;
-  flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
-  color:var(--md-sys-color-on-surface);
-}
-.pp-cmap-card-level-block {
-  display:flex; flex-direction:column; align-items:flex-end; flex-shrink:0;
-}
-.pp-cmap-card-level-num {
-  font-size:14px; font-weight:900; line-height:1;
-  color:var(--md-sys-color-on-surface);
-}
-.pp-cmap-card-level-label {
-  font-size:7px; font-weight:700; letter-spacing:.08em; text-transform:uppercase;
-  color:var(--md-sys-color-on-surface-variant);
-}
-.pp-cmap-card-merged {
-  font-size:8px; font-weight:600; letter-spacing:.06em; text-transform:uppercase;
-  padding:0 9px 3px; color:var(--md-sys-color-on-surface-variant);
-}
-.pp-cmap-card-rule {
-  height:1px; margin:0 9px; background:var(--md-sys-color-outline-variant); opacity:.5;
+/* ── Head / controls ───────────────────────────────────── */
+#pp-cl-head {
+  flex-shrink: 0;
+  padding: var(--space-3) var(--space-3) var(--space-2);
+  border-bottom: 1px solid var(--md-sys-color-outline-variant);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  background: var(--md-sys-color-surface-container);
 }
 
-/* ── Solid-color card: text driven by --ppc-on (set from palette label in JS) ── */
-.pp-cmap-card .pp-cmap-card-cat-num    { color: color-mix(in srgb, var(--ppc-on,#fff) 92%, transparent); }
-.pp-cmap-card .pp-cmap-card-level-num  { color: color-mix(in srgb, var(--ppc-on,#fff) 95%, transparent); }
-.pp-cmap-card .pp-cmap-card-level-label { color: color-mix(in srgb, var(--ppc-on,#fff) 55%, transparent); }
-.pp-cmap-card .pp-cmap-card-merged     { color: color-mix(in srgb, var(--ppc-on,#fff) 50%, transparent); }
-.pp-cmap-card .pp-cmap-card-rule       { background: color-mix(in srgb, var(--ppc-on,#fff) 22%, transparent); opacity: 1; }
-.pp-cmap-card .pp-cmap-cell-cat        { color: color-mix(in srgb, var(--ppc-on,#fff) 60%, transparent); }
-.pp-cmap-card .pp-cmap-cell-text       { color: color-mix(in srgb, var(--ppc-on,#fff) 92%, transparent); }
-.pp-cmap-card .pp-cmap-merge-sep       { background: color-mix(in srgb, var(--ppc-on,#fff) 20%, transparent); border-color: transparent; }
-.pp-cmap-card .pp-cmap-card-footer     { border-top-color: color-mix(in srgb, var(--ppc-on,#fff) 18%, transparent); }
-.pp-cmap-card .pp-cmap-sim-line        { color: color-mix(in srgb, var(--ppc-on,#fff) 60%, transparent); }
-.pp-cmap-card .pp-cmap-sim-pct         { color: color-mix(in srgb, var(--ppc-on,#fff) 92%, transparent); }
-.pp-cmap-card .pp-cmap-leaf-badge      { color: color-mix(in srgb, var(--ppc-on,#fff) 55%, transparent); }
+#pp-cl-subtitle {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--md-sys-color-on-surface-variant);
+  letter-spacing: var(--letter-spacing-wide);
+  line-height: 1.3;
+  min-height: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
-.pp-cmap-card-head { padding:5px 9px 4px; display:flex; align-items:flex-start; gap:5px; flex-wrap:wrap; }
-.pp-cmap-level-badge {
-  font-size:8px; font-weight:800; letter-spacing:.10em; text-transform:uppercase;
-  opacity:.9; flex:1; min-width:0; line-height:1.4;
+/* Status chip — MD3 Assist Chip style */
+#pp-cl-status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 4px var(--space-2);
+  border-radius: var(--radius-full);
+  border: 1px solid var(--md-sys-color-outline-variant);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: var(--letter-spacing-caps);
+  text-transform: uppercase;
+  transition: opacity .6s ease, background .4s ease;
+  width: fit-content;
 }
-.pp-cmap-split-badge { font-size:8px; font-weight:800; letter-spacing:.06em; opacity:.9; flex:1; min-width:0; line-height:1.4; }
-.pp-cmap-split-fraction {
-  font-size:9px; font-weight:900; letter-spacing:.04em; opacity:.8; flex-shrink:0;
-  align-self:center; padding:1px 6px; border-radius:8px;
+#pp-cl-status.cl-loading {
+  background: color-mix(in srgb, var(--md-sys-color-on-surface) 5%, transparent);
+  color: var(--md-sys-color-on-surface-variant);
+  border-color: var(--md-sys-color-outline-variant);
 }
-.pp-cmap-parent-count {
-  font-size:8px; font-weight:700; letter-spacing:.06em; padding:1px 5px;
-  border-radius:8px; flex-shrink:0; align-self:center;
-  background:color-mix(in srgb, var(--ppc-on,#fff) 20%, transparent); color:color-mix(in srgb, var(--ppc-on,#fff) 90%, transparent);
+#pp-cl-status.cl-ready {
+  background: color-mix(in srgb, var(--md-sys-color-secondary) 12%, transparent);
+  color: var(--md-sys-color-secondary);
+  border-color: color-mix(in srgb, var(--md-sys-color-secondary) 30%, transparent);
 }
-.pp-cmap-merged-count {
-  font-size:8px; font-weight:700; letter-spacing:.07em;
-  padding:1px 6px; border-radius:10px; margin-left:auto; opacity:.7; flex-shrink:0;
+#pp-cl-status.cl-error {
+  background: color-mix(in srgb, var(--md-sys-color-error) 12%, transparent);
+  color: var(--md-sys-color-error);
+  border-color: color-mix(in srgb, var(--md-sys-color-error) 30%, transparent);
 }
-.pp-cmap-card-body { padding:6px 9px 4px; display:flex; flex-direction:column; gap:4px; }
-.pp-cmap-cell-cat {
-  font-size:8px; font-weight:700; letter-spacing:.08em; text-transform:uppercase;
-  color:var(--md-sys-color-on-surface-variant); margin-bottom:1px;
+.pp-cl-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  transition: background .4s;
 }
-.pp-cmap-cell-text { font-size:10px; line-height:1.38; color:var(--md-sys-color-on-surface); word-break:break-word; overflow-wrap:break-word; }
-.pp-cmap-merge-sep { border-top:1px solid var(--md-sys-color-outline-variant); margin:3px 0; }
-.pp-cmap-card-footer {
-  padding:4px 9px 7px; border-top:1px solid var(--md-sys-color-outline-variant); margin-top:2px;
-  display:flex; flex-direction:column; gap:3px;
+#pp-cl-status.cl-loading .pp-cl-dot {
+  background: var(--md-sys-color-outline);
+  animation: pp-cl-pulse 1.2s ease-in-out infinite;
 }
-.pp-cmap-sim-row { display:flex; align-items:center; gap:5px; }
-.pp-cmap-sim-arrow {
-  font-size:9px; font-weight:800; flex-shrink:0; width:10px; text-align:center; opacity:.55;
+#pp-cl-status.cl-ready .pp-cl-dot  { background: var(--md-sys-color-secondary); }
+#pp-cl-status.cl-error .pp-cl-dot  { background: var(--md-sys-color-error); }
+
+@keyframes pp-cl-pulse {
+  0%, 100% { opacity: .3; transform: scale(.85); }
+  50%       { opacity: 1; transform: scale(1.1); }
 }
-.pp-cmap-sim-bar { flex:1; height:3px; border-radius:2px; background:var(--md-sys-color-surface-container-high); overflow:hidden; }
-.pp-cmap-sim-fill { height:100%; border-radius:2px; transition:width .3s ease; }
-.pp-cmap-sim-label { font-size:9px; font-weight:700; letter-spacing:.04em; flex-shrink:0; color:var(--md-sys-color-on-surface-variant); min-width:52px; }
-.pp-cmap-leaf-badge {
-  font-size:8px; font-weight:600; letter-spacing:.06em; text-transform:uppercase;
-  color:var(--md-sys-color-on-surface-variant); padding:4px 9px 7px; display:block;
+
+/* Controls grid */
+#pp-cl-controls { display: flex; flex-direction: column; gap: var(--space-1); }
+#pp-cl-sliders  {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 100px;
+  gap: var(--space-2);
+  align-items: center;
+}
+.pp-cl-slider-col { display: flex; flex-direction: column; gap: 2px; }
+.pp-cl-btn-col    { display: flex; align-items: stretch; justify-content: stretch; align-self: stretch; height: 100%; }
+
+/* Re-cluster button — MD3 Tonal Button */
+#pp-cl-recluster {
+  flex: 1;
+  border: none;
+  border-radius: var(--radius-full);
+  padding: 0 var(--space-3);
+  font-family: var(--font-family);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: var(--letter-spacing-caps);
+  text-transform: uppercase;
+  background: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
+  cursor: pointer;
+  transition: box-shadow var(--transition-fast), background var(--transition-fast);
+  display: flex; align-items: center; justify-content: center;
+  text-align: center; line-height: 1.3; white-space: nowrap;
+  position: relative; overflow: hidden;
+}
+#pp-cl-recluster::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: var(--md-sys-color-on-secondary-container);
+  opacity: 0;
+  border-radius: inherit;
+  transition: opacity var(--transition-fast);
+}
+#pp-cl-recluster:hover::before { opacity: var(--md-sys-state-hover-opacity); }
+#pp-cl-recluster:hover         { box-shadow: var(--md-elev-1); }
+#pp-cl-recluster.pp-cl-reclustering {
+  background: color-mix(in srgb, var(--md-sys-color-on-surface) 12%, transparent);
+  color: color-mix(in srgb, var(--md-sys-color-on-surface) 38%, transparent);
+  cursor: default;
+}
+
+/* ── Canvas ─────────────────────────────────────────────── */
+#pp-cl-canvas {
+  flex: 1; min-height: 0;
+  overflow: hidden;
+  position: relative;
+  cursor: default;
+  user-select: none;
+  background: var(--md-sys-color-background);
+}
+#pp-cl-canvas.pp-cl-panning { cursor: grabbing !important; }
+#pp-cl-canvas-world {
+  position: absolute; top: 0; left: 0;
+  width: 100%; height: 100%;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+#pp-cl-empty {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: var(--space-2);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: var(--letter-spacing-caps);
+  text-transform: uppercase;
+  color: var(--md-sys-color-outline);
+  text-align: center; padding: var(--space-6);
+  pointer-events: none;
+}
+#pp-cl-zoom-hint {
+  position: absolute; bottom: var(--space-2); right: var(--space-3);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: .05em;
+  color: var(--md-sys-color-outline);
+  pointer-events: none; z-index: 20;
+}
+
+/* ── Nests — MD3 Elevated Card ──────────────────────────── */
+.pp-cl-nest {
+  position: absolute;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--md-sys-color-outline-variant);
+  background: var(--md-sys-color-surface-container-low);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+  box-shadow: var(--md-elev-1);
+  transition: box-shadow var(--transition-fast);
+}
+.pp-cl-nest.pp-cl-nest-lifted { box-shadow: var(--md-elev-3); }
+
+.pp-cl-nest-head {
+  display: flex; align-items: center; gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  cursor: grab; flex-shrink: 0; user-select: none;
+}
+.pp-cl-nest-head:active { cursor: grabbing; }
+
+.pp-cl-nest-label {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: .04em;
+  flex-shrink: 0;
+  opacity: .85;
+  min-width: 16px;
+}
+.pp-cl-nest-dot  { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.pp-cl-nest-count {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: var(--letter-spacing-caps);
+  text-transform: uppercase;
+  color: var(--md-sys-color-on-surface-variant);
+  white-space: nowrap;
+}
+
+.pp-cl-nest-body {
+  flex: 1; min-height: 0; overflow-y: auto;
+  padding: var(--space-2);
+  display: flex; flex-direction: column; gap: var(--space-1);
+  scrollbar-width: thin;
+  scrollbar-color: var(--md-sys-color-outline-variant) transparent;
+}
+.pp-cl-nest-body::-webkit-scrollbar       { width: 4px; }
+.pp-cl-nest-body::-webkit-scrollbar-thumb {
+  background: var(--md-sys-color-outline-variant);
+  border-radius: var(--radius-full);
+}
+.pp-cl-nest-body::-webkit-scrollbar-track { background: transparent; }
+
+.pp-cl-tile-row {
+  display: flex; flex-wrap: wrap;
+  align-items: flex-start; align-content: flex-start;
+  gap: var(--space-1); width: 100%;
+}
+
+.pp-cl-resize-handle {
+  position: absolute; bottom: 0; right: 0;
+  width: 14px; height: 14px;
+  cursor: nwse-resize;
+  background: linear-gradient(135deg, transparent 50%, var(--md-sys-color-outline-variant) 50%);
+  border-radius: 0 0 var(--radius-sm) 0;
+  z-index: 5;
+  opacity: .5;
+  transition: opacity var(--transition-fast);
+}
+.pp-cl-nest:hover .pp-cl-resize-handle { opacity: 1; }
+
+/* ── Cards ──────────────────────────────────────────────── */
+.pp-cl-card {
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--md-sys-color-outline-variant);
+  background: var(--ppc-bg, var(--md-sys-color-surface));
+  cursor: pointer;
+  flex: 1 1 100px; min-width: 100px;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+  animation: pp-cl-card-in .22s var(--md-motion-easing-emphasized-decel) both;
+  box-sizing: border-box;
+  position: relative; overflow: hidden;
+}
+.pp-cl-card::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: var(--md-sys-color-on-surface);
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+.pp-cl-card:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--md-elev-2);
+}
+.pp-cl-card:hover::before { opacity: var(--md-sys-state-hover-opacity); }
+
+@keyframes pp-cl-card-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* ── Solid-colour card: text driven by --ppc-on (set from palette label in JS) ── */
+.pp-cl-card .pp-cmap-card-cat-num     { color: color-mix(in srgb, var(--ppc-on,#fff) 92%, transparent); }
+.pp-cl-card .pp-cmap-card-level-label { color: color-mix(in srgb, var(--ppc-on,#fff) 55%, transparent); }
+.pp-cl-card .pp-cmap-card-rule        { background: color-mix(in srgb, var(--ppc-on,#fff) 22%, transparent); opacity: 1; }
+.pp-cl-card .pp-cl-card-cat           { color: color-mix(in srgb, var(--ppc-on,#fff) 60%, transparent); }
+.pp-cl-card .pp-cl-card-text          { color: color-mix(in srgb, var(--ppc-on,#fff) 92%, transparent); }
+.pp-cl-card .pp-cl-card-split         { color: color-mix(in srgb, var(--ppc-on,#fff) 50%, transparent); }
+
+.pp-cl-card-body        { padding: var(--space-1) var(--space-2) var(--space-2); }
+.pp-cl-card-cat {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: var(--letter-spacing-caps);
+  text-transform: uppercase;
+  color: var(--md-sys-color-on-surface-variant);
+  margin-bottom: 2px;
+}
+.pp-cl-card-text {
+  font-size: var(--font-size-sm);
+  line-height: 1.4;
+  color: var(--md-sys-color-on-surface);
+}
+.pp-cl-card-split {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: var(--letter-spacing-caps);
+  text-transform: uppercase;
+  color: var(--md-sys-color-outline);
+  margin-top: 2px;
+}
+
+/* Sub-cluster strip */
+.pp-cl-sub-strip {
+  width: 100%; display: flex; align-items: center;
+  gap: var(--space-1); padding: 3px var(--space-2);
+  border-radius: var(--radius-xs);
+  box-sizing: border-box;
+}
+
+/* ── Tooltip — MD3 Plain Tooltip ────────────────────────── */
+#pp-cl-tooltip {
+  position: fixed; z-index: 9999; pointer-events: none;
+  background: var(--md-sys-color-inverse-surface);
+  color: var(--md-sys-color-inverse-on-surface);
+  border-radius: var(--radius-xs);
+  padding: var(--space-2) var(--space-3);
+  max-width: 240px;
+  box-shadow: var(--md-elev-2);
+  opacity: 0;
+  transition: opacity .14s var(--md-motion-easing-standard);
+  display: flex; flex-direction: column; gap: var(--space-1);
+  line-height: 1.4;
+}
+#pp-cl-tooltip.pp-cl-tt-visible { opacity: 1; pointer-events: auto; }
+
+.pp-cl-tooltip-cluster {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--letter-spacing-caps);
+  text-transform: uppercase;
+}
+.pp-cl-tooltip-text {
+  font-size: var(--font-size-sm);
+  color: var(--md-sys-color-inverse-on-surface);
+}
+.pp-cl-tooltip-goto {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--letter-spacing-caps);
+  text-transform: uppercase;
+  cursor: pointer;
+  align-self: flex-end;
+  margin-top: var(--space-1);
+  opacity: .8;
+  transition: opacity var(--transition-fast);
+}
+.pp-cl-tooltip-goto:hover { opacity: 1; }
+
+/* ── Cluster Spreadsheet Side Panel ─────────────────────── */
+#pp-cl-sheet-host {
+  position: absolute;
+  top: 0; right: 0; bottom: 0;
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  z-index: 60;
+  pointer-events: none;
+}
+#pp-cl-sheet-host > .ds-panel {
+  pointer-events: all;
+  height: 100%;
+}
+
+/* Panel header */
+#pp-cl-sheet-phead {
+  flex-shrink: 0;
+  padding: var(--space-3) var(--space-3) var(--space-2);
+  border-bottom: 1px solid var(--md-sys-color-outline-variant);
+  display: flex; align-items: center; gap: var(--space-2);
+  background: var(--md-sys-color-surface-container);
+}
+#pp-cl-sheet-ptitle {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--letter-spacing-caps);
+  text-transform: uppercase;
+  color: var(--md-sys-color-on-surface-variant);
+  flex: 1;
+}
+#pp-cl-sheet-desc {
+  font-size: var(--font-size-xs);
+  color: var(--md-sys-color-outline);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: .03em;
+  white-space: nowrap;
+}
+#pp-cl-sheet-body {
+  flex: 1; min-height: 0;
+  overflow: auto;
+  background: var(--md-sys-color-surface);
+  scrollbar-width: thin;
+  scrollbar-color: var(--md-sys-color-outline-variant) transparent;
+}
+#pp-cl-sheet-body::-webkit-scrollbar       { width: 4px; height: 4px; }
+#pp-cl-sheet-body::-webkit-scrollbar-thumb {
+  background: var(--md-sys-color-outline-variant);
+  border-radius: var(--radius-full);
+}
+#pp-cl-sheet-body::-webkit-scrollbar-track { background: transparent; }
+
+.pp-cl-panel-empty {
+  padding: var(--space-6) var(--space-4);
+  font-size: var(--font-size-sm);
+  color: var(--md-sys-color-outline);
+  letter-spacing: .05em;
+}
+
+/* ── Cluster table — MD3 Data Table ─────────────────────── */
+.pp-cl-table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: var(--font-size-sm);
+}
+.pp-cl-table thead tr { position: sticky; top: 0; z-index: 10; }
+.pp-cl-table th {
+  background: var(--md-sys-color-surface-container);
+  padding: var(--space-3) var(--space-4) var(--space-2);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: var(--letter-spacing-caps);
+  text-transform: uppercase;
+  text-align: left;
+  white-space: nowrap;
+  color: var(--md-sys-color-on-surface-variant);
+  border-right: 1px solid var(--md-sys-color-outline-variant);
+  border-bottom: 2px solid var(--md-sys-color-outline-variant);
+}
+.pp-cl-table th.pp-cl-th-corner {
+  position: sticky; left: 0; z-index: 11;
+  min-width: 28px; width: 28px;
+  text-align: center;
+  border-right: 2px solid var(--md-sys-color-outline-variant);
+}
+.pp-cl-table td {
+  padding: var(--space-1);
+  vertical-align: top;
+  border-right: 1px solid var(--md-sys-color-outline-variant);
+  border-bottom: 1px solid var(--md-sys-color-outline-variant);
+  min-width: 130px;
+}
+.pp-cl-table td.pp-cl-td-rowlabel {
+  position: sticky; left: 0; z-index: 5;
+  background: var(--md-sys-color-surface-container-low);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--letter-spacing-caps);
+  color: var(--md-sys-color-on-surface-variant);
+  text-align: center;
+  padding: var(--space-1) var(--space-2);
+  white-space: nowrap;
+  min-width: 28px; width: 28px;
+  border-right: 2px solid var(--md-sys-color-outline-variant);
+}
+.pp-cl-table td.pp-cl-td-empty {
+  background: color-mix(in srgb, var(--md-sys-color-on-surface) 3%, transparent);
+  color: var(--md-sys-color-outline);
+  font-size: var(--font-size-sm);
+  text-align: center;
+  padding: var(--space-2) var(--space-1);
+}
+.pp-cl-table tbody tr:hover {
+  background: color-mix(in srgb, var(--md-sys-color-on-surface) 5%, transparent);
+}
+
+/* Mini cards inside table cells */
+.pp-cl-scard {
+  background: var(--md-sys-color-surface);
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: var(--radius-xs);
+  border-left: 3px solid transparent;
+  padding: var(--space-1) var(--space-2) var(--space-1);
+  margin-bottom: var(--space-1);
+  cursor: pointer;
+  font-size: var(--font-size-sm);
+  line-height: 1.4;
+  color: var(--md-sys-color-on-surface);
+  transition: background var(--transition-fast), box-shadow var(--transition-fast);
+}
+.pp-cl-scard:last-child { margin-bottom: 0; }
+.pp-cl-scard:hover {
+  background: color-mix(in srgb, var(--md-sys-color-on-surface) 5%, transparent);
+  box-shadow: var(--md-elev-1);
 }
 `;
   document.head.appendChild(s);
 })();
 
 // ════════════════════════════════════════════════════════════════════════════
-function initConceptMapTool(paneEl, sidebarEl) {
-
-  const DRAG_DELAY = 600; // ms debounce while slider is being dragged
+function initClustersTool(paneEl, sidebarEl) {
 
   paneEl.innerHTML =
-    '<div id="pp-cmap-head">' +
-      '<div id="pp-cmap-subtitle">Waiting for embeddings\u2026</div>' +
-      '<div id="pp-cmap-status" class="cmap-loading">' +
-        '<div class="pp-cmap-dot"></div><span id="pp-cmap-label">Embeddings loading\u2026</span>' +
-      '</div>' +
-      '<div id="pp-cmap-controls">' +
-        '<div class="pp-cmap-ctrl-col">' +
-          '<div class="pp-group-label">Max Depth</div>' +
-          '<div class="pp-range-row">' +
-            '<span class="pp-range-label">Lvl</span>' +
-            '<input class="pp-range" id="pp-cmap-depth" type="range" min="1" max="8" value="5" step="1">' +
-            '<span class="pp-range-val" id="pp-cmap-depth-val">5</span>' +
-          '</div>' +
+    '<div id="pp-cl-head">' +
+      '<div id="pp-cl-subtitle">Waiting for embeddings\u2026</div>' +
+      '<div id="pp-cl-status" class="cl-loading"><div class="pp-cl-dot"></div><span id="pp-cl-label">Embeddings loading\u2026</span></div>' +
+      '<div id="pp-cl-controls"><div id="pp-cl-sliders">' +
+        '<div class="pp-cl-slider-col"><div class="pp-group-label">Outer</div>' +
+          '<div class="pp-range-row"><span class="pp-range-label">Min</span><input class="pp-range" id="pp-cl-omin" type="range" min="2" max="20" value="2" step="1"><span class="pp-range-val" id="pp-cl-omin-val">2</span></div>' +
+          '<div class="pp-range-row"><span class="pp-range-label">Max</span><input class="pp-range" id="pp-cl-omax" type="range" min="2" max="20" value="12" step="1"><span class="pp-range-val" id="pp-cl-omax-val">12</span></div>' +
         '</div>' +
-        '<div class="pp-cmap-ctrl-col">' +
-          '<div class="pp-group-label">Link Threshold</div>' +
-          '<div class="pp-range-row">' +
-            '<span class="pp-range-label">Min</span>' +
-            '<input class="pp-range" id="pp-cmap-thresh" type="range" min="20" max="90" value="50" step="5">' +
-            '<span class="pp-range-val" id="pp-cmap-thresh-val">50%</span>' +
-          '</div>' +
+        '<div class="pp-cl-slider-col"><div class="pp-group-label">Inner</div>' +
+          '<div class="pp-range-row"><span class="pp-range-label">Min</span><input class="pp-range pp-range--muted" id="pp-cl-imin" type="range" min="2" max="12" value="2" step="1"><span class="pp-range-val" id="pp-cl-imin-val">2</span></div>' +
+          '<div class="pp-range-row"><span class="pp-range-label">Max</span><input class="pp-range pp-range--muted" id="pp-cl-imax" type="range" min="2" max="12" value="4" step="1"><span class="pp-range-val" id="pp-cl-imax-val">4</span></div>' +
         '</div>' +
-        '<div class="pp-cmap-ctrl-col">' +
-          '<div class="pp-group-label" style="color:#7c5cbf">Max Parents</div>' +
-          '<div class="pp-range-row">' +
-            '<span class="pp-range-label" style="color:#7c5cbf">Par</span>' +
-            '<input class="pp-range pp-range--accent" id="pp-cmap-maxpar" type="range" min="1" max="6" value="1" step="1">' +
-            '<span class="pp-range-val" id="pp-cmap-maxpar-val" style="color:#7c5cbf">1</span>' +
-          '</div>' +
+        '<div class="pp-cl-slider-col"><div class="pp-group-label">Depth</div>' +
+          '<div class="pp-range-row"><span class="pp-range-label">Lvl</span><input class="pp-range pp-range--accent" id="pp-cl-depth" type="range" min="1" max="4" value="2" step="1"><span class="pp-range-val" id="pp-cl-depth-val">2</span></div>' +
         '</div>' +
-        '<div id="pp-cmap-layout-wrap">' +
-          '<button id="pp-cmap-layout-btn" title="Change layout">' +
-            '<svg viewBox="0 0 12 12" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="6" cy="6" r="2"/><circle cx="6" cy="6" r="5" stroke-dasharray="2 2"/></svg>' +
-            '<span id="pp-cmap-layout-label">Radial</span>' +
-          '</button>' +
-          '<div id="pp-cmap-layout-menu">' +
-            '<div class="pp-cmap-layout-group">Layout</div>' +
-            '<button class="pp-cmap-layout-opt active" data-layout="radial">Radial</button>' +
-            '<button class="pp-cmap-layout-opt" data-layout="vtree">Vertical Tree</button>' +
-            '<button class="pp-cmap-layout-opt" data-layout="htree">Horizontal Tree</button>' +
-            '<button class="pp-cmap-layout-opt" data-layout="vflow">Vertical Flow</button>' +
-            '<div class="pp-cmap-layout-sep"></div>' +
-            '<button class="pp-cmap-layout-opt" data-layout="organic">Organic</button>' +
-          '</div>' +
-        '</div>' +
-        '<button id="pp-cmap-rebuild">Rebuild</button>' +
-      '</div>' +
+        '<div class="pp-cl-btn-col"><button id="pp-cl-recluster">Re-cluster</button></div>' +
+      '</div></div>' +
     '</div>' +
-    '<div id="pp-cmap-canvas">' +
-      '<div id="pp-cmap-world"></div>' +
-      '<div id="pp-cmap-empty">Concept map will appear<br>once the spreadsheet loads</div>' +
-      '<button id="pp-cmap-fit" title="Fit all into view">' +
-        '<svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">' +
-          '<path d="M1 5V2h3M12 2h3v3M15 11v3h-3M4 14H1v-3"/>' +
-          '<rect x="4" y="4" width="8" height="8" rx="1" opacity=".4"/>' +
-        '</svg>' +
-      '</button>' +
-      '<div id="pp-cmap-zoom-hint">scroll = zoom \u00b7 RMB drag = pan \u00b7 pinch/2-finger = touch</div>' +
+    '<div id="pp-cl-canvas">' +
+      '<div id="pp-cl-canvas-world"></div>' +
+      '<div id="pp-cl-empty">Clusters will appear<br>once embeddings finish</div>' +
+      '<div id="pp-cl-zoom-hint">scroll\u2009=\u2009zoom \u00b7 RMB drag\u2009=\u2009pan \u00b7 pinch/2-finger\u2009=\u2009touch</div>' +
+    '</div>' +
+    '<div id="pp-cl-tooltip">' +
+      '<div class="pp-cl-tooltip-cluster" id="pp-cl-tt-cluster"></div>' +
+      '<div class="pp-cl-tooltip-text" id="pp-cl-tt-text"></div>' +
+      '<div class="pp-cl-tooltip-goto" id="pp-cl-tt-goto">Go to \u2197</div>' +
     '</div>';
 
-  // ── Upgrade all sliders with bounce animation ──────────────────────────────
   if (typeof upgradeSlider === 'function') {
     paneEl.querySelectorAll('.pp-range').forEach(upgradeSlider);
   }
 
-  const subtitleEl  = paneEl.querySelector('#pp-cmap-subtitle');
-  const statusEl    = paneEl.querySelector('#pp-cmap-status');
-  const labelEl     = paneEl.querySelector('#pp-cmap-label');
-  const canvas      = paneEl.querySelector('#pp-cmap-canvas');
-  const world       = paneEl.querySelector('#pp-cmap-world');
-  const emptyEl     = paneEl.querySelector('#pp-cmap-empty');
-  const rebuildBtn  = paneEl.querySelector('#pp-cmap-rebuild');
-  const fitBtn      = paneEl.querySelector('#pp-cmap-fit');
-  const layoutBtn   = paneEl.querySelector('#pp-cmap-layout-btn');
-  const layoutMenu  = paneEl.querySelector('#pp-cmap-layout-menu');
-  const layoutLabel = paneEl.querySelector('#pp-cmap-layout-label');
-  const layoutOpts  = paneEl.querySelectorAll('.pp-cmap-layout-opt');
-  const depthSlider = paneEl.querySelector('#pp-cmap-depth');
-  const depthValEl  = paneEl.querySelector('#pp-cmap-depth-val');
-  const threshSlider= paneEl.querySelector('#pp-cmap-thresh');
-  const threshValEl = paneEl.querySelector('#pp-cmap-thresh-val');
-  const maxParSlider= paneEl.querySelector('#pp-cmap-maxpar');
-  const maxParValEl = paneEl.querySelector('#pp-cmap-maxpar-val');
+  const subtitle     = paneEl.querySelector('#pp-cl-subtitle');
+  const statusEl     = paneEl.querySelector('#pp-cl-status');
+  const labelEl      = paneEl.querySelector('#pp-cl-label');
+  const canvas       = paneEl.querySelector('#pp-cl-canvas');
+  const world        = paneEl.querySelector('#pp-cl-canvas-world');
+  const emptyEl      = paneEl.querySelector('#pp-cl-empty');
+  const tooltip      = paneEl.querySelector('#pp-cl-tooltip');
+  const ttCluster    = paneEl.querySelector('#pp-cl-tt-cluster');
+  const ttText       = paneEl.querySelector('#pp-cl-tt-text');
+  const ttGoto       = paneEl.querySelector('#pp-cl-tt-goto');
+  const reclusterBtn = paneEl.querySelector('#pp-cl-recluster');
+  const oMinSlider   = paneEl.querySelector('#pp-cl-omin'), oMinVal = paneEl.querySelector('#pp-cl-omin-val');
+  const oMaxSlider   = paneEl.querySelector('#pp-cl-omax'), oMaxVal = paneEl.querySelector('#pp-cl-omax-val');
+  const iMinSlider   = paneEl.querySelector('#pp-cl-imin'), iMinVal = paneEl.querySelector('#pp-cl-imin-val');
+  const iMaxSlider   = paneEl.querySelector('#pp-cl-imax'), iMaxVal = paneEl.querySelector('#pp-cl-imax-val');
+  const depthSlider  = paneEl.querySelector('#pp-cl-depth'), depthVal = paneEl.querySelector('#pp-cl-depth-val');
 
-  const CARD_W = 170;
-  const MM_PAD = 16;
+  const CARD_W       = 200;
+  const RESIZE_MIN_W = 200;
+  const RESIZE_MIN_H = 60;
+  const NEST_GAP     = 20;
+  const DRAG_DELAY   = 600;
 
-  let _depth      = 5;
-  let _threshold  = CMAP_PARENT_CHILD_THRESHOLD;
-  let _maxParents = 1;
-  let _layout     = 'organic';
-  let _rows       = null;
-  let _rendered   = false;
-  let _rebuildTimer = null;
-  let _topZ       = 10;
-  let _panX = 0, _panY = 0, _zoom = 1;
-  let _liveRects  = new Map();
+  let _outerMin=2, _outerMax=12, _innerMin=2, _innerMax=4, _depth=2;
+  let _rendered=false, _ttRow=null;
+  let _cachedEmbedded=null, _cachedVectors=null;
+  let _reclusterTimer=null;
+  let _panX=0, _panY=0, _zoom=1;
+  let _topZ=10;
+  let _clusterState=null;
 
-  function applyTransform() {
+  function outerLabel(i) {
+    let label = '', n = i;
+    do { label = String.fromCharCode(65 + (n % 26)) + label; n = Math.floor(n / 26) - 1; } while (n >= 0);
+    return label;
+  }
+  function innerLabel(outerLbl, subIdx) { return outerLbl + (subIdx + 1); }
+
+  function applyWorldTransform() {
     world.style.transform = `translate(${_panX}px,${_panY}px) scale(${_zoom})`;
   }
-
   function setStatus(state, text) {
-    statusEl.className = 'cmap-' + state;
-    labelEl.textContent = text;
-    statusEl.style.opacity = '1';
+    statusEl.className = 'cl-' + state; labelEl.textContent = text; statusEl.style.opacity = '1';
     if (state === 'ready') setTimeout(() => { statusEl.style.opacity = '0'; }, 3200);
   }
 
-  // ── Sliders: delay while dragging, instant on release ─────────────────────
-  [
-    { el: depthSlider,  valEl: depthValEl,  read: () => { _depth = +depthSlider.value; depthValEl.textContent = _depth; } },
-    { el: threshSlider, valEl: threshValEl, read: () => { _threshold = +threshSlider.value / 100; threshValEl.textContent = threshSlider.value + '%'; } },
-    { el: maxParSlider, valEl: maxParValEl, read: () => { _maxParents = +maxParSlider.value; maxParValEl.textContent = _maxParents; } },
-  ].forEach(({ el, read }) => {
-    el.addEventListener('input', () => {
-      read();
-      clearTimeout(_rebuildTimer);
-      rebuildBtn.classList.add('pp-cmap-busy');
-      _rebuildTimer = setTimeout(() => { _rendered = false; tryRender(); }, DRAG_DELAY);
-    });
-    el.addEventListener('change', () => {
-      read();
-      clearTimeout(_rebuildTimer);
-      rebuildBtn.classList.remove('pp-cmap-busy');
-      _rendered = false; tryRender();
-    });
-  });
-
-  rebuildBtn.addEventListener('click', () => { clearTimeout(_rebuildTimer); _rendered = false; tryRender(); });
-
-  // ── Layout dropdown ───────────────────────────────────────────────────────
-  const LAYOUT_LABELS = { radial:'Radial', vtree:'Vertical Tree', htree:'Horizontal Tree', vflow:'Vertical Flow', organic:'Organic' };
-  layoutBtn.addEventListener('click', e => { e.stopPropagation(); layoutMenu.classList.toggle('open'); layoutBtn.classList.toggle('open', layoutMenu.classList.contains('open')); });
-  document.addEventListener('click', () => { layoutMenu.classList.remove('open'); layoutBtn.classList.remove('open'); });
-  layoutMenu.addEventListener('click', e => e.stopPropagation());
-  layoutOpts.forEach(opt => {
-    opt.addEventListener('click', () => {
-      const l = opt.dataset.layout; if (!l) return;
-      _layout = l; layoutLabel.textContent = LAYOUT_LABELS[l] || l;
-      layoutOpts.forEach(o => o.classList.toggle('active', o.dataset.layout === l));
-      layoutMenu.classList.remove('open'); layoutBtn.classList.remove('open');
-      if (_rendered) { _rendered = false; tryRender(); }
-    });
-  });
-
-  // ── Fit-all ───────────────────────────────────────────────────────────────
-  function fitAll() {
-    if (!_liveRects.size) return;
-    let minX=Infinity, minY=Infinity, maxX=-Infinity, maxY=-Infinity;
-    _liveRects.forEach(r => { minX=Math.min(minX,r.x); minY=Math.min(minY,r.y); maxX=Math.max(maxX,r.x+(r.w||CARD_W)); maxY=Math.max(maxY,r.y+(r.h||80)); });
-    if (!isFinite(minX)) return;
-    const W=canvas.clientWidth||400, H=canvas.clientHeight||400, pad=32;
-    const scaleX=(W-pad*2)/Math.max(maxX-minX,1), scaleY=(H-pad*2)/Math.max(maxY-minY,1);
-    _zoom=Math.min(scaleX,scaleY,2.5);
-    _panX=pad-minX*_zoom+(W-pad*2-(maxX-minX)*_zoom)/2;
-    _panY=pad-minY*_zoom+(H-pad*2-(maxY-minY)*_zoom)/2;
-    applyTransform();
+  function syncSliders() {
+    if (+oMinSlider.value > +oMaxSlider.value) oMaxSlider.value = oMinSlider.value;
+    if (+iMinSlider.value > +iMaxSlider.value) iMaxSlider.value = iMinSlider.value;
+    _outerMin = +oMinSlider.value; _outerMax = +oMaxSlider.value;
+    _innerMin = +iMinSlider.value; _innerMax = +iMaxSlider.value;
+    _depth    = +depthSlider.value;
+    smoothSliderVal(oMinSlider, oMinVal, _outerMin);
+    smoothSliderVal(oMaxSlider, oMaxVal, _outerMax);
+    smoothSliderVal(iMinSlider, iMinVal, _innerMin);
+    smoothSliderVal(iMaxSlider, iMaxVal, _innerMax);
+    smoothSliderVal(depthSlider, depthVal, _depth);
   }
-  fitBtn.addEventListener('click', fitAll);
 
-  // ── Pan & zoom ────────────────────────────────────────────────────────────
+  const _sliderTargets = new Map();
+  function smoothSliderVal(slider, valEl, intVal) {
+    let state = _sliderTargets.get(slider);
+    if (!state) { state = { current: intVal, raf: null }; _sliderTargets.set(slider, state); }
+    state.target = intVal;
+    if (state.raf) return;
+    function step() {
+      state.current += (state.target - state.current) * 0.28;
+      if (Math.abs(state.target - state.current) < 0.05) {
+        state.current = state.target; valEl.textContent = state.target; state.raf = null; return;
+      }
+      valEl.textContent = Math.round(state.current); state.raf = requestAnimationFrame(step);
+    }
+    state.raf = requestAnimationFrame(step);
+  }
+
+  [oMinSlider, oMaxSlider, iMinSlider, iMaxSlider, depthSlider].forEach(s => {
+    s.addEventListener('input', () => {
+      syncSliders();
+      if (!_cachedEmbedded) return;
+      clearTimeout(_reclusterTimer);
+      reclusterBtn.classList.add('pp-cl-reclustering'); reclusterBtn.textContent = '\u2026';
+      _reclusterTimer = setTimeout(() => { _rendered = false; tryRender(); }, DRAG_DELAY);
+    });
+    s.addEventListener('change', () => {
+      syncSliders();
+      if (!_cachedEmbedded) return;
+      clearTimeout(_reclusterTimer); _rendered = false; tryRender();
+    });
+  });
+
+  reclusterBtn.addEventListener('click', () => { clearTimeout(_reclusterTimer); _rendered = false; tryRender(); });
+
+  const sheetHost = document.createElement('div');
+  sheetHost.id = 'pp-cl-sheet-host';
+  canvas.appendChild(sheetHost);
+
+  const sheetPanelContent = document.createElement('div');
+  sheetPanelContent.style.cssText = 'display:flex;flex-direction:column;height:100%;';
+
+  const sheetPHead = document.createElement('div');
+  sheetPHead.id = 'pp-cl-sheet-phead';
+  const sheetTitle = document.createElement('div');
+  sheetTitle.id = 'pp-cl-sheet-ptitle';
+  sheetTitle.textContent = 'Cluster Table';
+  const sheetDesc = document.createElement('div');
+  sheetDesc.id = 'pp-cl-sheet-desc';
+  sheetPHead.appendChild(sheetTitle);
+  sheetPHead.appendChild(sheetDesc);
+
+  const sheetBody = document.createElement('div');
+  sheetBody.id = 'pp-cl-sheet-body';
+  sheetBody.innerHTML = '<div class="pp-cl-panel-empty">Clusters will appear here once embeddings finish.</div>';
+
+  sheetPanelContent.appendChild(sheetPHead);
+  sheetPanelContent.appendChild(sheetBody);
+
+  sheetBody.addEventListener('wheel', ev => ev.stopPropagation(), { passive: true });
+
+  const sheetPanel = createSidePanel(sheetHost, {
+    side:               'right',
+    defaultFraction:    0.40,
+    minFraction:        0,
+    maxFraction:        0.88,
+    snapCloseFraction:  0.10,
+    overlapFraction:    0,
+    fullscreenFraction: 0.88,
+    twoPosition:        false,
+    animDuration:       260,
+    onResize: () => {},
+    onOpen:   () => {},
+    onClose:  () => {},
+  });
+
+  sheetPanel.setContent(sheetPanelContent);
+
+  function updateSheetPanel() {
+    if (!_clusterState) return;
+    const { nonEmpty, alignedAsgns } = _clusterState;
+    if (!nonEmpty || !nonEmpty.length) {
+      sheetBody.innerHTML = '<div class="pp-cl-panel-empty">No clusters yet.</div>';
+      return;
+    }
+
+    const cols = nonEmpty.map((members, ci) => {
+      const subAsgn = alignedAsgns ? alignedAsgns[ci] : null;
+      const numSub  = subAsgn ? Math.max(...subAsgn, 0) + 1 : 1;
+      const groups  = Array.from({ length: numSub }, () => []);
+      if (subAsgn) members.forEach((r, i) => groups[subAsgn[i]].push(r));
+      else groups[0] = members.slice();
+      return { label: outerLabel(ci), col: colForIndex(ci), groups };
+    });
+
+    const maxRows = Math.max(...cols.map(c => c.groups.length));
+    sheetDesc.textContent = cols.length + ' col \u00b7 ' + maxRows + ' row' + (maxRows === 1 ? '' : 's');
+
+    const table = document.createElement('table');
+    table.className = 'pp-cl-table';
+
+    const thead = document.createElement('thead');
+    const hrow  = document.createElement('tr');
+    const thC   = document.createElement('th');
+    thC.className = 'pp-cl-th-corner'; thC.textContent = '#';
+    hrow.appendChild(thC);
+    cols.forEach(c => {
+      const th = document.createElement('th');
+      th.textContent = c.label + ' cluster';
+      th.style.color      = c.col.accent;
+      th.style.borderTop  = '3px solid ' + c.col.accent;
+      hrow.appendChild(th);
+    });
+    thead.appendChild(hrow);
+    table.appendChild(thead);
+
+    const tbody = document.createElement('tbody');
+    for (let ri = 0; ri < maxRows; ri++) {
+      const tr = document.createElement('tr');
+      const tdLbl = document.createElement('td');
+      tdLbl.className   = 'pp-cl-td-rowlabel';
+      tdLbl.textContent = ri + 1;
+      tr.appendChild(tdLbl);
+      cols.forEach(c => {
+        const td      = document.createElement('td');
+        const members = c.groups[ri] || [];
+        if (!members.length) {
+          td.className = 'pp-cl-td-empty'; td.textContent = '\u2014';
+        } else {
+          members.forEach(r => {
+            const cells  = r.row && r.row.cells ? r.row.cells : (r.cells || []);
+            const best   = cells.reduce((b, x) => x.length > b.length ? x : b, '');
+            const parsed = typeof parseCitation === 'function' ? parseCitation(best) : { body: best };
+            const scard  = document.createElement('div');
+            scard.className          = 'pp-cl-scard';
+            scard.style.borderLeftColor = c.col.accent;
+            const txt = parsed.body || best;
+            scard.textContent = txt.length > 130 ? txt.slice(0, 130) + '\u2026' : txt;
+            scard.title = txt;
+            scard.addEventListener('click', () => { if (typeof panelGoTo === 'function') panelGoTo(r, 0); });
+            td.appendChild(scard);
+          });
+        }
+        tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
+    }
+    table.appendChild(tbody);
+    sheetBody.innerHTML = '';
+    sheetBody.appendChild(table);
+  }
+
   let _panning=false, _panSX=0, _panSY=0, _panBX=0, _panBY=0;
 
   canvas.addEventListener('mousedown', ev => {
     if (ev.button !== 2) return;
     _panning=true; _panSX=ev.clientX; _panSY=ev.clientY; _panBX=_panX; _panBY=_panY;
-    canvas.classList.add('pp-cmap-panning'); ev.preventDefault();
+    canvas.classList.add('pp-cl-panning'); ev.preventDefault();
   });
   document.addEventListener('mousemove', ev => {
     if (!_panning) return;
-    _panX=_panBX+(ev.clientX-_panSX); _panY=_panBY+(ev.clientY-_panSY); applyTransform();
+    _panX=_panBX+ev.clientX-_panSX; _panY=_panBY+ev.clientY-_panSY; applyWorldTransform();
   });
   document.addEventListener('mouseup', ev => {
     if (ev.button !== 2 || !_panning) return;
-    _panning=false; canvas.classList.remove('pp-cmap-panning');
+    _panning=false; canvas.classList.remove('pp-cl-panning');
   });
   canvas.addEventListener('contextmenu', ev => ev.preventDefault());
 
   canvas.addEventListener('wheel', ev => {
     ev.preventDefault();
-    const rect=canvas.getBoundingClientRect(), mx=ev.clientX-rect.left, my=ev.clientY-rect.top;
+    const rect = canvas.getBoundingClientRect();
+    const mx = ev.clientX - rect.left, my = ev.clientY - rect.top;
     if (ev.ctrlKey || (Math.abs(ev.deltaY) >= 50 && Math.abs(ev.deltaX) < 50)) {
-      const dz=ev.deltaY>0?0.94:1/0.94, nz=Math.max(0.15,Math.min(4,_zoom*dz));
-      _panX=mx-(mx-_panX)*nz/_zoom; _panY=my-(my-_panY)*nz/_zoom; _zoom=nz;
-    } else {
-      _panX-=ev.deltaX; _panY-=ev.deltaY;
-    }
-    applyTransform();
-  }, {passive:false});
-
-  // Touch pinch/pan handled by Pointer Events in makeDraggable block above
-
-  // ── Card drag — Pointer Events API (works on touch + mouse) ──────────────
-  // Per-card pointerdown + capture → only that card's events route here.
-  // Canvas pointerdown only fires when NOT hitting a card → canvas pan only.
-  const _pointers = new Map(); // pointerId → {x,y}
-  let _cardDrag   = null;      // {el, cid, pointerId, ox, oy, sx, sy}
-  let _pinchState = null;      // {midX, midY, dist, panX, panY, zoom}
-
-  canvas.style.touchAction = 'none';
-
-  // ── Canvas pan (bare canvas touch, not on a card) ──────────────────────
-  canvas.addEventListener('pointerdown', ev => {
-    // If the pointer landed on a card, card's own handler takes over
-    if (ev.target.closest('.pp-cmap-card')) return;
-    canvas.setPointerCapture(ev.pointerId);
-    _pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
-
-    if (_pointers.size === 2) {
-      const pts = [..._pointers.values()];
-      _pinchState = {
-        midX: (pts[0].x + pts[1].x) / 2, midY: (pts[0].y + pts[1].y) / 2,
-        dist: Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y),
-        panX: _panX, panY: _panY, zoom: _zoom,
-      };
-    } else {
-      // Single finger on bare canvas = pan
-      _pinchState = null;
-    }
-  });
-
-  canvas.addEventListener('pointermove', ev => {
-    if (!_pointers.has(ev.pointerId)) return;
-    const prev = _pointers.get(ev.pointerId);
-    _pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
-
-    if (_pointers.size === 1 && !_pinchState) {
-      // Single-finger pan on bare canvas
-      ev.preventDefault();
-      _panX += ev.clientX - prev.x;
-      _panY += ev.clientY - prev.y;
-      applyTransform();
-      return;
-    }
-
-    if (_pinchState && _pointers.size >= 2) {
-      ev.preventDefault();
-      const pts     = [..._pointers.values()];
-      const newMidX = (pts[0].x + pts[1].x) / 2;
-      const newMidY = (pts[0].y + pts[1].y) / 2;
-      const newDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
-      const rect    = canvas.getBoundingClientRect();
-      const cmx     = newMidX - rect.left;
-      const cmy     = newMidY - rect.top;
-      const sf      = newDist / _pinchState.dist;
-      const nz      = Math.max(0.15, Math.min(4, _pinchState.zoom * sf));
-      const origCmx = _pinchState.midX - rect.left;
-      const origCmy = _pinchState.midY - rect.top;
+      const dz = ev.deltaY > 0 ? 0.94 : 1 / 0.94;
+      const nz = Math.max(0.15, Math.min(4, _zoom * dz));
+      _panX = mx - (mx - _panX) * nz / _zoom;
+      _panY = my - (my - _panY) * nz / _zoom;
       _zoom = nz;
-      _panX = cmx - (origCmx - _pinchState.panX) * nz / _pinchState.zoom + (newMidX - _pinchState.midX);
-      _panY = cmy - (origCmy - _pinchState.panY) * nz / _pinchState.zoom + (newMidY - _pinchState.midY);
-      applyTransform();
-      redrawConnectors();
+    } else {
+      _panX -= ev.deltaX; _panY -= ev.deltaY;
     }
+    applyWorldTransform();
+  }, { passive: false });
+
+  let _pinchD=null, _touchMidX=0, _touchMidY=0;
+  canvas.addEventListener('touchstart', ev => {
+    if (ev.touches.length === 2) {
+      _pinchD    = Math.hypot(ev.touches[0].clientX-ev.touches[1].clientX, ev.touches[0].clientY-ev.touches[1].clientY);
+      _touchMidX = (ev.touches[0].clientX+ev.touches[1].clientX)/2;
+      _touchMidY = (ev.touches[0].clientY+ev.touches[1].clientY)/2;
+    }
+  }, { passive: true });
+  canvas.addEventListener('touchmove', ev => {
+    if (ev.touches.length !== 2 || !_pinchD) return;
+    ev.preventDefault();
+    const mx = (ev.touches[0].clientX+ev.touches[1].clientX)/2;
+    const my = (ev.touches[0].clientY+ev.touches[1].clientY)/2;
+    const d  = Math.hypot(ev.touches[0].clientX-ev.touches[1].clientX, ev.touches[0].clientY-ev.touches[1].clientY);
+    const rect = canvas.getBoundingClientRect();
+    const cmx = mx-rect.left, cmy = my-rect.top;
+    const nz = Math.max(0.15, Math.min(4, _zoom * d / _pinchD));
+    _panX = cmx-(cmx-_panX)*nz/_zoom; _panY = cmy-(cmy-_panY)*nz/_zoom;
+    _zoom = nz; _pinchD = d;
+    _panX += mx-_touchMidX; _panY += my-_touchMidY;
+    _touchMidX = mx; _touchMidY = my;
+    applyWorldTransform();
+  }, { passive: false });
+  canvas.addEventListener('touchend', () => { _pinchD = null; });
+
+  let _nestDrag = null;
+  function makeNestDraggable(nestEl) {
+    const head = nestEl.querySelector(':scope > .pp-cl-nest-head');
+    if (!head) return;
+    head.addEventListener('mousedown', ev => {
+      if (ev.button !== 0 || ev.target.closest('.pp-cl-resize-handle')) return;
+      ev.stopPropagation(); ev.preventDefault();
+      _nestDrag = { el: nestEl, sx: parseInt(nestEl.style.left)||0, sy: parseInt(nestEl.style.top)||0, cx: ev.clientX, cy: ev.clientY };
+      nestEl.style.zIndex = String(++_topZ); nestEl.classList.add('pp-cl-nest-lifted'); hideTooltip();
+    });
+    head.addEventListener('touchstart', ev => {
+      if (ev.touches.length !== 1 || ev.target.closest('.pp-cl-resize-handle')) return;
+      ev.stopPropagation();
+      _nestDrag = { el: nestEl, sx: parseInt(nestEl.style.left)||0, sy: parseInt(nestEl.style.top)||0, cx: ev.touches[0].clientX, cy: ev.touches[0].clientY };
+      nestEl.style.zIndex = String(++_topZ); nestEl.classList.add('pp-cl-nest-lifted'); hideTooltip();
+    }, { passive: false });
+  }
+  document.addEventListener('mousemove', ev => {
+    if (!_nestDrag) return;
+    _nestDrag.el.style.left = (_nestDrag.sx + (ev.clientX - _nestDrag.cx) / _zoom) + 'px';
+    _nestDrag.el.style.top  = (_nestDrag.sy + (ev.clientY - _nestDrag.cy) / _zoom) + 'px';
+  });
+  document.addEventListener('mouseup', () => {
+    if (!_nestDrag) return;
+    _nestDrag.el.classList.remove('pp-cl-nest-lifted'); _nestDrag = null;
+  });
+  document.addEventListener('touchmove', ev => {
+    if (!_nestDrag || ev.touches.length !== 1) return;
+    _nestDrag.el.style.left = (_nestDrag.sx + (ev.touches[0].clientX - _nestDrag.cx) / _zoom) + 'px';
+    _nestDrag.el.style.top  = (_nestDrag.sy + (ev.touches[0].clientY - _nestDrag.cy) / _zoom) + 'px';
+    ev.preventDefault();
+  }, { passive: false });
+  document.addEventListener('touchend', () => {
+    if (!_nestDrag) return; _nestDrag.el.classList.remove('pp-cl-nest-lifted'); _nestDrag = null;
   });
 
-  function _canvasPointerEnd(ev) {
-    _pointers.delete(ev.pointerId);
-    if (_pointers.size < 2) { _pinchState = null; }
-  }
-  canvas.addEventListener('pointerup',     _canvasPointerEnd);
-  canvas.addEventListener('pointercancel', _canvasPointerEnd);
-
-  function makeDraggable(el, cid) {
-    el.dataset.cid = String(cid);
-    el.style.touchAction = 'none';
-
-    // Each card captures its own pointer — completely isolated from canvas pan
-    el.addEventListener('pointerdown', ev => {
-      if (ev.button !== undefined && ev.button !== 0) return;
-      ev.stopPropagation(); // prevent canvas pointerdown from also firing
-      el.setPointerCapture(ev.pointerId);
-      const r = _liveRects.get(cid) || { x: 0, y: 0 };
-      _cardDrag = { el, cid, pointerId: ev.pointerId, ox: ev.clientX, oy: ev.clientY, sx: r.x, sy: r.y };
-      el.style.zIndex = String(++_topZ);
-      ev.preventDefault();
+  function makeResizable(nestEl) {
+    const handle = document.createElement('div');
+    handle.className = 'pp-cl-resize-handle';
+    nestEl.appendChild(handle);
+    let resizing=false, sw=0, sh=0, sx=0, sy=0;
+    handle.addEventListener('mousedown', ev => {
+      resizing=true; sw=nestEl.offsetWidth; sh=nestEl.offsetHeight; sx=ev.clientX; sy=ev.clientY;
+      ev.stopPropagation(); ev.preventDefault();
     });
-
-    el.addEventListener('pointermove', ev => {
-      if (!_cardDrag || ev.pointerId !== _cardDrag.pointerId) return;
-      ev.preventDefault();
-      const dx = (ev.clientX - _cardDrag.ox) / _zoom;
-      const dy = (ev.clientY - _cardDrag.oy) / _zoom;
-      const nx = _cardDrag.sx + dx;
-      const ny = _cardDrag.sy + dy;
-      const r  = _liveRects.get(cid) || { w: CARD_W, h: 80 };
-      el.style.left = nx + 'px';
-      el.style.top  = ny + 'px';
-      _liveRects.set(cid, { x: nx, y: ny, w: r.w, h: r.h });
-      redrawConnectors();
+    document.addEventListener('mousemove', ev => {
+      if (!resizing) return;
+      nestEl.style.width  = Math.max(RESIZE_MIN_W, sw+(ev.clientX-sx)/_zoom)+'px';
+      nestEl.style.height = Math.max(RESIZE_MIN_H, sh+(ev.clientY-sy)/_zoom)+'px';
     });
-
-    el.addEventListener('pointerup',     ev => { if (_cardDrag && ev.pointerId === _cardDrag.pointerId) _cardDrag = null; });
-    el.addEventListener('pointercancel', ev => { if (_cardDrag && ev.pointerId === _cardDrag.pointerId) _cardDrag = null; });
+    document.addEventListener('mouseup', () => { resizing = false; });
   }
 
-  // ── Cosine similarity ─────────────────────────────────────────────────────
-  function cosineSim(a, b) {
-    if (!a||!b||a.length!==b.length) return 0;
-    let dot=0, na=0, nb=0;
-    for (let i=0;i<a.length;i++) { dot+=a[i]*b[i]; na+=a[i]*a[i]; nb+=b[i]*b[i]; }
-    return (na&&nb) ? Math.max(0,Math.min(1,dot/(Math.sqrt(na)*Math.sqrt(nb)))) : 0;
+  function showTooltip(ev, r, text, accentColor, clusterLabel) {
+    _ttRow = r;
+    ttCluster.textContent = clusterLabel || '';
+    ttCluster.style.color = accentColor;
+    ttText.textContent    = text.slice(0, 160) + (text.length > 160 ? '\u2026' : '');
+    ttGoto.style.color    = accentColor;
+    tooltip.classList.add('pp-cl-tt-visible');
+    moveTooltip(ev);
+  }
+  function moveTooltip(ev) {
+    const pad=12, tw=tooltip.offsetWidth||200, th=tooltip.offsetHeight||80;
+    let tx=ev.clientX+pad, ty=ev.clientY+pad;
+    if (tx+tw > window.innerWidth-6)  tx = ev.clientX-tw-pad;
+    if (ty+th > window.innerHeight-6) ty = ev.clientY-th-pad;
+    tooltip.style.left = tx+'px'; tooltip.style.top = ty+'px';
+  }
+  function hideTooltip() { tooltip.classList.remove('pp-cl-tt-visible'); _ttRow = null; }
+  ttGoto.addEventListener('click', () => {
+    if (_ttRow && typeof panelGoTo === 'function') panelGoTo(_ttRow, 0);
+    hideTooltip();
+  });
+
+  function sentenceSplit(text) {
+    return text
+      .replace(/([.!?;])\s+/g, '$1\n')
+      .split('\n')
+      .map(s => s.trim())
+      .filter(s => s.length >= CL_MIN_SPLIT_LENGTH);
   }
 
   function avgVec(vecs) {
-    const valid=vecs.filter(Boolean); if (!valid.length) return null;
-    const dim=valid[0].length, sum=new Float32Array(dim);
-    valid.forEach(v=>v.forEach((x,i)=>{ sum[i]+=x; }));
-    return Array.from(sum).map(x=>x/valid.length);
+    const valid = vecs.filter(Boolean); if (!valid.length) return null;
+    const dim = valid[0].length, sum = new Float32Array(dim);
+    valid.forEach(v => v.forEach((x, i) => { sum[i] += x; }));
+    return Array.from(sum).map(x => x / valid.length);
   }
 
-  // ── Intra-cell splitting ──────────────────────────────────────────────────
-  function sentenceSplit(text) {
-    return text.replace(/([.!?;])\s+/g,'$1\n').split('\n').map(s=>s.trim()).filter(s=>s.length>=CMAP_MIN_SPLIT_LENGTH);
-  }
-
-  async function maybeSplitRow(row) {
-    const cells=row.row?.cells||row.cells||[], cats=row.row?.cats?row.row.cats.filter(c=>c.trim()):[], catStr=cats.join(' \u00b7 ')||'Cell';
-    let bestText='', bestIdx=0;
-    cells.forEach((c,i)=>{ if(c.trim().length>bestText.length){ bestText=c.trim(); bestIdx=i; } });
-    if (bestText.length<CMAP_MIN_SPLIT_LENGTH*2) return [row];
-    const segments=sentenceSplit(bestText); if (segments.length<=1) return [row];
+  async function maybySplitRow(row) {
+    if (!window.EmbeddingUtils || typeof window.EmbeddingUtils.getCachedEmbedding !== 'function') return [row];
+    const cells = row.row && row.row.cells ? row.row.cells : (row.cells || []);
+    const cats  = row.row && row.row.cats  ? row.row.cats.filter(c => c.trim()) : [];
+    let bestText = '', bestIdx = 0;
+    cells.forEach((c, i) => { if (c.trim().length > bestText.length) { bestText = c.trim(); bestIdx = i; } });
+    if (bestText.length < CL_MIN_SPLIT_LENGTH * 2) return [row];
+    const segments = sentenceSplit(bestText);
+    if (segments.length <= 1) return [row];
     let segVecs;
-    try { segVecs=await Promise.all(segments.map(s=>window.EmbeddingUtils.getCachedEmbedding(s))); } catch(e){ return [row]; }
-    const valid=segments.map((s,i)=>({text:s,vec:segVecs[i]})).filter(x=>x.vec&&x.vec.length);
-    if (valid.length<=1) return [row];
-    const n=valid.length;
-    const sim=Array.from({length:n},(_,i)=>Array.from({length:n},(_,j)=>i===j?1:cosineSim(valid[i].vec,valid[j].vec)));
-    const groupOf=new Array(n).fill(-1); let numGroups=0;
-    for (let i=0;i<n;i++) {
-      if (groupOf[i]!==-1) continue; const g=numGroups++; groupOf[i]=g;
-      for (let j=i+1;j<n;j++) { if (groupOf[j]!==-1) continue; let linked=false; for (let k=0;k<j;k++) { if (groupOf[k]===g&&sim[k][j]>=_threshold){linked=true;break;} } if (linked) groupOf[j]=g; }
+    try { segVecs = await Promise.all(segments.map(s => window.EmbeddingUtils.getCachedEmbedding(s))); }
+    catch(e) { return [row]; }
+    const valid = segments
+      .map((s, i) => ({ text: s, vec: segVecs[i] }))
+      .filter(x => x.vec && x.vec.length);
+    if (valid.length <= 1) return [row];
+    const n = valid.length, threshold = 0.55;
+    const sim = Array.from({length: n}, (_, i) =>
+      Array.from({length: n}, (_, j) => i === j ? 1 : cosineSim(valid[i].vec, valid[j].vec))
+    );
+    const groupOf = new Array(n).fill(-1); let numGroups = 0;
+    for (let i = 0; i < n; i++) {
+      if (groupOf[i] !== -1) continue; const g = numGroups++; groupOf[i] = g;
+      for (let j = i+1; j < n; j++) {
+        if (groupOf[j] !== -1) continue;
+        let linked = false;
+        for (let k = 0; k < j; k++) { if (groupOf[k] === g && sim[k][j] >= threshold) { linked=true; break; } }
+        if (linked) groupOf[j] = g;
+      }
     }
-    if (numGroups<=1) return [row];
-    const t=numGroups, groups=Array.from({length:t},()=>[]);
-    valid.forEach((seg,i)=>groups[groupOf[i]].push(seg));
-    return groups.map((segs,ni)=>({ tabIdx:row.tabIdx, rowIdx:row.rowIdx, headers:row.headers||[], title:row.title||'', kws:row.kws||new Set(), _splitFrom:catStr, _splitN:ni+1, _splitT:t, vec:avgVec(segs.map(s=>s.vec)), row:{cells:cells.map((c,ci)=>ci===bestIdx?segs.map(s=>s.text).join(' '):''), cats} }));
+    if (numGroups <= 1) return [row];
+    const groups = Array.from({length: numGroups}, () => []);
+    valid.forEach((seg, i) => groups[groupOf[i]].push(seg));
+    return groups.map((segs, ni) => ({
+      tabIdx: row.tabIdx, rowIdx: row.rowIdx,
+      headers: row.headers || [], title: row.title || '',
+      kws: row.kws || new Set(),
+      _splitN: ni + 1, _splitT: numGroups,
+      vec: avgVec(segs.map(s => s.vec)),
+      row: { cells: cells.map((c, ci) => ci === bestIdx ? segs.map(s => s.text).join(' ') : c), cats }
+    }));
   }
 
   async function splitAllRows(rows) {
-    const result=[];
-    for (const row of rows) { const parts=await maybeSplitRow(row); parts.forEach(r=>result.push(r)); }
+    const result = [];
+    for (const row of rows) {
+      const parts = await maybySplitRow(row);
+      parts.forEach(r => result.push(r));
+    }
     return result;
   }
 
-  // ════════════════════════════════════════════════════════════════════════
-  // ── Hierarchy builder — multi-parent DAG ────────────────────────────────
-  // ════════════════════════════════════════════════════════════════════════
-  function buildHierarchy(rows) {
-    const n=rows.length; if (n<2) return null;
-
-    const scores=new Float32Array(n);
-    for (let i=0;i<n;i++) { let sum=0; for (let j=0;j<n;j++) { if (i!==j) sum+=cosineSim(rows[i].vec,rows[j].vec); } scores[i]=sum/(n-1); }
-
-    const rankOrder=Array.from({length:n},(_,i)=>i).sort((a,b)=>scores[b]-scores[a]);
-    const levels=new Int32Array(n);
-    rankOrder.forEach((ri,rank)=>{ levels[ri]=Math.max(1,Math.min(_depth,Math.floor(rank*_depth/n)+1)); });
-
-    const parentsOf    = new Map();
-    const parentSimsOf = new Map();
-
-    for (let i=0;i<n;i++) {
-      parentsOf.set(i,[]); parentSimsOf.set(i,[]);
-      if (levels[i]===1) continue;
-      const candidates=[];
-      for (let j=0;j<n;j++) {
-        if (j===i||levels[j]!==levels[i]-1) continue;
-        const s=cosineSim(rows[i].vec,rows[j].vec);
-        if (s>=_threshold) candidates.push({j,s});
+  function resolveCollisions(rects, gap, maxPasses) {
+    gap = gap || 0; maxPasses = maxPasses || 160;
+    for (let pass = 0; pass < maxPasses; pass++) {
+      let moved = false;
+      for (let a = 0; a < rects.length; a++) {
+        for (let b = a + 1; b < rects.length; b++) {
+          const ra = rects[a], rb = rects[b];
+          const overlapX  = (ra.x + ra.w + gap) - rb.x;
+          const overlapY  = (ra.y + ra.h + gap) - rb.y;
+          const overlapX2 = (rb.x + rb.w + gap) - ra.x;
+          const overlapY2 = (rb.y + rb.h + gap) - ra.y;
+          if (overlapX <= 0 || overlapX2 <= 0 || overlapY <= 0 || overlapY2 <= 0) continue;
+          const pushX = Math.min(overlapX, overlapX2), pushY = Math.min(overlapY, overlapY2);
+          if (pushX <= pushY) {
+            const half = pushX / 2;
+            if (overlapX < overlapX2) { ra.x -= half; rb.x += half; }
+            else                      { ra.x += half; rb.x -= half; }
+          } else {
+            const half = pushY / 2;
+            if (overlapY < overlapY2) { ra.y -= half; rb.y += half; }
+            else                      { ra.y += half; rb.y -= half; }
+          }
+          moved = true;
+        }
       }
-      candidates.sort((a,b)=>b.s-a.s);
-      const kept=candidates.slice(0,_maxParents);
-      parentsOf.set(i,kept.map(c=>c.j));
-      parentSimsOf.set(i,kept.map(c=>c.s));
+      if (!moved) break;
     }
-
-    const relaxed=_threshold*ORPHAN_RECOVERY_THRESHOLD;
-    for (let i=0;i<n;i++) {
-      if (levels[i]<=1||parentsOf.get(i).length>0) continue;
-      let bestJ=-1, bestSim=relaxed;
-      for (let j=0;j<n;j++) {
-        if (j===i||levels[j]>=levels[i]) continue;
-        const s=cosineSim(rows[i].vec,rows[j].vec); if (s>bestSim){ bestSim=s; bestJ=j; }
-      }
-      if (bestJ!==-1) { levels[i]=levels[bestJ]+1; parentsOf.set(i,[bestJ]); parentSimsOf.set(i,[bestSim]); }
-      else levels[i]=1;
-    }
-
-    const childrenOf=Array.from({length:n},()=>[]);
-    for (let i=0;i<n;i++) { parentsOf.get(i).forEach(p=>{ if(!childrenOf[p].includes(i)) childrenOf[p].push(i); }); }
-
-    const simToChildren=new Float32Array(n);
-    for (let i=0;i<n;i++) { if (!childrenOf[i].length) continue; let sum=0; childrenOf[i].forEach(c=>{sum+=cosineSim(rows[i].vec,rows[c].vec);}); simToChildren[i]=sum/childrenOf[i].length; }
-
-    const simToParents=new Float32Array(n);
-    for (let i=0;i<n;i++) { const pars=parentsOf.get(i)||[]; if (!pars.length) continue; let sum=0; pars.forEach(p=>{sum+=cosineSim(rows[i].vec,rows[p].vec);}); simToParents[i]=sum/pars.length; }
-
-    const absorbedInto=new Int32Array(n).fill(-1), mergeExtras=new Map();
-    const mkKey=i=>levels[i]+':p'+parentsOf.get(i).slice().sort((a,b)=>a-b).join(',')+':c'+childrenOf[i].slice().sort((a,b)=>a-b).join(',');
-    const seenKeys=new Map();
-    for (let i=0;i<n;i++) {
-      if (!childrenOf[i].length) continue;
-      const k=mkKey(i);
-      if (seenKeys.has(k)) { const primary=seenKeys.get(k); absorbedInto[i]=primary; if (!mergeExtras.has(primary)) mergeExtras.set(primary,[]); mergeExtras.get(primary).push(i); }
-      else seenKeys.set(k,i);
-    }
-
-    return { rows, n, levels, parentsOf, parentSimsOf, childrenOf, simToChildren, simToParents, absorbedInto, mergeExtras };
   }
 
-  // ── Connectors ────────────────────────────────────────────────────────────
-  let _connSvg=null, _connEdges=[];
+  function cosineSim(a, b) {
+    let d=0, na=0, nb=0;
+    for (let i=0; i<a.length; i++) { d+=a[i]*b[i]; na+=a[i]*a[i]; nb+=b[i]*b[i]; }
+    return na && nb ? d / (Math.sqrt(na) * Math.sqrt(nb)) : 0;
+  }
+  function centroid(rows) {
+    if (!rows.length) return null;
+    const dim = rows[0].vec.length, sum = new Float32Array(dim);
+    rows.forEach(r => r.vec.forEach((x, i) => { sum[i] += x; }));
+    return Array.from(sum).map(x => x / rows.length);
+  }
+  function kMeansCosine(rows, k, iters) {
+    iters = iters || 25;
+    const n = rows.length;
+    if (n <= k) return rows.map((_, i) => i % k);
+    const centers = [rows[Math.floor(Math.random() * n)].vec.slice()];
+    while (centers.length < k) {
+      const dists = rows.map(r => Math.min(...centers.map(c => 1 - cosineSim(r.vec, c))));
+      const sum = dists.reduce((a, b) => a + b, 0);
+      let r = Math.random() * sum; let picked = false;
+      for (let i = 0; i < n; i++) { r -= dists[i]; if (r <= 0) { centers.push(rows[i].vec.slice()); picked=true; break; } }
+      if (!picked) centers.push(rows[Math.floor(Math.random() * n)].vec.slice());
+    }
+    let asgn = new Array(n).fill(0);
+    for (let iter = 0; iter < iters; iter++) {
+      const na = rows.map(r => { let best=0, bs=-Infinity; centers.forEach((c, ci) => { const s=cosineSim(r.vec, c); if (s > bs) { bs=s; best=ci; } }); return best; });
+      centers.forEach((_, ci) => { const members = rows.filter((_, i) => na[i] === ci); if (!members.length) return; const c = centroid(members); if (c) centers[ci] = c; });
+      if (na.every((a, i) => a === asgn[i])) break;
+      asgn = na;
+    }
+    return asgn;
+  }
+  function bestKMeans(rows, k, trials) {
+    trials = trials || 3; let bestAsgn = null, bestInertia = Infinity;
+    for (let t = 0; t < trials; t++) {
+      const asgn = kMeansCosine(rows, k);
+      const groups = Array.from({ length: k }, () => []);
+      rows.forEach((r, i) => groups[asgn[i]].push(r));
+      const cents = groups.map(g => g.length ? centroid(g) : null);
+      const inertia = rows.reduce((s, r, i) => s + (cents[asgn[i]] ? 1 - cosineSim(r.vec, cents[asgn[i]]) : 0), 0);
+      if (inertia < bestInertia) { bestInertia = inertia; bestAsgn = asgn; }
+    }
+    return { asgn: bestAsgn, inertia: bestInertia };
+  }
+  function autoCluster(rows, minK, maxK) {
+    const n = rows.length;
+    if (n === 0) return [];
+    if (n <= 2) return rows.map((_, i) => i);
+    minK = Math.max(2, minK);
+    maxK = Math.min(maxK, Math.floor(Math.sqrt(n) * 2), n - 1);
+    if (maxK < minK) return new Array(n).fill(0);
+    if (minK === maxK) return bestKMeans(rows, minK).asgn;
+    const results = [];
+    for (let k = minK; k <= maxK; k++) results.push({ k, ...bestKMeans(rows, k) });
+    const inertias = results.map(r => r.inertia);
+    const totalDrop = (inertias[0] - inertias[inertias.length - 1]) || 1;
+    let chosenK = results[0].k;
+    for (let i = 1; i < results.length; i++) {
+      if ((inertias[i-1] - inertias[i]) / totalDrop < 0.10) { chosenK = results[i-1].k; break; }
+      chosenK = results[i].k;
+    }
+    return (results.find(r => r.k === chosenK) || results[results.length-1]).asgn;
+  }
 
-  function redrawConnectors() {
-    if (!_connSvg) return;
-    const ns='http://www.w3.org/2000/svg';
-    _connSvg.innerHTML='';
-    _connEdges.forEach(({fromId,toId,color,depth})=>{
-      const ra=_liveRects.get(fromId), rb=_liveRects.get(toId); if (!ra||!rb) return;
-      function pts(r){ const{x,y,w,h}=r; return [{x:x+w*.25,y},{x:x+w*.5,y},{x:x+w*.75,y},{x:x+w*.25,y:y+h},{x:x+w*.5,y:y+h},{x:x+w*.75,y:y+h},{x,y:y+h*.33},{x,y:y+h*.67},{x:x+w,y:y+h*.33},{x:x+w,y:y+h*.67}]; }
-      const pA=pts(ra), pB=pts(rb); let best=null, bd=Infinity;
-      pA.forEach(a=>pB.forEach(b=>{ const d=Math.hypot(a.x-b.x,a.y-b.y); if(d<bd){bd=d;best={a,b};} }));
-      if (!best) return;
-      const{a,b}=best, dist=Math.hypot(b.x-a.x,b.y-a.y), off=Math.min(dist*.4,80);
-      function tang(pt,r){ const t=3; if(Math.abs(pt.y-r.y)<t) return{dx:0,dy:-1}; if(Math.abs(pt.y-(r.y+r.h))<t) return{dx:0,dy:1}; if(Math.abs(pt.x-r.x)<t) return{dx:-1,dy:0}; if(Math.abs(pt.x-(r.x+r.w))<t) return{dx:1,dy:0}; return{dx:0,dy:1}; }
-      const tA=tang(a,ra), tB=tang(b,rb);
-      const path=document.createElementNS(ns,'path');
-      path.setAttribute('d',`M${a.x},${a.y} C${a.x+tA.dx*off},${a.y+tA.dy*off} ${b.x+tB.dx*off},${b.y+tB.dy*off} ${b.x},${b.y}`);
-      path.setAttribute('fill','none'); path.setAttribute('stroke',color);
-      path.setAttribute('stroke-width',depth===0?'2.5':'2');
-      path.setAttribute('stroke-opacity',depth===0?'1':'0.9');
-      path.setAttribute('stroke-dasharray',depth===0?'none':'5 3');
-      _connSvg.appendChild(path);
-      const dot=document.createElementNS(ns,'circle');
-      dot.setAttribute('cx',String(b.x)); dot.setAttribute('cy',String(b.y)); dot.setAttribute('r','3.5');
-      dot.setAttribute('fill',color); dot.setAttribute('opacity','1');
-      _connSvg.appendChild(dot);
+  function alignedSubCluster(topGroups, minK, maxK) {
+    const numGroups = topGroups.length;
+    if (numGroups < 2) return numGroups === 0 ? [] : [autoCluster(topGroups[0], minK, maxK)];
+    const perGroupK = topGroups.map(members => {
+      if (members.length < 2) return 1;
+      const asgn = autoCluster(members, minK, maxK);
+      return Math.max(...asgn) + 1;
+    });
+    const kCounts = {}; perGroupK.forEach(k => { kCounts[k] = (kCounts[k] || 0) + 1; });
+    const canonicalK = parseInt(Object.entries(kCounts).sort((a, b) => b[1] - a[1])[0][0]);
+    if (canonicalK < 2) return topGroups.map(g => new Array(g.length).fill(0));
+    const allRows = topGroups.flat();
+    const globalAsgn = bestKMeans(allRows, canonicalK, 5).asgn;
+    const globalBuckets = Array.from({ length: canonicalK }, () => []);
+    allRows.forEach((r, i) => globalBuckets[globalAsgn[i]].push(r));
+    const globalCentroids = globalBuckets.map(b => b.length ? centroid(b) : null);
+    return topGroups.map(members => {
+      if (members.length < 2) return new Array(members.length).fill(0);
+      const localAsgn = members.length < canonicalK ? members.map((_, i) => i % canonicalK) : bestKMeans(members, canonicalK, 3).asgn;
+      const localBuckets = Array.from({ length: canonicalK }, () => []);
+      members.forEach((r, i) => localBuckets[localAsgn[i]].push(r));
+      const localCentroids = localBuckets.map(b => b.length ? centroid(b) : null);
+      const sim = Array.from({ length: canonicalK }, (_, ci) =>
+        Array.from({ length: canonicalK }, (_, gi) =>
+          (localCentroids[ci] && globalCentroids[gi]) ? cosineSim(localCentroids[ci], globalCentroids[gi]) : 0));
+      const usedGlobal = new Set(), mapping = new Array(canonicalK).fill(-1);
+      const pairs = [];
+      for (let ci = 0; ci < canonicalK; ci++)
+        for (let gi = 0; gi < canonicalK; gi++)
+          pairs.push({ ci, gi, s: sim[ci][gi] });
+      pairs.sort((a, b) => b.s - a.s);
+      for (const { ci, gi } of pairs) {
+        if (mapping[ci] !== -1 || usedGlobal.has(gi)) continue;
+        mapping[ci] = gi; usedGlobal.add(gi);
+        if (usedGlobal.size === canonicalK) break;
+      }
+      for (let ci = 0; ci < canonicalK; ci++) {
+        if (mapping[ci] !== -1) continue;
+        for (let gi = 0; gi < canonicalK; gi++) {
+          if (!usedGlobal.has(gi)) { mapping[ci] = gi; usedGlobal.add(gi); break; }
+        }
+        if (mapping[ci] === -1) mapping[ci] = ci;
+      }
+      return localAsgn.map(ci => mapping[ci]);
     });
   }
 
-  // ── Color by hierarchy level ──────────────────────────────────────────────
-  const CMAP_FALLBACK_PALETTE = [
-    { accent: '#c8991a', bg: '#fffdf5', label: '#fff' },
+  const FALLBACK_PALETTE = [
     { accent: '#2e7d5e', bg: '#f4faf7', label: '#fff' },
     { accent: '#4a56c8', bg: '#f4f5fd', label: '#fff' },
     { accent: '#5e3d9e', bg: '#f6f3fb', label: '#fff' },
@@ -665,295 +1081,259 @@ function initConceptMapTool(paneEl, sidebarEl) {
     { accent: '#c8991a', bg: '#fffdf5', label: '#fff' },
     { accent: '#888888', bg: '#f7f7f8', label: '#fff' },
   ];
-
-  function depthColor(level) {
-    const idx = level - 1;
-    const pal = (typeof getPalette === 'function' ? getPalette() : null)
-             || window.PP_PALETTE
-             || CMAP_FALLBACK_PALETTE;
-
-    if (pal && pal.length >= 5) {
-      const rotated = [pal[4], pal[0], pal[1], pal[2], pal[3], pal[4], pal[5] || pal[0]];
-      return rotated[Math.min(idx, rotated.length - 1)];
-    }
-
-    if (typeof THEMES !== 'undefined') {
-      const tname = (idx < CMAP_LEVEL_THEMES.length) ? CMAP_LEVEL_THEMES[idx] : 'default';
-      const theme = THEMES[tname] || THEMES.default || {};
-      const fb = CMAP_FALLBACK_PALETTE[Math.min(idx, CMAP_FALLBACK_PALETTE.length - 1)];
-      return {
-        accent: theme['--tab-active-bg']    || fb.accent,
-        label:  theme['--tab-active-color'] || '#fff',
-        bg:     theme['--bg-data']          || fb.bg,
-      };
-    }
-
-    return CMAP_FALLBACK_PALETTE[Math.min(idx, CMAP_FALLBACK_PALETTE.length - 1)];
+  function colForIndex(i) {
+    const pal = (typeof getPalette === 'function' ? getPalette() : null) || window.PP_PALETTE || FALLBACK_PALETTE;
+    return pal[i % pal.length];
   }
 
-  function renderConceptMap(hier) {
-    world.innerHTML=''; emptyEl.style.display='none'; _liveRects.clear(); _connEdges=[]; _topZ=10;
-    _panX=0; _panY=0; _zoom=1; applyTransform();
-    if (!hier) { emptyEl.style.display='flex'; return; }
+  function buildCard(r, col, delay, clusterLabel) {
+    const cells = r.row && r.row.cells ? r.row.cells : (r.cells || []);
+    const cats  = r.row && r.row.cats  ? r.row.cats.filter(c => c.trim()) : [];
+    const best  = cells.reduce((b, c) => c.length > b.length ? c : b, '');
+    const parsed = typeof parseCitation === 'function' ? parseCitation(best) : { body: best };
+    const card = document.createElement('div');
+    card.className = 'pp-cl-card';
+    card.style.setProperty('--ppc-bg',     col.accent);
+    card.style.setProperty('--ppc-border', col.accent);
+    card.style.setProperty('--ppc-on',     col.label || '#fff');
+    if (delay) card.style.animationDelay = delay + 'ms';
 
-    const ns='http://www.w3.org/2000/svg';
-    _connSvg=document.createElementNS(ns,'svg');
-    _connSvg.style.cssText='position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:1';
-    world.appendChild(_connSvg);
+    const topRow = document.createElement('div');
+    topRow.className = 'pp-cmap-card-top';
+    const catNumEl = document.createElement('div');
+    catNumEl.className = 'pp-cmap-card-cat-num';
+    catNumEl.textContent = cats.length ? cats[0] : (clusterLabel ? clusterLabel.slice(0, 6) : '\u00b7');
+    const levelBlock = document.createElement('div');
+    levelBlock.className = 'pp-cmap-card-level-block';
+    const levelLbl = document.createElement('div');
+    levelLbl.className = 'pp-cmap-card-level-label';
+    levelLbl.textContent = clusterLabel || 'Cluster';
+    levelBlock.appendChild(levelLbl);
+    topRow.appendChild(catNumEl);
+    topRow.appendChild(levelBlock);
+    card.appendChild(topRow);
 
-    const{rows,n,levels,parentsOf,childrenOf,simToChildren,simToParents,absorbedInto,mergeExtras}=hier;
-    const cardEls=new Map();
+    const rule = document.createElement('div');
+    rule.className = 'pp-cmap-card-rule';
+    card.appendChild(rule);
 
-    for (let i=0;i<n;i++) {
-      if (absorbedInto[i]!==-1) continue;
-      const level=levels[i], {accent,label:lc,bg}=depthColor(level);
-      const extras=mergeExtras.get(i)||[], allRows=[i,...extras];
-
-      const card=document.createElement('div');
-      card.className='pp-cmap-card';
-      card.style.cssText=`width:${CARD_W}px;position:absolute;z-index:${++_topZ}`;
-      card.style.setProperty('--ppc-border',accent);
-      card.style.setProperty('--ppc-bg',accent);
-      card.style.setProperty('--ppc-on', lc);
-
-      // ── Top row: big category letter (left) + level block (right) ──────
-      const primaryRow=rows[i], isSplit=!!primaryRow._splitFrom;
-      const numParents=(parentsOf.get(i)||[]).length;
-
-      const topRow=document.createElement('div');
-      topRow.className='pp-cmap-card-top';
-
-      const catNumEl=document.createElement('div');
-      catNumEl.className='pp-cmap-card-cat-num';
-      const allCats = primaryRow.row?.cats?.filter(c => c.trim()) || [];
-      const catChar = allCats.length ? allCats.join(' · ') : String(level);
-      catNumEl.textContent = catChar;
-
-      const levelBlock=document.createElement('div');
-      levelBlock.className='pp-cmap-card-level-block';
-      const levelNum=document.createElement('div');
-      levelNum.className='pp-cmap-card-level-num';
-      levelNum.textContent = isSplit ? (primaryRow._splitN+'/'+primaryRow._splitT) : String(level);
-      const levelLbl=document.createElement('div');
-      levelLbl.className='pp-cmap-card-level-label';
-      levelLbl.textContent = isSplit ? 'Split' : 'Level';
-      levelBlock.appendChild(levelNum);
-      levelBlock.appendChild(levelLbl);
-
-      topRow.appendChild(catNumEl);
-      topRow.appendChild(levelBlock);
-      card.appendChild(topRow);
-
-      if (extras.length>0) {
-        const mg=document.createElement('div');
-        mg.className='pp-cmap-card-merged';
-        mg.textContent='\u00d7'+allRows.length+' merged';
-        card.appendChild(mg);
-      }
-
-      const rule=document.createElement('div');
-      rule.className='pp-cmap-card-rule';
-      card.appendChild(rule);
-
-      const body=document.createElement('div');
-      body.className='pp-cmap-card-body';
-      allRows.forEach((ri,idx)=>{
-        if (idx>0) { const sep=document.createElement('div'); sep.className='pp-cmap-merge-sep'; body.appendChild(sep); }
-        const r=rows[ri], cells=r.row?.cells||r.cells||[], cats=r.row?.cats?r.row.cats.filter(c=>c.trim()):[];
-        const best=cells.reduce((b,c)=>c.trim().length>b.length?c.trim():b,'');
-        const parsed=typeof parseCitation==='function'?parseCitation(best):{body:best};
-        if (cats.length) {
-          const ce=document.createElement('div');
-          ce.className='pp-cmap-cell-cat';
-          ce.textContent=cats.join(' \u00b7 ');
-          body.appendChild(ce);
-        }
-        const te=document.createElement('div');
-        te.className='pp-cmap-cell-text';
-        te.textContent=parsed.body;
-        body.appendChild(te);
-      });
-      card.appendChild(body);
-
-      const hasChildren=childrenOf[i].length>0;
-      const hasParents=numParents>0;
-
-      if (hasChildren||hasParents) {
-        const footer=document.createElement('div');
-        footer.className='pp-cmap-card-footer';
-
-        function makeSimLine(arrow, sim, label) {
-          const pct=Math.round(sim*100);
-          const line=document.createElement('div');
-          line.className='pp-cmap-sim-line';
-          const pctEl=document.createElement('span');
-          pctEl.className='pp-cmap-sim-pct';
-          pctEl.textContent=pct+'%';
-          line.innerHTML='<span>'+arrow+'</span>';
-          line.appendChild(pctEl);
-          const lblEl=document.createElement('span');
-          lblEl.textContent=' '+label;
-          line.appendChild(lblEl);
-          return line;
-        }
-
-        if (hasParents) footer.appendChild(makeSimLine('\u2191', simToParents[i], numParents>1?numParents+' parents':'to parent'));
-        if (hasChildren) footer.appendChild(makeSimLine('\u2193', simToChildren[i], 'to children'));
-        card.appendChild(footer);
-      } else {
-        const leaf=document.createElement('span');
-        leaf.className='pp-cmap-leaf-badge';
-        leaf.textContent='Terminal concept';
-        card.appendChild(leaf);
-      }
-
-      world.appendChild(card); cardEls.set(i,card); _liveRects.set(i,{x:0,y:0,w:CARD_W,h:80});
-      makeDraggable(card,i);
-      if (window.ResizeObserver) { new ResizeObserver(()=>{ const r=_liveRects.get(i); if(r){r.h=card.offsetHeight;redrawConnectors();} }).observe(card); }
+    const body = document.createElement('div'); body.className = 'pp-cl-card-body';
+    if (cats.length) {
+      const ce = document.createElement('div'); ce.className = 'pp-cl-card-cat'; ce.textContent = cats.join(' \u00b7 '); body.appendChild(ce);
     }
-
-    for (let i=0;i<n;i++) {
-      if (absorbedInto[i]!==-1) continue;
-      (parentsOf.get(i)||[]).forEach(par=>{
-        const parPrimary=absorbedInto[par]!==-1?absorbedInto[par]:par;
-        if (!cardEls.has(i)||!cardEls.has(parPrimary)) return;
-        const{accent}=depthColor(levels[parPrimary]);
-        _connEdges.push({fromId:parPrimary,toId:i,color:accent,depth:levels[parPrimary]-1});
-      });
+    const te = document.createElement('div'); te.className = 'pp-cl-card-text'; te.textContent = parsed.body; body.appendChild(te);
+    if (r._splitN && r._splitT && r._splitT > 1) {
+      const sp = document.createElement('div'); sp.className = 'pp-cl-card-split';
+      sp.textContent = 'Segment ' + r._splitN + '\u2009/\u2009' + r._splitT;
+      body.appendChild(sp);
     }
+    card.appendChild(body);
+    card.addEventListener('mouseenter', ev => showTooltip(ev, r, parsed.body, col.accent, clusterLabel || ''));
+    card.addEventListener('mousemove',  ev => moveTooltip(ev));
+    card.addEventListener('mouseleave', ()  => hideTooltip());
+    return card;
+  }
 
-    // ── Layout ────────────────────────────────────────────────────────────
-    requestAnimationFrame(()=>{
-      const W=canvas.clientWidth||500, H=canvas.clientHeight||500;
-      const nodeIds=[]; cardEls.forEach((_,id)=>nodeIds.push(id));
-      const byLevel=new Map();
-      nodeIds.forEach(id=>{ const lv=levels[id]; if(!byLevel.has(lv)) byLevel.set(lv,[]); byLevel.get(lv).push(id); });
-      const maxLevel=Math.max(...byLevel.keys(),1);
-
-      const primaryParentOf=new Map(), childrenOfPrimary=new Map();
-      nodeIds.forEach(id=>{ childrenOfPrimary.set(id,[]); });
-      _connEdges.forEach(({fromId,toId})=>{
-        if (!primaryParentOf.has(toId)) { primaryParentOf.set(toId,fromId); if(childrenOfPrimary.has(fromId)) childrenOfPrimary.get(fromId).push(toId); }
-      });
-      const roots=nodeIds.filter(id=>!primaryParentOf.has(id));
-      const cH=id=>{ const el=cardEls.get(id); return el?(el.offsetHeight||80):80; };
-      const GAP_X=MM_PAD+10, GAP_Y=MM_PAD+20;
-
-      function applyPositions(posMap) {
-        posMap.forEach((pos,id)=>{ const el=cardEls.get(id); if(!el) return; el.style.left=pos.x+'px'; el.style.top=pos.y+'px'; _liveRects.set(id,{x:pos.x,y:pos.y,w:CARD_W,h:cH(id)}); });
-        for (let pass=0;pass<30;pass++) {
-          let moved=false;
-          _liveRects.forEach((ra,ka)=>{ _liveRects.forEach((rb,kb)=>{ if(ka===kb) return; if(ra.x<rb.x+rb.w+MM_PAD&&ra.x+ra.w+MM_PAD>rb.x&&ra.y<rb.y+rb.h+MM_PAD&&ra.y+ra.h+MM_PAD>rb.y){ const dR=rb.x+rb.w+MM_PAD-ra.x, dL=ra.x+ra.w+MM_PAD-rb.x, dD=rb.y+rb.h+MM_PAD-ra.y, dU=ra.y+ra.h+MM_PAD-rb.y; if(Math.min(dR,dL)<=Math.min(dD,dU)) ra.x+=dR<dL?dR:-dL; else ra.y+=dD<dU?dD:-dU; const el=cardEls.get(ka); if(el){el.style.left=ra.x+'px';el.style.top=ra.y+'px';} moved=true; } }); });
-          if (!moved) break;
-        }
-        redrawConnectors();
-      }
-
-      function layoutRadial() {
-        const pos=new Map(), cx=W/2, cy=H/2;
-        byLevel.forEach((ids,lv)=>{ const R=maxLevel===1?0:(0.12+0.20*(lv-1))*Math.min(W,H); ids.forEach((id,idx)=>{ const h=cH(id); if(lv===1&&ids.length===1){pos.set(id,{x:cx-CARD_W/2,y:cy-h/2});return;} const a=(2*Math.PI*idx/ids.length)-Math.PI/2; pos.set(id,{x:cx+R*Math.cos(a)-CARD_W/2,y:cy+R*Math.sin(a)-h/2}); }); });
-        applyPositions(pos);
-      }
-      function subtreeW(id){ const kids=childrenOfPrimary.get(id)||[]; if(!kids.length) return CARD_W; return kids.reduce((s,k)=>s+subtreeW(k),0)+GAP_X*(kids.length-1); }
-      function layoutTree(vertical) {
-        const pos=new Map();
-        function place(id,left,depth){ const kids=childrenOfPrimary.get(id)||[], myW=subtreeW(id), cx=left+myW/2, h=cH(id), rowY=depth*(90+GAP_Y); if(vertical) pos.set(id,{x:cx-CARD_W/2,y:rowY}); else pos.set(id,{x:rowY,y:cx-h/2}); let childLeft=left; kids.forEach(kid=>{place(kid,childLeft,depth+1);childLeft+=subtreeW(kid)+GAP_X;}); }
-        const totalW=roots.reduce((s,r)=>s+subtreeW(r),0)+GAP_X*(roots.length-1); let curX=W/2-totalW/2;
-        roots.forEach(r=>{place(r,curX,0);curX+=subtreeW(r)+GAP_X;});
-        applyPositions(pos);
-      }
-      function layoutFlow(vertical) {
-        const pos=new Map();
-        byLevel.forEach((ids,lv)=>{ const layerH=Math.max(...ids.map(cH),80), totalW=ids.length*(CARD_W+GAP_X)-GAP_X, startX=W/2-totalW/2, rowY=(lv-1)*(layerH+GAP_Y*2); ids.forEach((id,idx)=>{ const h=cH(id); if(vertical) pos.set(id,{x:startX+idx*(CARD_W+GAP_X),y:rowY+(layerH-h)/2}); else pos.set(id,{x:rowY,y:startX+idx*(CARD_W+GAP_X)}); }); });
-        applyPositions(pos);
-      }
-      function layoutOrganic() {
-        const px={}, py={};
-        nodeIds.forEach((id,i)=>{ const a=(2*Math.PI*i/nodeIds.length)-Math.PI/2, R=Math.min(W,H)*.35; px[id]=W/2+R*Math.cos(a); py[id]=H/2+R*Math.sin(a); });
-        const AREA=W*H, k=Math.sqrt(AREA/Math.max(nodeIds.length,1))*.9; let temp=Math.min(W,H)*.25;
-        for (let it=0;it<80;it++) {
-          const dx={}, dy={}; nodeIds.forEach(id=>{dx[id]=0;dy[id]=0;});
-          for (let i=0;i<nodeIds.length;i++) for (let j=i+1;j<nodeIds.length;j++) { const u=nodeIds[i],v=nodeIds[j]; let ddx=px[u]-px[v],ddy=py[u]-py[v]; const d=Math.sqrt(ddx*ddx+ddy*ddy)||.01,f=k*k/d; ddx/=d;ddy/=d; dx[u]+=ddx*f;dy[u]+=ddy*f;dx[v]-=ddx*f;dy[v]-=ddy*f; }
-          _connEdges.forEach(({fromId:u,toId:v})=>{ if(!px.hasOwnProperty(u)||!px.hasOwnProperty(v)) return; let ddx=px[v]-px[u],ddy=py[v]-py[u]; const d=Math.sqrt(ddx*ddx+ddy*ddy)||.01,f=d*d/k; ddx/=d;ddy/=d; dx[u]+=ddx*f;dy[u]+=ddy*f;dx[v]-=ddx*f;dy[v]-=ddy*f; });
-          nodeIds.forEach(id=>{ const d=Math.sqrt(dx[id]*dx[id]+dy[id]*dy[id])||.01,disp=Math.min(d,temp); px[id]+=dx[id]/d*disp;py[id]+=dy[id]/d*disp; }); temp*=.93;
-        }
-        const pos=new Map(); nodeIds.forEach(id=>{ const h=cH(id); pos.set(id,{x:px[id]-CARD_W/2,y:py[id]-h/2}); }); applyPositions(pos);
-      }
-
-      switch (_layout) {
-        case 'vtree': layoutTree(true); break;
-        case 'htree': layoutTree(false); break;
-        case 'vflow': layoutFlow(true); break;
-        case 'organic': layoutOrganic(); break;
-        default: layoutRadial(); break;
-      }
-      setTimeout(fitAll,80);
+  function buildInnerTiles(rows, subAsgn, col, outerLbl) {
+    const frag = document.createDocumentFragment();
+    if (!subAsgn || _depth <= 1) {
+      const tileRow = document.createElement('div'); tileRow.className = 'pp-cl-tile-row';
+      rows.forEach((r, ri) => tileRow.appendChild(buildCard(r, col, ri * 10, outerLbl)));
+      frag.appendChild(tileRow);
+      return frag;
+    }
+    const numSub = Math.max(...subAsgn, 0) + 1;
+    const groups = Array.from({ length: numSub }, () => []);
+    rows.forEach((r, i) => groups[subAsgn[i]].push(r));
+    groups.forEach((members, si) => {
+      if (!members.length) return;
+      const subCol = colForIndex(si);
+      const subLbl = innerLabel(outerLbl, si);
+      const strip  = document.createElement('div');
+      strip.className = 'pp-cl-sub-strip';
+      strip.style.background   = subCol.accent + '18';
+      strip.style.marginTop    = si === 0 ? '0' : 'var(--space-1)';
+      const dot = document.createElement('span');
+      dot.style.cssText = 'width:5px;height:5px;border-radius:50%;background:' + subCol.accent + ';flex-shrink:0;display:inline-block;';
+      const lbl = document.createElement('span');
+      lbl.style.cssText = 'font-size:var(--font-size-xs);font-weight:var(--font-weight-bold);letter-spacing:var(--letter-spacing-caps);color:' + subCol.accent + ';margin-right:var(--space-1);flex-shrink:0;';
+      lbl.textContent = subLbl;
+      const cnt = document.createElement('span');
+      cnt.style.cssText = 'font-size:var(--font-size-xs);font-weight:var(--font-weight-medium);color:' + subCol.accent + ';opacity:.7;';
+      cnt.textContent = members.length + ' entr' + (members.length === 1 ? 'y' : 'ies');
+      strip.appendChild(dot); strip.appendChild(lbl); strip.appendChild(cnt);
+      frag.appendChild(strip);
+      const tileWrap = document.createElement('div'); tileWrap.className = 'pp-cl-tile-row';
+      members.forEach((r, ri) => tileWrap.appendChild(buildCard(r, subCol, ri * 10, subLbl)));
+      frag.appendChild(tileWrap);
     });
+    return frag;
   }
 
-  // ── Data pipeline ─────────────────────────────────────────────────────────
+  function buildOuterNest(members, outerIdx, subAsgn) {
+    const col = colForIndex(outerIdx);
+    const lbl = outerLabel(outerIdx);
+    const nest = document.createElement('div');
+    nest.className = 'pp-cl-nest';
+    nest.style.borderTopColor  = col.accent;
+    nest.style.borderTopWidth  = '3px';
+
+    const subCount = subAsgn ? (Math.max(...subAsgn, 0) + 1) : 0;
+    const subLabel = subAsgn && _depth > 1 ? ' \u00b7 ' + subCount + ' group' + (subCount === 1 ? '' : 's') : '';
+
+    const head = document.createElement('div'); head.className = 'pp-cl-nest-head';
+    head.style.background = col.accent + '18';
+
+    const nestLblEl = document.createElement('span'); nestLblEl.className = 'pp-cl-nest-label';
+    nestLblEl.textContent = lbl; nestLblEl.style.color = col.accent;
+    const dot = document.createElement('span'); dot.className = 'pp-cl-nest-dot'; dot.style.background = col.accent;
+    const cnt = document.createElement('span'); cnt.className = 'pp-cl-nest-count';
+    cnt.textContent = members.length + ' entr' + (members.length === 1 ? 'y' : 'ies') + subLabel;
+    head.appendChild(nestLblEl); head.appendChild(dot); head.appendChild(cnt);
+    nest.appendChild(head);
+
+    const body = document.createElement('div'); body.className = 'pp-cl-nest-body';
+    nest.appendChild(body);
+    body.appendChild(buildInnerTiles(members, subAsgn, col, lbl));
+
+    const CARD_H_EST = 52, CARD_COLS = 3;
+    const numRows = Math.ceil(members.length / CARD_COLS);
+    const bodyH   = Math.max(80, numRows * (CARD_H_EST + 5) + 14 + (subAsgn && _depth > 1 ? subCount * 18 : 0));
+    const nestW   = Math.max(RESIZE_MIN_W, CARD_W * CARD_COLS + 5 * (CARD_COLS - 1) + 14);
+    const nestH   = Math.max(RESIZE_MIN_H, 28 + bodyH);
+    nest.style.width  = nestW + 'px';
+    nest.style.height = nestH + 'px';
+    body.style.height = bodyH + 'px';
+    nest._estW = nestW; nest._estH = nestH;
+
+    makeNestDraggable(nest);
+    makeResizable(nest);
+    return nest;
+  }
+
+  function render(rows) {
+    Array.from(world.children).forEach(c => c.remove());
+    emptyEl.style.display = 'none';
+    _panX = 0; _panY = 0; _zoom = 1; applyWorldTransform(); _topZ = 10;
+
+    const topAsgn   = autoCluster(rows, _outerMin, _outerMax);
+    const numTop    = Math.max(...topAsgn, 0) + 1;
+    const topGroups = Array.from({ length: numTop }, () => []);
+    rows.forEach((r, i) => topGroups[topAsgn[i]].push(r));
+
+    let alignedAsgns = null;
+    const nonEmpty = topGroups.filter(g => g.length > 0);
+    if (_depth > 1 && nonEmpty.length > 1) {
+      alignedAsgns = alignedSubCluster(nonEmpty, _innerMin, _innerMax);
+    }
+
+    const nestEls = [];
+    let alignIdx = 0;
+    topGroups.forEach((members, oi) => {
+      if (!members.length) return;
+      const subAsgn = (alignedAsgns && _depth > 1) ? alignedAsgns[alignIdx++] : null;
+      const nest = buildOuterNest(members, oi, subAsgn);
+      nest.style.animationDelay = (oi * 55) + 'ms';
+      world.appendChild(nest); nestEls.push(nest);
+    });
+
+    const cols = Math.max(1, Math.ceil(Math.sqrt(nestEls.length)));
+    const topRects = nestEls.map((n, i) => ({
+      x: NEST_GAP + (i % cols) * ((n._estW || 200) + NEST_GAP * 2),
+      y: NEST_GAP + Math.floor(i / cols) * ((n._estH || 200) + NEST_GAP * 2),
+      w: n._estW || 200, h: n._estH || 200, el: n
+    }));
+
+    resolveCollisions(topRects, NEST_GAP, 160);
+
+    const minX = Math.min(...topRects.map(r => r.x));
+    const minY = Math.min(...topRects.map(r => r.y));
+    const offX = minX < NEST_GAP ? NEST_GAP - minX : 0;
+    const offY = minY < NEST_GAP ? NEST_GAP - minY : 0;
+    topRects.forEach(r => {
+      r.el.style.left = (r.x + offX) + 'px';
+      r.el.style.top  = (r.y + offY) + 'px';
+    });
+
+    const splitCount  = rows.filter(r => r._splitN && r._splitN > 1).length;
+    const clusterNames = nestEls.map((_, i) => outerLabel(i)).join(', ');
+    subtitle.textContent =
+      numTop + ' cluster' + (numTop === 1 ? '' : 's') +
+      ' (' + clusterNames + ') \u00b7 ' + rows.length + ' entries' +
+      (splitCount > 0 ? ' \u00b7 ' + splitCount + ' split' : '');
+
+    _clusterState = { nonEmpty, alignedAsgns: (_depth > 1 ? alignedAsgns : null) };
+    updateSheetPanel();
+  }
+
   function tryRender() {
     if (_rendered) return;
-    if (!window.EmbeddingUtils||!window.EmbeddingUtils.isReady()) return;
-    if (typeof buildRowIndex!=='function') return;
-    if (_rows) { doRender(); return; }
-    const rawRows=buildRowIndex(); if (!rawRows.length) return;
-    setStatus('loading','Embedding '+rawRows.length+' cells\u2026'); emptyEl.style.display='none';
-    Promise.all(rawRows.map(r=>{ const text=(r.row?.cells||r.cells||[]).join(' ').trim(); if(!text) return Promise.resolve(null); return window.EmbeddingUtils.getCachedEmbedding(text).then(vec=>({key:r.tabIdx+':'+r.rowIdx,vec})).catch(()=>null); })).then(results=>{
-      const vectors=new Map(); results.forEach(res=>{ if(res?.vec) vectors.set(res.key,res.vec); });
-      if (!vectors.size){ setStatus('error','No vectors available'); return; }
-      const embedded=rawRows.filter(r=>vectors.has(r.tabIdx+':'+r.rowIdx));
-      if (embedded.length<3){ setStatus('error','Not enough data (\u22653 cells needed)'); return; }
-      embedded.forEach(r=>{ r.vec=vectors.get(r.tabIdx+':'+r.rowIdx); }); _rows=embedded; doRender();
+    if (typeof buildRowIndex !== 'function') return;
+    if (_cachedEmbedded && _cachedVectors) { doRender(); return; }
+    const rows = buildRowIndex(); if (!rows.length) return;
+
+    const preVeced = rows.filter(r => r.vec && r.vec.length);
+    if (preVeced.length >= 2) {
+      const vectors = new Map();
+      preVeced.forEach(r => vectors.set(r.tabIdx+':'+r.rowIdx, r.vec));
+      _cachedEmbedded = preVeced; _cachedVectors = vectors;
+      requestAnimationFrame(doRender); return;
+    }
+
+    if (!window.EmbeddingUtils || !window.EmbeddingUtils.isReady()) return;
+    setStatus('loading', 'Clustering ' + rows.length + ' entries\u2026'); emptyEl.style.display = 'none';
+    Promise.all(rows.map(r => {
+      const text = (r.row?.cells || r.cells || []).join(' ').trim();
+      if (!text) return Promise.resolve(null);
+      return window.EmbeddingUtils.getCachedEmbedding(text)
+        .then(vec => ({ key: r.tabIdx+':'+r.rowIdx, vec }))
+        .catch(() => null);
+    })).then(results => {
+      const vectors = new Map(); results.forEach(res => { if (res?.vec) vectors.set(res.key, res.vec); });
+      if (!vectors.size) { setStatus('error', 'No vectors available'); return; }
+      const embedded = rows.filter(r => vectors.has(r.tabIdx+':'+r.rowIdx));
+      if (embedded.length < 2) { setStatus('error', 'Not enough data'); return; }
+      embedded.forEach(r => { r.vec = vectors.get(r.tabIdx+':'+r.rowIdx); });
+      _cachedEmbedded = embedded; _cachedVectors = vectors;
+      requestAnimationFrame(doRender);
     });
   }
 
   async function doRender() {
-    rebuildBtn.classList.remove('pp-cmap-busy');
-    setStatus('loading','Splitting cells\u2026');
-    let workRows;
-    try { workRows=await splitAllRows(_rows); } catch(e){ console.warn('[concept-map v17] split error:',e); workRows=_rows; }
-    const splitCount=workRows.length-_rows.length;
-    setStatus('loading','Building hierarchy for '+workRows.length+' concepts\u2026');
-    setTimeout(()=>{
-      try {
-        const hier=buildHierarchy(workRows);
-        if (!hier){ setStatus('error','Not enough data'); return; }
-        let visibleCount=0, multiParentCount=0;
-        const levelCounts=new Map();
-        for (let i=0;i<hier.n;i++) {
-          if (hier.absorbedInto[i]!==-1) continue; visibleCount++;
-          const lv=hier.levels[i]; levelCounts.set(lv,(levelCounts.get(lv)||0)+1);
-          if ((hier.parentsOf.get(i)||[]).length>1) multiParentCount++;
-        }
-        const levelStr=[...levelCounts.keys()].sort((a,b)=>a-b).map(l=>'L'+l+': '+levelCounts.get(l)).join(' \u00b7 ');
-        const splitStr=splitCount>0?' \u00b7 '+splitCount+' split'+(splitCount===1?'':'s'):'';
-        const mpStr=multiParentCount>0?' \u00b7 '+multiParentCount+' multi-parent':'';
-        renderConceptMap(hier);
-        subtitleEl.textContent=visibleCount+' cards \u00b7 '+levelStr+splitStr+mpStr;
-        setStatus('ready','Done'); _rendered=true;
-      } catch(err){ console.error('[concept-map v17]',err); setStatus('error','Failed: '+err.message); }
-    },20);
+    reclusterBtn.classList.remove('pp-cl-reclustering'); reclusterBtn.textContent = 'Re-cluster';
+    setStatus('loading', 'Splitting cells\u2026');
+    let workRows = _cachedEmbedded;
+    try {
+      const split = await splitAllRows(_cachedEmbedded);
+      if (split.length > _cachedEmbedded.length) {
+        workRows = split;
+        setStatus('loading', 'Clustering ' + workRows.length + ' concepts\u2026');
+      }
+    } catch(e) { console.warn('[clusters] split error:', e); }
+
+    setTimeout(() => {
+      try { render(workRows); setStatus('ready', 'Done'); _rendered = true; }
+      catch (err) { console.error('[clusters]', err); setStatus('error', 'Clustering failed'); }
+    }, 20);
   }
 
-  if (window.EmbeddingUtils&&window.EmbeddingUtils.isReady()) setTimeout(tryRender,120);
-  document.addEventListener('embeddings-ready',()=>setTimeout(tryRender,120));
-  window.addEventListener('embedding-progress',ev=>{ if(!_rendered) setStatus('loading','Indexing\u2026 '+ev.detail.pct+'%'); });
-  window.addEventListener('embedder-ready',()=>setTimeout(tryRender,120));
+  if (window.EmbeddingUtils && window.EmbeddingUtils.isReady()) setTimeout(tryRender, 120);
+  window.addEventListener('embedder-ready',    () => setTimeout(tryRender, 120));
+  window.addEventListener('embedding-progress', ev => { if (!_rendered) setStatus('loading', 'Indexing\u2026 ' + ev.detail.pct + '%'); });
+  window.addEventListener('embedding-complete', ev => {
+    if (!_rendered) { subtitle.textContent = 'Indexed ' + ev.detail.total + ' entries \u2014 building clusters\u2026'; tryRender(); }
+  });
 
-  // Re-render cards when dark/light mode changes so palette colours update
-  window.addEventListener('df-theme-change', () => { _rendered=false; tryRender(); });
+  window.addEventListener('df-theme-change', () => { _rendered = false; tryRender(); });
 
-return {
+  return {
     reset() {
-      _rendered=false; _rows=null; _liveRects.clear(); _connEdges=[]; _connSvg=null;
-      world.innerHTML=''; emptyEl.style.display='flex'; _panX=0; _panY=0; _zoom=1; applyTransform();
-    },
-    resize() {
-      if (_rendered) fitAll();
-    },
-    start() {
-      setTimeout(tryRender, 120);
+      _rendered = false; _cachedEmbedded = null; _cachedVectors = null; _clusterState = null;
+      Array.from(world.children).forEach(c => c.remove());
+      emptyEl.style.display = 'flex';
+      _panX = 0; _panY = 0; _zoom = 1; applyWorldTransform();
+      hideTooltip();
+      sheetBody.innerHTML = '<div class="pp-cl-panel-empty">Clusters will appear here once embeddings finish.</div>';
     }
   };
 }
