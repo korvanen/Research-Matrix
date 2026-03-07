@@ -264,7 +264,8 @@ var CL_MIN_SPLIT_LENGTH = 60;
   opacity: .5;
   transition: opacity var(--transition-fast);
 }
-.pp-cl-nest:hover .pp-cl-resize-handle { opacity: 1; }
+.pp-cl-nest:hover .pp-cl-resize-handle { opacity: 0.6; }
+.pp-cl-nest:hover .pp-cl-resize-handle:hover { opacity: 1; }
 
 /* ── Cards — Bento box style with flexible sizing (BENTO-BOX) ──────────────────────────── */
 .pp-cl-card {
