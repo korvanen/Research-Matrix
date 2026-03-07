@@ -1129,7 +1129,7 @@ function initClustersTool(paneEl, sidebarEl) {
     const parsed = typeof parseCitation === 'function' ? parseCitation(best) : { body: best };
     const card = document.createElement('div');
     card.className = 'pp-cl-card';
-    card.style.setProperty('--ppc-bg',     col.bg);
+    card.style.setProperty('--ppc-bg',     col.accent);
     card.style.setProperty('--ppc-border', col.accent);
     if (delay) card.style.animationDelay = delay + 'ms';
 
