@@ -1,4 +1,4 @@
-/* =========================================================
+/* ============================================================
    DIMENSIONAL FRAMEWORK — Design System v3
    Material Design 3  ·  Light + Dark  ·  design-system.css
 
@@ -1661,7 +1661,7 @@ mark.pkw {
    Set by utils-shared.js on toggle.
    ══════════════════════════════════════════════════════════ */
 
-html.dark :root {
+html.dark {
   --md-sys-color-primary:                #bcc2ff;
   --md-sys-color-on-primary:             #1b1f8a;
   --md-sys-color-primary-container:      #3140b0;
@@ -1708,7 +1708,7 @@ html.dark :root {
   --md-elev-5: 0px 8px 12px 6px rgba(0,0,0,0.25), 0px 4px 4px rgba(0,0,0,0.5);
 }
 
-html.light :root {
+html.light {
   --md-sys-color-primary:                #4a56c8;
   --md-sys-color-on-primary:             #ffffff;
   --md-sys-color-primary-container:      #dfe0ff;
