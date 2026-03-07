@@ -6,7 +6,7 @@
 //     – open/close arrow buttons wired to visible state via ds-panel-arrow--open / --close
 //   • Nest cards, tooltips, table cells, status badge all use semantic DS tokens
 //   • Dark-mode inherits automatically via CSS custom properties
-console.log('[utils-clusters.js V36]');
+console.log('[utils-clusters.js V3]');
 
 var CL_MIN_SPLIT_LENGTH = 60;
 
@@ -170,16 +170,26 @@ var CL_MIN_SPLIT_LENGTH = 60;
   pointer-events: none; z-index: 20;
 }
 
-/* ── Nests — MD3 Elevated Card ──────────────────────────── */
+/* ── Nests — Invisible until hover, MD3 styled (BENTO-BOX) ──────────────────────────── */
 .pp-cl-nest {
   position: absolute;
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--md-sys-color-outline-variant);
-  background: var(--md-sys-color-surface-container-low);
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  background: transparent;
   display: flex; flex-direction: column;
-  overflow: hidden;
-  box-shadow: var(--md-elev-1);
-  transition: box-shadow var(--transition-fast);
+  overflow: visible;
+  box-shadow: none;
+  transition: all var(--transition-base);
+  pointer-events: none; /* Allow click-through to cards */
+}
+
+/* Reveal nest on hover over any card inside */
+.pp-cl-nest:hover,
+.pp-cl-nest.pp-cl-nest-reveal {
+  border-color: var(--md-sys-color-outline-variant);
+  background: var(--md-sys-color-surface-container-lowest);
+  box-shadow: var(--md-elev-2);
+  pointer-events: all;
 }
 .pp-cl-nest.pp-cl-nest-lifted { box-shadow: var(--md-elev-3); }
 
@@ -187,18 +197,31 @@ var CL_MIN_SPLIT_LENGTH = 60;
   display: flex; align-items: center; gap: var(--space-2);
   padding: var(--space-2) var(--space-3);
   cursor: grab; flex-shrink: 0; user-select: none;
+  background: var(--md-sys-color-surface-container);
+  border-bottom: 1px solid var(--md-sys-color-outline-variant);
+  opacity: 0;
+  transition: opacity var(--transition-base);
 }
+
+.pp-cl-nest:hover .pp-cl-nest-head,
+.pp-cl-nest.pp-cl-nest-reveal .pp-cl-nest-head {
+  opacity: 1;
+}
+
 .pp-cl-nest-head:active { cursor: grabbing; }
 
 .pp-cl-nest-label {
-  font-size: var(--font-size-sm);
+  font-size: var(--font-size-title-sm);
   font-weight: var(--font-weight-bold);
-  letter-spacing: .04em;
+  letter-spacing: 0.02em;
   flex-shrink: 0;
-  opacity: .85;
   min-width: 16px;
 }
-.pp-cl-nest-dot  { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.pp-cl-nest-dot  { 
+  width: 8px; height: 8px; 
+  border-radius: 50%; 
+  flex-shrink: 0; 
+}
 .pp-cl-nest-count {
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-medium);
@@ -209,12 +232,17 @@ var CL_MIN_SPLIT_LENGTH = 60;
 }
 
 .pp-cl-nest-body {
-  flex: 1; min-height: 0; overflow-y: auto;
-  padding: var(--space-2);
-  display: flex; flex-direction: column; gap: var(--space-1);
+  flex: 1; min-height: 0; overflow: visible;
+  padding: var(--space-3);
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: var(--space-2);
+  align-content: start;
   scrollbar-width: thin;
   scrollbar-color: var(--md-sys-color-outline-variant) transparent;
+  pointer-events: all; /* Cards are always clickable */
 }
+
 .pp-cl-nest-body::-webkit-scrollbar       { width: 4px; }
 .pp-cl-nest-body::-webkit-scrollbar-thumb {
   background: var(--md-sys-color-outline-variant);
@@ -223,9 +251,7 @@ var CL_MIN_SPLIT_LENGTH = 60;
 .pp-cl-nest-body::-webkit-scrollbar-track { background: transparent; }
 
 .pp-cl-tile-row {
-  display: flex; flex-wrap: wrap;
-  align-items: flex-start; align-content: flex-start;
-  gap: var(--space-1); width: 100%;
+  display: contents; /* Flatten into grid */
 }
 
 .pp-cl-resize-handle {
@@ -240,45 +266,99 @@ var CL_MIN_SPLIT_LENGTH = 60;
 }
 .pp-cl-nest:hover .pp-cl-resize-handle { opacity: 1; }
 
-/* ── Cards ──────────────────────────────────────────────── */
+/* ── Cards — Bento box style with flexible sizing (BENTO-BOX) ──────────────────────────── */
 .pp-cl-card {
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   border: 1px solid var(--md-sys-color-outline-variant);
   background: var(--ppc-bg, var(--md-sys-color-surface));
   cursor: pointer;
-  flex: 1 1 100px; min-width: 100px;
+  /* Flexible sizing between 140px and 280px */
+  min-width: 140px;
+  max-width: 280px;
+  /* Height auto-adjusts to content */
+  min-height: 80px;
+  height: auto;
   transition: transform var(--transition-fast), box-shadow var(--transition-fast);
   animation: pp-cl-card-in .22s var(--md-motion-easing-emphasized-decel) both;
   box-sizing: border-box;
-  position: relative; overflow: hidden;
+  position: relative; 
+  overflow: visible;
+  display: flex;
+  flex-direction: column;
 }
+
 .pp-cl-card::before {
   content: '';
   position: absolute; inset: 0;
   background: var(--md-sys-color-on-surface);
   opacity: 0;
   transition: opacity var(--transition-fast);
+  border-radius: inherit;
+  pointer-events: none;
 }
+
 .pp-cl-card:hover {
-  transform: translateY(-1px);
-  box-shadow: var(--md-elev-2);
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: var(--md-elev-3);
+  z-index: 10;
 }
 .pp-cl-card:hover::before { opacity: var(--md-sys-state-hover-opacity); }
 
 @keyframes pp-cl-card-in {
-  from { opacity: 0; transform: translateY(4px); }
+  from { opacity: 0; transform: translateY(4px) scale(0.98); }
   to   { opacity: 1; transform: none; }
 }
 
 /* ── Solid-colour card: text driven by --ppc-on (set from palette label in JS) ── */
-.pp-cl-card .pp-cmap-card-cat-num     { color: color-mix(in srgb, var(--ppc-on,#fff) 92%, transparent); }
-.pp-cl-card .pp-cmap-card-level-label { color: color-mix(in srgb, var(--ppc-on,#fff) 55%, transparent); }
-.pp-cl-card .pp-cmap-card-rule        { background: color-mix(in srgb, var(--ppc-on,#fff) 22%, transparent); opacity: 1; }
-.pp-cl-card .pp-cl-card-cat           { color: color-mix(in srgb, var(--ppc-on,#fff) 60%, transparent); }
-.pp-cl-card .pp-cl-card-text          { color: color-mix(in srgb, var(--ppc-on,#fff) 92%, transparent); }
+.pp-cl-card .pp-cmap-card-cat-num     { 
+  font-family: var(--font-family-serif);
+  font-size: 28px;
+  line-height: 1;
+  font-weight: 400;
+  font-style: italic;
+  color: color-mix(in srgb, var(--ppc-on,#fff) 92%, transparent); 
+  letter-spacing: -0.02em;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  word-break: break-word;
+}
+.pp-cl-card .pp-cmap-card-level-label { 
+  font-size: 8px;
+  font-weight: var(--font-weight-medium);
+  letter-spacing: var(--letter-spacing-caps);
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--ppc-on,#fff) 55%, transparent); 
+}
+.pp-cl-card .pp-cmap-card-rule        { 
+  height: 1px;
+  background: color-mix(in srgb, var(--ppc-on,#fff) 20%, transparent); 
+  margin: 8px 14px 0;
+  flex-shrink: 0;
+  opacity: 1; 
+}
+.pp-cl-card .pp-cl-card-cat           { color: color-mix(in srgb, var(--ppc-on,#fff) 65%, transparent); }
+.pp-cl-card .pp-cl-card-text          { 
+  font-family: var(--font-family-serif);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.35;
+  letter-spacing: -0.01em;
+  color: color-mix(in srgb, var(--ppc-on,#fff) 95%, transparent);
+  /* Remove line clamp - let text wrap naturally */
+  display: block;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
 .pp-cl-card .pp-cl-card-split         { color: color-mix(in srgb, var(--ppc-on,#fff) 50%, transparent); }
 
-.pp-cl-card-body        { padding: var(--space-1) var(--space-2) var(--space-2); }
+.pp-cl-card-body        { 
+  padding: 10px 14px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+}
 .pp-cl-card-cat {
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-medium);
@@ -299,6 +379,17 @@ var CL_MIN_SPLIT_LENGTH = 60;
   text-transform: uppercase;
   color: var(--md-sys-color-outline);
   margin-top: 2px;
+}
+.pp-cl-sub-strip {
+  width: 100%; 
+  display: flex; 
+  align-items: center;
+  gap: var(--space-2); 
+  padding: 6px var(--space-3);
+  border-radius: var(--radius-sm);
+  box-sizing: border-box;
+  margin-bottom: var(--space-1);
+  grid-column: 1 / -1; /* Span full width in grid */
 }
 
 /* Sub-cluster strip */
@@ -1188,41 +1279,83 @@ function initClustersTool(paneEl, sidebarEl) {
     return frag;
   }
 
-  function buildOuterNest(members, outerIdx, subAsgn) {
+function buildOuterNest(members, outerIdx, subAsgn) {
     const col = colForIndex(outerIdx);
     const lbl = outerLabel(outerIdx);
     const nest = document.createElement('div');
     nest.className = 'pp-cl-nest';
-    nest.style.borderTopColor  = col.accent;
-    nest.style.borderTopWidth  = '3px';
 
     const subCount = subAsgn ? (Math.max(...subAsgn, 0) + 1) : 0;
-    const subLabel = subAsgn && _depth > 1 ? ' \u00b7 ' + subCount + ' group' + (subCount === 1 ? '' : 's') : '';
+    const subLabel = subAsgn && _depth > 1 ? ' · ' + subCount + ' group' + (subCount === 1 ? '' : 's') : '';
 
-    const head = document.createElement('div'); head.className = 'pp-cl-nest-head';
+    const head = document.createElement('div'); 
+    head.className = 'pp-cl-nest-head';
     head.style.background = col.accent + '18';
 
-    const nestLblEl = document.createElement('span'); nestLblEl.className = 'pp-cl-nest-label';
-    nestLblEl.textContent = lbl; nestLblEl.style.color = col.accent;
-    const dot = document.createElement('span'); dot.className = 'pp-cl-nest-dot'; dot.style.background = col.accent;
-    const cnt = document.createElement('span'); cnt.className = 'pp-cl-nest-count';
+    const nestLblEl = document.createElement('span'); 
+    nestLblEl.className = 'pp-cl-nest-label';
+    nestLblEl.textContent = lbl; 
+    nestLblEl.style.color = col.accent;
+    
+    const dot = document.createElement('span'); 
+    dot.className = 'pp-cl-nest-dot'; 
+    dot.style.background = col.accent;
+    
+    const cnt = document.createElement('span'); 
+    cnt.className = 'pp-cl-nest-count';
     cnt.textContent = members.length + ' entr' + (members.length === 1 ? 'y' : 'ies') + subLabel;
-    head.appendChild(nestLblEl); head.appendChild(dot); head.appendChild(cnt);
+    
+    head.appendChild(nestLblEl); 
+    head.appendChild(dot); 
+    head.appendChild(cnt);
     nest.appendChild(head);
 
-    const body = document.createElement('div'); body.className = 'pp-cl-nest-body';
+    const body = document.createElement('div'); 
+    body.className = 'pp-cl-nest-body';
     nest.appendChild(body);
     body.appendChild(buildInnerTiles(members, subAsgn, col, lbl));
 
-    const CARD_H_EST = 52, CARD_COLS = 3;
-    const numRows = Math.ceil(members.length / CARD_COLS);
-    const bodyH   = Math.max(80, numRows * (CARD_H_EST + 5) + 14 + (subAsgn && _depth > 1 ? subCount * 18 : 0));
-    const nestW   = Math.max(RESIZE_MIN_W, CARD_W * CARD_COLS + 5 * (CARD_COLS - 1) + 14);
-    const nestH   = Math.max(RESIZE_MIN_H, 28 + bodyH);
+    // ────────────────────────────────────────────────────────────────────────
+    // BENTO-BOX LAYOUT: Calculate grid-based dimensions
+    // Grid: auto-fill with minmax(140px, 1fr), gap 8px
+    // ────────────────────────────────────────────────────────────────────────
+    const MIN_CARD_W = 140;
+    const GAP = 8;
+    const PADDING = 12;
+    const HEAD_H = 40;
+    
+    // Estimate how many columns we can fit
+    const totalCards = members.length + (subAsgn && _depth > 1 ? subCount : 0); // cards + sub-strips
+    const idealCols = Math.min(Math.max(3, Math.ceil(Math.sqrt(totalCards))), 6);
+    
+    // Calculate nest width to accommodate grid
+    const nestW = Math.max(
+      RESIZE_MIN_W, 
+      idealCols * MIN_CARD_W + (idealCols - 1) * GAP + PADDING * 2
+    );
+    
+    // Height is auto-calculated by content, but we need a minimum
+    const estimatedRows = Math.ceil(totalCards / idealCols);
+    const AVG_CARD_H = 120; // Average card height with wrapped text
+    const nestH = Math.max(
+      RESIZE_MIN_H,
+      HEAD_H + estimatedRows * AVG_CARD_H + (estimatedRows - 1) * GAP + PADDING * 2
+    );
+    
     nest.style.width  = nestW + 'px';
     nest.style.height = nestH + 'px';
-    body.style.height = bodyH + 'px';
-    nest._estW = nestW; nest._estH = nestH;
+    nest._estW = nestW; 
+    nest._estH = nestH;
+
+    // ────────────────────────────────────────────────────────────────────────
+    // HOVER-REVEAL: Add hover behavior to show cluster boundaries
+    // ────────────────────────────────────────────────────────────────────────
+    body.addEventListener('mouseenter', () => {
+      nest.classList.add('pp-cl-nest-reveal');
+    });
+    nest.addEventListener('mouseleave', () => {
+      nest.classList.remove('pp-cl-nest-reveal');
+    });
 
     makeNestDraggable(nest);
     makeResizable(nest);
