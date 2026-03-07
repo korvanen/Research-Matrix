@@ -1,12 +1,14 @@
-// utils-concept-map.js — Concept Map v18
-// v16 → v18 changes:
-//   • depthColor() now reads window.PP_PALETTE (set by script.js) as first
-//     priority so all tools share one color source. Falls back to THEMES
-//     globals then hardcoded CMAP_FALLBACK_PALETTE for standalone/bridge mode.
-//   • CMAP_FALLBACK_PALETTE upgraded from 5 plain hex strings to 7 full
-//     { accent, bg, label } objects matching the global theme palette.
-console.log('[utils-concept-map.js [v.18]');
-// Level themes (used by THEMES fallback path only):
+// utils-concept-map.js — Concept Map v19
+// v18 → v19 changes:
+//   • Removed CMAP_FALLBACK_PALETTE, contrastFor(), and window.PP_PALETTE chain.
+//   • depthColor() now reads exclusively from THEMES (via CMAP_LEVEL_THEMES) —
+//     single source of truth, no drift between palette and theme definitions.
+//   • Bug #1 fix: rotated[] array corrected so Level 1 = pal[0] = yellow theme.
+//   • Bug #2 fix: --ppc-on set directly from theme['--tab-active-color'], no
+//     hex-parsing heuristic needed.
+console.log('[utils-concept-map.js [v.19]');
+
+// Level themes — must match order/names in THEMES (utils-shared.js)
 const CMAP_LEVEL_THEMES = ['yellow','visions','relational','organizational','physical','yellow'];
 
 const CMAP_PARENT_CHILD_THRESHOLD = 0.50;
@@ -120,7 +122,7 @@ const ORPHAN_RECOVERY_THRESHOLD = 0.85;
 .pp-cmap-card:active { cursor:grabbing; }
 .pp-cmap-card:hover  { box-shadow:var(--md-elev-4); }
 
-/* ── Card top layout (base styles shared with clusters) ── */
+/* ── Card top layout ── */
 .pp-cmap-card-top {
   display:flex; align-items:flex-start; justify-content:space-between;
   padding:5px 9px 4px; gap:6px;
@@ -128,40 +130,37 @@ const ORPHAN_RECOVERY_THRESHOLD = 0.85;
 .pp-cmap-card-cat-num {
   font-size:11px; font-weight:800; letter-spacing:.02em; line-height:1.35;
   flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
-  color:var(--md-sys-color-on-surface);
 }
 .pp-cmap-card-level-block {
   display:flex; flex-direction:column; align-items:flex-end; flex-shrink:0;
 }
 .pp-cmap-card-level-num {
   font-size:14px; font-weight:900; line-height:1;
-  color:var(--md-sys-color-on-surface);
 }
 .pp-cmap-card-level-label {
   font-size:7px; font-weight:700; letter-spacing:.08em; text-transform:uppercase;
-  color:var(--md-sys-color-on-surface-variant);
 }
 .pp-cmap-card-merged {
   font-size:8px; font-weight:600; letter-spacing:.06em; text-transform:uppercase;
-  padding:0 9px 3px; color:var(--md-sys-color-on-surface-variant);
+  padding:0 9px 3px;
 }
 .pp-cmap-card-rule {
-  height:1px; margin:0 9px; background:var(--md-sys-color-outline-variant); opacity:.5;
+  height:1px; margin:0 9px; opacity:.5;
 }
 
-/* ── Solid-color card: text driven by --ppc-on (set from palette label in JS) ── */
-.pp-cmap-card .pp-cmap-card-cat-num    { color: color-mix(in srgb, var(--ppc-on,#fff) 92%, transparent); }
-.pp-cmap-card .pp-cmap-card-level-num  { color: color-mix(in srgb, var(--ppc-on,#fff) 95%, transparent); }
-.pp-cmap-card .pp-cmap-card-level-label { color: color-mix(in srgb, var(--ppc-on,#fff) 55%, transparent); }
-.pp-cmap-card .pp-cmap-card-merged     { color: color-mix(in srgb, var(--ppc-on,#fff) 50%, transparent); }
-.pp-cmap-card .pp-cmap-card-rule       { background: color-mix(in srgb, var(--ppc-on,#fff) 22%, transparent); opacity: 1; }
-.pp-cmap-card .pp-cmap-cell-cat        { color: color-mix(in srgb, var(--ppc-on,#fff) 60%, transparent); }
-.pp-cmap-card .pp-cmap-cell-text       { color: color-mix(in srgb, var(--ppc-on,#fff) 92%, transparent); }
-.pp-cmap-card .pp-cmap-merge-sep       { background: color-mix(in srgb, var(--ppc-on,#fff) 20%, transparent); border-color: transparent; }
-.pp-cmap-card .pp-cmap-card-footer     { border-top-color: color-mix(in srgb, var(--ppc-on,#fff) 18%, transparent); }
-.pp-cmap-card .pp-cmap-sim-line        { color: color-mix(in srgb, var(--ppc-on,#fff) 60%, transparent); }
-.pp-cmap-card .pp-cmap-sim-pct         { color: color-mix(in srgb, var(--ppc-on,#fff) 92%, transparent); }
-.pp-cmap-card .pp-cmap-leaf-badge      { color: color-mix(in srgb, var(--ppc-on,#fff) 55%, transparent); }
+/* ── All text elements driven by --ppc-on (set from THEMES[name]['--tab-active-color']) ── */
+.pp-cmap-card .pp-cmap-card-cat-num    { color: color-mix(in srgb, var(--ppc-on,#fff) 92%, black); }
+.pp-cmap-card .pp-cmap-card-level-num  { color: color-mix(in srgb, var(--ppc-on,#fff) 95%, black); }
+.pp-cmap-card .pp-cmap-card-level-label { color: color-mix(in srgb, var(--ppc-on,#fff) 55%, var(--ppc-bg,#888)); }
+.pp-cmap-card .pp-cmap-card-merged     { color: color-mix(in srgb, var(--ppc-on,#fff) 50%, var(--ppc-bg,#888)); }
+.pp-cmap-card .pp-cmap-card-rule       { background: color-mix(in srgb, var(--ppc-on,#fff) 22%, var(--ppc-bg,#888)); opacity: 1; }
+.pp-cmap-card .pp-cmap-cell-cat        { color: color-mix(in srgb, var(--ppc-on,#fff) 60%, var(--ppc-bg,#888)); }
+.pp-cmap-card .pp-cmap-cell-text       { color: color-mix(in srgb, var(--ppc-on,#fff) 92%, black); }
+.pp-cmap-card .pp-cmap-merge-sep       { background: color-mix(in srgb, var(--ppc-on,#fff) 20%, var(--ppc-bg,#888)); border-color: transparent; }
+.pp-cmap-card .pp-cmap-card-footer     { border-top-color: color-mix(in srgb, var(--ppc-on,#fff) 18%, var(--ppc-bg,#888)); }
+.pp-cmap-card .pp-cmap-sim-line        { color: color-mix(in srgb, var(--ppc-on,#fff) 60%, var(--ppc-bg,#888)); }
+.pp-cmap-card .pp-cmap-sim-pct         { color: color-mix(in srgb, var(--ppc-on,#fff) 92%, black); }
+.pp-cmap-card .pp-cmap-leaf-badge      { color: color-mix(in srgb, var(--ppc-on,#fff) 55%, var(--ppc-bg,#888)); }
 
 .pp-cmap-card-head { padding:5px 9px 4px; display:flex; align-items:flex-start; gap:5px; flex-wrap:wrap; }
 .pp-cmap-level-badge {
@@ -211,7 +210,7 @@ const ORPHAN_RECOVERY_THRESHOLD = 0.85;
 // ════════════════════════════════════════════════════════════════════════════
 function initConceptMapTool(paneEl, sidebarEl) {
 
-  const DRAG_DELAY = 600; // ms debounce while slider is being dragged
+  const DRAG_DELAY = 600;
 
   paneEl.innerHTML =
     '<div id="pp-cmap-head">' +
@@ -274,7 +273,6 @@ function initConceptMapTool(paneEl, sidebarEl) {
       '<div id="pp-cmap-zoom-hint">scroll = zoom \u00b7 RMB drag = pan \u00b7 pinch/2-finger = touch</div>' +
     '</div>';
 
-  // ── Upgrade all sliders with bounce animation ──────────────────────────────
   if (typeof upgradeSlider === 'function') {
     paneEl.querySelectorAll('.pp-range').forEach(upgradeSlider);
   }
@@ -323,7 +321,6 @@ function initConceptMapTool(paneEl, sidebarEl) {
     if (state === 'ready') setTimeout(() => { statusEl.style.opacity = '0'; }, 3200);
   }
 
-  // ── Sliders: delay while dragging, instant on release ─────────────────────
   [
     { el: depthSlider,  valEl: depthValEl,  read: () => { _depth = +depthSlider.value; depthValEl.textContent = _depth; } },
     { el: threshSlider, valEl: threshValEl, read: () => { _threshold = +threshSlider.value / 100; threshValEl.textContent = threshSlider.value + '%'; } },
@@ -345,7 +342,6 @@ function initConceptMapTool(paneEl, sidebarEl) {
 
   rebuildBtn.addEventListener('click', () => { clearTimeout(_rebuildTimer); _rendered = false; tryRender(); });
 
-  // ── Layout dropdown ───────────────────────────────────────────────────────
   const LAYOUT_LABELS = { radial:'Radial', vtree:'Vertical Tree', htree:'Horizontal Tree', vflow:'Vertical Flow', organic:'Organic' };
   layoutBtn.addEventListener('click', e => { e.stopPropagation(); layoutMenu.classList.toggle('open'); layoutBtn.classList.toggle('open', layoutMenu.classList.contains('open')); });
   document.addEventListener('click', () => { layoutMenu.classList.remove('open'); layoutBtn.classList.remove('open'); });
@@ -360,7 +356,6 @@ function initConceptMapTool(paneEl, sidebarEl) {
     });
   });
 
-  // ── Fit-all ───────────────────────────────────────────────────────────────
   function fitAll() {
     if (!_liveRects.size) return;
     let minX=Infinity, minY=Infinity, maxX=-Infinity, maxY=-Infinity;
@@ -375,7 +370,6 @@ function initConceptMapTool(paneEl, sidebarEl) {
   }
   fitBtn.addEventListener('click', fitAll);
 
-  // ── Pan & zoom ────────────────────────────────────────────────────────────
   let _panning=false, _panSX=0, _panSY=0, _panBX=0, _panBY=0;
 
   canvas.addEventListener('mousedown', ev => {
@@ -405,7 +399,6 @@ function initConceptMapTool(paneEl, sidebarEl) {
     applyTransform();
   }, {passive:false});
 
-  // ── Card drag — Pointer Events API (works on touch + mouse) ──────────────
   const _pointers = new Map();
   let _cardDrag   = null;
   let _pinchState = null;
@@ -502,7 +495,6 @@ function initConceptMapTool(paneEl, sidebarEl) {
     el.addEventListener('pointercancel', ev => { if (_cardDrag && ev.pointerId === _cardDrag.pointerId) _cardDrag = null; });
   }
 
-  // ── Cosine similarity ─────────────────────────────────────────────────────
   function cosineSim(a, b) {
     if (!a||!b||a.length!==b.length) return 0;
     let dot=0, na=0, nb=0;
@@ -517,7 +509,6 @@ function initConceptMapTool(paneEl, sidebarEl) {
     return Array.from(sum).map(x=>x/valid.length);
   }
 
-  // ── Intra-cell splitting ──────────────────────────────────────────────────
   function sentenceSplit(text) {
     return text.replace(/([.!?;])\s+/g,'$1\n').split('\n').map(s=>s.trim()).filter(s=>s.length>=CMAP_MIN_SPLIT_LENGTH);
   }
@@ -551,9 +542,6 @@ function initConceptMapTool(paneEl, sidebarEl) {
     return result;
   }
 
-  // ════════════════════════════════════════════════════════════════════════
-  // ── Hierarchy builder — multi-parent DAG ────────────────────────────────
-  // ════════════════════════════════════════════════════════════════════════
   function buildHierarchy(rows) {
     const n=rows.length; if (n<2) return null;
 
@@ -616,7 +604,6 @@ function initConceptMapTool(paneEl, sidebarEl) {
     return { rows, n, levels, parentsOf, parentSimsOf, childrenOf, simToChildren, simToParents, absorbedInto, mergeExtras };
   }
 
-  // ── Connectors ────────────────────────────────────────────────────────────
   let _connSvg=null, _connEdges=[];
 
   function redrawConnectors() {
@@ -646,57 +633,17 @@ function initConceptMapTool(paneEl, sidebarEl) {
     });
   }
 
-  // ── Color by hierarchy level ──────────────────────────────────────────────
-  const CMAP_FALLBACK_PALETTE = [
-    { accent: '#c8991a', bg: '#fffdf5', label: '#fff' },
-    { accent: '#2e7d5e', bg: '#f4faf7', label: '#fff' },
-    { accent: '#4a56c8', bg: '#f4f5fd', label: '#fff' },
-    { accent: '#5e3d9e', bg: '#f6f3fb', label: '#fff' },
-    { accent: '#c44035', bg: '#fdf5f4', label: '#fff' },
-    { accent: '#c8991a', bg: '#fffdf5', label: '#fff' },
-    { accent: '#888888', bg: '#f7f7f8', label: '#fff' },
-  ];
-
-  // Returns '#fff' or '#000' to maximize contrast against the given hex background color
-  function contrastFor(hex) {
-    let c = String(hex).trim();
-    if (c[0] === '#') c = c.slice(1);
-    if (c.length === 3) c = c.split('').map(ch => ch + ch).join('');
-    if (c.length === 8) c = c.slice(0, 6);
-    if (c.length !== 6) return '#fff';
-    const r = parseInt(c.slice(0, 2), 16) / 255;
-    const g = parseInt(c.slice(2, 4), 16) / 255;
-    const b = parseInt(c.slice(4, 6), 16) / 255;
-    const toLinear = v => (v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4));
-    const L = 0.2126 * toLinear(r) + 0.7152 * toLinear(g) + 0.0722 * toLinear(b);
-    const contrastWithWhite = (1.05) / (L + 0.05);
-    const contrastWithBlack = (L + 0.05) / 0.05;
-    return contrastWithWhite >= contrastWithBlack ? '#fff' : '#000';
-  }
-
+  // ── Color by hierarchy level — reads exclusively from THEMES ─────────────
+  // No fallback palette needed: THEMES is the single source of truth.
   function depthColor(level) {
-    const idx = level - 1;
-    const pal = (typeof getPalette === 'function' ? getPalette() : null)
-             || window.PP_PALETTE
-             || CMAP_FALLBACK_PALETTE;
-
-    if (pal && pal.length >= 5) {
-      const rotated = [pal[0], pal[1], pal[2], pal[3], pal[4], pal[5] || pal[0], pal[6] || pal[0]];
-      return rotated[Math.min(idx, rotated.length - 1)];
-    }
-
-    if (typeof THEMES !== 'undefined') {
-      const tname = (idx < CMAP_LEVEL_THEMES.length) ? CMAP_LEVEL_THEMES[idx] : 'default';
-      const theme = THEMES[tname] || THEMES.default || {};
-      const fb = CMAP_FALLBACK_PALETTE[Math.min(idx, CMAP_FALLBACK_PALETTE.length - 1)];
-      return {
-        accent: theme['--tab-active-bg']    || fb.accent,
-        label:  theme['--tab-active-color'] || '#fff',
-        bg:     theme['--bg-data']          || fb.bg,
-      };
-    }
-
-    return CMAP_FALLBACK_PALETTE[Math.min(idx, CMAP_FALLBACK_PALETTE.length - 1)];
+    const idx   = level - 1;
+    const tname = CMAP_LEVEL_THEMES[Math.min(idx, CMAP_LEVEL_THEMES.length - 1)];
+    const theme = (typeof THEMES !== 'undefined' && THEMES[tname]) || (typeof THEMES !== 'undefined' && THEMES.default) || {};
+    return {
+      accent: theme['--tab-active-bg']    || '#888888',
+      label:  theme['--tab-active-color'] || '#ffffff',
+      bg:     theme['--bg-data']          || '#f7f7f8',
+    };
   }
 
   function renderConceptMap(hier) {
@@ -714,15 +661,19 @@ function initConceptMapTool(paneEl, sidebarEl) {
 
     for (let i=0;i<n;i++) {
       if (absorbedInto[i]!==-1) continue;
-      const level=levels[i], {accent,label:lc,bg}=depthColor(level);
+      const level=levels[i];
+      // depthColor now reads from THEMES — accent, label, bg are all theme-accurate
+      const { accent, label: lc, bg } = depthColor(level);
       const extras=mergeExtras.get(i)||[], allRows=[i,...extras];
 
       const card=document.createElement('div');
       card.className='pp-cmap-card';
       card.style.cssText=`width:${CARD_W}px;position:absolute;z-index:${++_topZ}`;
-      card.style.setProperty('--ppc-border',accent);
-      card.style.setProperty('--ppc-bg',accent);
-      card.style.setProperty('--ppc-on', contrastFor(accent));
+      card.style.setProperty('--ppc-border', accent);
+      card.style.setProperty('--ppc-bg',     accent);
+      // lc comes directly from theme['--tab-active-color'] — designer-controlled,
+      // no hex parsing needed.
+      card.style.setProperty('--ppc-on',     lc);
 
       const primaryRow=rows[i], isSplit=!!primaryRow._splitFrom;
       const numParents=(parentsOf.get(i)||[]).length;
@@ -829,7 +780,6 @@ function initConceptMapTool(paneEl, sidebarEl) {
       });
     }
 
-    // ── Layout ────────────────────────────────────────────────────────────
     requestAnimationFrame(()=>{
       const W=canvas.clientWidth||500, H=canvas.clientHeight||500;
       const nodeIds=[]; cardEls.forEach((_,id)=>nodeIds.push(id));
@@ -898,7 +848,6 @@ function initConceptMapTool(paneEl, sidebarEl) {
     });
   }
 
-  // ── Data pipeline ─────────────────────────────────────────────────────────
   function tryRender() {
     if (_rendered) return;
     if (!window.EmbeddingUtils||!window.EmbeddingUtils.isReady()) return;
@@ -919,7 +868,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
     rebuildBtn.classList.remove('pp-cmap-busy');
     setStatus('loading','Splitting cells\u2026');
     let workRows;
-    try { workRows=await splitAllRows(_rows); } catch(e){ console.warn('[concept-map v17] split error:',e); workRows=_rows; }
+    try { workRows=await splitAllRows(_rows); } catch(e){ console.warn('[concept-map v19] split error:',e); workRows=_rows; }
     const splitCount=workRows.length-_rows.length;
     setStatus('loading','Building hierarchy for '+workRows.length+' concepts\u2026');
     setTimeout(()=>{
@@ -939,7 +888,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
         renderConceptMap(hier);
         subtitleEl.textContent=visibleCount+' cards \u00b7 '+levelStr+splitStr+mpStr;
         setStatus('ready','Done'); _rendered=true;
-      } catch(err){ console.error('[concept-map v17]',err); setStatus('error','Failed: '+err.message); }
+      } catch(err){ console.error('[concept-map v19]',err); setStatus('error','Failed: '+err.message); }
     },20);
   }
 
@@ -948,10 +897,9 @@ function initConceptMapTool(paneEl, sidebarEl) {
   window.addEventListener('embedding-progress',ev=>{ if(!_rendered) setStatus('loading','Indexing\u2026 '+ev.detail.pct+'%'); });
   window.addEventListener('embedder-ready',()=>setTimeout(tryRender,120));
 
-  // Re-render cards when dark/light mode changes so palette colours update
   window.addEventListener('df-theme-change', () => { _rendered=false; tryRender(); });
 
-return {
+  return {
     reset() {
       _rendered=false; _rows=null; _liveRects.clear(); _connEdges=[]; _connSvg=null;
       world.innerHTML=''; emptyEl.style.display='flex'; _panX=0; _panY=0; _zoom=1; applyTransform();
