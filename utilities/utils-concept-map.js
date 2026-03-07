@@ -5,7 +5,11 @@
 //   • Text color (--ppc-on) now adapts based on html.dark/html.light class
 //   • Background and accent colors read from --raw-{theme}-bg and --raw-{theme}-mid
 //     which update automatically when theme changes
-console.log('[utils-concept-map.js [v.2]');
+// v20 fixes:
+//   • depthColor: added missing paletteIdx + theme variable (was ReferenceError)
+//   • depthColor: rewrote getLuminance without array destructuring (was SyntaxError)
+//   • Removed dead CMAP_LEVEL_THEMES constant
+console.log('[utils-concept-map.js v.3]');
 
 const CMAP_PARENT_CHILD_THRESHOLD = 0.50;
 const CMAP_MIN_SPLIT_LENGTH = 60;
@@ -144,7 +148,7 @@ const ORPHAN_RECOVERY_THRESHOLD = 0.85;
   height:1px; margin:0 9px; opacity:.5;
 }
 
-/* ── All text elements driven by --ppc-on (set from theme['--tab-active-color']) ── */
+/* ── All text elements driven by --ppc-on ── */
 .pp-cmap-card .pp-cmap-card-cat-num    { color: color-mix(in srgb, var(--ppc-on,#fff) 92%, black); }
 .pp-cmap-card .pp-cmap-card-level-num  { color: color-mix(in srgb, var(--ppc-on,#fff) 95%, black); }
 .pp-cmap-card .pp-cmap-card-level-label { color: color-mix(in srgb, var(--ppc-on,#fff) 55%, var(--ppc-bg,#888)); }
@@ -301,53 +305,53 @@ function initConceptMapTool(paneEl, sidebarEl) {
   let _layout     = 'organic';
   let _rows       = null;
   let _rendered   = false;
-  let _everRendered = false;  // Track if we've ever rendered (for animation logic)
+  let _everRendered = false;
   let _rebuildTimer = null;
   let _topZ       = 10;
   let _panX = 0, _panY = 0, _zoom = 1;
   let _liveRects  = new Map();
 
   function applyTransform() {
-    world.style.transform = `translate(${_panX}px,${_panY}px) scale(${_zoom})`;
+    world.style.transform = 'translate(' + _panX + 'px,' + _panY + 'px) scale(' + _zoom + ')';
   }
 
   function setStatus(state, text) {
     statusEl.className = 'cmap-' + state;
     labelEl.textContent = text;
     statusEl.style.opacity = '1';
-    if (state === 'ready') setTimeout(() => { statusEl.style.opacity = '0'; }, 3200);
+    if (state === 'ready') setTimeout(function() { statusEl.style.opacity = '0'; }, 3200);
   }
 
   [
-    { el: depthSlider,  valEl: depthValEl,  read: () => { _depth = +depthSlider.value; depthValEl.textContent = _depth; } },
-    { el: threshSlider, valEl: threshValEl, read: () => { _threshold = +threshSlider.value / 100; threshValEl.textContent = threshSlider.value + '%'; } },
-    { el: maxParSlider, valEl: maxParValEl, read: () => { _maxParents = +maxParSlider.value; maxParValEl.textContent = _maxParents; } },
-  ].forEach(({ el, read }) => {
-    el.addEventListener('input', () => {
-      read();
+    { el: depthSlider,  valEl: depthValEl,  read: function() { _depth = +depthSlider.value; depthValEl.textContent = _depth; } },
+    { el: threshSlider, valEl: threshValEl, read: function() { _threshold = +threshSlider.value / 100; threshValEl.textContent = threshSlider.value + '%'; } },
+    { el: maxParSlider, valEl: maxParValEl, read: function() { _maxParents = +maxParSlider.value; maxParValEl.textContent = _maxParents; } },
+  ].forEach(function(item) {
+    item.el.addEventListener('input', function() {
+      item.read();
       clearTimeout(_rebuildTimer);
       rebuildBtn.classList.add('pp-cmap-busy');
-      _rebuildTimer = setTimeout(() => { _rendered = false; tryRender(); }, DRAG_DELAY);
+      _rebuildTimer = setTimeout(function() { _rendered = false; tryRender(); }, DRAG_DELAY);
     });
-    el.addEventListener('change', () => {
-      read();
+    item.el.addEventListener('change', function() {
+      item.read();
       clearTimeout(_rebuildTimer);
       rebuildBtn.classList.remove('pp-cmap-busy');
       _rendered = false; tryRender();
     });
   });
 
-  rebuildBtn.addEventListener('click', () => { clearTimeout(_rebuildTimer); _rendered = false; tryRender(); });
+  rebuildBtn.addEventListener('click', function() { clearTimeout(_rebuildTimer); _rendered = false; tryRender(); });
 
-  const LAYOUT_LABELS = { radial:'Radial', vtree:'Vertical Tree', htree:'Horizontal Tree', vflow:'Vertical Flow', organic:'Organic' };
-  layoutBtn.addEventListener('click', e => { e.stopPropagation(); layoutMenu.classList.toggle('open'); layoutBtn.classList.toggle('open', layoutMenu.classList.contains('open')); });
-  document.addEventListener('click', () => { layoutMenu.classList.remove('open'); layoutBtn.classList.remove('open'); });
-  layoutMenu.addEventListener('click', e => e.stopPropagation());
-  layoutOpts.forEach(opt => {
-    opt.addEventListener('click', () => {
-      const l = opt.dataset.layout; if (!l) return;
+  var LAYOUT_LABELS = { radial:'Radial', vtree:'Vertical Tree', htree:'Horizontal Tree', vflow:'Vertical Flow', organic:'Organic' };
+  layoutBtn.addEventListener('click', function(e) { e.stopPropagation(); layoutMenu.classList.toggle('open'); layoutBtn.classList.toggle('open', layoutMenu.classList.contains('open')); });
+  document.addEventListener('click', function() { layoutMenu.classList.remove('open'); layoutBtn.classList.remove('open'); });
+  layoutMenu.addEventListener('click', function(e) { e.stopPropagation(); });
+  layoutOpts.forEach(function(opt) {
+    opt.addEventListener('click', function() {
+      var l = opt.dataset.layout; if (!l) return;
       _layout = l; layoutLabel.textContent = LAYOUT_LABELS[l] || l;
-      layoutOpts.forEach(o => o.classList.toggle('active', o.dataset.layout === l));
+      layoutOpts.forEach(function(o) { o.classList.toggle('active', o.dataset.layout === l); });
       layoutMenu.classList.remove('open'); layoutBtn.classList.remove('open');
       if (_rendered) { _rendered = false; tryRender(); }
     });
@@ -355,11 +359,11 @@ function initConceptMapTool(paneEl, sidebarEl) {
 
   function fitAll() {
     if (!_liveRects.size) return;
-    let minX=Infinity, minY=Infinity, maxX=-Infinity, maxY=-Infinity;
-    _liveRects.forEach(r => { minX=Math.min(minX,r.x); minY=Math.min(minY,r.y); maxX=Math.max(maxX,r.x+(r.w||CARD_W)); maxY=Math.max(maxY,r.y+(r.h||80)); });
+    var minX=Infinity, minY=Infinity, maxX=-Infinity, maxY=-Infinity;
+    _liveRects.forEach(function(r) { minX=Math.min(minX,r.x); minY=Math.min(minY,r.y); maxX=Math.max(maxX,r.x+(r.w||CARD_W)); maxY=Math.max(maxY,r.y+(r.h||80)); });
     if (!isFinite(minX)) return;
-    const W=canvas.clientWidth||400, H=canvas.clientHeight||400, pad=32;
-    const scaleX=(W-pad*2)/Math.max(maxX-minX,1), scaleY=(H-pad*2)/Math.max(maxY-minY,1);
+    var W=canvas.clientWidth||400, H=canvas.clientHeight||400, pad=32;
+    var scaleX=(W-pad*2)/Math.max(maxX-minX,1), scaleY=(H-pad*2)/Math.max(maxY-minY,1);
     _zoom=Math.min(scaleX,scaleY,2.5);
     _panX=pad-minX*_zoom+(W-pad*2-(maxX-minX)*_zoom)/2;
     _panY=pad-minY*_zoom+(H-pad*2-(maxY-minY)*_zoom)/2;
@@ -367,28 +371,28 @@ function initConceptMapTool(paneEl, sidebarEl) {
   }
   fitBtn.addEventListener('click', fitAll);
 
-  let _panning=false, _panSX=0, _panSY=0, _panBX=0, _panBY=0;
+  var _panning=false, _panSX=0, _panSY=0, _panBX=0, _panBY=0;
 
-  canvas.addEventListener('mousedown', ev => {
+  canvas.addEventListener('mousedown', function(ev) {
     if (ev.button !== 2) return;
     _panning=true; _panSX=ev.clientX; _panSY=ev.clientY; _panBX=_panX; _panBY=_panY;
     canvas.classList.add('pp-cmap-panning'); ev.preventDefault();
   });
-  document.addEventListener('mousemove', ev => {
+  document.addEventListener('mousemove', function(ev) {
     if (!_panning) return;
     _panX=_panBX+(ev.clientX-_panSX); _panY=_panBY+(ev.clientY-_panSY); applyTransform();
   });
-  document.addEventListener('mouseup', ev => {
+  document.addEventListener('mouseup', function(ev) {
     if (ev.button !== 2 || !_panning) return;
     _panning=false; canvas.classList.remove('pp-cmap-panning');
   });
-  canvas.addEventListener('contextmenu', ev => ev.preventDefault());
+  canvas.addEventListener('contextmenu', function(ev) { ev.preventDefault(); });
 
-  canvas.addEventListener('wheel', ev => {
+  canvas.addEventListener('wheel', function(ev) {
     ev.preventDefault();
-    const rect=canvas.getBoundingClientRect(), mx=ev.clientX-rect.left, my=ev.clientY-rect.top;
+    var rect=canvas.getBoundingClientRect(), mx=ev.clientX-rect.left, my=ev.clientY-rect.top;
     if (ev.ctrlKey || (Math.abs(ev.deltaY) >= 50 && Math.abs(ev.deltaX) < 50)) {
-      const dz=ev.deltaY>0?0.94:1/0.94, nz=Math.max(0.15,Math.min(4,_zoom*dz));
+      var dz=ev.deltaY>0?0.94:1/0.94, nz=Math.max(0.15,Math.min(4,_zoom*dz));
       _panX=mx-(mx-_panX)*nz/_zoom; _panY=my-(my-_panY)*nz/_zoom; _zoom=nz;
     } else {
       _panX-=ev.deltaX; _panY-=ev.deltaY;
@@ -396,19 +400,18 @@ function initConceptMapTool(paneEl, sidebarEl) {
     applyTransform();
   }, {passive:false});
 
-  const _pointers = new Map();
-  let _cardDrag   = null;
-  let _pinchState = null;
+  var _pointers = new Map();
+  var _cardDrag   = null;
+  var _pinchState = null;
 
   canvas.style.touchAction = 'none';
 
-  canvas.addEventListener('pointerdown', ev => {
+  canvas.addEventListener('pointerdown', function(ev) {
     if (ev.target.closest('.pp-cmap-card')) return;
     canvas.setPointerCapture(ev.pointerId);
     _pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
-
     if (_pointers.size === 2) {
-      const pts = [..._pointers.values()];
+      var pts = Array.from(_pointers.values());
       _pinchState = {
         midX: (pts[0].x + pts[1].x) / 2, midY: (pts[0].y + pts[1].y) / 2,
         dist: Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y),
@@ -419,11 +422,10 @@ function initConceptMapTool(paneEl, sidebarEl) {
     }
   });
 
-  canvas.addEventListener('pointermove', ev => {
+  canvas.addEventListener('pointermove', function(ev) {
     if (!_pointers.has(ev.pointerId)) return;
-    const prev = _pointers.get(ev.pointerId);
+    var prev = _pointers.get(ev.pointerId);
     _pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
-
     if (_pointers.size === 1 && !_pinchState) {
       ev.preventDefault();
       _panX += ev.clientX - prev.x;
@@ -431,20 +433,19 @@ function initConceptMapTool(paneEl, sidebarEl) {
       applyTransform();
       return;
     }
-
     if (_pinchState && _pointers.size >= 2) {
       ev.preventDefault();
-      const pts     = [..._pointers.values()];
-      const newMidX = (pts[0].x + pts[1].x) / 2;
-      const newMidY = (pts[0].y + pts[1].y) / 2;
-      const newDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
-      const rect    = canvas.getBoundingClientRect();
-      const cmx     = newMidX - rect.left;
-      const cmy     = newMidY - rect.top;
-      const sf      = newDist / _pinchState.dist;
-      const nz      = Math.max(0.15, Math.min(4, _pinchState.zoom * sf));
-      const origCmx = _pinchState.midX - rect.left;
-      const origCmy = _pinchState.midY - rect.top;
+      var pts     = Array.from(_pointers.values());
+      var newMidX = (pts[0].x + pts[1].x) / 2;
+      var newMidY = (pts[0].y + pts[1].y) / 2;
+      var newDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+      var rect    = canvas.getBoundingClientRect();
+      var cmx     = newMidX - rect.left;
+      var cmy     = newMidY - rect.top;
+      var sf      = newDist / _pinchState.dist;
+      var nz      = Math.max(0.15, Math.min(4, _pinchState.zoom * sf));
+      var origCmx = _pinchState.midX - rect.left;
+      var origCmy = _pinchState.midY - rect.top;
       _zoom = nz;
       _panX = cmx - (origCmx - _pinchState.panX) * nz / _pinchState.zoom + (newMidX - _pinchState.midX);
       _panY = cmy - (origCmy - _pinchState.panY) * nz / _pinchState.zoom + (newMidY - _pinchState.midY);
@@ -464,174 +465,173 @@ function initConceptMapTool(paneEl, sidebarEl) {
     el.dataset.cid = String(cid);
     el.style.touchAction = 'none';
 
-    el.addEventListener('pointerdown', ev => {
+    el.addEventListener('pointerdown', function(ev) {
       if (ev.button !== undefined && ev.button !== 0) return;
       ev.stopPropagation();
       el.setPointerCapture(ev.pointerId);
-      const r = _liveRects.get(cid) || { x: 0, y: 0 };
-      _cardDrag = { el, cid, pointerId: ev.pointerId, ox: ev.clientX, oy: ev.clientY, sx: r.x, sy: r.y };
+      var r = _liveRects.get(cid) || { x: 0, y: 0 };
+      _cardDrag = { el: el, cid: cid, pointerId: ev.pointerId, ox: ev.clientX, oy: ev.clientY, sx: r.x, sy: r.y };
       el.style.zIndex = String(++_topZ);
       ev.preventDefault();
     });
 
-    el.addEventListener('pointermove', ev => {
+    el.addEventListener('pointermove', function(ev) {
       if (!_cardDrag || ev.pointerId !== _cardDrag.pointerId) return;
       ev.preventDefault();
-      const dx = (ev.clientX - _cardDrag.ox) / _zoom;
-      const dy = (ev.clientY - _cardDrag.oy) / _zoom;
-      const nx = _cardDrag.sx + dx;
-      const ny = _cardDrag.sy + dy;
-      const r  = _liveRects.get(cid) || { w: CARD_W, h: 80 };
+      var dx = (ev.clientX - _cardDrag.ox) / _zoom;
+      var dy = (ev.clientY - _cardDrag.oy) / _zoom;
+      var nx = _cardDrag.sx + dx;
+      var ny = _cardDrag.sy + dy;
+      var r  = _liveRects.get(cid) || { w: CARD_W, h: 80 };
       el.style.left = nx + 'px';
       el.style.top  = ny + 'px';
       _liveRects.set(cid, { x: nx, y: ny, w: r.w, h: r.h });
       redrawConnectors();
     });
 
-    el.addEventListener('pointerup',     ev => { if (_cardDrag && ev.pointerId === _cardDrag.pointerId) _cardDrag = null; });
-    el.addEventListener('pointercancel', ev => { if (_cardDrag && ev.pointerId === _cardDrag.pointerId) _cardDrag = null; });
+    el.addEventListener('pointerup',     function(ev) { if (_cardDrag && ev.pointerId === _cardDrag.pointerId) _cardDrag = null; });
+    el.addEventListener('pointercancel', function(ev) { if (_cardDrag && ev.pointerId === _cardDrag.pointerId) _cardDrag = null; });
   }
 
   function cosineSim(a, b) {
     if (!a||!b||a.length!==b.length) return 0;
-    let dot=0, na=0, nb=0;
-    for (let i=0;i<a.length;i++) { dot+=a[i]*b[i]; na+=a[i]*a[i]; nb+=b[i]*b[i]; }
+    var dot=0, na=0, nb=0;
+    for (var i=0;i<a.length;i++) { dot+=a[i]*b[i]; na+=a[i]*a[i]; nb+=b[i]*b[i]; }
     return (na&&nb) ? Math.max(0,Math.min(1,dot/(Math.sqrt(na)*Math.sqrt(nb)))) : 0;
   }
 
   function avgVec(vecs) {
-    const valid=vecs.filter(Boolean); if (!valid.length) return null;
-    const dim=valid[0].length, sum=new Float32Array(dim);
-    valid.forEach(v=>v.forEach((x,i)=>{ sum[i]+=x; }));
-    return Array.from(sum).map(x=>x/valid.length);
+    var valid=vecs.filter(Boolean); if (!valid.length) return null;
+    var dim=valid[0].length, sum=new Float32Array(dim);
+    valid.forEach(function(v){ v.forEach(function(x,i){ sum[i]+=x; }); });
+    return Array.from(sum).map(function(x){ return x/valid.length; });
   }
 
   function sentenceSplit(text) {
-    return text.replace(/([.!?;])\s+/g,'$1\n').split('\n').map(s=>s.trim()).filter(s=>s.length>=CMAP_MIN_SPLIT_LENGTH);
+    return text.replace(/([.!?;])\s+/g,'$1\n').split('\n').map(function(s){ return s.trim(); }).filter(function(s){ return s.length>=CMAP_MIN_SPLIT_LENGTH; });
   }
 
   async function maybeSplitRow(row) {
-    const cells=row.row?.cells||row.cells||[], cats=row.row?.cats?row.row.cats.filter(c=>c.trim()):[], catStr=cats.join(' \u00b7 ')||'Cell';
-    let bestText='', bestIdx=0;
-    cells.forEach((c,i)=>{ if(c.trim().length>bestText.length){ bestText=c.trim(); bestIdx=i; } });
+    var cells=row.row&&row.row.cells?row.row.cells:(row.cells||[]);
+    var cats=row.row&&row.row.cats?row.row.cats.filter(function(c){ return c.trim(); }):[];
+    var catStr=cats.join(' \u00b7 ')||'Cell';
+    var bestText='', bestIdx=0;
+    cells.forEach(function(c,i){ if(c.trim().length>bestText.length){ bestText=c.trim(); bestIdx=i; } });
     if (bestText.length<CMAP_MIN_SPLIT_LENGTH*2) return [row];
-    const segments=sentenceSplit(bestText); if (segments.length<=1) return [row];
-    let segVecs;
-    try { segVecs=await Promise.all(segments.map(s=>window.EmbeddingUtils.getCachedEmbedding(s))); } catch(e){ return [row]; }
-    const valid=segments.map((s,i)=>({text:s,vec:segVecs[i]})).filter(x=>x.vec&&x.vec.length);
+    var segments=sentenceSplit(bestText); if (segments.length<=1) return [row];
+    var segVecs;
+    try { segVecs=await Promise.all(segments.map(function(s){ return window.EmbeddingUtils.getCachedEmbedding(s); })); } catch(e){ return [row]; }
+    var valid=segments.map(function(s,i){ return {text:s,vec:segVecs[i]}; }).filter(function(x){ return x.vec&&x.vec.length; });
     if (valid.length<=1) return [row];
-    const n=valid.length;
-    const sim=Array.from({length:n},(_,i)=>Array.from({length:n},(_,j)=>i===j?1:cosineSim(valid[i].vec,valid[j].vec)));
-    const groupOf=new Array(n).fill(-1); let numGroups=0;
-    for (let i=0;i<n;i++) {
-      if (groupOf[i]!==-1) continue; const g=numGroups++; groupOf[i]=g;
-      for (let j=i+1;j<n;j++) { if (groupOf[j]!==-1) continue; let linked=false; for (let k=0;k<j;k++) { if (groupOf[k]===g&&sim[k][j]>=_threshold){linked=true;break;} } if (linked) groupOf[j]=g; }
+    var n=valid.length;
+    var sim=Array.from({length:n},function(_,i){ return Array.from({length:n},function(_,j){ return i===j?1:cosineSim(valid[i].vec,valid[j].vec); }); });
+    var groupOf=new Array(n).fill(-1); var numGroups=0;
+    for (var i=0;i<n;i++) {
+      if (groupOf[i]!==-1) continue; var g=numGroups++; groupOf[i]=g;
+      for (var j=i+1;j<n;j++) { if (groupOf[j]!==-1) continue; var linked=false; for (var k=0;k<j;k++) { if (groupOf[k]===g&&sim[k][j]>=_threshold){linked=true;break;} } if (linked) groupOf[j]=g; }
     }
     if (numGroups<=1) return [row];
-    const t=numGroups, groups=Array.from({length:t},()=>[]);
-    valid.forEach((seg,i)=>groups[groupOf[i]].push(seg));
-    return groups.map((segs,ni)=>({ tabIdx:row.tabIdx, rowIdx:row.rowIdx, headers:row.headers||[], title:row.title||'', kws:row.kws||new Set(), _splitFrom:catStr, _splitN:ni+1, _splitT:t, vec:avgVec(segs.map(s=>s.vec)), row:{cells:cells.map((c,ci)=>ci===bestIdx?segs.map(s=>s.text).join(' '):''), cats} }));
+    var t=numGroups, groups=Array.from({length:t},function(){ return []; });
+    valid.forEach(function(seg,i){ groups[groupOf[i]].push(seg); });
+    return groups.map(function(segs,ni){ return { tabIdx:row.tabIdx, rowIdx:row.rowIdx, headers:row.headers||[], title:row.title||'', kws:row.kws||new Set(), _splitFrom:catStr, _splitN:ni+1, _splitT:t, vec:avgVec(segs.map(function(s){ return s.vec; })), row:{cells:cells.map(function(c,ci){ return ci===bestIdx?segs.map(function(s){ return s.text; }).join(' '):''; }), cats:cats} }; });
   }
 
   async function splitAllRows(rows) {
-    const result=[];
-    for (const row of rows) { const parts=await maybeSplitRow(row); parts.forEach(r=>result.push(r)); }
+    var result=[];
+    for (var i=0; i<rows.length; i++) { var parts=await maybeSplitRow(rows[i]); parts.forEach(function(r){ result.push(r); }); }
     return result;
   }
 
   function buildHierarchy(rows) {
-    const n=rows.length; if (n<2) return null;
+    var n=rows.length; if (n<2) return null;
 
-    const scores=new Float32Array(n);
-    for (let i=0;i<n;i++) { let sum=0; for (let j=0;j<n;j++) { if (i!==j) sum+=cosineSim(rows[i].vec,rows[j].vec); } scores[i]=sum/(n-1); }
+    var scores=new Float32Array(n);
+    for (var i=0;i<n;i++) { var sum=0; for (var j=0;j<n;j++) { if (i!==j) sum+=cosineSim(rows[i].vec,rows[j].vec); } scores[i]=sum/(n-1); }
 
-    const rankOrder=Array.from({length:n},(_,i)=>i).sort((a,b)=>scores[b]-scores[a]);
-    const levels=new Int32Array(n);
-    rankOrder.forEach((ri,rank)=>{ levels[ri]=Math.max(1,Math.min(_depth,Math.floor(rank*_depth/n)+1)); });
+    var rankOrder=Array.from({length:n},function(_,i){ return i; }).sort(function(a,b){ return scores[b]-scores[a]; });
+    var levels=new Int32Array(n);
+    rankOrder.forEach(function(ri,rank){ levels[ri]=Math.max(1,Math.min(_depth,Math.floor(rank*_depth/n)+1)); });
 
-    const parentsOf    = new Map();
-    const parentSimsOf = new Map();
+    var parentsOf    = new Map();
+    var parentSimsOf = new Map();
 
-    for (let i=0;i<n;i++) {
+    for (var i=0;i<n;i++) {
       parentsOf.set(i,[]); parentSimsOf.set(i,[]);
       if (levels[i]===1) continue;
-      const candidates=[];
-      for (let j=0;j<n;j++) {
+      var candidates=[];
+      for (var j=0;j<n;j++) {
         if (j===i||levels[j]!==levels[i]-1) continue;
-        const s=cosineSim(rows[i].vec,rows[j].vec);
-        if (s>=_threshold) candidates.push({j,s});
+        var s=cosineSim(rows[i].vec,rows[j].vec);
+        if (s>=_threshold) candidates.push({j:j,s:s});
       }
-      candidates.sort((a,b)=>b.s-a.s);
-      const kept=candidates.slice(0,_maxParents);
-      parentsOf.set(i,kept.map(c=>c.j));
-      parentSimsOf.set(i,kept.map(c=>c.s));
+      candidates.sort(function(a,b){ return b.s-a.s; });
+      var kept=candidates.slice(0,_maxParents);
+      parentsOf.set(i,kept.map(function(c){ return c.j; }));
+      parentSimsOf.set(i,kept.map(function(c){ return c.s; }));
     }
 
-    const relaxed=_threshold*ORPHAN_RECOVERY_THRESHOLD;
-    for (let i=0;i<n;i++) {
+    var relaxed=_threshold*ORPHAN_RECOVERY_THRESHOLD;
+    for (var i=0;i<n;i++) {
       if (levels[i]<=1||parentsOf.get(i).length>0) continue;
-      let bestJ=-1, bestSim=relaxed;
-      for (let j=0;j<n;j++) {
+      var bestJ=-1, bestSim=relaxed;
+      for (var j=0;j<n;j++) {
         if (j===i||levels[j]>=levels[i]) continue;
-        const s=cosineSim(rows[i].vec,rows[j].vec); if (s>bestSim){ bestSim=s; bestJ=j; }
+        var s=cosineSim(rows[i].vec,rows[j].vec); if (s>bestSim){ bestSim=s; bestJ=j; }
       }
       if (bestJ!==-1) { levels[i]=levels[bestJ]+1; parentsOf.set(i,[bestJ]); parentSimsOf.set(i,[bestSim]); }
       else levels[i]=1;
     }
 
-    const childrenOf=Array.from({length:n},()=>[]);
-    for (let i=0;i<n;i++) { parentsOf.get(i).forEach(p=>{ if(!childrenOf[p].includes(i)) childrenOf[p].push(i); }); }
+    var childrenOf=Array.from({length:n},function(){ return []; });
+    for (var i=0;i<n;i++) { parentsOf.get(i).forEach(function(p){ if(!childrenOf[p].includes(i)) childrenOf[p].push(i); }); }
 
-    const simToChildren=new Float32Array(n);
-    for (let i=0;i<n;i++) { if (!childrenOf[i].length) continue; let sum=0; childrenOf[i].forEach(c=>{sum+=cosineSim(rows[i].vec,rows[c].vec);}); simToChildren[i]=sum/childrenOf[i].length; }
+    var simToChildren=new Float32Array(n);
+    for (var i=0;i<n;i++) { if (!childrenOf[i].length) continue; var sum=0; childrenOf[i].forEach(function(c){ sum+=cosineSim(rows[i].vec,rows[c].vec); }); simToChildren[i]=sum/childrenOf[i].length; }
 
-    const simToParents=new Float32Array(n);
-    for (let i=0;i<n;i++) { const pars=parentsOf.get(i)||[]; if (!pars.length) continue; let sum=0; pars.forEach(p=>{sum+=cosineSim(rows[i].vec,rows[p].vec);}); simToParents[i]=sum/pars.length; }
+    var simToParents=new Float32Array(n);
+    for (var i=0;i<n;i++) { var pars=parentsOf.get(i)||[]; if (!pars.length) continue; var sum=0; pars.forEach(function(p){ sum+=cosineSim(rows[i].vec,rows[p].vec); }); simToParents[i]=sum/pars.length; }
 
-    const absorbedInto=new Int32Array(n).fill(-1), mergeExtras=new Map();
-    const mkKey=i=>levels[i]+':p'+parentsOf.get(i).slice().sort((a,b)=>a-b).join(',')+':c'+childrenOf[i].slice().sort((a,b)=>a-b).join(',');
-    const seenKeys=new Map();
-    for (let i=0;i<n;i++) {
+    var absorbedInto=new Int32Array(n).fill(-1), mergeExtras=new Map();
+    var mkKey=function(i){ return levels[i]+':p'+parentsOf.get(i).slice().sort(function(a,b){ return a-b; }).join(',')+':c'+childrenOf[i].slice().sort(function(a,b){ return a-b; }).join(','); };
+    var seenKeys=new Map();
+    for (var i=0;i<n;i++) {
       if (!childrenOf[i].length) continue;
-      const k=mkKey(i);
-      if (seenKeys.has(k)) { const primary=seenKeys.get(k); absorbedInto[i]=primary; if (!mergeExtras.has(primary)) mergeExtras.set(primary,[]); mergeExtras.get(primary).push(i); }
+      var k=mkKey(i);
+      if (seenKeys.has(k)) { var primary=seenKeys.get(k); absorbedInto[i]=primary; if (!mergeExtras.has(primary)) mergeExtras.set(primary,[]); mergeExtras.get(primary).push(i); }
       else seenKeys.set(k,i);
     }
 
-    return { rows, n, levels, parentsOf, parentSimsOf, childrenOf, simToChildren, simToParents, absorbedInto, mergeExtras };
+    return { rows:rows, n:n, levels:levels, parentsOf:parentsOf, parentSimsOf:parentSimsOf, childrenOf:childrenOf, simToChildren:simToChildren, simToParents:simToParents, absorbedInto:absorbedInto, mergeExtras:mergeExtras };
   }
 
-  let _connSvg=null, _connEdges=[];
+  var _connSvg=null, _connEdges=[];
 
   function redrawConnectors() {
     if (!_connSvg) return;
-    const ns='http://www.w3.org/2000/svg';
+    var ns='http://www.w3.org/2000/svg';
     _connSvg.innerHTML='';
-    _connEdges.forEach(({fromId,toId,color,depth})=>{
-      const ra=_liveRects.get(fromId), rb=_liveRects.get(toId); if (!ra||!rb) return;
-      function pts(r){ const{x,y,w,h}=r; return [{x:x+w*.25,y},{x:x+w*.5,y},{x:x+w*.75,y},{x:x+w*.25,y:y+h},{x:x+w*.5,y:y+h},{x:x+w*.75,y:y+h},{x,y:y+h*.33},{x,y:y+h*.67},{x:x+w,y:y+h*.33},{x:x+w,y:y+h*.67}]; }
-      const pA=pts(ra), pB=pts(rb); let best=null, bd=Infinity;
-      pA.forEach(a=>pB.forEach(b=>{ const d=Math.hypot(a.x-b.x,a.y-b.y); if(d<bd){bd=d;best={a,b};} }));
+    _connEdges.forEach(function(edge) {
+      var fromId=edge.fromId, toId=edge.toId, color=edge.color, depth=edge.depth;
+      var ra=_liveRects.get(fromId), rb=_liveRects.get(toId); if (!ra||!rb) return;
+      function pts(r){ var x=r.x,y=r.y,w=r.w,h=r.h; return [{x:x+w*.25,y:y},{x:x+w*.5,y:y},{x:x+w*.75,y:y},{x:x+w*.25,y:y+h},{x:x+w*.5,y:y+h},{x:x+w*.75,y:y+h},{x:x,y:y+h*.33},{x:x,y:y+h*.67},{x:x+w,y:y+h*.33},{x:x+w,y:y+h*.67}]; }
+      var pA=pts(ra), pB=pts(rb); var best=null, bd=Infinity;
+      pA.forEach(function(a){ pB.forEach(function(b){ var d=Math.hypot(a.x-b.x,a.y-b.y); if(d<bd){bd=d;best={a:a,b:b};} }); });
       if (!best) return;
-      const{a,b}=best, dist=Math.hypot(b.x-a.x,b.y-a.y), off=Math.min(dist*.4,80);
-      function tang(pt,r){ const t=3; if(Math.abs(pt.y-r.y)<t) return{dx:0,dy:-1}; if(Math.abs(pt.y-(r.y+r.h))<t) return{dx:0,dy:1}; if(Math.abs(pt.x-r.x)<t) return{dx:-1,dy:0}; if(Math.abs(pt.x-(r.x+r.w))<t) return{dx:1,dy:0}; return{dx:0,dy:1}; }
-      const tA=tang(a,ra), tB=tang(b,rb);
-      const path=document.createElementNS(ns,'path');
-      path.setAttribute('d',`M${a.x},${a.y} C${a.x+tA.dx*off},${a.y+tA.dy*off} ${b.x+tB.dx*off},${b.y+tB.dy*off} ${b.x},${b.y}`);
+      var a=best.a, b=best.b, dist=Math.hypot(b.x-a.x,b.y-a.y), off=Math.min(dist*.4,80);
+      function tang(pt,r){ var t=3; if(Math.abs(pt.y-r.y)<t) return{dx:0,dy:-1}; if(Math.abs(pt.y-(r.y+r.h))<t) return{dx:0,dy:1}; if(Math.abs(pt.x-r.x)<t) return{dx:-1,dy:0}; if(Math.abs(pt.x-(r.x+r.w))<t) return{dx:1,dy:0}; return{dx:0,dy:1}; }
+      var tA=tang(a,ra), tB=tang(b,rb);
+      var path=document.createElementNS(ns,'path');
+      path.setAttribute('d','M'+a.x+','+a.y+' C'+(a.x+tA.dx*off)+','+(a.y+tA.dy*off)+' '+(b.x+tB.dx*off)+','+(b.y+tB.dy*off)+' '+b.x+','+b.y);
       path.setAttribute('fill','none'); path.setAttribute('stroke',color);
       path.setAttribute('stroke-width',depth===0?'2.5':'2');
       path.setAttribute('stroke-opacity',depth===0?'1':'0.9');
       path.setAttribute('stroke-dasharray',depth===0?'none':'5 3');
       _connSvg.appendChild(path);
-      
-      // Dot at child end (arrow head replacement)
-      const dotChild=document.createElementNS(ns,'circle');
+      var dotChild=document.createElementNS(ns,'circle');
       dotChild.setAttribute('cx',String(b.x)); dotChild.setAttribute('cy',String(b.y)); dotChild.setAttribute('r','3.5');
       dotChild.setAttribute('fill',color); dotChild.setAttribute('opacity','1');
       _connSvg.appendChild(dotChild);
-      
-      // NEW: Dot at parent end (connection point on parent card)
-      const dotParent=document.createElementNS(ns,'circle');
+      var dotParent=document.createElementNS(ns,'circle');
       dotParent.setAttribute('cx',String(a.x)); dotParent.setAttribute('cy',String(a.y)); dotParent.setAttribute('r','4');
       dotParent.setAttribute('fill',color); dotParent.setAttribute('opacity','0.9');
       dotParent.setAttribute('stroke','#ffffff'); dotParent.setAttribute('stroke-width','1.5');
@@ -639,45 +639,35 @@ function initConceptMapTool(paneEl, sidebarEl) {
     });
   }
 
-  // ── Color by hierarchy level — uses getPalette() like clusters ────────────
-  // getPalette() returns the correct palette for current light/dark mode.
-  // This ensures concept map colors match clusters tool exactly.
-function depthColor(level) {
-  const idx = level - 1;
-  const palette = (typeof getPalette === 'function') ? getPalette() : window.PP_PALETTE || [];
-  const paletteIdx = [0, 1, 2, 3, 4,5,6,7,0][Math.min(idx, 7)];
-  const theme = palette[paletteIdx] || { accent: '#888888', bg: '#f7f7f8', label: '#ffffff' };
+  // ── Color by hierarchy level ──────────────────────────────
+  // paletteIdx maps level (1-based) to palette slot.
+  // Edit this array to change which theme each level uses.
+  // e.g. [0,1,2,3,4,5,6,7] uses all 8 themes in order.
+  function depthColor(level) {
+    var idx = level - 1;
+    var palette = (typeof getPalette === 'function') ? getPalette() : (window.PP_PALETTE || []);
+    var paletteIdx = [0, 1, 2, 3, 4, 0][Math.min(idx, 5)];
+    var theme = palette[paletteIdx] || { accent: '#888888', bg: '#f7f7f8', label: '#ffffff' };
 
-  function getLuminance(hex) { ... }
-
-  const bgLum = getLuminance(theme.accent);
-  const label = bgLum > 0.5 ? '#1a1a1a' : '#ffffff';
-  return { accent: theme.accent || '#888888', bg: theme.bg || '#f7f7f8', label };
-}
-    
-    // Get the palette (light or dark) from utils-shared.js
-    const palette = (typeof getPalette === 'function') ? getPalette() : window.PP_PALETTE || [];
-
-    
-    // Calculate text color based on background luminance for proper contrast
+    // Compute contrast text color from accent luminance (no array destructuring)
     function getLuminance(hex) {
-      const rgb = parseInt(hex.replace('#', ''), 16);
-      const r = ((rgb >> 16) & 0xff) / 255;
-      const g = ((rgb >> 8) & 0xff) / 255;
-      const b = (rgb & 0xff) / 255;
-      const [rs, gs, bs] = [r, g, b].map(c => 
-        c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4)
-      );
-      return 0.2126 * rs + 0.7152 * gs + 0.0722 * bs;
+      var c = String(hex).replace('#', '');
+      if (c.length === 3) c = c[0]+c[0]+c[1]+c[1]+c[2]+c[2];
+      var rgb = parseInt(c, 16);
+      var r = ((rgb >> 16) & 0xff) / 255;
+      var g = ((rgb >> 8)  & 0xff) / 255;
+      var b = (rgb & 0xff) / 255;
+      function toLinear(v) { return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }
+      return 0.2126 * toLinear(r) + 0.7152 * toLinear(g) + 0.0722 * toLinear(b);
     }
-    
-    const bgLum = getLuminance(theme.accent);  // Use accent since that's the card background
-    const label = bgLum > 0.5 ? '#1a1a1a' : '#ffffff';
-    
-    return { 
-      accent: theme.accent || '#888888', 
-      bg: theme.bg || '#f7f7f8',
-      label 
+
+    var lum = getLuminance(theme.accent);
+    var label = lum > 0.5 ? '#1a1a1a' : '#ffffff';
+
+    return {
+      accent: theme.accent || '#888888',
+      bg:     theme.bg     || '#f7f7f8',
+      label:  label
     };
   }
 
@@ -686,46 +676,48 @@ function depthColor(level) {
     _panX=0; _panY=0; _zoom=1; applyTransform();
     if (!hier) { emptyEl.style.display='flex'; return; }
 
-    const ns='http://www.w3.org/2000/svg';
+    var ns='http://www.w3.org/2000/svg';
     _connSvg=document.createElementNS(ns,'svg');
     _connSvg.style.cssText='position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:1';
     world.appendChild(_connSvg);
 
-    const{rows,n,levels,parentsOf,childrenOf,simToChildren,simToParents,absorbedInto,mergeExtras}=hier;
-    const cardEls=new Map();
+    var rows=hier.rows, n=hier.n, levels=hier.levels, parentsOf=hier.parentsOf,
+        childrenOf=hier.childrenOf, simToChildren=hier.simToChildren,
+        simToParents=hier.simToParents, absorbedInto=hier.absorbedInto, mergeExtras=hier.mergeExtras;
+    var cardEls=new Map();
 
-    for (let i=0;i<n;i++) {
+    for (var i=0;i<n;i++) {
       if (absorbedInto[i]!==-1) continue;
-      const level=levels[i];
-      // depthColor now reads from live CSS custom properties
-      const { accent, label: lc, bg } = depthColor(level);
-      const extras=mergeExtras.get(i)||[], allRows=[i,...extras];
+      var level=levels[i];
+      var dc = depthColor(level);
+      var accent=dc.accent, lc=dc.label, bg=dc.bg;
+      var extras=mergeExtras.get(i)||[], allRows=[i].concat(extras);
 
-      const card=document.createElement('div');
+      var card=document.createElement('div');
       card.className='pp-cmap-card';
-      card.style.cssText=`width:${CARD_W}px;position:absolute;z-index:${++_topZ}`;
+      card.style.cssText='width:'+CARD_W+'px;position:absolute;z-index:'+(++_topZ);
       card.style.setProperty('--ppc-border', accent);
-      card.style.setProperty('--ppc-bg',     accent);  // Use accent (saturated color) like clusters tool
+      card.style.setProperty('--ppc-bg',     accent);
       card.style.setProperty('--ppc-on',     lc);
 
-      const primaryRow=rows[i], isSplit=!!primaryRow._splitFrom;
-      const numParents=(parentsOf.get(i)||[]).length;
+      var primaryRow=rows[i], isSplit=!!primaryRow._splitFrom;
+      var numParents=(parentsOf.get(i)||[]).length;
 
-      const topRow=document.createElement('div');
+      var topRow=document.createElement('div');
       topRow.className='pp-cmap-card-top';
 
-      const catNumEl=document.createElement('div');
+      var catNumEl=document.createElement('div');
       catNumEl.className='pp-cmap-card-cat-num';
-      const allCats = primaryRow.row?.cats?.filter(c => c.trim()) || [];
-      const catChar = allCats.length ? allCats.join(' · ') : String(level);
+      var allCats = primaryRow.row&&primaryRow.row.cats ? primaryRow.row.cats.filter(function(c){ return c.trim(); }) : [];
+      var catChar = allCats.length ? allCats.join(' \u00b7 ') : String(level);
       catNumEl.textContent = catChar;
 
-      const levelBlock=document.createElement('div');
+      var levelBlock=document.createElement('div');
       levelBlock.className='pp-cmap-card-level-block';
-      const levelNum=document.createElement('div');
+      var levelNum=document.createElement('div');
       levelNum.className='pp-cmap-card-level-num';
       levelNum.textContent = isSplit ? (primaryRow._splitN+'/'+primaryRow._splitT) : String(level);
-      const levelLbl=document.createElement('div');
+      var levelLbl=document.createElement('div');
       levelLbl.className='pp-cmap-card-level-label';
       levelLbl.textContent = isSplit ? 'Split' : 'Level';
       levelBlock.appendChild(levelNum);
@@ -736,53 +728,54 @@ function depthColor(level) {
       card.appendChild(topRow);
 
       if (extras.length>0) {
-        const mg=document.createElement('div');
+        var mg=document.createElement('div');
         mg.className='pp-cmap-card-merged';
         mg.textContent='\u00d7'+allRows.length+' merged';
         card.appendChild(mg);
       }
 
-      const rule=document.createElement('div');
+      var rule=document.createElement('div');
       rule.className='pp-cmap-card-rule';
       card.appendChild(rule);
 
-      const body=document.createElement('div');
+      var body=document.createElement('div');
       body.className='pp-cmap-card-body';
-      allRows.forEach((ri,idx)=>{
-        if (idx>0) { const sep=document.createElement('div'); sep.className='pp-cmap-merge-sep'; body.appendChild(sep); }
-        const r=rows[ri], cells=r.row?.cells||r.cells||[], cats=r.row?.cats?r.row.cats.filter(c=>c.trim()):[];
-        const best=cells.reduce((b,c)=>c.trim().length>b.length?c.trim():b,'');
-        const parsed=typeof parseCitation==='function'?parseCitation(best):{body:best};
+      allRows.forEach(function(ri,idx){
+        if (idx>0) { var sep=document.createElement('div'); sep.className='pp-cmap-merge-sep'; body.appendChild(sep); }
+        var r=rows[ri], cells=r.row&&r.row.cells?r.row.cells:(r.cells||[]);
+        var cats=r.row&&r.row.cats?r.row.cats.filter(function(c){ return c.trim(); }):[];
+        var best=cells.reduce(function(b,c){ return c.trim().length>b.length?c.trim():b; },'');
+        var parsed=typeof parseCitation==='function'?parseCitation(best):{body:best};
         if (cats.length) {
-          const ce=document.createElement('div');
+          var ce=document.createElement('div');
           ce.className='pp-cmap-cell-cat';
           ce.textContent=cats.join(' \u00b7 ');
           body.appendChild(ce);
         }
-        const te=document.createElement('div');
+        var te=document.createElement('div');
         te.className='pp-cmap-cell-text';
         te.textContent=parsed.body;
         body.appendChild(te);
       });
       card.appendChild(body);
 
-      const hasChildren=childrenOf[i].length>0;
-      const hasParents=numParents>0;
+      var hasChildren=childrenOf[i].length>0;
+      var hasParents=numParents>0;
 
       if (hasChildren||hasParents) {
-        const footer=document.createElement('div');
+        var footer=document.createElement('div');
         footer.className='pp-cmap-card-footer';
 
         function makeSimLine(arrow, sim, label) {
-          const pct=Math.round(sim*100);
-          const line=document.createElement('div');
+          var pct=Math.round(sim*100);
+          var line=document.createElement('div');
           line.className='pp-cmap-sim-line';
-          const pctEl=document.createElement('span');
+          var pctEl=document.createElement('span');
           pctEl.className='pp-cmap-sim-pct';
           pctEl.textContent=pct+'%';
           line.innerHTML='<span>'+arrow+'</span>';
           line.appendChild(pctEl);
-          const lblEl=document.createElement('span');
+          var lblEl=document.createElement('span');
           lblEl.textContent=' '+label;
           line.appendChild(lblEl);
           return line;
@@ -792,7 +785,7 @@ function depthColor(level) {
         if (hasChildren) footer.appendChild(makeSimLine('\u2193', simToChildren[i], 'to children'));
         card.appendChild(footer);
       } else {
-        const leaf=document.createElement('span');
+        var leaf=document.createElement('span');
         leaf.className='pp-cmap-leaf-badge';
         leaf.textContent='Terminal concept';
         card.appendChild(leaf);
@@ -800,49 +793,47 @@ function depthColor(level) {
 
       world.appendChild(card); cardEls.set(i,card); _liveRects.set(i,{x:0,y:0,w:CARD_W,h:80});
       makeDraggable(card,i);
-      if (window.ResizeObserver) { new ResizeObserver(()=>{ const r=_liveRects.get(i); if(r){r.h=card.offsetHeight;redrawConnectors();} }).observe(card); }
+      (function(cardEl, cardId) {
+        if (window.ResizeObserver) {
+          new ResizeObserver(function(){ var r=_liveRects.get(cardId); if(r){r.h=cardEl.offsetHeight;redrawConnectors();} }).observe(cardEl);
+        }
+      })(card, i);
     }
 
-    for (let i=0;i<n;i++) {
+    for (var i=0;i<n;i++) {
       if (absorbedInto[i]!==-1) continue;
-      (parentsOf.get(i)||[]).forEach(par=>{
-        const parPrimary=absorbedInto[par]!==-1?absorbedInto[par]:par;
+      (parentsOf.get(i)||[]).forEach(function(par){
+        var parPrimary=absorbedInto[par]!==-1?absorbedInto[par]:par;
         if (!cardEls.has(i)||!cardEls.has(parPrimary)) return;
-        const{accent}=depthColor(levels[parPrimary]);
-        _connEdges.push({fromId:parPrimary,toId:i,color:accent,depth:levels[parPrimary]-1});
+        var dc=depthColor(levels[parPrimary]);
+        _connEdges.push({fromId:parPrimary,toId:i,color:dc.accent,depth:levels[parPrimary]-1});
       });
     }
 
-    requestAnimationFrame(()=>{
-      const W=canvas.clientWidth||500, H=canvas.clientHeight||500;
-      const nodeIds=[]; cardEls.forEach((_,id)=>nodeIds.push(id));
-      const byLevel=new Map();
-      nodeIds.forEach(id=>{ const lv=levels[id]; if(!byLevel.has(lv)) byLevel.set(lv,[]); byLevel.get(lv).push(id); });
-      const maxLevel=Math.max(...byLevel.keys(),1);
+    requestAnimationFrame(function(){
+      var W=canvas.clientWidth||500, H=canvas.clientHeight||500;
+      var nodeIds=[]; cardEls.forEach(function(_,id){ nodeIds.push(id); });
+      var byLevel=new Map();
+      nodeIds.forEach(function(id){ var lv=levels[id]; if(!byLevel.has(lv)) byLevel.set(lv,[]); byLevel.get(lv).push(id); });
+      var maxLevel=Math.max.apply(null, Array.from(byLevel.keys()).concat([1]));
 
-      const primaryParentOf=new Map(), childrenOfPrimary=new Map();
-      nodeIds.forEach(id=>{ childrenOfPrimary.set(id,[]); });
-      _connEdges.forEach(({fromId,toId})=>{
-        if (!primaryParentOf.has(toId)) { primaryParentOf.set(toId,fromId); if(childrenOfPrimary.has(fromId)) childrenOfPrimary.get(fromId).push(toId); }
+      var primaryParentOf=new Map(), childrenOfPrimary=new Map();
+      nodeIds.forEach(function(id){ childrenOfPrimary.set(id,[]); });
+      _connEdges.forEach(function(e){
+        if (!primaryParentOf.has(e.toId)) { primaryParentOf.set(e.toId,e.fromId); if(childrenOfPrimary.has(e.fromId)) childrenOfPrimary.get(e.fromId).push(e.toId); }
       });
-      const roots=nodeIds.filter(id=>!primaryParentOf.has(id));
-      const cH=id=>{ const el=cardEls.get(id); return el?(el.offsetHeight||80):80; };
-      const GAP_X=MM_PAD+10, GAP_Y=MM_PAD+20;
+      var roots=nodeIds.filter(function(id){ return !primaryParentOf.has(id); });
+      var cH=function(id){ var el=cardEls.get(id); return el?(el.offsetHeight||80):80; };
+      var GAP_X=MM_PAD+10, GAP_Y=MM_PAD+20;
 
       function applyPositions(posMap) {
-        const ANIMATE_DURATION = 600;
-        
-        // Only instant-load on the VERY FIRST render ever
-        // All subsequent renders (sliders, rebuild, layout change) should animate
-        const isFirstEverRender = !_everRendered;
-        
+        var ANIMATE_DURATION = 600;
+        var isFirstEverRender = !_everRendered;
+
         if (isFirstEverRender) {
-          // Very first load: instant appearance at final positions
-          posMap.forEach((pos, id) => {
-            const el = cardEls.get(id);
+          posMap.forEach(function(pos, id) {
+            var el = cardEls.get(id);
             if (!el) return;
-            
-            // Place cards directly at their final positions
             el.style.left = pos.x + 'px';
             el.style.top = pos.y + 'px';
             el.style.opacity = '1';
@@ -850,65 +841,43 @@ function depthColor(level) {
             el.style.transition = 'none';
             _liveRects.set(id, { x: pos.x, y: pos.y, w: CARD_W, h: cH(id) });
           });
-          
-          // Draw connectors immediately
-          requestAnimationFrame(() => {
-            redrawConnectors();
-          });
-          
-          // Run collision detection after a short delay
-          setTimeout(() => {
-            for (let pass=0;pass<30;pass++) {
-              let moved=false;
-              _liveRects.forEach((ra,ka)=>{ _liveRects.forEach((rb,kb)=>{ if(ka===kb) return; if(ra.x<rb.x+rb.w+MM_PAD&&ra.x+ra.w+MM_PAD>rb.x&&ra.y<rb.y+rb.h+MM_PAD&&ra.y+ra.h+MM_PAD>rb.y){ const dR=rb.x+rb.w+MM_PAD-ra.x, dL=ra.x+ra.w+MM_PAD-rb.x, dD=rb.y+rb.h+MM_PAD-ra.y, dU=ra.y+ra.h+MM_PAD-rb.y; if(Math.min(dR,dL)<=Math.min(dD,dU)) ra.x+=dR<dL?dR:-dL; else ra.y+=dD<dU?dD:-dU; const el=cardEls.get(ka); if(el){el.style.left=ra.x+'px';el.style.top=ra.y+'px';} moved=true; } }); });
+          requestAnimationFrame(function() { redrawConnectors(); });
+          setTimeout(function() {
+            for (var pass=0;pass<30;pass++) {
+              var moved=false;
+              _liveRects.forEach(function(ra,ka){ _liveRects.forEach(function(rb,kb){ if(ka===kb) return; if(ra.x<rb.x+rb.w+MM_PAD&&ra.x+ra.w+MM_PAD>rb.x&&ra.y<rb.y+rb.h+MM_PAD&&ra.y+ra.h+MM_PAD>rb.y){ var dR=rb.x+rb.w+MM_PAD-ra.x, dL=ra.x+ra.w+MM_PAD-rb.x, dD=rb.y+rb.h+MM_PAD-ra.y, dU=ra.y+ra.h+MM_PAD-rb.y; if(Math.min(dR,dL)<=Math.min(dD,dU)) ra.x+=dR<dL?dR:-dL; else ra.y+=dD<dU?dD:-dU; var el=cardEls.get(ka); if(el){el.style.left=ra.x+'px';el.style.top=ra.y+'px';} moved=true; } }); });
               if (!moved) break;
             }
             redrawConnectors();
           }, 50);
-          
           _everRendered = true;
-          
         } else {
-          // Any subsequent render: smooth transition
-          
-          // First, apply collision detection to the TARGET positions (before animating)
-          // This ensures we animate to collision-free positions
-          const targetRects = new Map();
-          posMap.forEach((pos, id) => {
+          var targetRects = new Map();
+          posMap.forEach(function(pos, id) {
             targetRects.set(id, { x: pos.x, y: pos.y, w: CARD_W, h: cH(id) });
           });
-          
-          // Run collision detection on target positions
-          for (let pass=0;pass<30;pass++) {
-            let moved=false;
-            targetRects.forEach((ra,ka)=>{ targetRects.forEach((rb,kb)=>{ if(ka===kb) return; if(ra.x<rb.x+rb.w+MM_PAD&&ra.x+ra.w+MM_PAD>rb.x&&ra.y<rb.y+rb.h+MM_PAD&&ra.y+ra.h+MM_PAD>rb.y){ const dR=rb.x+rb.w+MM_PAD-ra.x, dL=ra.x+ra.w+MM_PAD-rb.x, dD=rb.y+rb.h+MM_PAD-ra.y, dU=ra.y+ra.h+MM_PAD-rb.y; if(Math.min(dR,dL)<=Math.min(dD,dU)) ra.x+=dR<dL?dR:-dL; else ra.y+=dD<dU?dD:-dU; moved=true; } }); });
+          for (var pass=0;pass<30;pass++) {
+            var moved=false;
+            targetRects.forEach(function(ra,ka){ targetRects.forEach(function(rb,kb){ if(ka===kb) return; if(ra.x<rb.x+rb.w+MM_PAD&&ra.x+ra.w+MM_PAD>rb.x&&ra.y<rb.y+rb.h+MM_PAD&&ra.y+ra.h+MM_PAD>rb.y){ var dR=rb.x+rb.w+MM_PAD-ra.x, dL=ra.x+ra.w+MM_PAD-rb.x, dD=rb.y+rb.h+MM_PAD-ra.y, dU=ra.y+ra.h+MM_PAD-rb.y; if(Math.min(dR,dL)<=Math.min(dD,dU)) ra.x+=dR<dL?dR:-dL; else ra.y+=dD<dU?dD:-dU; moved=true; } }); });
             if (!moved) break;
           }
-          
-          // Now animate to the collision-free target positions
-          targetRects.forEach((pos, id) => {
-            const el = cardEls.get(id);
+          targetRects.forEach(function(pos, id) {
+            var el = cardEls.get(id);
             if (!el) return;
-            
-            el.style.transition = `left ${ANIMATE_DURATION}ms cubic-bezier(0.4, 0, 0.2, 1), top ${ANIMATE_DURATION}ms cubic-bezier(0.4, 0, 0.2, 1)`;
+            el.style.transition = 'left '+ANIMATE_DURATION+'ms cubic-bezier(0.4,0,0.2,1), top '+ANIMATE_DURATION+'ms cubic-bezier(0.4,0,0.2,1)';
             el.style.left = pos.x + 'px';
             el.style.top = pos.y + 'px';
             _liveRects.set(id, { x: pos.x, y: pos.y, w: pos.w, h: pos.h });
           });
-          
-          // Animate connectors during transition
-          const startTime = performance.now();
+          var startTime = performance.now();
           function animateConnectors(currentTime) {
-            const elapsed = currentTime - startTime;
+            var elapsed = currentTime - startTime;
             if (elapsed < ANIMATE_DURATION) {
               redrawConnectors();
               requestAnimationFrame(animateConnectors);
             } else {
               redrawConnectors();
-              // Remove transition styles
-              cardEls.forEach(el => {
-                el.style.transition = '';
-              });
+              cardEls.forEach(function(el) { el.style.transition = ''; });
             }
           }
           requestAnimationFrame(animateConnectors);
@@ -916,34 +885,34 @@ function depthColor(level) {
       }
 
       function layoutRadial() {
-        const pos=new Map(), cx=W/2, cy=H/2;
-        byLevel.forEach((ids,lv)=>{ const R=maxLevel===1?0:(0.12+0.20*(lv-1))*Math.min(W,H); ids.forEach((id,idx)=>{ const h=cH(id); if(lv===1&&ids.length===1){pos.set(id,{x:cx-CARD_W/2,y:cy-h/2});return;} const a=(2*Math.PI*idx/ids.length)-Math.PI/2; pos.set(id,{x:cx+R*Math.cos(a)-CARD_W/2,y:cy+R*Math.sin(a)-h/2}); }); });
+        var pos=new Map(), cx=W/2, cy=H/2;
+        byLevel.forEach(function(ids,lv){ var R=maxLevel===1?0:(0.12+0.20*(lv-1))*Math.min(W,H); ids.forEach(function(id,idx){ var h=cH(id); if(lv===1&&ids.length===1){pos.set(id,{x:cx-CARD_W/2,y:cy-h/2});return;} var a=(2*Math.PI*idx/ids.length)-Math.PI/2; pos.set(id,{x:cx+R*Math.cos(a)-CARD_W/2,y:cy+R*Math.sin(a)-h/2}); }); });
         applyPositions(pos);
       }
-      function subtreeW(id){ const kids=childrenOfPrimary.get(id)||[]; if(!kids.length) return CARD_W; return kids.reduce((s,k)=>s+subtreeW(k),0)+GAP_X*(kids.length-1); }
+      function subtreeW(id){ var kids=childrenOfPrimary.get(id)||[]; if(!kids.length) return CARD_W; return kids.reduce(function(s,k){ return s+subtreeW(k); },0)+GAP_X*(kids.length-1); }
       function layoutTree(vertical) {
-        const pos=new Map();
-        function place(id,left,depth){ const kids=childrenOfPrimary.get(id)||[], myW=subtreeW(id), cx=left+myW/2, h=cH(id), rowY=depth*(90+GAP_Y); if(vertical) pos.set(id,{x:cx-CARD_W/2,y:rowY}); else pos.set(id,{x:rowY,y:cx-h/2}); let childLeft=left; kids.forEach(kid=>{place(kid,childLeft,depth+1);childLeft+=subtreeW(kid)+GAP_X;}); }
-        const totalW=roots.reduce((s,r)=>s+subtreeW(r),0)+GAP_X*(roots.length-1); let curX=W/2-totalW/2;
-        roots.forEach(r=>{place(r,curX,0);curX+=subtreeW(r)+GAP_X;});
+        var pos=new Map();
+        function place(id,left,depth){ var kids=childrenOfPrimary.get(id)||[], myW=subtreeW(id), cx=left+myW/2, h=cH(id), rowY=depth*(90+GAP_Y); if(vertical) pos.set(id,{x:cx-CARD_W/2,y:rowY}); else pos.set(id,{x:rowY,y:cx-h/2}); var childLeft=left; kids.forEach(function(kid){ place(kid,childLeft,depth+1); childLeft+=subtreeW(kid)+GAP_X; }); }
+        var totalW=roots.reduce(function(s,r){ return s+subtreeW(r); },0)+GAP_X*(roots.length-1); var curX=W/2-totalW/2;
+        roots.forEach(function(r){ place(r,curX,0); curX+=subtreeW(r)+GAP_X; });
         applyPositions(pos);
       }
       function layoutFlow(vertical) {
-        const pos=new Map();
-        byLevel.forEach((ids,lv)=>{ const layerH=Math.max(...ids.map(cH),80), totalW=ids.length*(CARD_W+GAP_X)-GAP_X, startX=W/2-totalW/2, rowY=(lv-1)*(layerH+GAP_Y*2); ids.forEach((id,idx)=>{ const h=cH(id); if(vertical) pos.set(id,{x:startX+idx*(CARD_W+GAP_X),y:rowY+(layerH-h)/2}); else pos.set(id,{x:rowY,y:startX+idx*(CARD_W+GAP_X)}); }); });
+        var pos=new Map();
+        byLevel.forEach(function(ids,lv){ var layerH=Math.max.apply(null,ids.map(cH).concat([80])), totalW=ids.length*(CARD_W+GAP_X)-GAP_X, startX=W/2-totalW/2, rowY=(lv-1)*(layerH+GAP_Y*2); ids.forEach(function(id,idx){ var h=cH(id); if(vertical) pos.set(id,{x:startX+idx*(CARD_W+GAP_X),y:rowY+(layerH-h)/2}); else pos.set(id,{x:rowY,y:startX+idx*(CARD_W+GAP_X)}); }); });
         applyPositions(pos);
       }
       function layoutOrganic() {
-        const px={}, py={};
-        nodeIds.forEach((id,i)=>{ const a=(2*Math.PI*i/nodeIds.length)-Math.PI/2, R=Math.min(W,H)*.35; px[id]=W/2+R*Math.cos(a); py[id]=H/2+R*Math.sin(a); });
-        const AREA=W*H, k=Math.sqrt(AREA/Math.max(nodeIds.length,1))*.9; let temp=Math.min(W,H)*.25;
-        for (let it=0;it<80;it++) {
-          const dx={}, dy={}; nodeIds.forEach(id=>{dx[id]=0;dy[id]=0;});
-          for (let i=0;i<nodeIds.length;i++) for (let j=i+1;j<nodeIds.length;j++) { const u=nodeIds[i],v=nodeIds[j]; let ddx=px[u]-px[v],ddy=py[u]-py[v]; const d=Math.sqrt(ddx*ddx+ddy*ddy)||.01,f=k*k/d; ddx/=d;ddy/=d; dx[u]+=ddx*f;dy[u]+=ddy*f;dx[v]-=ddx*f;dy[v]-=ddy*f; }
-          _connEdges.forEach(({fromId:u,toId:v})=>{ if(!px.hasOwnProperty(u)||!px.hasOwnProperty(v)) return; let ddx=px[v]-px[u],ddy=py[v]-py[u]; const d=Math.sqrt(ddx*ddx+ddy*ddy)||.01,f=d*d/k; ddx/=d;ddy/=d; dx[u]+=ddx*f;dy[u]+=ddy*f;dx[v]-=ddx*f;dy[v]-=ddy*f; });
-          nodeIds.forEach(id=>{ const d=Math.sqrt(dx[id]*dx[id]+dy[id]*dy[id])||.01,disp=Math.min(d,temp); px[id]+=dx[id]/d*disp;py[id]+=dy[id]/d*disp; }); temp*=.93;
+        var px={}, py={};
+        nodeIds.forEach(function(id,i){ var a=(2*Math.PI*i/nodeIds.length)-Math.PI/2, R=Math.min(W,H)*.35; px[id]=W/2+R*Math.cos(a); py[id]=H/2+R*Math.sin(a); });
+        var AREA=W*H, k=Math.sqrt(AREA/Math.max(nodeIds.length,1))*.9; var temp=Math.min(W,H)*.25;
+        for (var it=0;it<80;it++) {
+          var dx={}, dy={}; nodeIds.forEach(function(id){ dx[id]=0; dy[id]=0; });
+          for (var ii=0;ii<nodeIds.length;ii++) for (var jj=ii+1;jj<nodeIds.length;jj++) { var u=nodeIds[ii],v=nodeIds[jj]; var ddx=px[u]-px[v],ddy=py[u]-py[v]; var d=Math.sqrt(ddx*ddx+ddy*ddy)||.01,f=k*k/d; ddx/=d;ddy/=d; dx[u]+=ddx*f;dy[u]+=ddy*f;dx[v]-=ddx*f;dy[v]-=ddy*f; }
+          _connEdges.forEach(function(e){ var u=e.fromId,v=e.toId; if(!px.hasOwnProperty(u)||!px.hasOwnProperty(v)) return; var ddx=px[v]-px[u],ddy=py[v]-py[u]; var d=Math.sqrt(ddx*ddx+ddy*ddy)||.01,f=d*d/k; ddx/=d;ddy/=d; dx[u]+=ddx*f;dy[u]+=ddy*f;dx[v]-=ddx*f;dy[v]-=ddy*f; });
+          nodeIds.forEach(function(id){ var d=Math.sqrt(dx[id]*dx[id]+dy[id]*dy[id])||.01,disp=Math.min(d,temp); px[id]+=dx[id]/d*disp;py[id]+=dy[id]/d*disp; }); temp*=.93;
         }
-        const pos=new Map(); nodeIds.forEach(id=>{ const h=cH(id); pos.set(id,{x:px[id]-CARD_W/2,y:py[id]-h/2}); }); applyPositions(pos);
+        var pos=new Map(); nodeIds.forEach(function(id){ var h=cH(id); pos.set(id,{x:px[id]-CARD_W/2,y:py[id]-h/2}); }); applyPositions(pos);
       }
 
       switch (_layout) {
@@ -962,61 +931,60 @@ function depthColor(level) {
     if (!window.EmbeddingUtils||!window.EmbeddingUtils.isReady()) return;
     if (typeof buildRowIndex!=='function') return;
     if (_rows) { doRender(); return; }
-    const rawRows=buildRowIndex(); if (!rawRows.length) return;
+    var rawRows=buildRowIndex(); if (!rawRows.length) return;
     setStatus('loading','Embedding '+rawRows.length+' cells\u2026'); emptyEl.style.display='none';
-    Promise.all(rawRows.map(r=>{ const text=(r.row?.cells||r.cells||[]).join(' ').trim(); if(!text) return Promise.resolve(null); return window.EmbeddingUtils.getCachedEmbedding(text).then(vec=>({key:r.tabIdx+':'+r.rowIdx,vec})).catch(()=>null); })).then(results=>{
-      const vectors=new Map(); results.forEach(res=>{ if(res?.vec) vectors.set(res.key,res.vec); });
+    Promise.all(rawRows.map(function(r){ var text=(r.row&&r.row.cells?r.row.cells:(r.cells||[])).join(' ').trim(); if(!text) return Promise.resolve(null); return window.EmbeddingUtils.getCachedEmbedding(text).then(function(vec){ return {key:r.tabIdx+':'+r.rowIdx,vec:vec}; }).catch(function(){ return null; }); })).then(function(results){
+      var vectors=new Map(); results.forEach(function(res){ if(res&&res.vec) vectors.set(res.key,res.vec); });
       if (!vectors.size){ setStatus('error','No vectors available'); return; }
-      const embedded=rawRows.filter(r=>vectors.has(r.tabIdx+':'+r.rowIdx));
+      var embedded=rawRows.filter(function(r){ return vectors.has(r.tabIdx+':'+r.rowIdx); });
       if (embedded.length<3){ setStatus('error','Not enough data (\u22653 cells needed)'); return; }
-      embedded.forEach(r=>{ r.vec=vectors.get(r.tabIdx+':'+r.rowIdx); }); _rows=embedded; doRender();
+      embedded.forEach(function(r){ r.vec=vectors.get(r.tabIdx+':'+r.rowIdx); }); _rows=embedded; doRender();
     });
   }
 
   async function doRender() {
     rebuildBtn.classList.remove('pp-cmap-busy');
     setStatus('loading','Splitting cells\u2026');
-    let workRows;
-    try { workRows=await splitAllRows(_rows); } catch(e){ console.warn('[concept-map v20] split error:',e); workRows=_rows; }
-    const splitCount=workRows.length-_rows.length;
+    var workRows;
+    try { workRows=await splitAllRows(_rows); } catch(e){ console.warn('[concept-map] split error:',e); workRows=_rows; }
+    var splitCount=workRows.length-_rows.length;
     setStatus('loading','Building hierarchy for '+workRows.length+' concepts\u2026');
-    setTimeout(()=>{
+    setTimeout(function(){
       try {
-        const hier=buildHierarchy(workRows);
+        var hier=buildHierarchy(workRows);
         if (!hier){ setStatus('error','Not enough data'); return; }
-        let visibleCount=0, multiParentCount=0;
-        const levelCounts=new Map();
-        for (let i=0;i<hier.n;i++) {
+        var visibleCount=0, multiParentCount=0;
+        var levelCounts=new Map();
+        for (var i=0;i<hier.n;i++) {
           if (hier.absorbedInto[i]!==-1) continue; visibleCount++;
-          const lv=hier.levels[i]; levelCounts.set(lv,(levelCounts.get(lv)||0)+1);
+          var lv=hier.levels[i]; levelCounts.set(lv,(levelCounts.get(lv)||0)+1);
           if ((hier.parentsOf.get(i)||[]).length>1) multiParentCount++;
         }
-        const levelStr=[...levelCounts.keys()].sort((a,b)=>a-b).map(l=>'L'+l+': '+levelCounts.get(l)).join(' \u00b7 ');
-        const splitStr=splitCount>0?' \u00b7 '+splitCount+' split'+(splitCount===1?'':'s'):'';
-        const mpStr=multiParentCount>0?' \u00b7 '+multiParentCount+' multi-parent':'';
+        var levelStr=Array.from(levelCounts.keys()).sort(function(a,b){ return a-b; }).map(function(l){ return 'L'+l+': '+levelCounts.get(l); }).join(' \u00b7 ');
+        var splitStr=splitCount>0?' \u00b7 '+splitCount+' split'+(splitCount===1?'':'s'):'';
+        var mpStr=multiParentCount>0?' \u00b7 '+multiParentCount+' multi-parent':'';
         renderConceptMap(hier);
         subtitleEl.textContent=visibleCount+' cards \u00b7 '+levelStr+splitStr+mpStr;
         setStatus('ready','Done'); _rendered=true;
-      } catch(err){ console.error('[concept-map v20]',err); setStatus('error','Failed: '+err.message); }
+      } catch(err){ console.error('[concept-map]',err); setStatus('error','Failed: '+err.message); }
     },20);
   }
 
   if (window.EmbeddingUtils&&window.EmbeddingUtils.isReady()) setTimeout(tryRender,120);
-  document.addEventListener('embeddings-ready',()=>setTimeout(tryRender,120));
-  window.addEventListener('embedding-progress',ev=>{ if(!_rendered) setStatus('loading','Indexing\u2026 '+ev.detail.pct+'%'); });
-  window.addEventListener('embedder-ready',()=>setTimeout(tryRender,120));
-
-  window.addEventListener('df-theme-change', () => { _rendered=false; tryRender(); });
+  document.addEventListener('embeddings-ready',function(){ setTimeout(tryRender,120); });
+  window.addEventListener('embedding-progress',function(ev){ if(!_rendered) setStatus('loading','Indexing\u2026 '+ev.detail.pct+'%'); });
+  window.addEventListener('embedder-ready',function(){ setTimeout(tryRender,120); });
+  window.addEventListener('df-theme-change', function() { _rendered=false; tryRender(); });
 
   return {
-    reset() {
+    reset: function() {
       _rendered=false; _everRendered=false; _rows=null; _liveRects.clear(); _connEdges=[]; _connSvg=null;
       world.innerHTML=''; emptyEl.style.display='flex'; _panX=0; _panY=0; _zoom=1; applyTransform();
     },
-    resize() {
+    resize: function() {
       if (_rendered) fitAll();
     },
-    start() {
+    start: function() {
       setTimeout(tryRender, 120);
     }
   };
