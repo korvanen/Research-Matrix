@@ -11,7 +11,7 @@
 //   • buildCard: --ppc-on now = contrastFor(col.accent) (white/#1a1a1a, same as concept-map)
 //   • buildCard: removed manual border-left accent stripe (concept-map doesn't use it)
 //   • CSS color-mix expressions in card text/cat/split now driven by --ppc-on/--ppc-bg
-console.log('[utils-clusters.js v9000000000000]');
+console.log('[utils-clusters.js v99999999999900000000000]');
 
 var CL_MIN_SPLIT_LENGTH = 60;
 
@@ -307,62 +307,64 @@ var CL_MIN_SPLIT_LENGTH = 60;
    identical to concept-map's color-mix(…ppc-on…, ppc-bg) pattern. */
 
 .pp-cl-card .pp-cmap-card-cat-num {
-  font-family: var(--font-family-serif);
-  font-size: 26px;
-  line-height: 1;
-  font-weight: 400;
-  font-style: italic;
-  color: color-mix(in srgb, var(--ppc-on, #fff) 92%, var(--ppc-bg, transparent));
-  letter-spacing: -0.02em;
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font-family: var(--font-family-serif) !important;
+  font-size: 26px !important;
+  line-height: 1 !important;
+  font-weight: 400 !important;
+  font-style: italic !important;
+  color: color-mix(in srgb, var(--ppc-on, #fff) 92%, var(--ppc-bg, transparent)) !important;
+  letter-spacing: -0.02em !important;
+  flex: 1 !important;
+  min-width: 0 !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
 }
 .pp-cl-card .pp-cmap-card-level-label {
-  font-size: 8px;
-  font-weight: var(--font-weight-medium);
-  letter-spacing: var(--letter-spacing-caps);
-  text-transform: uppercase;
-  color: color-mix(in srgb, var(--ppc-on, #fff) 55%, var(--ppc-bg, transparent));
+  font-size: 8px !important;
+  font-weight: var(--font-weight-medium) !important;
+  letter-spacing: var(--letter-spacing-caps) !important;
+  text-transform: uppercase !important;
+  color: color-mix(in srgb, var(--ppc-on, #fff) 55%, var(--ppc-bg, transparent)) !important;
 }
 .pp-cl-card .pp-cmap-card-rule {
-  height: 1px;
-  background: color-mix(in srgb, var(--ppc-on, #fff) 22%, var(--ppc-bg, transparent));
-  margin: 8px 14px 0;
-  flex-shrink: 0;
-  opacity: 1;
+  height: 1px !important;
+  background: color-mix(in srgb, var(--ppc-on, #fff) 22%, var(--ppc-bg, transparent)) !important;
+  margin: 8px 14px 0 !important;
+  flex-shrink: 0 !important;
+  opacity: 1 !important;
 }
 .pp-cl-card .pp-cl-card-cat {
-  font-size: 9px;
-  font-weight: var(--font-weight-medium);
-  letter-spacing: var(--letter-spacing-caps);
-  text-transform: uppercase;
-  margin-bottom: 2px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: color-mix(in srgb, var(--ppc-on, #fff) 60%, var(--ppc-bg, transparent));
+  font-size: 9px !important;
+  font-weight: var(--font-weight-medium) !important;
+  letter-spacing: var(--letter-spacing-caps) !important;
+  text-transform: uppercase !important;
+  margin-bottom: 2px !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  color: color-mix(in srgb, var(--ppc-on, #fff) 60%, var(--ppc-bg, transparent)) !important;
+  opacity: 1 !important;
 }
 .pp-cl-card .pp-cl-card-text {
-  font-family: var(--font-family-serif);
-  font-size: 13px;
-  font-weight: 400;
-  line-height: 1.35;
-  letter-spacing: -0.01em;
-  color: color-mix(in srgb, var(--ppc-on, #fff) 92%, var(--ppc-bg, transparent));
-  display: block;
-  overflow-wrap: break-word;
-  word-break: break-word;
+  font-family: var(--font-family-serif) !important;
+  font-size: 13px !important;
+  font-weight: 400 !important;
+  line-height: 1.35 !important;
+  letter-spacing: -0.01em !important;
+  color: color-mix(in srgb, var(--ppc-on, #fff) 92%, var(--ppc-bg, transparent)) !important;
+  display: block !important;
+  overflow-wrap: break-word !important;
+  word-break: break-word !important;
 }
 .pp-cl-card .pp-cl-card-split {
-  font-size: 8px;
-  font-weight: var(--font-weight-medium);
-  letter-spacing: var(--letter-spacing-caps);
-  text-transform: uppercase;
-  margin-top: 4px;
-  color: color-mix(in srgb, var(--ppc-on, #fff) 50%, var(--ppc-bg, transparent));
+  font-size: 8px !important;
+  font-weight: var(--font-weight-medium) !important;
+  letter-spacing: var(--letter-spacing-caps) !important;
+  text-transform: uppercase !important;
+  margin-top: 4px !important;
+  color: color-mix(in srgb, var(--ppc-on, #fff) 50%, var(--ppc-bg, transparent)) !important;
+  opacity: 1 !important;
 }
 
 .pp-cl-card-body {
