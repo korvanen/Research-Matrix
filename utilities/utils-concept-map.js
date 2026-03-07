@@ -1,11 +1,11 @@
-// utils-concept-map.js — Concept Map v25
+// utils-concept-map.js — Concept Map v20
 // v19 → v20 changes:
 //   • Fixed light/dark mode support: depthColor() now reads live CSS custom
 //     properties instead of static THEMES object values
 //   • Text color (--ppc-on) now adapts based on html.dark/html.light class
 //   • Background and accent colors read from --raw-{theme}-bg and --raw-{theme}-mid
 //     which update automatically when theme changes
-console.log('[utils-concept-map.js [v.25]');
+console.log('[utils-concept-map.js [v.30]');
 
 // Level themes — must match order/names in THEMES (utils-shared.js)
 const CMAP_LEVEL_THEMES = ['yellow','visions','relational','organizational','physical','yellow'];
@@ -702,7 +702,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
       card.className='pp-cmap-card';
       card.style.cssText=`width:${CARD_W}px;position:absolute;z-index:${++_topZ}`;
       card.style.setProperty('--ppc-border', accent);
-      card.style.setProperty('--ppc-bg',     accent);
+      card.style.setProperty('--ppc-bg',     bg);     // Fixed: was 'accent', should be 'bg'
       card.style.setProperty('--ppc-on',     lc);
 
       const primaryRow=rows[i], isSplit=!!primaryRow._splitFrom;
