@@ -165,57 +165,6 @@
 }
 
 
-/* ══════════════════════════════════════════════════════════
-   4. Raw Palette  (brand colors — unchanged from v2)
-   ══════════════════════════════════════════════════════════ */
-:root {
-  /* Neutrals */
-  --raw-black:       #111111;
-  --raw-white:       #ffffff;
-  --raw-grey-100:    #f7f7f8;
-  --raw-grey-200:    #f0f0f0;
-  --raw-grey-300:    #e8e8e8;
-  --raw-grey-400:    #d0d0d0;
-  --raw-grey-500:    #c0c0c8;
-  --raw-grey-600:    #9898aa;
-  --raw-grey-700:    #767676;
-
-  /* Visions */
-  --raw-visions-dark:   #1a4a3a;
-  --raw-visions:        #346754;
-  --raw-visions-mid:    #2e7d5e;
-  --raw-visions-light:  #a8cfc0;
-  --raw-visions-bg:     #f4faf7;
-
-  /* Relational */
-  --raw-relational-dark:  #2e3899;
-  --raw-relational:       #535fc1;
-  --raw-relational-mid:   #4a56c8;
-  --raw-relational-light: #b0b6e8;
-  --raw-relational-bg:    #f4f5fd;
-
-  /* Org */
-  --raw-org-dark:   #3d2868;
-  --raw-org:        #5a3f86;
-  --raw-org-mid:    #5e3d9e;
-  --raw-org-light:  #c0a8e0;
-  --raw-org-bg:     #f6f3fb;
-
-  /* Physical */
-  --raw-physical-dark:  #8a2820;
-  --raw-physical:       #bb463c;
-  --raw-physical-mid:   #c44035;
-  --raw-physical-light: #e0a8a4;
-  --raw-physical-bg:    #fdf5f4;
-
-  /* Yellow */
-  --raw-yellow-dark:  #9a7010;
-  --raw-yellow:       #D4AF37;
-  --raw-yellow-mid:   #c8991a;
-  --raw-yellow-light: #e8d080;
-  --raw-yellow-bg:    #fffdf5;
-}
-
 
 /* ══════════════════════════════════════════════════════════
    5. Semantic tokens  — mapped to MD3 system colors
@@ -367,31 +316,8 @@
   --bg-content-surround:     var(--md-sys-color-surface-container);
 }
 
-/* Shared palette tokens */
-:root {
-  --palette-0-accent: var(--raw-visions-mid);
-  --palette-0-bg:     var(--raw-visions-bg);
-  --palette-1-accent: var(--raw-relational-mid);
-  --palette-1-bg:     var(--raw-relational-bg);
-  --palette-2-accent: var(--raw-org-mid);
-  --palette-2-bg:     var(--raw-org-bg);
-  --palette-3-accent: var(--raw-physical-mid);
-  --palette-3-bg:     var(--raw-physical-bg);
-  --palette-4-accent: var(--raw-yellow-mid);
-  --palette-4-bg:     var(--raw-yellow-bg);
-  --palette-5-accent: var(--md-sys-color-outline);
-  --palette-5-bg:     var(--md-sys-color-surface-container-low);
-}
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --raw-visions-bg:    color-mix(in srgb, #2e7d5e 15%, #1b1b1f);
-    --raw-relational-bg: color-mix(in srgb, #4a56c8 15%, #1b1b1f);
-    --raw-org-bg:        color-mix(in srgb, #5e3d9e 15%, #1b1b1f);
-    --raw-physical-bg:   color-mix(in srgb, #c44035 15%, #1b1b1f);
-    --raw-yellow-bg:     color-mix(in srgb, #c8991a 15%, #1b1b1f);
-  }
-}
+
 
 
 /* ══════════════════════════════════════════════════════════
@@ -1691,11 +1617,6 @@ html.dark {
   --md-sys-color-inverse-primary:        #4a56c8;
   --raw-black:         #e5e1e6;
   --raw-white:         #1b1b1f;
-  --raw-visions-bg:    color-mix(in srgb, #2e7d5e 15%, #1b1b1f);
-  --raw-relational-bg: color-mix(in srgb, #4a56c8 15%, #1b1b1f);
-  --raw-org-bg:        color-mix(in srgb, #5e3d9e 15%, #1b1b1f);
-  --raw-physical-bg:   color-mix(in srgb, #c44035 15%, #1b1b1f);
-  --raw-yellow-bg:     color-mix(in srgb, #c8991a 15%, #1b1b1f);
   --md-elev-1: 0px 1px 2px rgba(0,0,0,0.5), 0px 1px 3px 1px rgba(0,0,0,0.25);
   --md-elev-2: 0px 1px 2px rgba(0,0,0,0.5), 0px 2px 6px 2px rgba(0,0,0,0.25);
   --md-elev-3: 0px 4px 8px 3px rgba(0,0,0,0.25), 0px 1px 3px rgba(0,0,0,0.5);
@@ -1738,11 +1659,6 @@ html.light {
   --md-sys-color-inverse-primary:        #bcc2ff;
   --raw-black:         #111111;
   --raw-white:         #ffffff;
-  --raw-visions-bg:    #f4faf7;
-  --raw-relational-bg: #f4f5fd;
-  --raw-org-bg:        #f6f3fb;
-  --raw-physical-bg:   #fdf5f4;
-  --raw-yellow-bg:     #fffdf5;
   --md-elev-1: 0px 1px 2px rgba(0,0,0,0.3),  0px 1px 3px 1px rgba(0,0,0,0.15);
   --md-elev-2: 0px 1px 2px rgba(0,0,0,0.3),  0px 2px 6px 2px rgba(0,0,0,0.15);
   --md-elev-3: 0px 4px 8px 3px rgba(0,0,0,0.15), 0px 1px 3px rgba(0,0,0,0.3);
