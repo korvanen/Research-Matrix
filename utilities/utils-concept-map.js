@@ -7,9 +7,6 @@
 //     which update automatically when theme changes
 console.log('[utils-concept-map.js [v.2]');
 
-// Level themes — must match order/names in THEMES (utils-shared.js)
-const CMAP_LEVEL_THEMES = ['yellow','visions','relational','organizational','physical','yellow'];
-
 const CMAP_PARENT_CHILD_THRESHOLD = 0.50;
 const CMAP_MIN_SPLIT_LENGTH = 60;
 const ORPHAN_RECOVERY_THRESHOLD = 0.85;
@@ -650,12 +647,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
     
     // Get the palette (light or dark) from utils-shared.js
     const palette = (typeof getPalette === 'function') ? getPalette() : window.PP_PALETTE || [];
-    
-    // Map level to palette index (rotated to match CMAP_LEVEL_THEMES)
-    // CMAP_LEVEL_THEMES = ['yellow','visions','relational','organizational','physical','yellow']
-    // which corresponds to palette indices [0,1,2,3,4,0]
-    const paletteIdx = [0, 1, 2, 3, 4, 0][Math.min(idx, 5)];
-    const theme = palette[paletteIdx] || { accent: '#888888', bg: '#f7f7f8', label: '#ffffff' };
+
     
     // Calculate text color based on background luminance for proper contrast
     function getLuminance(hex) {
