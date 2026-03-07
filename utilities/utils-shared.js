@@ -227,7 +227,7 @@ function modifyColor(hex, { lightness = 0, saturation = 0, hue = 0, alpha } = {}
 // ════════════════════════════════════════════════════════════════
 
 const THEME_DEFS = [
-  { name: 'Bubblegum',      base: '#EDB0CB', tabIndex: 0 },
+  { name: 'Dark Purple',      base: '#3A1C36', tabIndex: 0 },
   { name: 'Dark Berry',     base: '#6E1E3A', tabIndex: 1 },
   { name: 'Carrot',         base: '#076A40', tabIndex: 2 },
   { name: 'Lemon Curd', base: '#FADD8B', tabIndex: 3 },
