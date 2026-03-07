@@ -1,12 +1,11 @@
-// utils-concept-map.js — Concept Map v19
-// v18 → v19 changes:
-//   • Removed CMAP_FALLBACK_PALETTE, contrastFor(), and window.PP_PALETTE chain.
-//   • depthColor() now reads exclusively from THEMES (via CMAP_LEVEL_THEMES) —
-//     single source of truth, no drift between palette and theme definitions.
-//   • Bug #1 fix: rotated[] array corrected so Level 1 = pal[0] = yellow theme.
-//   • Bug #2 fix: --ppc-on set directly from theme['--tab-active-color'], no
-//     hex-parsing heuristic needed.
-console.log('[utils-concept-map.js [v.19]');
+// utils-concept-map.js — Concept Map v20
+// v19 → v20 changes:
+//   • Fixed light/dark mode support: depthColor() now reads live CSS custom
+//     properties instead of static THEMES object values
+//   • Text color (--ppc-on) now adapts based on html.dark/html.light class
+//   • Background and accent colors read from --raw-{theme}-bg and --raw-{theme}-mid
+//     which update automatically when theme changes
+console.log('[utils-concept-map.js [v.20]');
 
 // Level themes — must match order/names in THEMES (utils-shared.js)
 const CMAP_LEVEL_THEMES = ['yellow','visions','relational','organizational','physical','yellow'];
@@ -148,7 +147,7 @@ const ORPHAN_RECOVERY_THRESHOLD = 0.85;
   height:1px; margin:0 9px; opacity:.5;
 }
 
-/* ── All text elements driven by --ppc-on (set from THEMES[name]['--tab-active-color']) ── */
+/* ── All text elements driven by --ppc-on (set from theme['--tab-active-color']) ── */
 .pp-cmap-card .pp-cmap-card-cat-num    { color: color-mix(in srgb, var(--ppc-on,#fff) 92%, black); }
 .pp-cmap-card .pp-cmap-card-level-num  { color: color-mix(in srgb, var(--ppc-on,#fff) 95%, black); }
 .pp-cmap-card .pp-cmap-card-level-label { color: color-mix(in srgb, var(--ppc-on,#fff) 55%, var(--ppc-bg,#888)); }
@@ -633,17 +632,30 @@ function initConceptMapTool(paneEl, sidebarEl) {
     });
   }
 
-  // ── Color by hierarchy level — reads exclusively from THEMES ─────────────
-  // No fallback palette needed: THEMES is the single source of truth.
+  // ── Color by hierarchy level — reads from CSS custom properties ──────────
+  // Uses CSS variables that automatically update when light/dark mode changes.
+  // These are defined in utils-shared.js and respond to html.dark/html.light.
   function depthColor(level) {
     const idx   = level - 1;
     const tname = CMAP_LEVEL_THEMES[Math.min(idx, CMAP_LEVEL_THEMES.length - 1)];
-    const theme = (typeof THEMES !== 'undefined' && THEMES[tname]) || (typeof THEMES !== 'undefined' && THEMES.default) || {};
-    return {
-      accent: theme['--tab-active-bg']    || '#888888',
-      label:  theme['--tab-active-color'] || '#ffffff',
-      bg:     theme['--bg-data']          || '#f7f7f8',
-    };
+    
+    // Read live CSS custom properties from :root
+    const style = getComputedStyle(document.documentElement);
+    
+    // Get theme-specific accent color (mid tone for cards)
+    const accent = style.getPropertyValue('--raw-' + tname + '-mid').trim() || 
+                   style.getPropertyValue('--raw-' + tname).trim() || 
+                   '#888888';
+    
+    // Get theme-specific background color (adapts to light/dark mode)
+    const bg = style.getPropertyValue('--raw-' + tname + '-bg').trim() || '#f7f7f8';
+    
+    // Determine text color based on current theme mode
+    // In dark mode, use light text; in light mode, use dark text
+    const isDark = document.documentElement.classList.contains('dark');
+    const label = isDark ? '#ffffff' : '#1a1a1a';
+    
+    return { accent, label, bg };
   }
 
   function renderConceptMap(hier) {
@@ -662,7 +674,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
     for (let i=0;i<n;i++) {
       if (absorbedInto[i]!==-1) continue;
       const level=levels[i];
-      // depthColor now reads from THEMES — accent, label, bg are all theme-accurate
+      // depthColor now reads from live CSS custom properties
       const { accent, label: lc, bg } = depthColor(level);
       const extras=mergeExtras.get(i)||[], allRows=[i,...extras];
 
@@ -671,8 +683,6 @@ function initConceptMapTool(paneEl, sidebarEl) {
       card.style.cssText=`width:${CARD_W}px;position:absolute;z-index:${++_topZ}`;
       card.style.setProperty('--ppc-border', accent);
       card.style.setProperty('--ppc-bg',     accent);
-      // lc comes directly from theme['--tab-active-color'] — designer-controlled,
-      // no hex parsing needed.
       card.style.setProperty('--ppc-on',     lc);
 
       const primaryRow=rows[i], isSplit=!!primaryRow._splitFrom;
@@ -868,7 +878,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
     rebuildBtn.classList.remove('pp-cmap-busy');
     setStatus('loading','Splitting cells\u2026');
     let workRows;
-    try { workRows=await splitAllRows(_rows); } catch(e){ console.warn('[concept-map v19] split error:',e); workRows=_rows; }
+    try { workRows=await splitAllRows(_rows); } catch(e){ console.warn('[concept-map v20] split error:',e); workRows=_rows; }
     const splitCount=workRows.length-_rows.length;
     setStatus('loading','Building hierarchy for '+workRows.length+' concepts\u2026');
     setTimeout(()=>{
@@ -888,7 +898,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
         renderConceptMap(hier);
         subtitleEl.textContent=visibleCount+' cards \u00b7 '+levelStr+splitStr+mpStr;
         setStatus('ready','Done'); _rendered=true;
-      } catch(err){ console.error('[concept-map v19]',err); setStatus('error','Failed: '+err.message); }
+      } catch(err){ console.error('[concept-map v20]',err); setStatus('error','Failed: '+err.message); }
     },20);
   }
 
