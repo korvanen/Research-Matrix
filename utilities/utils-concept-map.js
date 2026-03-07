@@ -1,18 +1,20 @@
-// sidepanel-concept-map.js — Concept Map v1
-// Sources consolidated/cleaned from: [1][2][3][4][5][6][7]
+// utils-concept-map.js — Concept Map (clean, robust)
+// Integrates fixes for depthColor normalization and WCAG contrastFor.
+// Uses UI/layout/handlers per your latest snippets.
+// Sources referenced in comments: [1][2][3][4][5][6][7]
+
+console.log('[utils-concept-map.js v23]');
 
 // ───────────────────────────────────────────────────────────────────────────
 // Constants
 // ───────────────────────────────────────────────────────────────────────────
-console.log('[concept-map v1]');
-
-const CMAP_LEVEL_THEMES = ['yellow','visions','relational','organizational','physical','yellow'];
-const CMAP_PARENT_CHILD_THRESHOLD = 0.50;
-const CMAP_MIN_SPLIT_LENGTH = 10;
-const ORPHAN_RECOVERY_THRESHOLD = 0.85;
+const CMAP_LEVEL_THEMES = ['yellow','visions','relational','organizational','physical','yellow']; // [4]
+const CMAP_PARENT_CHILD_THRESHOLD = 0.50; // [4]
+const CMAP_MIN_SPLIT_LENGTH = 10; // [4]
+const ORPHAN_RECOVERY_THRESHOLD = 0.85; // [4]
 
 // ───────────────────────────────────────────────────────────────────────────
-// Inject styles once
+// Styles (inject once)
 // ───────────────────────────────────────────────────────────────────────────
 (function injectCmapStyles() {
   if (document.getElementById('pp-cmap-styles')) return;
@@ -31,7 +33,7 @@ const ORPHAN_RECOVERY_THRESHOLD = 0.85;
 #pp-cmap-status.cmap-error .pp-cmap-dot { background:var(--md-sys-color-error); }
 @keyframes pp-cmap-pulse { 0%,100%{opacity:.25;transform:scale(.85);}50%{opacity:1;transform:scale(1.1);} }
 
-/* Controls */
+/* Controls grid */ /* [4][7] */
 #pp-cmap-controls { display:grid; grid-template-columns:1fr 1fr 1fr auto auto; gap:6px; align-items:end; }
 .pp-cmap-ctrl-col { display:flex; flex-direction:column; gap:2px; }
 #pp-cmap-rebuild { border:none; border-radius:var(--radius-full); padding:4px 12px; align-self:stretch; font-size:9px; font-weight:600; letter-spacing:.07em; text-transform:uppercase; background:var(--md-sys-color-secondary-container);color:var(--md-sys-color-on-secondary-container); cursor:pointer; transition:background .15s,color .15s,box-shadow .15s; white-space:nowrap; }
@@ -50,7 +52,7 @@ const ORPHAN_RECOVERY_THRESHOLD = 0.85;
 .pp-cmap-layout-sep { height:1px; background:var(--md-sys-color-outline-variant); margin:3px 4px; }
 .pp-cmap-layout-group { font-size:7px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--md-sys-color-on-surface-variant);padding:4px 9px 2px; }
 
-/* Canvas */
+/* Canvas */ /* [4][7] */
 #pp-cmap-canvas { flex:1; min-height:0; position:relative; overflow:hidden; cursor:default; user-select:none; }
 #pp-cmap-canvas.pp-cmap-panning { cursor:grabbing !important; }
 #pp-cmap-world { position:absolute; top:0; left:0; width:100%; height:100%; transform-origin:0 0; }
@@ -59,22 +61,21 @@ const ORPHAN_RECOVERY_THRESHOLD = 0.85;
 #pp-cmap-fit { position:absolute; bottom:28px; right:9px; z-index:25; width:28px; height:28px; border:1px solid var(--md-sys-color-outline-variant); border-radius:var(--radius-sm); padding:0; background:var(--md-sys-color-surface-container);color:var(--md-sys-color-on-surface-variant); cursor:pointer; display:grid; place-items:center; transition:background .15s,color .15s,box-shadow .15s; }
 #pp-cmap-fit:hover { background:var(--md-sys-color-surface-container-high);color:var(--md-sys-color-on-surface);box-shadow:var(--md-elev-1); }
 
-/* Card */
+/* Card */ /* [7] */
 .pp-cmap-card { position:absolute; border-radius:9px; border:none; background:var(--ppc-bg,#fff); box-shadow:var(--md-elev-2); cursor:grab; user-select:none; overflow:hidden; transition:box-shadow .15s; }
 .pp-cmap-card:active { cursor:grabbing; }
 .pp-cmap-card:hover { box-shadow:var(--md-elev-4); }
 
-/* Card top layout */
+/* Card top layout (base styles) */ /* [7] */
 .pp-cmap-card-top { display:flex; align-items:flex-start; justify-content:space-between; padding:5px 9px 4px; gap:6px; }
 .pp-cmap-card-cat-num { font-size:11px; font-weight:800; letter-spacing:.02em; line-height:1.35; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--md-sys-color-on-surface); }
 .pp-cmap-card-level-block { display:flex; flex-direction:column; align-items:flex-end; flex-shrink:0; }
 .pp-cmap-card-level-num { font-size:14px; font-weight:900; line-height:1; color:var(--md-sys-color-on-surface); }
 .pp-cmap-card-level-label { font-size:7px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--md-sys-color-on-surface-variant); }
-
 .pp-cmap-card-merged { font-size:8px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; padding:0 9px 3px; color:var(--md-sys-color-on-surface-variant); }
 .pp-cmap-card-rule { height:1px; margin:0 9px; background:var(--md-sys-color-outline-variant); opacity:.5; }
 
-/* Solid-color card: text driven by --ppc-on */
+/* Solid-color card: text driven by --ppc-on (set in JS) */ /* [7] */
 .pp-cmap-card .pp-cmap-card-cat-num { color: color-mix(in srgb, var(--ppc-on,#fff) 92%, transparent); }
 .pp-cmap-card .pp-cmap-card-level-num { color: color-mix(in srgb, var(--ppc-on,#fff) 95%, transparent); }
 .pp-cmap-card .pp-cmap-card-level-label { color: color-mix(in srgb, var(--ppc-on,#fff) 55%, transparent); }
@@ -88,7 +89,7 @@ const ORPHAN_RECOVERY_THRESHOLD = 0.85;
 .pp-cmap-card .pp-cmap-sim-pct { color: color-mix(in srgb, var(--ppc-on,#fff) 92%, transparent); }
 .pp-cmap-card .pp-cmap-leaf-badge { color: color-mix(in srgb, var(--ppc-on,#fff) 55%, transparent); }
 
-/* Body */
+/* Body */ /* [7] */
 .pp-cmap-card-head { padding:5px 9px 4px; display:flex; align-items:flex-start; gap:5px; flex-wrap:wrap; }
 .pp-cmap-level-badge { font-size:8px; font-weight:800; letter-spacing:.10em; text-transform:uppercase; opacity:.9; flex:1; min-width:0; line-height:1.4; }
 .pp-cmap-split-badge { font-size:8px; font-weight:800; letter-spacing:.06em; opacity:.9; flex:1; min-width:0; line-height:1.4; }
@@ -115,9 +116,9 @@ const ORPHAN_RECOVERY_THRESHOLD = 0.85;
 // Public entrypoint
 // ───────────────────────────────────────────────────────────────────────────
 function initConceptMapTool(paneEl, sidebarEl) {
-  const DRAG_DELAY = 600; // ms debounce while slider is being dragged [3]
+  const DRAG_DELAY = 600; // debounce while dragging sliders [1]
 
-  // UI
+  // UI markup [4][1]
   paneEl.innerHTML =
     '<div id="pp-cmap-head">' +
       '<div id="pp-cmap-subtitle">Waiting for embeddings…</div>' +
@@ -151,10 +152,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
         '</div>' +
         '<div id="pp-cmap-layout-wrap">' +
           '<button id="pp-cmap-layout-btn" title="Change layout">' +
-            '<svg viewBox="0 0 12 12" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">' +
-              '<circle cx="6" cy="6" r="2"/>' +
-              '<circle cx="6" cy="6" r="5" stroke-dasharray="2 2"/>' +
-            '</svg>' +
+            '<svg viewBox="0 0 12 12" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="6" cy="6" r="2"/><circle cx="6" cy="6" r="5" stroke-dasharray="2 2"/></svg>' +
             '<span id="pp-cmap-layout-label">Radial</span>' +
           '</button>' +
           '<div id="pp-cmap-layout-menu">' +
@@ -182,12 +180,12 @@ function initConceptMapTool(paneEl, sidebarEl) {
       '<div id="pp-cmap-zoom-hint">scroll = zoom · RMB drag = pan · pinch/2-finger = touch</div>' +
     '</div>';
 
-  // Upgrade sliders with optional external helper
+  // Upgrade sliders with helper if available [1]
   if (typeof upgradeSlider === 'function') {
-    paneEl.querySelectorAll('.pp-range').forEach(upgradeSlider); // [1]
+    paneEl.querySelectorAll('.pp-range').forEach(upgradeSlider);
   }
 
-  // DOM refs
+  // Refs
   const subtitleEl = paneEl.querySelector('#pp-cmap-subtitle');
   const statusEl = paneEl.querySelector('#pp-cmap-status');
   const labelEl = paneEl.querySelector('#pp-cmap-label');
@@ -208,11 +206,11 @@ function initConceptMapTool(paneEl, sidebarEl) {
   const maxParValEl = paneEl.querySelector('#pp-cmap-maxpar-val');
 
   // State
-  const CARD_W = 250;
-  const MM_PAD = 16;
-  let _depth = +depthSlider.value || 5;
-  let _threshold = (+threshSlider.value || 50) / 100;
-  let _maxParents = +maxParSlider.value || 1;
+  const CARD_W = 250; // [1]
+  const MM_PAD = 16;  // [1]
+  let _depth = +depthSlider.value || 5;                  // [1]
+  let _threshold = (+threshSlider.value || 50) / 100;    // [1]
+  let _maxParents = +maxParSlider.value || 1;            // [1]
   let _layout = 'radial';
   let _rows = null;
   let _rendered = false;
@@ -225,27 +223,18 @@ function initConceptMapTool(paneEl, sidebarEl) {
     world.style.transform = `translate(${_panX}px,${_panY}px) scale(${_zoom})`;
   }
 
-  function setStatus(state, text) {
+  function setStatus(state, text) { // [1]
     statusEl.className = 'cmap-' + state;
     labelEl.textContent = text;
     statusEl.style.opacity = '1';
     if (state === 'ready') setTimeout(() => { statusEl.style.opacity = '0'; }, 3200);
   }
 
-  // Sliders: debounce on input, apply on change [1]
+  // Sliders: delay on input, apply on change [1]
   [
-    {
-      el: depthSlider,
-      read: () => { _depth = +depthSlider.value; depthValEl.textContent = _depth; }
-    },
-    {
-      el: threshSlider,
-      read: () => { _threshold = +threshSlider.value / 100; threshValEl.textContent = threshSlider.value + '%'; }
-    },
-    {
-      el: maxParSlider,
-      read: () => { _maxParents = +maxParSlider.value; maxParValEl.textContent = _maxParents; }
-    },
+    { el: depthSlider, read: () => { _depth = +depthSlider.value; depthValEl.textContent = _depth; } },
+    { el: threshSlider, read: () => { _threshold = +threshSlider.value / 100; threshValEl.textContent = threshSlider.value + '%'; } },
+    { el: maxParSlider, read: () => { _maxParents = +maxParSlider.value; maxParValEl.textContent = _maxParents; } },
   ].forEach(({ el, read }) => {
     el.addEventListener('input', () => {
       read();
@@ -265,13 +254,13 @@ function initConceptMapTool(paneEl, sidebarEl) {
     });
   });
 
-  rebuildBtn.addEventListener('click', () => {
+  rebuildBtn.addEventListener('click', () => { // [1]
     clearTimeout(_rebuildTimer);
     _rendered = false;
     tryRender();
   });
 
-  // Layout dropdown [3]
+  // Layout dropdown [1]
   const LAYOUT_LABELS = { radial:'Radial', vtree:'Vertical Tree', htree:'Horizontal Tree', vflow:'Vertical Flow', organic:'Organic' };
   layoutBtn.addEventListener('click', e => {
     e.stopPropagation();
@@ -292,10 +281,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
       layoutOpts.forEach(o => o.classList.toggle('active', o.dataset.layout === l));
       layoutMenu.classList.remove('open');
       layoutBtn.classList.remove('open');
-      if (_rendered) {
-        _rendered = false;
-        tryRender();
-      }
+      if (_rendered) { _rendered = false; tryRender(); }
     });
   });
 
@@ -319,9 +305,9 @@ function initConceptMapTool(paneEl, sidebarEl) {
   }
   fitBtn.addEventListener('click', fitAll);
 
-  // Pan & zoom (mouse wheel + RMB drag) [1]
+  // Mouse wheel zoom + RMB pan [1]
   let _panning=false, _panSX=0, _panSY=0, _panBX=0, _panBY=0;
-  canvas.addEventListener('mousedown', ev => {
+  canvas.addEventListener('mousedown', ev => { // RMB drag
     if (ev.button !== 2) return;
     _panning=true;
     _panSX=ev.clientX; _panSY=ev.clientY;
@@ -356,7 +342,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
     applyTransform();
   }, {passive:false});
 
-  // Pointer pan (touch), pinch zoom, and card drag [5]
+  // Pointer pan/pinch + card drag [3]
   const _pointers = new Map();
   let _cardDrag = null;
   let _pinchState = null;
@@ -422,7 +408,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
   canvas.addEventListener('pointerup', _canvasPointerEnd);
   canvas.addEventListener('pointercancel', _canvasPointerEnd);
 
-  function makeDraggable(el, cid) {
+  function makeDraggable(el, cid) { // [3]
     el.dataset.cid = String(cid);
     el.style.touchAction = 'none';
 
@@ -458,14 +444,14 @@ function initConceptMapTool(paneEl, sidebarEl) {
     });
   }
 
-  // Cosine similarity + helpers [5]
+  // Cosine similarity + helpers [3]
   function cosineSim(a, b) {
     if (!a||!b||a.length!==b.length) return 0;
     let dot=0, na=0, nb=0;
     for (let i=0;i<a.length;i++) { dot+=a[i]*b[i]; na+=a[i]*a[i]; nb+=b[i]*b[i]; }
     return (na&&nb) ? Math.max(0,Math.min(1,dot/(Math.sqrt(na)*Math.sqrt(nb)))) : 0;
   }
-  function avgVec(vecs) {
+  function avgVec(vecs) { // [3]
     const valid=vecs.filter(Boolean);
     if (!valid.length) return null;
     const dim=valid[1].length, sum=new Float32Array(dim);
@@ -473,11 +459,11 @@ function initConceptMapTool(paneEl, sidebarEl) {
     return Array.from(sum).map(x=>x/valid.length);
   }
 
-  // Splitting [5]
+  // Intra-cell splitting [3]
   function sentenceSplit(text) {
-    return text.replace(/([.!?;])\\s+/g,'$1\\n').split('\\n').map(s=>s.trim()).filter(s=>s.length>=CMAP_MIN_SPLIT_LENGTH);
+    return text.replace(/([.!?;])\s+/g,'$1\n').split('\n').map(s=>s.trim()).filter(s=>s.length>=CMAP_MIN_SPLIT_LENGTH);
   }
-  async function maybeSplitRow(row) {
+  async function maybeSplitRow(row) { // [3]
     const cells=row.row?.cells||row.cells||[], cats=row.row?.cats?row.row.cats.filter(c=>c.trim()):[], catStr=cats.join(' · ')||'Cell';
     let bestText='', bestIdx=0;
     cells.forEach((c,i)=>{ if(c.trim().length>bestText.length){ bestText=c.trim(); bestIdx=i; } });
@@ -517,7 +503,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
       row:{cells:cells.map((c,ci)=>ci===bestIdx?segs.map(s=>s.text).join(' '):''), cats}
     }));
   }
-  async function splitAllRows(rows) {
+  async function splitAllRows(rows) { // [3]
     const result=[];
     for (const row of rows) {
       const parts=await maybeSplitRow(row);
@@ -526,12 +512,11 @@ function initConceptMapTool(paneEl, sidebarEl) {
     return result;
   }
 
-  // Hierarchy builder [5]
+  // Hierarchy builder — multi-parent DAG [3][6]
   function buildHierarchy(rows) {
     const n=rows.length;
     if (n<2) return null;
 
-    // Rank by average similarity
     const scores=new Float32Array(n);
     for (let i=0;i<n;i++) {
       let sum=0;
@@ -539,12 +524,9 @@ function initConceptMapTool(paneEl, sidebarEl) {
       scores[i]=sum/(n-1);
     }
     const rankOrder=Array.from({length:n},(_,i)=>i).sort((a,b)=>scores[b]-scores[a]);
-
-    // Assign levels 1.._depth by rank
     const levels=new Int32Array(n);
     rankOrder.forEach((ri,rank)=>{ levels[ri]=Math.max(1,Math.min(_depth,Math.floor(rank*_depth/n)+1)); });
 
-    // Parents at (level-1) within threshold/top-k
     const parentsOf = new Map();
     const parentSimsOf = new Map();
     for (let i=0;i<n;i++) {
@@ -563,7 +545,6 @@ function initConceptMapTool(paneEl, sidebarEl) {
       parentSimsOf.set(i,kept.map(c=>c.s));
     }
 
-    // Orphan recovery (relaxed threshold)
     const relaxed=_threshold*ORPHAN_RECOVERY_THRESHOLD;
     for (let i=0;i<n;i++) {
       if (levels[i]<=1||parentsOf.get(i).length>0) continue;
@@ -580,13 +561,11 @@ function initConceptMapTool(paneEl, sidebarEl) {
       } else levels[i]=1;
     }
 
-    // Children lists
     const childrenOf=Array.from({length:n},()=>[]);
     for (let i=0;i<n;i++) {
       parentsOf.get(i).forEach(p=>{ if(!childrenOf[p].includes(i)) childrenOf[p].push(i); });
     }
 
-    // Similarity summaries
     const simToChildren=new Float32Array(n);
     for (let i=0;i<n;i++) {
       if (!childrenOf[i].length) continue;
@@ -603,7 +582,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
       simToParents[i]=sum/pars.length;
     }
 
-    // Merge identical nodes (structure dedupe)
+    // Merge structurally identical nodes
     const absorbedInto=new Int32Array(n).fill(-1), mergeExtras=new Map();
     const mkKey=i=>levels[i]+':p'+parentsOf.get(i).slice().sort((a,b)=>a-b).join(',')+':c'+childrenOf[i].slice().sort((a,b)=>a-b).join(',');
     const seenKeys=new Map();
@@ -621,7 +600,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
     return { rows, n, levels, parentsOf, parentSimsOf, childrenOf, simToChildren, simToParents, absorbedInto, mergeExtras };
   }
 
-  // Connectors [4]
+  // Connectors (SVG) [6]
   let _connSvg=null, _connEdges=[];
   function redrawConnectors() {
     if (!_connSvg) return;
@@ -630,6 +609,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
     _connEdges.forEach(({fromId,toId,color,depth})=>{
       const ra=_liveRects.get(fromId), rb=_liveRects.get(toId);
       if (!ra||!rb) return;
+
       function pts(r){
         const{x,y,w,h}=r;
         return [
@@ -645,6 +625,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
         if(d<bd){bd=d;best={a,b};}
       }));
       if (!best) return;
+
       const{a,b}=best, dist=Math.hypot(b.x-a.x,b.y-a.y), off=Math.min(dist*.4,80);
       function tang(pt,r){
         const t=3;
@@ -655,6 +636,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
         return{dx:0,dy:1};
       }
       const tA=tang(a,ra), tB=tang(b,rb);
+
       const path=document.createElementNS(ns,'path');
       path.setAttribute('d',`M${a.x},${a.y} C${a.x+tA.dx*off},${a.y+tA.dy*off} ${b.x+tB.dx*off},${b.y+tB.dy*off} ${b.x},${b.y}`);
       path.setAttribute('fill','none');
@@ -674,8 +656,8 @@ function initConceptMapTool(paneEl, sidebarEl) {
     });
   }
 
-  // Color palette and contrast [4][7]
-  const CMAP_FALLBACK_PALETTE = [
+  // Color palette and contrast
+  const CMAP_FALLBACK_PALETTE = [ // [4][6]
     { accent: '#c8991a', bg: '#fffdf5', label: '#fff' },
     { accent: '#2e7d5e', bg: '#f4faf7', label: '#fff' },
     { accent: '#4a56c8', bg: '#f4f5fd', label: '#fff' },
@@ -685,44 +667,75 @@ function initConceptMapTool(paneEl, sidebarEl) {
     { accent: '#888888', bg: '#f7f7f8', label: '#fff' },
   ];
 
-  // Returns '#fff' or '#000' to maximize contrast vs the given hex color
+  // WCAG relative luminance: returns '#fff' or '#000' [4]
   function contrastFor(hex) {
     let c = String(hex).trim();
     if (c.startsWith('#')) c = c.slice(1);
     if (c.length === 3) c = c.split('').map(ch => ch + ch).join('');
-    if (c.length === 8) c = c.slice(0, 6); // ignore alpha if present
+    if (c.length === 8) c = c.slice(0, 6); // ignore alpha
     if (c.length !== 6) return '#fff';
+
     const r = parseInt(c.slice(0, 2), 16) / 255;
     const g = parseInt(c.slice(2, 4), 16) / 255;
     const b = parseInt(c.slice(4, 6), 16) / 255;
+
     const toLinear = v => (v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4));
     const L = 0.2126 * toLinear(r) + 0.7152 * toLinear(g) + 0.0722 * toLinear(b);
+
     const contrastWithWhite = 1.05 / (L + 0.05);
     const contrastWithBlack = (L + 0.05) / 0.05;
+
     return contrastWithWhite >= contrastWithBlack ? '#fff' : '#000';
   }
 
+  // depthColor: normalize palette; always return {accent,bg,label} [5][4]
   function depthColor(level) {
-    const idx = level - 1;
-    const pal = (typeof getPalette === 'function' ? getPalette() : null) || window.PP_PALETTE || CMAP_FALLBACK_PALETTE; // [7]
-    if (pal && pal.length >= 5) {
-      const rotated = [pal[5], pal[1], pal[2], pal[3], pal[4], pal[5], pal[6] || pal[1]];
-      return rotated[Math.min(idx, rotated.length - 1)];
+    const idx = Math.max(0, (level | 0) - 1);
+    const fb = CMAP_FALLBACK_PALETTE[Math.min(idx, CMAP_FALLBACK_PALETTE.length - 1)];
+
+    const normalize = (item) => {
+      if (!item) return fb;
+      if (typeof item === 'string') {
+        return { accent: item, bg: fb.bg, label: contrastFor(item) };
+      }
+      const accent = item.accent || fb.accent;
+      const bg = item.bg || fb.bg;
+      const label = item.label || contrastFor(accent);
+      return { accent, bg, label };
+    };
+
+    const fromGetter = (typeof getPalette === 'function' ? getPalette() : null);
+    const palRaw = fromGetter || window.PP_PALETTE || null;
+
+    if (Array.isArray(palRaw) && palRaw.length) {
+      // Rotate/choose indexes defensively; normalize each [5]
+      const r = [
+        normalize(palRaw[6] ?? palRaw[2] ?? palRaw[1]),
+        normalize(palRaw[2] ?? palRaw[1]),
+        normalize(palRaw[3] ?? palRaw[2] ?? palRaw[1]),
+        normalize(palRaw[4] ?? palRaw[2] ?? palRaw[1]),
+        normalize(palRaw[5] ?? palRaw[3] ?? palRaw[1]),
+        normalize(palRaw[6] ?? palRaw[2] ?? palRaw[1]),
+        normalize(palRaw[7] ?? palRaw[3] ?? palRaw[1]),
+      ];
+      return r[Math.min(idx, r.length - 1)];
     }
+
+    // THEMES fallback [4][5]
     if (typeof THEMES !== 'undefined') {
       const tname = (idx < CMAP_LEVEL_THEMES.length) ? CMAP_LEVEL_THEMES[idx] : 'default';
       const theme = THEMES[tname] || THEMES.default || {};
-      const fb = CMAP_FALLBACK_PALETTE[Math.min(idx, CMAP_FALLBACK_PALETTE.length - 1)];
-      return {
-        accent: theme['--tab-active-bg'] || fb.accent,
-        label: theme['--tab-active-color'] || fb.label,
-        bg: theme['--bg-data'] || fb.bg,
-      };
+      return normalize({
+        accent: theme['--tab-active-bg'],
+        label: theme['--tab-active-color'],
+        bg: theme['--bg-data'],
+      });
     }
-    return CMAP_FALLBACK_PALETTE[Math.min(idx, CMAP_FALLBACK_PALETTE.length - 1)];
+
+    return fb;
   }
 
-  // Render cards + connectors, then layout [7][2]
+  // Render cards+connectors and layout [5]
   function renderConceptMap(hier) {
     world.innerHTML='';
     emptyEl.style.display='none';
@@ -746,22 +759,22 @@ function initConceptMapTool(paneEl, sidebarEl) {
       if (absorbedInto[i]!==-1) continue;
 
       const level=levels[i];
-      const {accent, label: lc, bg} = depthColor(level);
-      const onColor = lc || contrastFor(accent); // prefer palette label, else compute contrast [3][7]
+      const {accent, label: lc, bg} = depthColor(level); // normalized [5]
+      const onColor = lc || contrastFor(accent);
       const extras=mergeExtras.get(i)||[];
       const allRows=[i,...extras];
 
       const card=document.createElement('div');
       card.className='pp-cmap-card';
       card.style.cssText=`width:${CARD_W}px;position:absolute;z-index:${++_topZ}`;
-      card.style.setProperty('--ppc-bg', accent); // solid accent background
-      card.style.background = 'var(--ppc-bg)'; // ensure applied
-      card.style.setProperty('--ppc-on', onColor);
+      card.style.setProperty('--ppc-bg', accent);
+      card.style.setProperty('--ppc-on', onColor); // use label or computed contrast [5]
 
       const primaryRow=rows[i];
       const isSplit=!!primaryRow._splitFrom;
       const numParents=(parentsOf.get(i)||[]).length;
 
+      // Top row
       const topRow=document.createElement('div');
       topRow.className='pp-cmap-card-top';
 
@@ -797,6 +810,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
       rule.className='pp-cmap-card-rule';
       card.appendChild(rule);
 
+      // Body
       const body=document.createElement('div');
       body.className='pp-cmap-card-body';
 
@@ -825,6 +839,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
 
       card.appendChild(body);
 
+      // Footer / leaf
       const hasChildren=childrenOf[i].length>0;
       const hasParents=numParents>0;
       if (hasChildren||hasParents) {
@@ -868,47 +883,38 @@ function initConceptMapTool(paneEl, sidebarEl) {
       }
     }
 
-    // Build connectors after cards exist
+    // Build connectors after cards exist [5][6]
     for (let i=0;i<n;i++) {
       if (absorbedInto[i]!==-1) continue;
       (parentsOf.get(i)||[]).forEach(par=>{
         const parPrimary=absorbedInto[par]!==-1?absorbedInto[par]:par;
         if (!cardEls.has(i)||!cardEls.has(parPrimary)) return;
-        const{accent}=depthColor(levels[parPrimary]);
+        const {accent}=depthColor(levels[parPrimary]);
         _connEdges.push({fromId:parPrimary,toId:i,color:accent,depth:levels[parPrimary]-1});
       });
     }
 
-    // Layout (radial/tree/flow/organic), with collision resolution [2]
+    // Layout (radial/tree/flow/organic) [2]
     requestAnimationFrame(()=>{
-      const W=canvas.clientWidth||500, H=canvas.clientHeight||500;
-      const nodeIds=[]; cardEls.forEach((_,id)=>nodeIds.push(id));
-      const byLevel=new Map();
-      nodeIds.forEach(id=>{
-        const lv=levels[id];
-        if(!byLevel.has(lv)) byLevel.set(lv,[]);
-        byLevel.get(lv).push(id);
-      });
-      const maxLevel=Math.max(...byLevel.keys(),1);
-      const primaryParentOf=new Map(), childrenOfPrimary=new Map();
-      nodeIds.forEach(id=>{ childrenOfPrimary.set(id,[]); });
-      _connEdges.forEach(({fromId,toId})=>{
-        if (!primaryParentOf.has(toId)) {
-          primaryParentOf.set(toId,fromId);
-          if(childrenOfPrimary.has(fromId)) childrenOfPrimary.get(fromId).push(toId);
-        }
-      });
-      const roots=nodeIds.filter(id=>!primaryParentOf.has(id));
-      const cH=id=>{ const el=cardEls.get(id); return el?(el.offsetHeight||80):80; };
-      const GAP_X=MM_PAD+10, GAP_Y=MM_PAD+20;
+      const W=canvas.clientWidth||500, H=canvas.clientHeight||500; // [2]
+      const nodeIds=[]; cardEls.forEach((_,id)=>nodeIds.push(id)); // [2]
+      const byLevel=new Map(); // [2]
+      nodeIds.forEach(id=>{ const lv=levels[id]; if(!byLevel.has(lv)) byLevel.set(lv,[]); byLevel.get(lv).push(id); }); // [2]
+      const maxLevel=Math.max(...byLevel.keys(),1); // [2]
+      const primaryParentOf=new Map(), childrenOfPrimary=new Map(); // [2]
+      nodeIds.forEach(id=>{ childrenOfPrimary.set(id,[]); }); // [2]
+      _connEdges.forEach(({fromId,toId})=>{ if (!primaryParentOf.has(toId)) { primaryParentOf.set(toId,fromId); if(childrenOfPrimary.has(fromId)) childrenOfPrimary.get(fromId).push(toId); } }); // [2]
+      const roots=nodeIds.filter(id=>!primaryParentOf.has(id)); // [2]
+      const cH=id=>{ const el=cardEls.get(id); return el?(el.offsetHeight||80):80; }; // [2]
+      const GAP_X=MM_PAD+10, GAP_Y=MM_PAD+20; // [2]
 
-      function applyPositions(posMap) {
+      function applyPositions(posMap) { // [2]
         posMap.forEach((pos,id)=>{
           const el=cardEls.get(id); if(!el) return;
           el.style.left=pos.x+'px'; el.style.top=pos.y+'px';
           _liveRects.set(id,{x:pos.x,y:pos.y,w:CARD_W,h:cH(id)});
         });
-        // Resolve overlaps
+        // Resolve overlaps (few passes) [2]
         for (let pass=0;pass<30;pass++) {
           let moved=false;
           _liveRects.forEach((ra,ka)=>{
@@ -928,7 +934,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
         redrawConnectors();
       }
 
-      function layoutRadial() {
+      function layoutRadial() { // [2]
         const pos=new Map(), cx=W/2, cy=H/2;
         byLevel.forEach((ids,lv)=>{
           const R=maxLevel===1?0:(0.12+0.20*(lv-1))*Math.min(W,H);
@@ -942,13 +948,13 @@ function initConceptMapTool(paneEl, sidebarEl) {
         applyPositions(pos);
       }
 
-      function subtreeW(id){
+      function subtreeW(id){ // [2]
         const kids=childrenOfPrimary.get(id)||[];
         if(!kids.length) return CARD_W;
         return kids.reduce((s,k)=>s+subtreeW(k),0)+GAP_X*(kids.length-1);
       }
 
-      function layoutTree(vertical) {
+      function layoutTree(vertical) { // [2]
         const pos=new Map();
         function place(id,left,depth){
           const kids=childrenOfPrimary.get(id)||[], myW=subtreeW(id), cx=left+myW/2, h=cH(id), rowY=depth*(90+GAP_Y);
@@ -962,7 +968,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
         applyPositions(pos);
       }
 
-      function layoutFlow(vertical) {
+      function layoutFlow(vertical) { // [2]
         const pos=new Map();
         byLevel.forEach((ids,lv)=>{
           const layerH=Math.max(...ids.map(cH),80), totalW=ids.length*(CARD_W+GAP_X)-GAP_X, startX=W/2-totalW/2, rowY=(lv-1)*(layerH+GAP_Y*2);
@@ -975,7 +981,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
         applyPositions(pos);
       }
 
-      function layoutOrganic() {
+      function layoutOrganic() { // [2]
         const px={}, py={};
         nodeIds.forEach((id,i)=>{
           const a=(2*Math.PI*i/nodeIds.length)-Math.PI/2, R=Math.min(W,H)*.35;
@@ -1026,7 +1032,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
     });
   }
 
-  // Data pipeline [1][3]
+  // Data pipeline [1][4]
   function tryRender() {
     if (_rendered) return;
     if (!window.EmbeddingUtils||!window.EmbeddingUtils.isReady()) return;
@@ -1058,12 +1064,12 @@ function initConceptMapTool(paneEl, sidebarEl) {
     });
   }
 
-  async function doRender() {
+  async function doRender() { // [1]
     rebuildBtn.classList.remove('pp-cmap-busy');
     setStatus('loading','Splitting cells…');
 
     let workRows;
-    try { workRows=await splitAllRows(_rows); } // may expand rows via sentence grouping
+    try { workRows=await splitAllRows(_rows); }
     catch(e){ console.warn('[concept-map] split error:',e); workRows=_rows; }
 
     const splitCount=workRows.length-_rows.length;
@@ -1099,7 +1105,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
     },20);
   }
 
-  // Startup triggers [3]
+  // Startup triggers [4]
   if (window.EmbeddingUtils&&window.EmbeddingUtils.isReady()) setTimeout(tryRender,120);
   document.addEventListener('embeddings-ready',()=>setTimeout(tryRender,120));
   window.addEventListener('embedding-progress',ev=>{
@@ -1107,7 +1113,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
   });
   window.addEventListener('embedder-ready',()=>setTimeout(tryRender,120));
 
-  // Re-render on theme change so palette colours update [3]
+  // Re-render on theme change (palette may change) [4]
   window.addEventListener('df-theme-change', () => {
     _rendered=false;
     tryRender();
