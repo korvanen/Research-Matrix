@@ -5,7 +5,7 @@
 //   • Text color (--ppc-on) now adapts based on html.dark/html.light class
 //   • Background and accent colors read from --raw-{theme}-bg and --raw-{theme}-mid
 //     which update automatically when theme changes
-console.log('[utils-concept-map.js [v.20]');
+console.log('[utils-concept-map.js [v.21]');
 
 // Level themes — must match order/names in THEMES (utils-shared.js)
 const CMAP_LEVEL_THEMES = ['yellow','visions','relational','organizational','physical','yellow'];
@@ -625,10 +625,19 @@ function initConceptMapTool(paneEl, sidebarEl) {
       path.setAttribute('stroke-opacity',depth===0?'1':'0.9');
       path.setAttribute('stroke-dasharray',depth===0?'none':'5 3');
       _connSvg.appendChild(path);
-      const dot=document.createElementNS(ns,'circle');
-      dot.setAttribute('cx',String(b.x)); dot.setAttribute('cy',String(b.y)); dot.setAttribute('r','3.5');
-      dot.setAttribute('fill',color); dot.setAttribute('opacity','1');
-      _connSvg.appendChild(dot);
+      
+      // Dot at child end (arrow head replacement)
+      const dotChild=document.createElementNS(ns,'circle');
+      dotChild.setAttribute('cx',String(b.x)); dotChild.setAttribute('cy',String(b.y)); dotChild.setAttribute('r','3.5');
+      dotChild.setAttribute('fill',color); dotChild.setAttribute('opacity','1');
+      _connSvg.appendChild(dotChild);
+      
+      // NEW: Dot at parent end (connection point on parent card)
+      const dotParent=document.createElementNS(ns,'circle');
+      dotParent.setAttribute('cx',String(a.x)); dotParent.setAttribute('cy',String(a.y)); dotParent.setAttribute('r','4');
+      dotParent.setAttribute('fill',color); dotParent.setAttribute('opacity','0.9');
+      dotParent.setAttribute('stroke','#ffffff'); dotParent.setAttribute('stroke-width','1.5');
+      _connSvg.appendChild(dotParent);
     });
   }
 
@@ -650,10 +659,25 @@ function initConceptMapTool(paneEl, sidebarEl) {
     // Get theme-specific background color (adapts to light/dark mode)
     const bg = style.getPropertyValue('--raw-' + tname + '-bg').trim() || '#f7f7f8';
     
-    // Determine text color based on current theme mode
-    // In dark mode, use light text; in light mode, use dark text
+    // Determine text color by checking background luminance
+    // This ensures text is always readable regardless of card color or theme
     const isDark = document.documentElement.classList.contains('dark');
-    const label = isDark ? '#ffffff' : '#1a1a1a';
+    
+    // For colored card backgrounds, determine contrast
+    function getLuminance(hex) {
+      const rgb = parseInt(hex.replace('#', ''), 16);
+      const r = ((rgb >> 16) & 0xff) / 255;
+      const g = ((rgb >> 8) & 0xff) / 255;
+      const b = (rgb & 0xff) / 255;
+      const [rs, gs, bs] = [r, g, b].map(c => 
+        c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4)
+      );
+      return 0.2126 * rs + 0.7152 * gs + 0.0722 * bs;
+    }
+    
+    const bgLum = getLuminance(bg);
+    // Use white text on dark backgrounds, dark text on light backgrounds
+    const label = bgLum > 0.5 ? '#1a1a1a' : '#ffffff';
     
     return { accent, label, bg };
   }
