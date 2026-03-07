@@ -5,7 +5,7 @@
 //     globals then hardcoded CMAP_FALLBACK_PALETTE for standalone/bridge mode.
 //   • CMAP_FALLBACK_PALETTE upgraded from 5 plain hex strings to 7 full
 //     { accent, bg, label } objects matching the global theme palette.
-console.log('[sidepanel-concept-map.js [v.7]');
+console.log('[sidepanel-concept-map.js [v.6]');
 // Level themes (used by THEMES fallback path only):
 const CMAP_LEVEL_THEMES = ['yellow','visions','relational','organizational','physical','yellow'];
 
@@ -119,6 +119,35 @@ const ORPHAN_RECOVERY_THRESHOLD = 0.85;
 }
 .pp-cmap-card:active { cursor:grabbing; }
 .pp-cmap-card:hover  { box-shadow:var(--md-elev-4); }
+
+/* ── Card top layout (base styles shared with clusters) ── */
+.pp-cmap-card-top {
+  display:flex; align-items:flex-start; justify-content:space-between;
+  padding:5px 9px 4px; gap:6px;
+}
+.pp-cmap-card-cat-num {
+  font-size:11px; font-weight:800; letter-spacing:.02em; line-height:1.35;
+  flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  color:var(--md-sys-color-on-surface);
+}
+.pp-cmap-card-level-block {
+  display:flex; flex-direction:column; align-items:flex-end; flex-shrink:0;
+}
+.pp-cmap-card-level-num {
+  font-size:14px; font-weight:900; line-height:1;
+  color:var(--md-sys-color-on-surface);
+}
+.pp-cmap-card-level-label {
+  font-size:7px; font-weight:700; letter-spacing:.08em; text-transform:uppercase;
+  color:var(--md-sys-color-on-surface-variant);
+}
+.pp-cmap-card-merged {
+  font-size:8px; font-weight:600; letter-spacing:.06em; text-transform:uppercase;
+  padding:0 9px 3px; color:var(--md-sys-color-on-surface-variant);
+}
+.pp-cmap-card-rule {
+  height:1px; margin:0 9px; background:var(--md-sys-color-outline-variant); opacity:.5;
+}
 
 /* ── Solid-color card: all text becomes white ── */
 .pp-cmap-card .pp-cmap-card-cat-num { color:rgba(255,255,255,0.92) !important; }
