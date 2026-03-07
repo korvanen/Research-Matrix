@@ -298,7 +298,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
   const maxParSlider= paneEl.querySelector('#pp-cmap-maxpar');
   const maxParValEl = paneEl.querySelector('#pp-cmap-maxpar-val');
 
-  const CARD_W = 170;
+  const CARD_W = 250;
   const MM_PAD = 16;
 
   let _depth      = 5;
@@ -671,7 +671,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
     const L = 0.2126 * toLinear(r) + 0.7152 * toLinear(g) + 0.0722 * toLinear(b);
     const contrastWithWhite = (1.05) / (L + 0.05);
     const contrastWithBlack = (L + 0.05) / 0.05;
-    return contrastWithWhite >= contrastWithBlack ? '#00':'#ff';
+    return contrastWithWhite >= contrastWithBlack ? '#00000':'#fffff';
   }
 
   function depthColor(level) {
@@ -691,7 +691,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
       const fb = CMAP_FALLBACK_PALETTE[Math.min(idx, CMAP_FALLBACK_PALETTE.length - 1)];
       return {
         accent: theme['--tab-active-bg']    || fb.accent,
-        label:  theme['--tab-active-color'] || '#fff',
+        label:  theme['--tab-active-color'] || fb.label,  // line i changed from --> label:  theme['--tab-active-color'] || '#fff'
         bg:     theme['--bg-data']          || fb.bg,
       };
     }
@@ -722,7 +722,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
       card.style.cssText=`width:${CARD_W}px;position:absolute;z-index:${++_topZ}`;
       card.style.setProperty('--ppc-border',accent);
       card.style.setProperty('--ppc-bg',accent);
-      card.style.setProperty('--ppc-on', contrastFor(accent));
+      card.style.setProperty('--ppc-on', accent);  // line i changed from -->  card.style.setProperty('--ppc-on', contrastFor(accent));
 
       const primaryRow=rows[i], isSplit=!!primaryRow._splitFrom;
       const numParents=(parentsOf.get(i)||[]).length;
