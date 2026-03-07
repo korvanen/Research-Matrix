@@ -1,11 +1,11 @@
-// utils-concept-map.js — Concept Map v22
+// utils-concept-map.js — Concept Map v25
 // v19 → v20 changes:
 //   • Fixed light/dark mode support: depthColor() now reads live CSS custom
 //     properties instead of static THEMES object values
 //   • Text color (--ppc-on) now adapts based on html.dark/html.light class
 //   • Background and accent colors read from --raw-{theme}-bg and --raw-{theme}-mid
 //     which update automatically when theme changes
-console.log('[utils-concept-map.js [v.22]');
+console.log('[utils-concept-map.js [v.25]');
 
 // Level themes — must match order/names in THEMES (utils-shared.js)
 const CMAP_LEVEL_THEMES = ['yellow','visions','relational','organizational','physical','yellow'];
@@ -641,29 +641,22 @@ function initConceptMapTool(paneEl, sidebarEl) {
     });
   }
 
-  // ── Color by hierarchy level — reads from CSS custom properties ──────────
-  // Uses CSS variables that automatically update when light/dark mode changes.
-  // These are defined in utils-shared.js and respond to html.dark/html.light.
+  // ── Color by hierarchy level — uses getPalette() like clusters ────────────
+  // getPalette() returns the correct palette for current light/dark mode.
+  // This ensures concept map colors match clusters tool exactly.
   function depthColor(level) {
-    const idx   = level - 1;
-    const tname = CMAP_LEVEL_THEMES[Math.min(idx, CMAP_LEVEL_THEMES.length - 1)];
+    const idx = level - 1;
     
-    // Read live CSS custom properties from :root
-    const style = getComputedStyle(document.documentElement);
+    // Get the palette (light or dark) from utils-shared.js
+    const palette = (typeof getPalette === 'function') ? getPalette() : window.PP_PALETTE || [];
     
-    // Get theme-specific accent color (mid tone for cards)
-    const accent = style.getPropertyValue('--raw-' + tname + '-mid').trim() || 
-                   style.getPropertyValue('--raw-' + tname).trim() || 
-                   '#888888';
+    // Map level to palette index (rotated to match CMAP_LEVEL_THEMES)
+    // CMAP_LEVEL_THEMES = ['yellow','visions','relational','organizational','physical','yellow']
+    // which corresponds to palette indices [0,1,2,3,4,0]
+    const paletteIdx = [0, 1, 2, 3, 4, 0][Math.min(idx, 5)];
+    const theme = palette[paletteIdx] || { accent: '#888888', bg: '#f7f7f8', label: '#ffffff' };
     
-    // Get theme-specific background color (adapts to light/dark mode)
-    const bg = style.getPropertyValue('--raw-' + tname + '-bg').trim() || '#f7f7f8';
-    
-    // Determine text color by checking background luminance
-    // This ensures text is always readable regardless of card color or theme
-    const isDark = document.documentElement.classList.contains('dark');
-    
-    // For colored card backgrounds, determine contrast
+    // Calculate text color based on background luminance for proper contrast
     function getLuminance(hex) {
       const rgb = parseInt(hex.replace('#', ''), 16);
       const r = ((rgb >> 16) & 0xff) / 255;
@@ -675,11 +668,14 @@ function initConceptMapTool(paneEl, sidebarEl) {
       return 0.2126 * rs + 0.7152 * gs + 0.0722 * bs;
     }
     
-    const bgLum = getLuminance(bg);
-    // Use white text on dark backgrounds, dark text on light backgrounds
+    const bgLum = getLuminance(theme.bg);
     const label = bgLum > 0.5 ? '#1a1a1a' : '#ffffff';
     
-    return { accent, label, bg };
+    return { 
+      accent: theme.accent || '#888888', 
+      bg: theme.bg || '#f7f7f8',
+      label 
+    };
   }
 
   function renderConceptMap(hier) {
@@ -831,13 +827,103 @@ function initConceptMapTool(paneEl, sidebarEl) {
       const GAP_X=MM_PAD+10, GAP_Y=MM_PAD+20;
 
       function applyPositions(posMap) {
-        posMap.forEach((pos,id)=>{ const el=cardEls.get(id); if(!el) return; el.style.left=pos.x+'px'; el.style.top=pos.y+'px'; _liveRects.set(id,{x:pos.x,y:pos.y,w:CARD_W,h:cH(id)}); });
-        for (let pass=0;pass<30;pass++) {
-          let moved=false;
-          _liveRects.forEach((ra,ka)=>{ _liveRects.forEach((rb,kb)=>{ if(ka===kb) return; if(ra.x<rb.x+rb.w+MM_PAD&&ra.x+ra.w+MM_PAD>rb.x&&ra.y<rb.y+rb.h+MM_PAD&&ra.y+ra.h+MM_PAD>rb.y){ const dR=rb.x+rb.w+MM_PAD-ra.x, dL=ra.x+ra.w+MM_PAD-rb.x, dD=rb.y+rb.h+MM_PAD-ra.y, dU=ra.y+ra.h+MM_PAD-rb.y; if(Math.min(dR,dL)<=Math.min(dD,dU)) ra.x+=dR<dL?dR:-dL; else ra.y+=dD<dU?dD:-dU; const el=cardEls.get(ka); if(el){el.style.left=ra.x+'px';el.style.top=ra.y+'px';} moved=true; } }); });
-          if (!moved) break;
+        const ANIMATE_DURATION = 800;
+        const STAGGER_BASE = 60;
+        
+        // Determine if this is initial render (no previous positions)
+        const isInitialRender = [..._liveRects.values()].every(r => r.x === 0 && r.y === 0);
+        
+        if (isInitialRender) {
+          // Initial load: hierarchical cascade animation
+          const byLevel = new Map();
+          posMap.forEach((pos, id) => {
+            const lv = levels[id];
+            if (!byLevel.has(lv)) byLevel.set(lv, []);
+            byLevel.get(lv).push({ id, pos });
+          });
+          
+          const sortedLevels = [...byLevel.keys()].sort((a, b) => a - b);
+          
+          sortedLevels.forEach((lv, levelIdx) => {
+            const cards = byLevel.get(lv);
+            cards.forEach(({ id, pos }, cardIdx) => {
+              const el = cardEls.get(id);
+              if (!el) return;
+              
+              // Start from center of canvas
+              const centerX = (canvas.clientWidth || 500) / 2;
+              const centerY = (canvas.clientHeight || 500) / 2;
+              
+              el.style.left = centerX + 'px';
+              el.style.top = centerY + 'px';
+              el.style.opacity = '0';
+              el.style.transform = 'scale(0.8)';
+              el.style.transition = 'none';
+              
+              // Stagger: each level starts after previous, plus internal card stagger
+              const delay = levelIdx * STAGGER_BASE + cardIdx * 20;
+              
+              requestAnimationFrame(() => {
+                setTimeout(() => {
+                  el.style.transition = `left ${ANIMATE_DURATION}ms cubic-bezier(0.34, 1.56, 0.64, 1), top ${ANIMATE_DURATION}ms cubic-bezier(0.34, 1.56, 0.64, 1), opacity ${ANIMATE_DURATION * 0.6}ms ease-out, transform ${ANIMATE_DURATION}ms cubic-bezier(0.34, 1.56, 0.64, 1)`;
+                  el.style.left = pos.x + 'px';
+                  el.style.top = pos.y + 'px';
+                  el.style.opacity = '1';
+                  el.style.transform = 'scale(1)';
+                  _liveRects.set(id, { x: pos.x, y: pos.y, w: CARD_W, h: cH(id) });
+                }, delay);
+              });
+            });
+          });
+          
+          // Redraw connectors after animation completes
+          setTimeout(() => {
+            redrawConnectors();
+            // Remove transition styles after animation
+            cardEls.forEach(el => {
+              el.style.transition = '';
+            });
+          }, ANIMATE_DURATION + sortedLevels.length * STAGGER_BASE + 100);
+          
+        } else {
+          // Layout change: smooth transition from current position
+          posMap.forEach((pos, id) => {
+            const el = cardEls.get(id);
+            if (!el) return;
+            
+            el.style.transition = `left ${ANIMATE_DURATION}ms cubic-bezier(0.2, 0, 0, 1), top ${ANIMATE_DURATION}ms cubic-bezier(0.2, 0, 0, 1)`;
+            el.style.left = pos.x + 'px';
+            el.style.top = pos.y + 'px';
+            _liveRects.set(id, { x: pos.x, y: pos.y, w: CARD_W, h: cH(id) });
+          });
+          
+          // Animate connectors during transition
+          const startTime = performance.now();
+          function animateConnectors(currentTime) {
+            const elapsed = currentTime - startTime;
+            if (elapsed < ANIMATE_DURATION) {
+              redrawConnectors();
+              requestAnimationFrame(animateConnectors);
+            } else {
+              redrawConnectors();
+              // Remove transition styles
+              cardEls.forEach(el => {
+                el.style.transition = '';
+              });
+            }
+          }
+          requestAnimationFrame(animateConnectors);
         }
-        redrawConnectors();
+        
+        // Collision detection runs after animation completes
+        setTimeout(() => {
+          for (let pass=0;pass<30;pass++) {
+            let moved=false;
+            _liveRects.forEach((ra,ka)=>{ _liveRects.forEach((rb,kb)=>{ if(ka===kb) return; if(ra.x<rb.x+rb.w+MM_PAD&&ra.x+ra.w+MM_PAD>rb.x&&ra.y<rb.y+rb.h+MM_PAD&&ra.y+ra.h+MM_PAD>rb.y){ const dR=rb.x+rb.w+MM_PAD-ra.x, dL=ra.x+ra.w+MM_PAD-rb.x, dD=rb.y+rb.h+MM_PAD-ra.y, dU=ra.y+ra.h+MM_PAD-rb.y; if(Math.min(dR,dL)<=Math.min(dD,dU)) ra.x+=dR<dL?dR:-dL; else ra.y+=dD<dU?dD:-dU; const el=cardEls.get(ka); if(el){el.style.left=ra.x+'px';el.style.top=ra.y+'px';} moved=true; } }); });
+            if (!moved) break;
+          }
+          redrawConnectors();
+        }, isInitialRender ? ANIMATE_DURATION + 400 : ANIMATE_DURATION + 50);
       }
 
       function layoutRadial() {
