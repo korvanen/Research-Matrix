@@ -1,11 +1,11 @@
-// utils-concept-map.js — Concept Map v20
+// utils-concept-map.js — Concept Map v22
 // v19 → v20 changes:
 //   • Fixed light/dark mode support: depthColor() now reads live CSS custom
 //     properties instead of static THEMES object values
 //   • Text color (--ppc-on) now adapts based on html.dark/html.light class
 //   • Background and accent colors read from --raw-{theme}-bg and --raw-{theme}-mid
 //     which update automatically when theme changes
-console.log('[utils-concept-map.js [v.21]');
+console.log('[utils-concept-map.js [v.22]');
 
 // Level themes — must match order/names in THEMES (utils-shared.js)
 const CMAP_LEVEL_THEMES = ['yellow','visions','relational','organizational','physical','yellow'];
