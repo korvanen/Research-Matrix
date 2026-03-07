@@ -5,7 +5,7 @@
 //     globals then hardcoded CMAP_FALLBACK_PALETTE for standalone/bridge mode.
 //   • CMAP_FALLBACK_PALETTE upgraded from 5 plain hex strings to 7 full
 //     { accent, bg, label } objects matching the global theme palette.
-console.log('[sidepanel-concept-map.js [v.9]');
+console.log('[sidepanel-concept-map.js [v.6]');
 // Level themes (used by THEMES fallback path only):
 const CMAP_LEVEL_THEMES = ['yellow','visions','relational','organizational','physical','yellow'];
 
@@ -24,7 +24,7 @@ const ORPHAN_RECOVERY_THRESHOLD = 0.85;
   display:flex; flex-direction:column; gap:5px;
 }
 #pp-cmap-subtitle {
-  font-size:11px; font-weight:500; color:rgba(0,0,0,.45);
+  font-size:11px; font-weight:500; color:var(--md-sys-color-on-surface-variant);
   letter-spacing:.04em; line-height:1.3; min-height:14px;
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
 }
@@ -33,11 +33,11 @@ const ORPHAN_RECOVERY_THRESHOLD = 0.85;
   font-size:9px; font-weight:600; letter-spacing:.07em; text-transform:uppercase;
   transition:opacity .6s ease, background .4s ease;
 }
-#pp-cmap-status.cmap-loading { background:rgba(0,0,0,.06);      color:rgba(0,0,0,.4); }
+#pp-cmap-status.cmap-loading { background:var(--md-sys-color-surface-container);color:var(--md-sys-color-on-surface-variant); }
 #pp-cmap-status.cmap-ready   { background:rgba(60,180,100,.12); color:rgba(30,130,60,.9); }
 #pp-cmap-status.cmap-error   { background:rgba(200,60,60,.10);  color:rgba(180,40,40,.85); }
 .pp-cmap-dot { width:6px;height:6px;border-radius:50%;flex-shrink:0;transition:background .4s; }
-#pp-cmap-status.cmap-loading .pp-cmap-dot { background:rgba(0,0,0,.25);animation:pp-cmap-pulse 1.2s ease-in-out infinite; }
+#pp-cmap-status.cmap-loading .pp-cmap-dot { background:var(--md-sys-color-on-surface-variant);animation:pp-cmap-pulse 1.2s ease-in-out infinite; }
 #pp-cmap-status.cmap-ready .pp-cmap-dot   { background:rgba(40,160,80,.9); }
 #pp-cmap-status.cmap-error .pp-cmap-dot   { background:rgba(180,40,40,.85); }
 @keyframes pp-cmap-pulse { 0%,100%{opacity:.25;transform:scale(.85);}50%{opacity:1;transform:scale(1.1);} }
@@ -51,25 +51,25 @@ const ORPHAN_RECOVERY_THRESHOLD = 0.85;
 #pp-cmap-rebuild {
   border:none; border-radius:5px; padding:4px 8px; align-self:stretch;
   font-size:8px; font-weight:700; letter-spacing:.07em; text-transform:uppercase;
-  background:rgba(0,0,0,.07); color:rgba(0,0,0,.45); cursor:pointer;
+  background:var(--md-sys-color-surface-container);color:var(--md-sys-color-on-surface-variant); cursor:pointer;
   transition:background .15s,color .15s; white-space:nowrap;
 }
-#pp-cmap-rebuild:hover { background:rgba(0,0,0,.13); color:rgba(0,0,0,.75); }
-#pp-cmap-rebuild.pp-cmap-busy { background:rgba(0,0,0,.04);color:rgba(0,0,0,.25);cursor:default; }
+#pp-cmap-rebuild:hover { background:var(--md-sys-color-surface-container-high);color:var(--md-sys-color-on-surface); }
+#pp-cmap-rebuild.pp-cmap-busy { background:var(--md-sys-color-surface-container-low);color:var(--md-sys-color-on-surface-variant);cursor:default; }
 
 #pp-cmap-layout-wrap { position:relative; align-self:stretch; }
 #pp-cmap-layout-btn {
   height:100%; border:none; border-radius:5px; padding:4px 7px;
   font-size:8px; font-weight:700; letter-spacing:.07em; text-transform:uppercase;
-  background:rgba(0,0,0,.07); color:rgba(0,0,0,.45); cursor:pointer;
+  background:var(--md-sys-color-surface-container);color:var(--md-sys-color-on-surface-variant); cursor:pointer;
   transition:background .15s,color .15s; white-space:nowrap;
   display:flex; align-items:center; gap:3px;
 }
-#pp-cmap-layout-btn:hover, #pp-cmap-layout-btn.open { background:rgba(0,0,0,.13); color:rgba(0,0,0,.75); }
+#pp-cmap-layout-btn:hover, #pp-cmap-layout-btn.open { background:var(--md-sys-color-surface-container-high);color:var(--md-sys-color-on-surface); }
 #pp-cmap-layout-menu {
   position:absolute; top:calc(100% + 5px); right:0; z-index:300;
-  background:#fff; border:1px solid rgba(0,0,0,.13); border-radius:9px;
-  box-shadow:0 6px 22px rgba(0,0,0,.18); padding:5px; min-width:148px;
+  background:var(--md-sys-color-surface-container-lowest);border:1px solid var(--md-sys-color-outline-variant); border-radius:9px;
+  box-shadow:var(--md-elev-3); padding:5px; min-width:148px;
   display:none; flex-direction:column; gap:1px;
   animation:pp-cmap-menu-in .15s cubic-bezier(0.22,1,0.36,1) both;
 }
@@ -78,12 +78,12 @@ const ORPHAN_RECOVERY_THRESHOLD = 0.85;
 .pp-cmap-layout-opt {
   display:flex; align-items:center; gap:6px; width:100%; border:none; background:transparent;
   text-align:left; padding:5px 9px; border-radius:6px; cursor:pointer;
-  font-size:9px; font-weight:600; letter-spacing:.03em; color:rgba(0,0,0,.6); transition:background .12s;
+  font-size:9px; font-weight:600; letter-spacing:.03em; color:var(--md-sys-color-on-surface-variant); transition:background .12s;
 }
-.pp-cmap-layout-opt:hover { background:rgba(0,0,0,.06); color:rgba(0,0,0,.85); }
-.pp-cmap-layout-opt.active { color:var(--color-topbar-sheet,#111); background:rgba(0,0,0,.07); }
-.pp-cmap-layout-sep { height:1px; background:rgba(0,0,0,.07); margin:3px 4px; }
-.pp-cmap-layout-group { font-size:7px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:rgba(0,0,0,.28);padding:4px 9px 2px; }
+.pp-cmap-layout-opt:hover { background:var(--md-sys-color-surface-container); color:var(--md-sys-color-on-surface); }
+.pp-cmap-layout-opt.active { color:var(--color-topbar-sheet,#111); background:var(--md-sys-color-surface-container); }
+.pp-cmap-layout-sep { height:1px; background:var(--md-sys-color-outline-variant); margin:3px 4px; }
+.pp-cmap-layout-group { font-size:7px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--md-sys-color-on-surface-variant);padding:4px 9px 2px; }
 
 #pp-cmap-canvas {
   flex:1; min-height:0; position:relative; overflow:hidden; cursor:default; user-select:none;
@@ -94,28 +94,28 @@ const ORPHAN_RECOVERY_THRESHOLD = 0.85;
   position:absolute; inset:0; display:flex; flex-direction:column;
   align-items:center; justify-content:center; gap:8px;
   font-size:11px; letter-spacing:.08em; text-transform:uppercase;
-  color:rgba(0,0,0,.25); text-align:center; padding:24px; pointer-events:none;
+  color:var(--md-sys-color-on-surface-variant); text-align:center; padding:24px; pointer-events:none;
 }
 #pp-cmap-zoom-hint {
   position:absolute; bottom:7px; right:9px; font-size:9px; font-weight:600;
-  letter-spacing:.05em; color:rgba(0,0,0,.22); pointer-events:none; z-index:20;
+  letter-spacing:.05em; color:var(--md-sys-color-on-surface-variant); pointer-events:none; z-index:20;
 }
 #pp-cmap-fit {
   position:absolute; bottom:28px; right:9px; z-index:25;
   width:24px; height:24px; border:none; border-radius:5px; padding:0;
-  background:rgba(0,0,0,.07); color:rgba(0,0,0,.4); cursor:pointer;
+  background:var(--md-sys-color-surface-container);color:var(--md-sys-color-on-surface-variant); cursor:pointer;
   display:grid; place-items:center; transition:background .15s,color .15s;
 }
-#pp-cmap-fit:hover { background:rgba(0,0,0,.14); color:rgba(0,0,0,.75); }
+#pp-cmap-fit:hover { background:var(--md-sys-color-surface-container-high);color:var(--md-sys-color-on-surface); }
 
 .pp-cmap-card {
   position:absolute; border-radius:9px;
   border:1.5px solid var(--ppc-border,#aaa); background:var(--ppc-bg,#fff);
-  box-shadow:0 2px 10px rgba(0,0,0,.10); cursor:grab; user-select:none;
+  box-shadow:var(--md-elev-1); cursor:grab; user-select:none;
   overflow:hidden; transition:box-shadow .15s;
 }
 .pp-cmap-card:active { cursor:grabbing; }
-.pp-cmap-card:hover  { box-shadow:0 4px 18px rgba(0,0,0,.16); }
+.pp-cmap-card:hover  { box-shadow:var(--md-elev-2); }
 .pp-cmap-card-head { padding:5px 9px 4px; display:flex; align-items:flex-start; gap:5px; flex-wrap:wrap; }
 .pp-cmap-level-badge {
   font-size:8px; font-weight:800; letter-spacing:.10em; text-transform:uppercase;
@@ -138,24 +138,24 @@ const ORPHAN_RECOVERY_THRESHOLD = 0.85;
 .pp-cmap-card-body { padding:6px 9px 4px; display:flex; flex-direction:column; gap:4px; }
 .pp-cmap-cell-cat {
   font-size:8px; font-weight:700; letter-spacing:.08em; text-transform:uppercase;
-  color:rgba(0,0,0,.35); margin-bottom:1px;
+  color:var(--md-sys-color-on-surface-variant); margin-bottom:1px;
 }
-.pp-cmap-cell-text { font-size:10px; line-height:1.38; color:rgba(0,0,0,.76); word-break:break-word; overflow-wrap:break-word; }
-.pp-cmap-merge-sep { border-top:1px solid rgba(0,0,0,.07); margin:3px 0; }
+.pp-cmap-cell-text { font-size:10px; line-height:1.38; color:var(--md-sys-color-on-surface); word-break:break-word; overflow-wrap:break-word; }
+.pp-cmap-merge-sep { border-top:1px solid var(--md-sys-color-outline-variant); margin:3px 0; }
 .pp-cmap-card-footer {
-  padding:4px 9px 7px; border-top:1px solid rgba(0,0,0,.06); margin-top:2px;
+  padding:4px 9px 7px; border-top:1px solid var(--md-sys-color-outline-variant); margin-top:2px;
   display:flex; flex-direction:column; gap:3px;
 }
 .pp-cmap-sim-row { display:flex; align-items:center; gap:5px; }
 .pp-cmap-sim-arrow {
   font-size:9px; font-weight:800; flex-shrink:0; width:10px; text-align:center; opacity:.55;
 }
-.pp-cmap-sim-bar { flex:1; height:3px; border-radius:2px; background:rgba(0,0,0,.08); overflow:hidden; }
+.pp-cmap-sim-bar { flex:1; height:3px; border-radius:2px; background:var(--md-sys-color-surface-container-high); overflow:hidden; }
 .pp-cmap-sim-fill { height:100%; border-radius:2px; transition:width .3s ease; }
-.pp-cmap-sim-label { font-size:9px; font-weight:700; letter-spacing:.04em; flex-shrink:0; color:rgba(0,0,0,.45); min-width:52px; }
+.pp-cmap-sim-label { font-size:9px; font-weight:700; letter-spacing:.04em; flex-shrink:0; color:var(--md-sys-color-on-surface-variant); min-width:52px; }
 .pp-cmap-leaf-badge {
   font-size:8px; font-weight:600; letter-spacing:.06em; text-transform:uppercase;
-  color:rgba(0,0,0,.28); padding:4px 9px 7px; display:block;
+  color:var(--md-sys-color-on-surface-variant); padding:4px 9px 7px; display:block;
 }
 `;
   document.head.appendChild(s);
@@ -597,13 +597,13 @@ function initConceptMapTool(paneEl, sidebarEl) {
       const path=document.createElementNS(ns,'path');
       path.setAttribute('d',`M${a.x},${a.y} C${a.x+tA.dx*off},${a.y+tA.dy*off} ${b.x+tB.dx*off},${b.y+tB.dy*off} ${b.x},${b.y}`);
       path.setAttribute('fill','none'); path.setAttribute('stroke',color);
-      path.setAttribute('stroke-width',depth===0?'2':'1.5');
-      path.setAttribute('stroke-opacity',depth===0?'0.55':'0.38');
+      path.setAttribute('stroke-width',depth===0?'2.5':'1.5');
+      path.setAttribute('stroke-opacity',depth===0?'0.75':'0.55');
       path.setAttribute('stroke-dasharray',depth===0?'none':'5 3');
       _connSvg.appendChild(path);
       const dot=document.createElementNS(ns,'circle');
       dot.setAttribute('cx',String(b.x)); dot.setAttribute('cy',String(b.y)); dot.setAttribute('r','3.5');
-      dot.setAttribute('fill',color); dot.setAttribute('opacity','0.6');
+      dot.setAttribute('fill',color); dot.setAttribute('opacity','0.85');
       _connSvg.appendChild(dot);
     });
   }
