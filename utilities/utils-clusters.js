@@ -1,12 +1,13 @@
-// utils-clusters.js — Clusters tool v35
-// v34 → v35 changes:
-//   • All inline CSS replaced with MD3 design-system.css tokens (--md-sys-color-*, --md-elev-*, --radius-*, etc.)
-//   • Sheet overlay panel replaced with createSidePanel() from utils-panel.js
-//     – correct drag direction (right edge drag expands leftward)
-//     – open/close arrow buttons wired to visible state via ds-panel-arrow--open / --close
-//   • Nest cards, tooltips, table cells, status badge all use semantic DS tokens
-//   • Dark-mode inherits automatically via CSS custom properties
-console.log('[utils-clusters.js V3]');
+// utils-clusters.js — Clusters tool v37 (BENTO-BOX FIXED)
+// v36 → v37 changes:
+//   • Bento-box card layout with flexible 140-280px card widths
+//   • CSS Grid layout replaces flexbox for card tiling
+//   • Full text wrapping - removed line-clamp truncation
+//   • Invisible cluster boundaries with hover-reveal
+//   • REMOVED sub-cluster strips/headers - cards flow freely by color
+//   • Fixed text contrast using --ppc-on variable
+//   • Fixed card height auto-expansion
+console.log('[utils-clusters.js V37 - BENTO BOX FIXED]');
 
 var CL_MIN_SPLIT_LENGTH = 60;
 
@@ -232,15 +233,18 @@ var CL_MIN_SPLIT_LENGTH = 60;
 }
 
 .pp-cl-nest-body {
-  flex: 1; min-height: 0; overflow: visible;
+  flex: 1; 
+  min-height: 0; 
+  overflow: visible;
   padding: var(--space-3);
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
   gap: var(--space-2);
   align-content: start;
+  align-items: start; /* FIXED: allows cards to expand vertically */
   scrollbar-width: thin;
   scrollbar-color: var(--md-sys-color-outline-variant) transparent;
-  pointer-events: all; /* Cards are always clickable */
+  pointer-events: all;
 }
 
 .pp-cl-nest-body::-webkit-scrollbar       { width: 4px; }
@@ -256,18 +260,18 @@ var CL_MIN_SPLIT_LENGTH = 60;
 
 .pp-cl-resize-handle {
   position: absolute; bottom: 0; right: 0;
-  width: 14px; height: 14px;
+  width: 16px; height: 16px;
   cursor: nwse-resize;
-  background: linear-gradient(135deg, transparent 50%, var(--md-sys-color-outline-variant) 50%);
+  background: linear-gradient(135deg, transparent 50%, var(--md-sys-color-outline) 50%);
   border-radius: 0 0 var(--radius-sm) 0;
   z-index: 5;
-  opacity: .5;
+  opacity: 0;
   transition: opacity var(--transition-fast);
 }
 .pp-cl-nest:hover .pp-cl-resize-handle { opacity: 0.6; }
 .pp-cl-nest:hover .pp-cl-resize-handle:hover { opacity: 1; }
 
-/* ── Cards — Bento box style with flexible sizing (BENTO-BOX) ──────────────────────────── */
+/* ── Cards — Bento box style with flexible sizing (BENTO-BOX FIXED) ──────────────────────────── */
 .pp-cl-card {
   border-radius: var(--radius-md);
   border: 1px solid var(--md-sys-color-outline-variant);
@@ -279,13 +283,18 @@ var CL_MIN_SPLIT_LENGTH = 60;
   /* Height auto-adjusts to content */
   min-height: 80px;
   height: auto;
-  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
-  animation: pp-cl-card-in .22s var(--md-motion-easing-emphasized-decel) both;
-  box-sizing: border-box;
-  position: relative; 
-  overflow: visible;
+  /* Grid alignment - FIXED */
+  align-self: start; /* Allows vertical expansion */
+  justify-self: stretch;
+  /* Layout */
   display: flex;
   flex-direction: column;
+  position: relative; 
+  overflow: visible;
+  box-sizing: border-box;
+  /* Animation */
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+  animation: pp-cl-card-in .22s var(--md-motion-easing-emphasized-decel) both;
 }
 
 .pp-cl-card::before {
@@ -310,14 +319,14 @@ var CL_MIN_SPLIT_LENGTH = 60;
   to   { opacity: 1; transform: none; }
 }
 
-/* ── Solid-colour card: text driven by --ppc-on (set from palette label in JS) ── */
+/* ── Card text with PROPER CONTRAST (FIXED - uses --ppc-on set by JS) ── */
 .pp-cl-card .pp-cmap-card-cat-num     { 
   font-family: var(--font-family-serif);
   font-size: 28px;
   line-height: 1;
   font-weight: 400;
   font-style: italic;
-  color: color-mix(in srgb, var(--ppc-on,#fff) 92%, transparent); 
+  color: color-mix(in srgb, var(--ppc-on,#fff) 92%, var(--ppc-bg, transparent)); 
   letter-spacing: -0.02em;
   flex: 1;
   min-width: 0;
@@ -329,76 +338,56 @@ var CL_MIN_SPLIT_LENGTH = 60;
   font-weight: var(--font-weight-medium);
   letter-spacing: var(--letter-spacing-caps);
   text-transform: uppercase;
-  color: color-mix(in srgb, var(--ppc-on,#fff) 55%, transparent); 
+  color: color-mix(in srgb, var(--ppc-on,#fff) 55%, var(--ppc-bg, transparent)); 
 }
 .pp-cl-card .pp-cmap-card-rule        { 
   height: 1px;
-  background: color-mix(in srgb, var(--ppc-on,#fff) 20%, transparent); 
+  background: color-mix(in srgb, var(--ppc-on,#fff) 20%, var(--ppc-bg, transparent)); 
   margin: 8px 14px 0;
   flex-shrink: 0;
   opacity: 1; 
 }
-.pp-cl-card .pp-cl-card-cat           { color: color-mix(in srgb, var(--ppc-on,#fff) 65%, transparent); }
-.pp-cl-card .pp-cl-card-text          { 
+.pp-cl-card .pp-cl-card-cat {
+  color: color-mix(in srgb, var(--ppc-on,#fff) 65%, var(--ppc-bg, transparent));
+}
+.pp-cl-card .pp-cl-card-text { 
   font-family: var(--font-family-serif);
   font-size: 14px;
   font-weight: 400;
   line-height: 1.35;
   letter-spacing: -0.01em;
-  color: color-mix(in srgb, var(--ppc-on,#fff) 95%, transparent);
-  /* Remove line clamp - let text wrap naturally */
+  color: color-mix(in srgb, var(--ppc-on,#fff) 95%, var(--ppc-bg, transparent));
+  /* FULL TEXT WRAPPING */
   display: block;
   overflow-wrap: break-word;
   word-break: break-word;
 }
-.pp-cl-card .pp-cl-card-split         { color: color-mix(in srgb, var(--ppc-on,#fff) 50%, transparent); }
+.pp-cl-card .pp-cl-card-split {
+  color: color-mix(in srgb, var(--ppc-on,#fff) 50%, var(--ppc-bg, transparent));
+}
 
-.pp-cl-card-body        { 
+.pp-cl-card-body {
   padding: 10px 14px 14px;
   display: flex;
   flex-direction: column;
   gap: 6px;
-  flex: 1;
-}
-.pp-cl-card-cat {
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-medium);
-  letter-spacing: var(--letter-spacing-caps);
-  text-transform: uppercase;
-  color: var(--md-sys-color-on-surface-variant);
-  margin-bottom: 2px;
-}
-.pp-cl-card-text {
-  font-size: var(--font-size-sm);
-  line-height: 1.4;
-  color: var(--md-sys-color-on-surface);
-}
-.pp-cl-card-split {
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-medium);
-  letter-spacing: var(--letter-spacing-caps);
-  text-transform: uppercase;
-  color: var(--md-sys-color-outline);
-  margin-top: 2px;
-}
-.pp-cl-sub-strip {
-  width: 100%; 
-  display: flex; 
-  align-items: center;
-  gap: var(--space-2); 
-  padding: 6px var(--space-3);
-  border-radius: var(--radius-sm);
-  box-sizing: border-box;
-  margin-bottom: var(--space-1);
-  grid-column: 1 / -1; /* Span full width in grid */
+  flex: 1; /* Expands to fill card height */
 }
 
-/* Sub-cluster strip */
-.pp-cl-sub-strip {
-  width: 100%; display: flex; align-items: center;
-  gap: var(--space-1); padding: 3px var(--space-2);
-  border-radius: var(--radius-xs);
-  box-sizing: border-box;
+.pp-cl-card-cat {
+  font-size: 9px;
+  font-weight: var(--font-weight-medium);
+  letter-spacing: var(--letter-spacing-caps);
+  text-transform: uppercase;
+  margin-bottom: 2px;
+}
+
+.pp-cl-card-split {
+  font-size: 8px;
+  font-weight: var(--font-weight-medium);
+  letter-spacing: var(--letter-spacing-caps);
+  text-transform: uppercase;
+  margin-top: 4px;
 }
 
 /* ── Tooltip — MD3 Plain Tooltip ────────────────────────── */
@@ -1244,43 +1233,39 @@ function initClustersTool(paneEl, sidebarEl) {
     return card;
   }
 
+  // FIXED: buildInnerTiles - NO SUB-CLUSTER STRIPS, cards flow freely by color
   function buildInnerTiles(rows, subAsgn, col, outerLbl) {
     const frag = document.createDocumentFragment();
+    
     if (!subAsgn || _depth <= 1) {
-      const tileRow = document.createElement('div'); tileRow.className = 'pp-cl-tile-row';
-      rows.forEach((r, ri) => tileRow.appendChild(buildCard(r, col, ri * 10, outerLbl)));
-      frag.appendChild(tileRow);
-      return frag;
+      // Single-level: all cards same color
+      rows.forEach((r, ri) => {
+        frag.appendChild(buildCard(r, col, ri * 10, outerLbl));
+      });
+    } else {
+      // Multi-level: each sub-cluster gets its own color, NO dividers
+      const numSub = Math.max(...subAsgn, 0) + 1;
+      const groups = Array.from({ length: numSub }, () => []);
+      rows.forEach((r, i) => groups[subAsgn[i]].push(r));
+      
+      // Render cards grouped by sub-cluster, each group has its color
+      groups.forEach((members, si) => {
+        if (!members.length) return;
+        const subCol = colForIndex(si);
+        const subLbl = innerLabel(outerLbl, si);
+        
+        // Just add cards directly - they'll flow in the grid
+        members.forEach((r, ri) => {
+          frag.appendChild(buildCard(r, subCol, ri * 10, subLbl));
+        });
+      });
     }
-    const numSub = Math.max(...subAsgn, 0) + 1;
-    const groups = Array.from({ length: numSub }, () => []);
-    rows.forEach((r, i) => groups[subAsgn[i]].push(r));
-    groups.forEach((members, si) => {
-      if (!members.length) return;
-      const subCol = colForIndex(si);
-      const subLbl = innerLabel(outerLbl, si);
-      const strip  = document.createElement('div');
-      strip.className = 'pp-cl-sub-strip';
-      strip.style.background   = subCol.accent + '18';
-      strip.style.marginTop    = si === 0 ? '0' : 'var(--space-1)';
-      const dot = document.createElement('span');
-      dot.style.cssText = 'width:5px;height:5px;border-radius:50%;background:' + subCol.accent + ';flex-shrink:0;display:inline-block;';
-      const lbl = document.createElement('span');
-      lbl.style.cssText = 'font-size:var(--font-size-xs);font-weight:var(--font-weight-bold);letter-spacing:var(--letter-spacing-caps);color:' + subCol.accent + ';margin-right:var(--space-1);flex-shrink:0;';
-      lbl.textContent = subLbl;
-      const cnt = document.createElement('span');
-      cnt.style.cssText = 'font-size:var(--font-size-xs);font-weight:var(--font-weight-medium);color:' + subCol.accent + ';opacity:.7;';
-      cnt.textContent = members.length + ' entr' + (members.length === 1 ? 'y' : 'ies');
-      strip.appendChild(dot); strip.appendChild(lbl); strip.appendChild(cnt);
-      frag.appendChild(strip);
-      const tileWrap = document.createElement('div'); tileWrap.className = 'pp-cl-tile-row';
-      members.forEach((r, ri) => tileWrap.appendChild(buildCard(r, subCol, ri * 10, subLbl)));
-      frag.appendChild(tileWrap);
-    });
+    
     return frag;
   }
 
-function buildOuterNest(members, outerIdx, subAsgn) {
+  // FIXED: buildOuterNest with improved height calculation
+  function buildOuterNest(members, outerIdx, subAsgn) {
     const col = colForIndex(outerIdx);
     const lbl = outerLabel(outerIdx);
     const nest = document.createElement('div');
@@ -1316,17 +1301,14 @@ function buildOuterNest(members, outerIdx, subAsgn) {
     nest.appendChild(body);
     body.appendChild(buildInnerTiles(members, subAsgn, col, lbl));
 
-    // ────────────────────────────────────────────────────────────────────────
     // BENTO-BOX LAYOUT: Calculate grid-based dimensions
-    // Grid: auto-fill with minmax(140px, 1fr), gap 8px
-    // ────────────────────────────────────────────────────────────────────────
     const MIN_CARD_W = 140;
     const GAP = 8;
     const PADDING = 12;
     const HEAD_H = 40;
     
     // Estimate how many columns we can fit
-    const totalCards = members.length + (subAsgn && _depth > 1 ? subCount : 0); // cards + sub-strips
+    const totalCards = members.length; // Just count cards, no strips
     const idealCols = Math.min(Math.max(3, Math.ceil(Math.sqrt(totalCards))), 6);
     
     // Calculate nest width to accommodate grid
@@ -1335,12 +1317,12 @@ function buildOuterNest(members, outerIdx, subAsgn) {
       idealCols * MIN_CARD_W + (idealCols - 1) * GAP + PADDING * 2
     );
     
-    // Height is auto-calculated by content, but we need a minimum
+    // FIXED: Increased height for wrapped text
     const estimatedRows = Math.ceil(totalCards / idealCols);
-    const AVG_CARD_H = 120; // Average card height with wrapped text
+    const AVG_CARD_H = 140; // Increased from 120 to account for text wrapping
     const nestH = Math.max(
       RESIZE_MIN_H,
-      HEAD_H + estimatedRows * AVG_CARD_H + (estimatedRows - 1) * GAP + PADDING * 2
+      HEAD_H + estimatedRows * AVG_CARD_H + (estimatedRows - 1) * GAP + PADDING * 2 + 40
     );
     
     nest.style.width  = nestW + 'px';
@@ -1348,9 +1330,7 @@ function buildOuterNest(members, outerIdx, subAsgn) {
     nest._estW = nestW; 
     nest._estH = nestH;
 
-    // ────────────────────────────────────────────────────────────────────────
     // HOVER-REVEAL: Add hover behavior to show cluster boundaries
-    // ────────────────────────────────────────────────────────────────────────
     body.addEventListener('mouseenter', () => {
       nest.classList.add('pp-cl-nest-reveal');
     });
