@@ -2,7 +2,7 @@
 // utils-shared.js — shared data, theme, and UI utilities
 // Loaded by: index.html, tools/spreadsheet.html, tools/*.html
 // ════════════════════════════════════════════════════════════════
-console.log('[utils-shared.js v.12]');
+console.log('[utils-shared.js v.9]');
 
 // ════════════════════════════════════════════════════════════════
 // DARK / LIGHT MODE
@@ -216,96 +216,138 @@ function modifyColor(hex, { lightness = 0, saturation = 0, hue = 0, alpha } = {}
 }
 
 // ════════════════════════════════════════════════════════════════
-// THEMES
+// THEME DEFINITIONS — single source of truth
+// To add a theme: add one entry here. Everything else is computed.
+// To edit a theme: change the hex here. No other files need editing.
+//
+// Fields:
+//   base      — the primary brand colour (mid tone)
+//   tabIndex  — which spreadsheet tab slot uses this theme (0-based)
+//               can be omitted if the theme isn't tied to a tab
 // ════════════════════════════════════════════════════════════════
 
-function makeTheme(base) {
-  const themeColor_1 = modifyColor(base, { lightness:  0.4  });
-  const themeColor_2 = modifyColor(base, { lightness: -0.10, alpha: 0.15 });
-  const themeColor_3 = modifyColor(base, { lightness:  0.9,  saturation: -0.55 });
-  return {
-    '--bg-topbar':               modifyColor(base, { lightness:  0.7,  saturation: -0.55 }),
-    '--bg-bottombar':            modifyColor(base, { lightness:  0.7,  saturation: -0.55 }),
-    '--bg-header':               themeColor_1,
-    '--bg-cat':                  themeColor_1,
-    '--bg-corner':               themeColor_1,
-    '--bg-data':                 modifyColor(base, { lightness:  0.9,  saturation: -0.60 }),
-    '--color-data':              modifyColor(base, { lightness: -0.30, saturation: -0.20, alpha: 0.80 }),
-    '--color-cat':               modifyColor(base, { lightness: -0.25, saturation: -0.10, alpha: 0.55 }),
-    '--color-header':            modifyColor(base, { lightness: -0.25, saturation: -0.10, alpha: 0.55 }),
-    '--color-topbar-global':     modifyColor(base, { lightness: -0.20, saturation: -0.10, alpha: 0.40 }),
-    '--color-topbar-sheet':      modifyColor(base, { lightness: -0.35, saturation:  0.00 }),
-    '--border-main':             themeColor_2,
-    '--border-group':            modifyColor(base, { lightness:  0.18, saturation: -0.25 }),
-    '--border-strong':           themeColor_3,
-    '--border-corner':           modifyColor(base, { lightness:  0.18, saturation: -0.25 }),
-    '--border-sticky':           modifyColor(base, { lightness:  0.18, saturation: -0.25 }),
-    '--highlight-cell':          modifyColor(base, { lightness:  0.2,  saturation:  0.00, alpha: 0.50 }),
-    '--highlight-group':         modifyColor(base, { lightness:  0.32, saturation: -0.10, alpha: 0.35 }),
-    '--selected-cell':           modifyColor(base, { lightness:  0.10, saturation:  0.05, alpha: 0.70 }),
-    '--selected-group':          modifyColor(base, { lightness:  0.18, saturation:  0.00, alpha: 0.50 }),
-    '--tab-bg':                  modifyColor(base, { lightness:  0.7,  saturation: -0.3  }),
-    '--tab-border':              modifyColor(base, { lightness: -0.22, saturation: -0.35 }),
-    '--tab-active-bg':           modifyColor(base, { lightness:  0.1,  saturation:  0    }),
-    '--tab-color':               modifyColor(base, { lightness: -0.40, saturation: -0.10, alpha: 0.45 }),
-    '--tab-active-color':        modifyColor(base, { lightness:  0.8,  saturation:  0.5  }),
-    '--drag-handle':             modifyColor(base, { lightness: -0.05, alpha: 0.35 }),
-    '--scrollbar-track':         modifyColor(base, { lightness:  0.36, saturation: -0.50, alpha: 0    }),
-    '--scrollbar-thumb':         modifyColor(base, { lightness:  0.18, saturation: -0.20 }),
-    '--scrollbar-thumb-hover':   modifyColor(base, { lightness:  0.08, saturation: -0.10 }),
-    '--bg-sidebar':              modifyColor(base, { lightness:  0.9,  saturation: -0.55 }),
-    '--sidebar-box-bg':          modifyColor(base, { lightness: -0.03, alpha: 0.06 }),
-    '--sidebar-box-border':      themeColor_2,
-    '--border-sidebar':          themeColor_3,
-    '--tab-arrow-bg':            modifyColor(base, { lightness:  0.55, saturation: -0.20 }),
-    '--tab-arrow-color':         modifyColor(base, { lightness: -0.30, saturation:  0.10 }),
-    '--bg-content-surround':     themeColor_3,
-    '--border-content-surround': themeColor_2,
-  };
+const THEME_DEFS = [
+  { name: 'yellow',         base: '#D4AF37', tabIndex: 0 },
+  { name: 'visions',        base: '#346754', tabIndex: 1 },
+  { name: 'relational',     base: '#535fc1', tabIndex: 2 },
+  { name: 'organizational', base: '#5a3f86', tabIndex: 3 },
+  { name: 'physical',       base: '#bb463c', tabIndex: 4 },
+  { name: 'default',        base: '#a1a1a1'               },
+];
+
+// ── Derived values ─────────────────────────────────────────────
+// Compute all tokens from each theme's base colour.
+// These functions mirror what makeTheme() used to do, but now drive
+// both the CSS variables (injected below) and the JS palette arrays.
+
+function _themeAccent(base)      { return modifyColor(base, { lightness:  0.05, saturation:  0.05 }); }
+function _themeMid(base)         { return modifyColor(base, { lightness:  0.08 }); }
+function _themeDark(base)        { return modifyColor(base, { lightness: -0.15, saturation: -0.05 }); }
+function _themeLight(base)       { return modifyColor(base, { lightness:  0.28, saturation: -0.15 }); }
+// Light bg: push to near-white by targeting high absolute lightness
+function _themeBgLight(base) {
+  const hsl = rgbToHsl(hexToRgb(base));
+  return rgbToHex(hslToRgb({ h: hsl.h, s: Math.max(0, hsl.s - 0.45), l: 0.96 }));
+}
+// Dark bg: push to near-black by targeting low absolute lightness
+function _themeBgDark(base) {
+  const hsl = rgbToHsl(hexToRgb(base));
+  return rgbToHex(hslToRgb({ h: hsl.h, s: Math.max(0, hsl.s - 0.20), l: 0.10 }));
+}
+// Dark accent: brighten significantly for readability on dark bg
+function _themeAccentDark(base)  { return modifyColor(base, { lightness:  0.28, saturation: -0.05 }); }
+
+// Build the CSS custom-property block for one theme
+function _themeTokens(name, base) {
+  return [
+    `--raw-${name}-dark:  ${_themeDark(base)}`,
+    `--raw-${name}:       ${base}`,
+    `--raw-${name}-mid:   ${_themeMid(base)}`,
+    `--raw-${name}-light: ${_themeLight(base)}`,
+    `--raw-${name}-bg:    ${_themeBgLight(base)}`,
+  ].join(';\n  ');
 }
 
-const THEMES = {
-  default:        makeTheme('#a1a1a1'),
-  visions:        makeTheme('#346754'),
-  relational:     makeTheme('#535fc1'),
-  organizational: makeTheme('#5a3f86'),
-  physical:       makeTheme('#bb463c'),
-  yellow:         makeTheme('#D4AF37'),
-};
+function _themeTokensDark(name, base) {
+  return `--raw-${name}-bg: ${_themeBgDark(base)}`;
+}
 
-const TAB_THEMES = ['yellow', 'visions', 'relational', 'organizational', 'physical', 'yellow'];
+// Inject all theme raw tokens + palette tokens into a <style> tag so
+// design-system.css doesn't need to know about individual themes at all.
+(function injectThemeTokens() {
+  const lightVars = THEME_DEFS
+    .map(t => _themeTokens(t.name, t.base))
+    .join(';\n  ');
 
-// Light-mode palette (bg = very pale tint, accent = saturated mid)
-const _PALETTE_LIGHT = [
-  { accent: '#2e7d5e', bg: '#eef5f1', label: '#ffffff' }, // visions
-  { accent: '#4a56c8', bg: '#eef0fb', label: '#ffffff' }, // relational
-  { accent: '#5e3d9e', bg: '#f2eef9', label: '#ffffff' }, // org
-  { accent: '#bb463c', bg: '#faf0ef', label: '#ffffff' }, // physical
-  { accent: '#c8991a', bg: '#fdfaee', label: '#ffffff' }, // yellow
-  { accent: '#787680', bg: '#f4f4f6', label: '#ffffff' }, // default
-];
+  // palette-N tokens: ordered by tabIndex (tabs in index order), then default last
+  const tabThemes = THEME_DEFS.filter(t => t.tabIndex !== undefined)
+    .sort((a, b) => a.tabIndex - b.tabIndex);
+  const paletteLight = tabThemes
+    .map((t, i) => `--palette-${i}-accent: var(--raw-${t.name}-mid);\n  --palette-${i}-bg: var(--raw-${t.name}-bg)`)
+    .join(';\n  ');
 
-// Dark-mode palette (bg = very dark tint, accent = lighter/more luminous)
-const _PALETTE_DARK = [
-  { accent: '#7ecfb0', bg: '#0e1f18', label: '#0e1f18' }, // visions
-  { accent: '#9ba4f0', bg: '#0d0f26', label: '#0d0f26' }, // relational
-  { accent: '#c0a8f0', bg: '#130b22', label: '#130b22' }, // org
-  { accent: '#f09090', bg: '#220c0b', label: '#220c0b' }, // physical
-  { accent: '#f0cc60', bg: '#1e1800', label: '#1e1800' }, // yellow
-  { accent: '#aaaabc', bg: '#1a1a1f', label: '#1a1a1f' }, // default
-];
+  const darkVars = THEME_DEFS
+    .map(t => _themeTokensDark(t.name, t.base))
+    .join(';\n  ');
 
-// Returns the right palette for the current theme mode
+  const css = `
+:root {
+  ${lightVars};
+  ${paletteLight};
+}
+@media (prefers-color-scheme: dark) {
+  :root { ${darkVars}; }
+}
+html.dark  { ${darkVars}; }
+html.light { ${THEME_DEFS.map(t => `--raw-${t.name}-bg: ${_themeBgLight(t.base)}`).join(';\n  ')}; }
+`;
+
+  const el = document.createElement('style');
+  el.id = 'df-theme-tokens';
+  document.head.appendChild(el);
+  el.textContent = css;
+})();
+
+// ── Palette arrays for JS card rendering ──────────────────────
+// getPalette() returns the right set for the current light/dark mode.
+
+const _tabThemesSorted = THEME_DEFS
+  .filter(t => t.tabIndex !== undefined)
+  .sort((a, b) => a.tabIndex - b.tabIndex);
+
+const _PALETTE_LIGHT = _tabThemesSorted.map(t => ({
+  accent: _themeMid(t.base),
+  bg:     _themeBgLight(t.base),
+  label:  '#ffffff',
+}));
+
+const _PALETTE_DARK = _tabThemesSorted.map(t => ({
+  accent: _themeAccentDark(t.base),
+  bg:     _themeBgDark(t.base),
+  label:  _themeBgDark(t.base),
+}));
+
 function getPalette() {
   return document.documentElement.classList.contains('dark')
     ? _PALETTE_DARK
     : _PALETTE_LIGHT;
 }
 
-// Legacy: static reference kept for any code that reads window.PP_PALETTE at load time
-window.PP_PALETTE = _PALETTE_LIGHT;
-// Dynamic accessor — tools should use this
+window.PP_PALETTE = _PALETTE_LIGHT; // legacy static reference
 window.getPalette = getPalette;
+
+// ── Legacy THEMES / TAB_THEMES for any code that still reads them ─
+const TAB_THEMES = _tabThemesSorted.map(t => t.name);
+
+function makeTheme(base) {
+  return {
+    '--tab-active-bg':    _themeMid(base),
+    '--tab-active-color': '#ffffff',
+    '--bg-data':          _themeBgLight(base),
+  };
+}
+
+const THEMES = Object.fromEntries(THEME_DEFS.map(t => [t.name, makeTheme(t.base)]));
 
 function panelThemeVars(tabIdx) {
   const name = TAB_THEMES[tabIdx] || 'default';
