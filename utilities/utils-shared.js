@@ -258,7 +258,11 @@ function _themeBgDark(base) {
   return rgbToHex(hslToRgb({ h: hsl.h, s: Math.max(0, hsl.s - 0.20), l: 0.10 }));
 }
 // Dark accent: brighten significantly for readability on dark bg
-function _themeAccentDark(base)  { return modifyColor(base, { lightness:  0.28, saturation: -0.05 }); }
+function _themeAccentDark(base) {
+  const hsl = rgbToHsl(hexToRgb(base));
+  const targetL = Math.min(0.72, Math.max(0.62, hsl.l + 0.28));
+  return rgbToHex(hslToRgb({ h: hsl.h, s: Math.max(0, hsl.s - 0.05), l: targetL }));
+}
 
 // Build the CSS custom-property block for one theme
 function _themeTokens(name, base) {
