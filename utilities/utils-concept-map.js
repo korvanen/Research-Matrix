@@ -1035,7 +1035,7 @@ function initClustersTool(paneEl, sidebarEl) {
     if (valid.length <= 1) return [row];
 
     // Fixed split threshold — independent of the UI link threshold slider
-    const SPLIT_THRESHOLD = 0.55;
+    const SPLIT_THRESHOLD = 0.4;
     const n = valid.length;
     const sim = Array.from({length: n}, (_, i) =>
       Array.from({length: n}, (_, j) => i === j ? 1 : cosineSim(valid[i].vec, valid[j].vec))
