@@ -9,7 +9,7 @@
 //   • depthColor: added missing paletteIdx + theme variable (was ReferenceError)
 //   • depthColor: rewrote getLuminance without array destructuring (was SyntaxError)
 //   • Removed dead CMAP_LEVEL_THEMES constant
-console.log('[utils-concept-map.js v.6]');
+console.log('[utils-concept-map.js v.4]');
 
 const CMAP_PARENT_CHILD_THRESHOLD = 0.50;
 const CMAP_MIN_SPLIT_LENGTH = 60;
@@ -117,7 +117,7 @@ const ORPHAN_RECOVERY_THRESHOLD = 0.85;
   position:absolute; border-radius:9px;
   border:none; background:var(--ppc-bg,#fff);
   box-shadow:var(--md-elev-2); cursor:grab; user-select:none;
-  overflow:hidden; transition:box-shadow .15s;
+  overflow:hidden; transition:box-shadow .15s, opacity .5s ease, transform .5s ease;
 }
 .pp-cmap-card:active { cursor:grabbing; }
 .pp-cmap-card:hover  { box-shadow:var(--md-elev-4); }
@@ -849,40 +849,45 @@ function initConceptMapTool(paneEl, sidebarEl) {
           if (!moved) break;
         }
 
-        // Step 1: place all cards at their FINAL positions instantly, hidden
-        targetRects.forEach(function(pos, id) {
+        var ids = Array.from(targetRects.keys());
+
+        // Step 1: place cards at final positions, fully hidden, no transition
+        ids.forEach(function(id) {
           var el = cardEls.get(id);
           if (!el) return;
+          var pos = targetRects.get(id);
           el.style.transition = 'none';
-          el.style.left = pos.x + 'px';
-          el.style.top  = pos.y + 'px';
+          el.style.left    = pos.x + 'px';
+          el.style.top     = pos.y + 'px';
           el.style.opacity = '0';
-          el.style.transform = 'scale(0.88)';
+          el.style.transform = 'scale(0.85)';
           _liveRects.set(id, { x: pos.x, y: pos.y, w: CARD_W, h: pos.h });
         });
 
-        // Step 2: force reflow so browser registers final positions as settled
-        cardEls.forEach(function(el) { el.offsetHeight; });
-
-        // Step 3: animate opacity+scale in, staggered per card
-        var ids = Array.from(targetRects.keys());
-        ids.forEach(function(id, i) {
-          var el = cardEls.get(id);
-          if (!el) return;
-          var delay = Math.min(i * 30, 300); // stagger, max 300ms total
-          el.style.transition =
-            'opacity ' + ANIMATE_DURATION + 'ms cubic-bezier(0.4,0,0.2,1) ' + delay + 'ms, ' +
-            'transform ' + ANIMATE_DURATION + 'ms cubic-bezier(0.4,0,0.2,1) ' + delay + 'ms';
-          el.style.opacity = '1';
-          el.style.transform = 'scale(1)';
+        // Step 2: first rAF — browser commits the hidden/positioned state
+        requestAnimationFrame(function() {
+          // Step 3: second rAF — NOW trigger transitions (browser has a "from" state)
+          requestAnimationFrame(function() {
+            ids.forEach(function(id, i) {
+              var el = cardEls.get(id);
+              if (!el) return;
+              var delay = Math.min(i * 25, 250);
+              el.style.transition =
+                'opacity ' + ANIMATE_DURATION + 'ms ease ' + delay + 'ms, ' +
+                'transform ' + ANIMATE_DURATION + 'ms cubic-bezier(0.34,1.56,0.64,1) ' + delay + 'ms';
+              el.style.opacity = '1';
+              el.style.transform = 'scale(1)';
+            });
+            redrawConnectors();
+            setTimeout(function() {
+              redrawConnectors();
+              cardEls.forEach(function(el) {
+                el.style.transition = '';
+                el.style.transform  = '';
+              });
+            }, ANIMATE_DURATION + 300);
+          });
         });
-
-        // Draw connectors once cards are visible
-        redrawConnectors();
-        setTimeout(function() {
-          redrawConnectors();
-          cardEls.forEach(function(el) { el.style.transition = ''; el.style.transform = ''; });
-        }, ANIMATE_DURATION + 350);
 
         _everRendered = true;
       }
