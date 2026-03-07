@@ -1251,15 +1251,16 @@ mark.pkw {
      │  ↓ 71%  to children              │
      └──────────────────────────────────┘
        whole card = one solid theme colour (var(--ppc-bg))
-       thin border = var(--ppc-border)
+       thin border = derived from --ppc-on for cohesion
+       all text uses --ppc-on for proper contrast
 
    Cards use NO ::before layout tricks — plain div structure only,
    so offsetWidth/Height are reliable for connector geometry and
    pointer-event drag works on both desktop and touchscreen.
 
-   --ppc-bg and --ppc-border are set inline per-card by JS from the
-   shared PP_PALETTE. All !important needed to beat the injected
-   runtime <style> blocks (#pp-cmap-styles, #pp-cluster-styles).
+   --ppc-bg and --ppc-on are set inline per-card by JS.
+   --ppc-bg = theme background color (adapts to light/dark mode)
+   --ppc-on = contrasting text color (calculated from --ppc-bg luminance)
    ══════════════════════════════════════════════════════════════════════════ */
 
 
@@ -1271,13 +1272,12 @@ mark.pkw {
   flex-direction: column !important;
   overflow: hidden !important;
   border-radius: var(--radius-lg) !important;
-  border: 1px solid var(--ppc-border, var(--md-sys-color-outline-variant)) !important;
+  border: 1px solid color-mix(in srgb, var(--ppc-on, var(--md-sys-color-outline-variant)) 15%, var(--ppc-bg, transparent)) !important;
   background: var(--ppc-bg, var(--md-sys-color-surface-container-low)) !important;
   box-shadow: var(--md-elev-1) !important;
   cursor: grab !important;
   touch-action: none !important;
   transition: box-shadow var(--transition-fast) !important;
-  /* Reset any previously injected pseudo-element damage */
 }
 .pp-cmap-card::before { display: none !important; }
 
@@ -1297,24 +1297,23 @@ mark.pkw {
   flex-shrink: 0 !important;
 }
 
-/* Big editorial letter/number — the "31" of the reference image */
+/* Big editorial letter/number */
 .pp-cmap-card-cat-num {
   font-family: var(--font-family-serif) !important;
   font-size: 52px !important;
   line-height: 1 !important;
   font-weight: 400 !important;
   font-style: italic !important;
-  color: var(--md-sys-color-on-surface) !important;
+  color: var(--ppc-on, var(--md-sys-color-on-surface)) !important;
   letter-spacing: -0.03em !important;
-  opacity: .85 !important;
+  opacity: 0.92 !important;
   flex: 1 !important;
   min-width: 0 !important;
-  /* Scale down gracefully when category string is longer */
   overflow: hidden !important;
   word-break: break-word !important;
 }
 
-/* Level block — top right, like "31 / NOV '20" */
+/* Level block — top right */
 .pp-cmap-card-level-block {
   display: flex !important;
   flex-direction: column !important;
@@ -1326,8 +1325,9 @@ mark.pkw {
   font-size: 22px !important;
   font-weight: var(--font-weight-bold) !important;
   line-height: 1 !important;
-  color: var(--md-sys-color-on-surface) !important;
+  color: var(--ppc-on, var(--md-sys-color-on-surface)) !important;
   letter-spacing: -0.02em !important;
+  opacity: 0.95 !important;
 }
 .pp-cmap-card-level-label {
   font-family: var(--font-family) !important;
@@ -1335,19 +1335,19 @@ mark.pkw {
   font-weight: var(--font-weight-medium) !important;
   letter-spacing: var(--letter-spacing-caps) !important;
   text-transform: uppercase !important;
-  color: var(--md-sys-color-outline) !important;
-  opacity: .7 !important;
+  color: var(--ppc-on, var(--md-sys-color-on-surface)) !important;
+  opacity: 0.6 !important;
   margin-top: 3px !important;
 }
 
-/* Merged ×N indicator — small, top-right corner */
+/* Merged ×N indicator */
 .pp-cmap-card-merged {
   font-family: var(--font-family) !important;
   font-size: 9px !important;
   font-weight: var(--font-weight-bold) !important;
   letter-spacing: .05em !important;
-  color: var(--md-sys-color-outline) !important;
-  opacity: .65 !important;
+  color: var(--ppc-on, var(--md-sys-color-on-surface)) !important;
+  opacity: 0.5 !important;
   text-align: right !important;
   padding: 0 14px 0 !important;
   flex-shrink: 0 !important;
@@ -1359,8 +1359,8 @@ mark.pkw {
 .pp-cmap-card-rule {
   width: calc(100% - 28px) !important;
   height: 1px !important;
-  background: var(--ppc-border, var(--md-sys-color-outline-variant)) !important;
-  opacity: .35 !important;
+  background: var(--ppc-on, var(--md-sys-color-outline-variant)) !important;
+  opacity: 0.2 !important;
   margin: 10px 14px 0 !important;
   flex-shrink: 0 !important;
 }
@@ -1373,31 +1373,31 @@ mark.pkw {
   display: flex !important;
   flex-direction: column !important;
   gap: 4px !important;
-  background: transparent !important;   /* card bg already set on shell */
+  background: transparent !important;
   flex: 1 !important;
 }
 
 /* Merge separator inside body */
 .pp-cmap-merge-sep {
   height: 1px !important;
-  background: var(--ppc-border, var(--md-sys-color-outline-variant)) !important;
-  opacity: .25 !important;
+  background: var(--ppc-on, var(--md-sys-color-outline-variant)) !important;
+  opacity: 0.15 !important;
   margin: 4px 0 !important;
 }
 
-/* Category micro-caps tag — "CATS · TAGS" */
+/* Category micro-caps tag */
 .pp-cmap-cell-cat {
   font-family: var(--font-family) !important;
   font-size: 9px !important;
   font-weight: var(--font-weight-medium) !important;
   letter-spacing: var(--letter-spacing-caps) !important;
   text-transform: uppercase !important;
-  color: var(--md-sys-color-on-surface-variant) !important;
-  opacity: .7 !important;
+  color: var(--ppc-on, var(--md-sys-color-on-surface-variant)) !important;
+  opacity: 0.65 !important;
   margin-bottom: 1px !important;
 }
 
-/* Main concept text — large serif, like the editorial headline */
+/* Main concept text — large serif */
 .pp-cmap-cell-text {
   font-family: var(--font-family-serif) !important;
   font-size: 15px !important;
@@ -1405,20 +1405,21 @@ mark.pkw {
   font-style: normal !important;
   line-height: 1.28 !important;
   letter-spacing: -0.01em !important;
-  color: var(--md-sys-color-on-surface) !important;
+  color: var(--ppc-on, var(--md-sys-color-on-surface)) !important;
+  opacity: 0.95 !important;
   word-break: break-word !important;
   overflow-wrap: break-word !important;
 }
 
-/* Split-origin badge (replaces cat-num top area for split cards) */
+/* Split-origin badge */
 .pp-cmap-split-num {
   font-family: var(--font-family) !important;
   font-size: 9px !important;
   font-weight: var(--font-weight-medium) !important;
   letter-spacing: var(--letter-spacing-caps) !important;
   text-transform: uppercase !important;
-  color: var(--md-sys-color-outline) !important;
-  opacity: .7 !important;
+  color: var(--ppc-on, var(--md-sys-color-on-surface)) !important;
+  opacity: 0.6 !important;
 }
 
 
@@ -1426,8 +1427,8 @@ mark.pkw {
 
 .pp-cmap-card-footer {
   padding: 6px 14px 10px !important;
-  border-top: 1px solid var(--ppc-border, var(--md-sys-color-outline-variant)) !important;
-  border-top-color: color-mix(in srgb, var(--ppc-border, var(--md-sys-color-outline-variant)) 30%, transparent) !important;
+  border-top: 1px solid transparent !important;
+  border-top-color: color-mix(in srgb, var(--ppc-on, var(--md-sys-color-outline-variant)) 12%, transparent) !important;
   display: flex !important;
   flex-direction: column !important;
   gap: 2px !important;
@@ -1439,7 +1440,8 @@ mark.pkw {
   font-family: var(--font-family) !important;
   font-size: 10px !important;
   font-weight: var(--font-weight-medium) !important;
-  color: var(--md-sys-color-outline) !important;
+  color: var(--ppc-on, var(--md-sys-color-outline)) !important;
+  opacity: 0.7 !important;
   display: flex !important;
   align-items: center !important;
   gap: 4px !important;
@@ -1447,8 +1449,8 @@ mark.pkw {
 }
 .pp-cmap-sim-pct {
   font-weight: var(--font-weight-bold) !important;
-  color: var(--md-sys-color-on-surface) !important;
-  opacity: .8 !important;
+  color: var(--ppc-on, var(--md-sys-color-on-surface)) !important;
+  opacity: 0.9 !important;
 }
 
 /* Leaf badge */
@@ -1458,8 +1460,8 @@ mark.pkw {
   font-weight: var(--font-weight-medium) !important;
   letter-spacing: var(--letter-spacing-caps) !important;
   text-transform: uppercase !important;
-  color: var(--md-sys-color-outline) !important;
-  opacity: .6 !important;
+  color: var(--ppc-on, var(--md-sys-color-outline)) !important;
+  opacity: 0.55 !important;
   padding: 6px 14px 10px !important;
   display: block !important;
   background: transparent !important;
@@ -1485,23 +1487,21 @@ mark.pkw {
 
 /* ── 16f. Cluster cards — same editorial style ───────────────────────────
    Cluster cards are simpler: no hierarchy, just category + text.
-   --ppc-bg / --ppc-border are set by the patched buildCard() JS.          */
+   --ppc-bg / --ppc-on are set by the patched buildCard() JS.          */
 
 .pp-cl-card {
   display: flex !important;
   flex-direction: column !important;
   overflow: hidden !important;
   border-radius: var(--radius-lg) !important;
-  border: 1px solid var(--ppc-border, var(--md-sys-color-outline-variant)) !important;
+  border: 1px solid color-mix(in srgb, var(--ppc-on, var(--md-sys-color-outline-variant)) 15%, var(--ppc-bg, transparent)) !important;
   background: var(--ppc-bg, var(--md-sys-color-surface-container-low)) !important;
   box-shadow: var(--md-elev-1) !important;
   cursor: pointer !important;
   transition: box-shadow var(--transition-fast), transform var(--transition-fast) !important;
-  /* Kill the injected left border override */
   border-left-width: 1px !important;
 }
 .pp-cl-card::before {
-  /* Completely disable the injected hover state-layer pseudo */
   display: none !important;
 }
 .pp-cl-card:hover {
@@ -1518,15 +1518,15 @@ mark.pkw {
   flex: 1 !important;
 }
 
-/* Category label — "STRATEGY · VISION" */
+/* Category label */
 .pp-cl-card-cat {
   font-family: var(--font-family) !important;
   font-size: 9px !important;
   font-weight: var(--font-weight-medium) !important;
   letter-spacing: var(--letter-spacing-caps) !important;
   text-transform: uppercase !important;
-  color: var(--md-sys-color-on-surface-variant) !important;
-  opacity: .7 !important;
+  color: var(--ppc-on, var(--md-sys-color-on-surface-variant)) !important;
+  opacity: 0.65 !important;
   margin-bottom: 3px !important;
 }
 
@@ -1538,7 +1538,8 @@ mark.pkw {
   font-style: normal !important;
   line-height: 1.28 !important;
   letter-spacing: -0.01em !important;
-  color: var(--md-sys-color-on-surface) !important;
+  color: var(--ppc-on, var(--md-sys-color-on-surface)) !important;
+  opacity: 0.95 !important;
   display: -webkit-box !important;
   -webkit-line-clamp: 3 !important;
   -webkit-box-orient: vertical !important;
@@ -1552,8 +1553,8 @@ mark.pkw {
   font-weight: var(--font-weight-medium) !important;
   letter-spacing: var(--letter-spacing-caps) !important;
   text-transform: uppercase !important;
-  color: var(--md-sys-color-outline) !important;
-  opacity: .6 !important;
+  color: var(--ppc-on, var(--md-sys-color-outline)) !important;
+  opacity: 0.55 !important;
   margin-top: 4px !important;
 }
 
@@ -1665,3 +1666,5 @@ html.light {
   --md-elev-4: 0px 6px 10px 4px rgba(0,0,0,0.15), 0px 2px 3px rgba(0,0,0,0.3);
   --md-elev-5: 0px 8px 12px 6px rgba(0,0,0,0.15), 0px 4px 4px rgba(0,0,0,0.3);
 }
+
+
