@@ -5,7 +5,7 @@
 //     globals then hardcoded CMAP_FALLBACK_PALETTE for standalone/bridge mode.
 //   • CMAP_FALLBACK_PALETTE upgraded from 5 plain hex strings to 7 full
 //     { accent, bg, label } objects matching the global theme palette.
-console.log('[sidepanel-concept-map.js [v.10]');
+console.log('[sidepanel-concept-map.js [v.17]');
 // Level themes (used by THEMES fallback path only):
 const CMAP_LEVEL_THEMES = ['yellow','visions','relational','organizational','physical','yellow'];
 
@@ -666,12 +666,30 @@ function initConceptMapTool(paneEl, sidebarEl) {
     { accent: '#888888', bg: '#f7f7f8', label: '#fff' },
   ];
 
-  // Returns '#fff' or '#000' based on luminance of a hex accent colour
-  function contrastFor(hex) {
-    const c = hex.replace('#','');
-    const r = parseInt(c.slice(0,2),16), g = parseInt(c.slice(2,4),16), b = parseInt(c.slice(4,6),16);
-    return (0.299*r + 0.587*g + 0.114*b) / 255 > 0.55 ? '#000' : '#fff';
-  }
+// Returns '#fff' or '#000' to maximize contrast against the given hex background color
+function contrastFor(hex) {
+  let c = String(hex).trim();
+  if (c[0] === '#') c = c.slice(1);
+
+  // Expand 3-digit shorthand, ignore alpha in 8-digit
+  if (c.length === 3) c = c.split('').map(ch => ch + ch).join('');
+  if (c.length === 8) c = c.slice(0, 6);
+  if (c.length !== 6) throw new Error('Invalid hex color: ' + hex);
+
+  const r = parseInt(c.slice(0, 2), 16) / 255;
+  const g = parseInt(c.slice(2, 4), 16) / 255;
+  const b = parseInt(c.slice(4, 6), 16) / 255;
+
+  const toLinear = v => (v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4));
+  const rl = toLinear(r), gl = toLinear(g), bl = toLinear(b);
+  const L = 0.2126 * rl + 0.7152 * gl + 0.0722 * bl;
+
+  const contrastWithWhite = (1.0 + 0.05) / (L + 0.05);
+  const contrastWithBlack = (L + 0.05) / 0.05;
+
+  return contrastWithWhite >= contrastWithBlack ? '#fff' : '#000';
+}
+
 
   function depthColor(level) {
     const idx = level - 1;
