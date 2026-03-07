@@ -1304,9 +1304,8 @@ mark.pkw {
   line-height: 1 !important;
   font-weight: 400 !important;
   font-style: italic !important;
-  color: var(--ppc-on, var(--md-sys-color-on-surface)) !important;
+  color: color-mix(in srgb, var(--ppc-on, var(--md-sys-color-on-surface)) 92%, var(--ppc-bg, transparent)) !important;
   letter-spacing: -0.03em !important;
-  opacity: 0.92 !important;
   flex: 1 !important;
   min-width: 0 !important;
   overflow: hidden !important;
@@ -1325,9 +1324,8 @@ mark.pkw {
   font-size: 22px !important;
   font-weight: var(--font-weight-bold) !important;
   line-height: 1 !important;
-  color: var(--ppc-on, var(--md-sys-color-on-surface)) !important;
+  color: color-mix(in srgb, var(--ppc-on, var(--md-sys-color-on-surface)) 95%, var(--ppc-bg, transparent)) !important;
   letter-spacing: -0.02em !important;
-  opacity: 0.95 !important;
 }
 .pp-cmap-card-level-label {
   font-family: var(--font-family) !important;
@@ -1335,8 +1333,7 @@ mark.pkw {
   font-weight: var(--font-weight-medium) !important;
   letter-spacing: var(--letter-spacing-caps) !important;
   text-transform: uppercase !important;
-  color: var(--ppc-on, var(--md-sys-color-on-surface)) !important;
-  opacity: 0.6 !important;
+  color: color-mix(in srgb, var(--ppc-on, var(--md-sys-color-on-surface)) 60%, var(--ppc-bg, transparent)) !important;
   margin-top: 3px !important;
 }
 
@@ -1346,8 +1343,7 @@ mark.pkw {
   font-size: 9px !important;
   font-weight: var(--font-weight-bold) !important;
   letter-spacing: .05em !important;
-  color: var(--ppc-on, var(--md-sys-color-on-surface)) !important;
-  opacity: 0.5 !important;
+  color: color-mix(in srgb, var(--ppc-on, var(--md-sys-color-on-surface)) 50%, var(--ppc-bg, transparent)) !important;
   text-align: right !important;
   padding: 0 14px 0 !important;
   flex-shrink: 0 !important;
@@ -1380,8 +1376,7 @@ mark.pkw {
 /* Merge separator inside body */
 .pp-cmap-merge-sep {
   height: 1px !important;
-  background: var(--ppc-on, var(--md-sys-color-outline-variant)) !important;
-  opacity: 0.15 !important;
+  background: color-mix(in srgb, var(--ppc-on, var(--md-sys-color-outline-variant)) 15%, var(--ppc-bg, transparent)) !important;
   margin: 4px 0 !important;
 }
 
@@ -1392,8 +1387,7 @@ mark.pkw {
   font-weight: var(--font-weight-medium) !important;
   letter-spacing: var(--letter-spacing-caps) !important;
   text-transform: uppercase !important;
-  color: var(--ppc-on, var(--md-sys-color-on-surface-variant)) !important;
-  opacity: 0.65 !important;
+  color: color-mix(in srgb, var(--ppc-on, var(--md-sys-color-on-surface-variant)) 65%, var(--ppc-bg, transparent)) !important;
   margin-bottom: 1px !important;
 }
 
@@ -1405,8 +1399,7 @@ mark.pkw {
   font-style: normal !important;
   line-height: 1.28 !important;
   letter-spacing: -0.01em !important;
-  color: var(--ppc-on, var(--md-sys-color-on-surface)) !important;
-  opacity: 0.95 !important;
+  color: color-mix(in srgb, var(--ppc-on, var(--md-sys-color-on-surface)) 95%, var(--ppc-bg, transparent)) !important;
   word-break: break-word !important;
   overflow-wrap: break-word !important;
 }
@@ -1418,8 +1411,7 @@ mark.pkw {
   font-weight: var(--font-weight-medium) !important;
   letter-spacing: var(--letter-spacing-caps) !important;
   text-transform: uppercase !important;
-  color: var(--ppc-on, var(--md-sys-color-on-surface)) !important;
-  opacity: 0.6 !important;
+  color: color-mix(in srgb, var(--ppc-on, var(--md-sys-color-on-surface)) 60%, var(--ppc-bg, transparent)) !important;
 }
 
 
@@ -1440,8 +1432,7 @@ mark.pkw {
   font-family: var(--font-family) !important;
   font-size: 10px !important;
   font-weight: var(--font-weight-medium) !important;
-  color: var(--ppc-on, var(--md-sys-color-outline)) !important;
-  opacity: 0.7 !important;
+  color: color-mix(in srgb, var(--ppc-on, var(--md-sys-color-outline)) 70%, var(--ppc-bg, transparent)) !important;
   display: flex !important;
   align-items: center !important;
   gap: 4px !important;
@@ -1449,8 +1440,7 @@ mark.pkw {
 }
 .pp-cmap-sim-pct {
   font-weight: var(--font-weight-bold) !important;
-  color: var(--ppc-on, var(--md-sys-color-on-surface)) !important;
-  opacity: 0.9 !important;
+  color: color-mix(in srgb, var(--ppc-on, var(--md-sys-color-on-surface)) 90%, var(--ppc-bg, transparent)) !important;
 }
 
 /* Leaf badge */
@@ -1460,8 +1450,7 @@ mark.pkw {
   font-weight: var(--font-weight-medium) !important;
   letter-spacing: var(--letter-spacing-caps) !important;
   text-transform: uppercase !important;
-  color: var(--ppc-on, var(--md-sys-color-outline)) !important;
-  opacity: 0.55 !important;
+  color: color-mix(in srgb, var(--ppc-on, var(--md-sys-color-outline)) 55%, var(--ppc-bg, transparent)) !important;
   padding: 6px 14px 10px !important;
   display: block !important;
   background: transparent !important;
@@ -1525,8 +1514,7 @@ mark.pkw {
   font-weight: var(--font-weight-medium) !important;
   letter-spacing: var(--letter-spacing-caps) !important;
   text-transform: uppercase !important;
-  color: var(--ppc-on, var(--md-sys-color-on-surface-variant)) !important;
-  opacity: 0.65 !important;
+  color: color-mix(in srgb, var(--ppc-on, var(--md-sys-color-on-surface-variant)) 65%, var(--ppc-bg, transparent)) !important;
   margin-bottom: 3px !important;
 }
 
@@ -1538,8 +1526,7 @@ mark.pkw {
   font-style: normal !important;
   line-height: 1.28 !important;
   letter-spacing: -0.01em !important;
-  color: var(--ppc-on, var(--md-sys-color-on-surface)) !important;
-  opacity: 0.95 !important;
+  color: color-mix(in srgb, var(--ppc-on, var(--md-sys-color-on-surface)) 95%, var(--ppc-bg, transparent)) !important;
   display: -webkit-box !important;
   -webkit-line-clamp: 3 !important;
   -webkit-box-orient: vertical !important;
@@ -1553,8 +1540,7 @@ mark.pkw {
   font-weight: var(--font-weight-medium) !important;
   letter-spacing: var(--letter-spacing-caps) !important;
   text-transform: uppercase !important;
-  color: var(--ppc-on, var(--md-sys-color-outline)) !important;
-  opacity: 0.55 !important;
+  color: color-mix(in srgb, var(--ppc-on, var(--md-sys-color-outline)) 55%, var(--ppc-bg, transparent)) !important;
   margin-top: 4px !important;
 }
 
@@ -1576,7 +1562,6 @@ mark.pkw {
   background: color-mix(in srgb, var(--md-sys-color-primary) 5%, var(--md-sys-color-surface)) !important;
   box-shadow: var(--md-elev-1) !important;
 }
-
 /* ══════════════════════════════════════════════════════════
    html.dark / html.light — class-based theme overrides
    These come LAST so they beat every @media rule above.
