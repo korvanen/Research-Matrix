@@ -544,15 +544,10 @@ input, textarea, select {
   gap: 8px;
   padding: 0 16px 0 4px;
   height: var(--topbar-height);
-  background: var(--md-sys-color-surface);
+  background: var(--md-sys-color-surface-container-low);
   border-bottom: 1px solid var(--md-sys-color-outline-variant);
-  box-shadow: none; /* MD3 top bars use tonal surface, not shadow by default */
+  box-shadow: none;
   z-index: 10;
-  /* MD3 surface tint at elevation 2 */
-  background-image: linear-gradient(
-    color-mix(in srgb, var(--md-sys-color-primary) 8%, transparent),
-    color-mix(in srgb, var(--md-sys-color-primary) 8%, transparent)
-  );
 }
 
 .ds-topbar-back {
