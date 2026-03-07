@@ -671,7 +671,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
     const L = 0.2126 * toLinear(r) + 0.7152 * toLinear(g) + 0.0722 * toLinear(b);
     const contrastWithWhite = (1.05) / (L + 0.05);
     const contrastWithBlack = (L + 0.05) / 0.05;
-    return contrastWithWhite >= contrastWithBlack ? '#fff' : '#000';
+    return contrastWithWhite >= contrastWithBlack ? '#000':'#fff';
   }
 
   function depthColor(level) {
