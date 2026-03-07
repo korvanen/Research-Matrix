@@ -6,7 +6,12 @@
 //   • Cluster cannot shrink below the minimum space needed to tile all its cards
 //   • makeResizable receives per-nest minW/minH — enforced during resize drag
 //   • Drag threshold (4 px) prevents accidental drags on short card clicks
-console.log('[utils-clusters.js v3000000000000]');
+// v38 → v38.1 changes:
+//   • buildCard: --ppc-bg now = col.accent (vivid, same as concept-map)
+//   • buildCard: --ppc-on now = contrastFor(col.accent) (white/#1a1a1a, same as concept-map)
+//   • buildCard: removed manual border-left accent stripe (concept-map doesn't use it)
+//   • CSS color-mix expressions in card text/cat/split now driven by --ppc-on/--ppc-bg
+console.log('[utils-clusters.js v9000000000000]');
 
 var CL_MIN_SPLIT_LENGTH = 60;
 
@@ -264,7 +269,7 @@ var CL_MIN_SPLIT_LENGTH = 60;
   width: var(--pp-card-w, 180px);
   box-sizing: border-box;
   border-radius: var(--radius-md);
-  border: 1px solid var(--md-sys-color-outline-variant);
+  border: 1px solid color-mix(in srgb, var(--ppc-on, var(--md-sys-color-outline-variant)) 15%, var(--ppc-bg, transparent));
   background: var(--ppc-bg, var(--md-sys-color-surface));
   cursor: grab;
   display: flex;
@@ -277,7 +282,7 @@ var CL_MIN_SPLIT_LENGTH = 60;
 .pp-cl-card::before {
   content: '';
   position: absolute; inset: 0;
-  background: var(--md-sys-color-on-surface);
+  background: var(--ppc-on, var(--md-sys-color-on-surface));
   opacity: 0;
   transition: opacity var(--transition-fast);
   border-radius: inherit;
@@ -296,10 +301,10 @@ var CL_MIN_SPLIT_LENGTH = 60;
 }
 
 /* ── Card text colors — exact match to utils-concept-map.js ──
-   --ppc-bg = col.bg  (light tint)   — card background
-   --ppc-on = col.accent  (vivid)    — text base color
-   All text mixes the vivid accent toward black for hierarchy.
-   This replicates concept-map's color-mix(…accent…, black) pattern. */
+   --ppc-bg = col.accent  (vivid)    — card background
+   --ppc-on = contrastFor(accent)    — white or #1a1a1a
+   All text mixes --ppc-on toward --ppc-bg for hierarchy,
+   identical to concept-map's color-mix(…ppc-on…, ppc-bg) pattern. */
 
 .pp-cl-card .pp-cmap-card-cat-num {
   font-family: var(--font-family-serif);
@@ -307,7 +312,7 @@ var CL_MIN_SPLIT_LENGTH = 60;
   line-height: 1;
   font-weight: 400;
   font-style: italic;
-  color: color-mix(in srgb, var(--ppc-on, #2e7d5e) 92%, black);
+  color: color-mix(in srgb, var(--ppc-on, #fff) 92%, var(--ppc-bg, transparent));
   letter-spacing: -0.02em;
   flex: 1;
   min-width: 0;
@@ -320,11 +325,11 @@ var CL_MIN_SPLIT_LENGTH = 60;
   font-weight: var(--font-weight-medium);
   letter-spacing: var(--letter-spacing-caps);
   text-transform: uppercase;
-  color: color-mix(in srgb, var(--ppc-on, #2e7d5e) 55%, black);
+  color: color-mix(in srgb, var(--ppc-on, #fff) 55%, var(--ppc-bg, transparent));
 }
 .pp-cl-card .pp-cmap-card-rule {
   height: 1px;
-  background: color-mix(in srgb, var(--ppc-on, #2e7d5e) 22%, black);
+  background: color-mix(in srgb, var(--ppc-on, #fff) 22%, var(--ppc-bg, transparent));
   margin: 8px 14px 0;
   flex-shrink: 0;
   opacity: 1;
@@ -338,7 +343,7 @@ var CL_MIN_SPLIT_LENGTH = 60;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: color-mix(in srgb, var(--ppc-on, #2e7d5e) 60%, black);
+  color: color-mix(in srgb, var(--ppc-on, #fff) 60%, var(--ppc-bg, transparent));
 }
 .pp-cl-card .pp-cl-card-text {
   font-family: var(--font-family-serif);
@@ -346,7 +351,7 @@ var CL_MIN_SPLIT_LENGTH = 60;
   font-weight: 400;
   line-height: 1.35;
   letter-spacing: -0.01em;
-  color: color-mix(in srgb, var(--ppc-on, #2e7d5e) 92%, black);
+  color: color-mix(in srgb, var(--ppc-on, #fff) 92%, var(--ppc-bg, transparent));
   display: block;
   overflow-wrap: break-word;
   word-break: break-word;
@@ -357,7 +362,7 @@ var CL_MIN_SPLIT_LENGTH = 60;
   letter-spacing: var(--letter-spacing-caps);
   text-transform: uppercase;
   margin-top: 4px;
-  color: color-mix(in srgb, var(--ppc-on, #2e7d5e) 50%, black);
+  color: color-mix(in srgb, var(--ppc-on, #fff) 50%, var(--ppc-bg, transparent));
 }
 
 .pp-cl-card-body {
@@ -849,13 +854,9 @@ function initClustersTool(paneEl, sidebarEl) {
   canvas.addEventListener('touchend', () => { _pinchD = null; });
 
   // ── Nest dragging — fires on ANY card hover click ─────────
-  // We use a small movement threshold so quick card clicks still
-  // show the tooltip and don't accidentally move the cluster.
   let _nestDrag = null;
 
   function makeNestDraggable(nestEl) {
-    // Mousedown anywhere on the nest (including cards) starts a potential drag.
-    // Actual movement only commits once DRAG_THRESHOLD px have been covered.
     nestEl.addEventListener('mousedown', ev => {
       if (ev.button !== 0) return;
       if (ev.target.closest('.pp-cl-resize-handle')) return;
@@ -868,11 +869,8 @@ function initClustersTool(paneEl, sidebarEl) {
         cy: ev.clientY,
         moved: false,
       };
-      // Don't stop propagation — tooltip mouseenter still works.
-      // Don't preventDefault here either — prevents text selection only.
     });
 
-    // Touch: keep on head for touch since multi-touch is already handled above.
     const head = nestEl.querySelector(':scope > .pp-cl-nest-head');
     if (head) {
       head.addEventListener('touchstart', ev => {
@@ -892,10 +890,8 @@ function initClustersTool(paneEl, sidebarEl) {
     if (!_nestDrag) return;
     const dx = ev.clientX - _nestDrag.cx;
     const dy = ev.clientY - _nestDrag.cy;
-    // Only commit to drag after threshold
     if (!_nestDrag.moved && Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
     if (!_nestDrag.moved) {
-      // First time crossing threshold — take ownership
       _nestDrag.moved = true;
       _nestDrag.el.style.zIndex = String(++_topZ);
       _nestDrag.el.classList.add('pp-cl-nest-lifted');
@@ -926,20 +922,17 @@ function initClustersTool(paneEl, sidebarEl) {
     _nestDrag = null;
   });
 
-  // ── Resize handle — doMasonry on col change, measured min-size ─
+  // ── Resize handle ─────────────────────────────────────────
   function makeResizable(nestEl, cardCount) {
     const handle = document.createElement('div');
     handle.className = 'pp-cl-resize-handle';
     nestEl.appendChild(handle);
 
-    // Minimum width = 1 column
     const minW = CARD_W + BODY_PAD * 2;
-    // Minimum height = measured content height (set after first doMasonry)
     let minH = 0;
 
     let resizing = false, sw = 0, sh = 0, sx = 0, sy = 0, lastCols = -1;
 
-    // Store the measured min height on the element for use during resize
     nestEl._setMasonryMinH = function(h) { minH = HEAD_H + h + BODY_PAD * 2; };
 
     handle.addEventListener('mousedown', ev => {
@@ -949,7 +942,6 @@ function initClustersTool(paneEl, sidebarEl) {
       sx       = ev.clientX;
       sy       = ev.clientY;
       lastCols = colsFromWidth(nestEl);
-      // Snapshot current height as explicit value so resize math works
       nestEl.style.height = sh + 'px';
       ev.stopPropagation(); ev.preventDefault();
     });
@@ -967,10 +959,8 @@ function initClustersTool(paneEl, sidebarEl) {
       nestEl.style.width  = newW + 'px';
       nestEl.style.height = newH + 'px';
 
-      // Re-run masonry with FLIP animation only when column count changes
       if (newCols !== lastCols) {
         const { contentH } = doMasonry(nestEl, true);
-        // Update min height to actual content height
         nestEl._setMasonryMinH(contentH);
         lastCols = newCols;
       }
@@ -1220,7 +1210,6 @@ function initClustersTool(paneEl, sidebarEl) {
   ];
 
   // ── Text contrast — exact same logic as concept-map ─────────
-  // Concept-map uses luminance threshold 0.5 → '#1a1a1a' or '#ffffff'
   function contrastFor(hex) {
     let c = String(hex).trim().replace('#', '');
     if (c.length === 3) c = c.split('').map(ch => ch + ch).join('');
@@ -1239,7 +1228,10 @@ function initClustersTool(paneEl, sidebarEl) {
     return pal[i % pal.length];
   }
 
-  // ── Card builder — fixed size, concept-map colour pattern ─
+  // ── Card builder — matches concept-map colour pattern exactly ─
+  // --ppc-bg = col.accent  (vivid hue — the card background)
+  // --ppc-on = contrastFor(col.accent)  (white or #1a1a1a for text)
+  // All color-mix() expressions then work identically to concept-map.
   function buildCard(r, col, delay, clusterLabel) {
     const cells  = r.row && r.row.cells ? r.row.cells : (r.cells || []);
     const cats   = r.row && r.row.cats  ? r.row.cats.filter(c => c.trim()) : [];
@@ -1248,15 +1240,13 @@ function initClustersTool(paneEl, sidebarEl) {
 
     const card = document.createElement('div');
     card.className = 'pp-cl-card';
-    // Match concept-map exactly: light tinted bg, vivid accent as text color
-    // --ppc-bg = col.bg  (light tint, e.g. #f4faf7)
-    // --ppc-on = col.accent  (vivid hue, used directly in color-mix → black)
-    // This gives: color-mix(in srgb, #2e7d5e 92%, black) = deep green text on light bg
-    card.style.setProperty('--ppc-bg', col.bg || col.accent);
-    card.style.setProperty('--ppc-on', col.accent);
-    // Accent border stripe instead of full accent background
-    card.style.borderLeftWidth  = '3px';
-    card.style.borderLeftColor  = col.accent;
+
+    // ── KEY FIX: match concept-map exactly ──
+    // concept-map sets --ppc-bg = accent (vivid), --ppc-on = lc (contrast white/#1a1a1a)
+    card.style.setProperty('--ppc-bg', col.accent);
+    card.style.setProperty('--ppc-on', contrastFor(col.accent));
+    // No manual border-left stripe — concept-map doesn't use one either
+
     if (delay) card.style.animationDelay = delay + 'ms';
 
     const topRow = document.createElement('div');
@@ -1331,18 +1321,13 @@ function initClustersTool(paneEl, sidebarEl) {
     return frag;
   }
 
-  // ── Nest initial size ─────────────────────────────────────
   // ── Masonry layout engine ─────────────────────────────────
-  // Places cards absolutely in a shortest-column order.
-  // Returns the total content height so the nest can size itself.
-  // If animate=true, FLIP-animates cards from their previous positions.
   function doMasonry(nestEl, animate) {
     const body  = nestEl.querySelector('.pp-cl-nest-body');
     const cols  = colsFromWidth(nestEl);
     const cards = Array.from(body.querySelectorAll('.pp-cl-card'));
     if (!cards.length) return { contentH: 0, cols };
 
-    // FLIP — snapshot before positions
     let before = null;
     if (animate) {
       before = cards.map(el => {
@@ -1351,7 +1336,6 @@ function initClustersTool(paneEl, sidebarEl) {
       });
     }
 
-    // Shortest-column placement
     const colHeights = new Array(cols).fill(0);
     cards.forEach(card => {
       const minH = Math.min(...colHeights);
@@ -1364,7 +1348,6 @@ function initClustersTool(paneEl, sidebarEl) {
     const contentH = Math.max(...colHeights) - CARD_GAP;
     body.style.height = contentH + 'px';
 
-    // FLIP — animate from snapshots to new positions
     if (animate && before) {
       requestAnimationFrame(() => {
         cards.forEach((el, i) => {
@@ -1386,13 +1369,11 @@ function initClustersTool(paneEl, sidebarEl) {
     return { contentH, cols };
   }
 
-  // Column count from current nest pixel width
   function colsFromWidth(nestEl) {
     const innerW = nestEl.offsetWidth - BODY_PAD * 2;
     return Math.max(1, Math.floor((innerW + CARD_GAP) / (CARD_W + CARD_GAP)));
   }
 
-  // Initial nest width estimate (real height set after first doMasonry)
   function calcNestDims(cardCount) {
     const idealCols = Math.min(Math.max(2, Math.ceil(Math.sqrt(cardCount * 1.5))), 6);
     const nestW = idealCols * CARD_W + (idealCols - 1) * CARD_GAP + BODY_PAD * 2;
@@ -1440,11 +1421,10 @@ function initClustersTool(paneEl, sidebarEl) {
     nest.appendChild(body);
     body.appendChild(buildInnerTiles(members, subAsgn, col, lbl));
 
-    // Set initial width; height set after masonry runs post-DOM-insert
     const { nestW, estH } = calcNestDims(members.length);
     nest.style.width = nestW + 'px';
     nest._estW = nestW;
-    nest._estH = estH;   // used for collision layout only
+    nest._estH = estH;
 
     makeNestDraggable(nest);
     makeResizable(nest, members.length);
@@ -1479,21 +1459,16 @@ function initClustersTool(paneEl, sidebarEl) {
       nestEls.push(nest);
     });
 
-    // Run masonry now that cards are in DOM and have real heights.
-    // Use two rAFs: first lets browser paint initial state, second reads heights.
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         nestEls.forEach(nest => {
           const { contentH } = doMasonry(nest, false);
-          // Store measured content height as resize minimum
           if (nest._setMasonryMinH) nest._setMasonryMinH(contentH);
-          // Snap nest height to actual content
           const realH = HEAD_H + contentH + BODY_PAD * 2;
           nest.style.height = realH + 'px';
           nest._estH = realH;
         });
 
-        // Now position with accurate heights
         const cols = Math.max(1, Math.ceil(Math.sqrt(nestEls.length)));
         const topRects = nestEls.map((n, i) => ({
           x: NEST_GAP + (i % cols) * ((n._estW || 200) + NEST_GAP * 2),
