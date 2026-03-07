@@ -1,11 +1,11 @@
-// utils-concept-map.js — Concept Map v20
+// utils-concept-map.js — Concept Map v21
 // v19 → v20 changes:
 //   • Fixed light/dark mode support: depthColor() now reads live CSS custom
 //     properties instead of static THEMES object values
 //   • Text color (--ppc-on) now adapts based on html.dark/html.light class
 //   • Background and accent colors read from --raw-{theme}-bg and --raw-{theme}-mid
 //     which update automatically when theme changes
-console.log('[utils-concept-map.js [v.50]');
+console.log('[utils-concept-map.js [v.21]');
 
 // Level themes — must match order/names in THEMES (utils-shared.js)
 const CMAP_LEVEL_THEMES = ['yellow','visions','relational','organizational','physical','yellow'];
@@ -827,66 +827,33 @@ function initConceptMapTool(paneEl, sidebarEl) {
       const GAP_X=MM_PAD+10, GAP_Y=MM_PAD+20;
 
       function applyPositions(posMap) {
-        const ANIMATE_DURATION = 800;
-        const STAGGER_BASE = 60;
+        const ANIMATE_DURATION = 600;
         
         // Determine if this is initial render (no previous positions)
         const isInitialRender = [..._liveRects.values()].every(r => r.x === 0 && r.y === 0);
         
         if (isInitialRender) {
-          // Initial load: hierarchical cascade animation
-          const byLevel = new Map();
+          // Initial load: instant appearance at final positions
           posMap.forEach((pos, id) => {
-            const lv = levels[id];
-            if (!byLevel.has(lv)) byLevel.set(lv, []);
-            byLevel.get(lv).push({ id, pos });
+            const el = cardEls.get(id);
+            if (!el) return;
+            
+            // Place cards directly at their final positions
+            el.style.left = pos.x + 'px';
+            el.style.top = pos.y + 'px';
+            el.style.opacity = '1';
+            el.style.transform = 'scale(1)';
+            el.style.transition = 'none';
+            _liveRects.set(id, { x: pos.x, y: pos.y, w: CARD_W, h: cH(id) });
           });
           
-          const sortedLevels = [...byLevel.keys()].sort((a, b) => a - b);
-          
-          sortedLevels.forEach((lv, levelIdx) => {
-            const cards = byLevel.get(lv);
-            cards.forEach(({ id, pos }, cardIdx) => {
-              const el = cardEls.get(id);
-              if (!el) return;
-              
-              // Start from center of canvas
-              const centerX = (canvas.clientWidth || 500) / 2;
-              const centerY = (canvas.clientHeight || 500) / 2;
-              
-              el.style.left = centerX + 'px';
-              el.style.top = centerY + 'px';
-              el.style.opacity = '0';
-              el.style.transform = 'scale(0.8)';
-              el.style.transition = 'none';
-              
-              // Stagger: each level starts after previous, plus internal card stagger
-              const delay = levelIdx * STAGGER_BASE + cardIdx * 20;
-              
-              requestAnimationFrame(() => {
-                setTimeout(() => {
-                  el.style.transition = `left ${ANIMATE_DURATION}ms cubic-bezier(0.34, 1.56, 0.64, 1), top ${ANIMATE_DURATION}ms cubic-bezier(0.34, 1.56, 0.64, 1), opacity ${ANIMATE_DURATION * 0.6}ms ease-out, transform ${ANIMATE_DURATION}ms cubic-bezier(0.34, 1.56, 0.64, 1)`;
-                  el.style.left = pos.x + 'px';
-                  el.style.top = pos.y + 'px';
-                  el.style.opacity = '1';
-                  el.style.transform = 'scale(1)';
-                  _liveRects.set(id, { x: pos.x, y: pos.y, w: CARD_W, h: cH(id) });
-                }, delay);
-              });
-            });
-          });
-          
-          // Redraw connectors after animation completes
-          setTimeout(() => {
+          // Draw connectors immediately
+          requestAnimationFrame(() => {
             redrawConnectors();
-            // Remove transition styles after animation
-            cardEls.forEach(el => {
-              el.style.transition = '';
-            });
-          }, ANIMATE_DURATION + sortedLevels.length * STAGGER_BASE + 100);
+          });
           
         } else {
-          // Layout change: smooth transition from current position
+          // Layout change: smooth transition from current position to new position
           posMap.forEach((pos, id) => {
             const el = cardEls.get(id);
             if (!el) return;
@@ -915,7 +882,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
           requestAnimationFrame(animateConnectors);
         }
         
-        // Collision detection runs after animation completes
+        // Collision detection runs after animation/placement completes
         setTimeout(() => {
           for (let pass=0;pass<30;pass++) {
             let moved=false;
@@ -923,7 +890,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
             if (!moved) break;
           }
           redrawConnectors();
-        }, isInitialRender ? ANIMATE_DURATION + 400 : ANIMATE_DURATION + 50);
+        }, isInitialRender ? 50 : ANIMATE_DURATION + 50);
       }
 
       function layoutRadial() {
