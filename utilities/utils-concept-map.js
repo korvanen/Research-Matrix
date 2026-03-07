@@ -1,11 +1,11 @@
-// utils-concept-map.js — Concept Map v1
+// utils-concept-map.js — Concept Map v20
 // v19 → v20 changes:
 //   • Fixed light/dark mode support: depthColor() now reads live CSS custom
 //     properties instead of static THEMES object values
 //   • Text color (--ppc-on) now adapts based on html.dark/html.light class
 //   • Background and accent colors read from --raw-{theme}-bg and --raw-{theme}-mid
 //     which update automatically when theme changes
-console.log('[utils-concept-map.js [v.1]');
+console.log('[utils-concept-map.js [v.2]');
 
 // Level themes — must match order/names in THEMES (utils-shared.js)
 const CMAP_LEVEL_THEMES = ['yellow','visions','relational','organizational','physical','yellow'];
@@ -304,6 +304,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
   let _layout     = 'organic';
   let _rows       = null;
   let _rendered   = false;
+  let _everRendered = false;  // Track if we've ever rendered (for animation logic)
   let _rebuildTimer = null;
   let _topZ       = 10;
   let _panX = 0, _panY = 0, _zoom = 1;
@@ -829,11 +830,12 @@ function initConceptMapTool(paneEl, sidebarEl) {
       function applyPositions(posMap) {
         const ANIMATE_DURATION = 600;
         
-        // Determine if this is initial render (no previous positions)
-        const isInitialRender = [..._liveRects.values()].every(r => r.x === 0 && r.y === 0);
+        // Only instant-load on the VERY FIRST render ever
+        // All subsequent renders (sliders, rebuild, layout change) should animate
+        const isFirstEverRender = !_everRendered;
         
-        if (isInitialRender) {
-          // Initial load: instant appearance at final positions
+        if (isFirstEverRender) {
+          // Very first load: instant appearance at final positions
           posMap.forEach((pos, id) => {
             const el = cardEls.get(id);
             if (!el) return;
@@ -862,8 +864,10 @@ function initConceptMapTool(paneEl, sidebarEl) {
             redrawConnectors();
           }, 50);
           
+          _everRendered = true;
+          
         } else {
-          // Layout change: smooth transition from current position to new position
+          // Any subsequent render: smooth transition
           
           // First, apply collision detection to the TARGET positions (before animating)
           // This ensures we animate to collision-free positions
@@ -1004,7 +1008,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
 
   return {
     reset() {
-      _rendered=false; _rows=null; _liveRects.clear(); _connEdges=[]; _connSvg=null;
+      _rendered=false; _everRendered=false; _rows=null; _liveRects.clear(); _connEdges=[]; _connSvg=null;
       world.innerHTML=''; emptyEl.style.display='flex'; _panX=0; _panY=0; _zoom=1; applyTransform();
     },
     resize() {
