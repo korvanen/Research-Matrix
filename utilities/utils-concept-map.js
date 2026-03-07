@@ -9,7 +9,7 @@
 //   • depthColor: added missing paletteIdx + theme variable (was ReferenceError)
 //   • depthColor: rewrote getLuminance without array destructuring (was SyntaxError)
 //   • Removed dead CMAP_LEVEL_THEMES constant
-console.log('[utils-concept-map.js v.3]');
+console.log('[utils-concept-map.js v.4]');
 
 const CMAP_PARENT_CHILD_THRESHOLD = 0.50;
 const CMAP_MIN_SPLIT_LENGTH = 60;
@@ -646,7 +646,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
   function depthColor(level) {
     var idx = level - 1;
     var palette = (typeof getPalette === 'function') ? getPalette() : (window.PP_PALETTE || []);
-    var paletteIdx = [0, 1, 2, 3, 4, 0][Math.min(idx, 5)];
+    var paletteIdx = [0, 1, 2, 3, 4,5,6,7, 0][Math.min(idx, 7)];
     var theme = palette[paletteIdx] || { accent: '#888888', bg: '#f7f7f8', label: '#ffffff' };
 
     // Compute contrast text color from accent luminance (no array destructuring)
