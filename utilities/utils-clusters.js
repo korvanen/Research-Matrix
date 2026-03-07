@@ -6,7 +6,7 @@
 //     – open/close arrow buttons wired to visible state via ds-panel-arrow--open / --close
 //   • Nest cards, tooltips, table cells, status badge all use semantic DS tokens
 //   • Dark-mode inherits automatically via CSS custom properties
-console.log('[utils-clusters.js V7]');
+console.log('[utils-clusters.js V9]');
 
 var CL_MIN_SPLIT_LENGTH = 60;
 
@@ -1117,7 +1117,7 @@ function initClustersTool(paneEl, sidebarEl) {
     { accent: '#888888', bg: '#f7f7f8', label: '#fff' },
   ];
   function colForIndex(i) {
-    const pal = window.PP_PALETTE || FALLBACK_PALETTE;
+    const pal = (typeof getPalette === 'function' ? getPalette() : null) || window.PP_PALETTE || FALLBACK_PALETTE;
     return pal[i % pal.length];
   }
 
@@ -1129,12 +1129,32 @@ function initClustersTool(paneEl, sidebarEl) {
     const parsed = typeof parseCitation === 'function' ? parseCitation(best) : { body: best };
     const card = document.createElement('div');
     card.className = 'pp-cl-card';
-    // Tint the left border with the cluster accent colour
-    card.style.borderLeftColor = col.accent;
-    card.style.borderLeftWidth = '3px';
     card.style.setProperty('--ppc-bg',     col.bg);
     card.style.setProperty('--ppc-border', col.accent);
     if (delay) card.style.animationDelay = delay + 'ms';
+
+    // ── Top row: big cat number (left) + cluster label block (right) ──
+    const topRow = document.createElement('div');
+    topRow.className = 'pp-cmap-card-top'; // reuse same class — same layout
+    const catNumEl = document.createElement('div');
+    catNumEl.className = 'pp-cmap-card-cat-num';
+    catNumEl.textContent = cats.length ? cats[0] : (clusterLabel ? clusterLabel.slice(0, 6) : '·');
+    const levelBlock = document.createElement('div');
+    levelBlock.className = 'pp-cmap-card-level-block';
+    const levelLbl = document.createElement('div');
+    levelLbl.className = 'pp-cmap-card-level-label';
+    levelLbl.textContent = clusterLabel || 'Cluster';
+    levelBlock.appendChild(levelLbl);
+    topRow.appendChild(catNumEl);
+    topRow.appendChild(levelBlock);
+    card.appendChild(topRow);
+
+    // ── Thin rule ──
+    const rule = document.createElement('div');
+    rule.className = 'pp-cmap-card-rule';
+    card.appendChild(rule);
+
+    // ── Body: category tag + main text ──
     const body = document.createElement('div'); body.className = 'pp-cl-card-body';
     if (cats.length) {
       const ce = document.createElement('div'); ce.className = 'pp-cl-card-cat'; ce.textContent = cats.join(' · '); body.appendChild(ce);
@@ -1345,6 +1365,9 @@ function initClustersTool(paneEl, sidebarEl) {
   window.addEventListener('embedding-complete', ev => {
     if (!_rendered) { subtitle.textContent = 'Indexed ' + ev.detail.total + ' entries — building clusters\u2026'; tryRender(); }
   });
+
+  // Re-render cards when dark/light mode changes so palette colours update
+  window.addEventListener('df-theme-change', () => { _rendered = false; tryRender(); });
 
   return {
     reset() {
