@@ -6,7 +6,7 @@
 //     – open/close arrow buttons wired to visible state via ds-panel-arrow--open / --close
 //   • Nest cards, tooltips, table cells, status badge all use semantic DS tokens
 //   • Dark-mode inherits automatically via CSS custom properties
-console.log('[utils-clusters.js V9]');
+console.log('[utils-clusters.js V10]');
 
 var CL_MIN_SPLIT_LENGTH = 60;
 
@@ -270,13 +270,13 @@ var CL_MIN_SPLIT_LENGTH = 60;
   to   { opacity: 1; transform: none; }
 }
 
-/* ── Solid-colour card: text always white (bg = hardcoded accent) ── */
-.pp-cl-card .pp-cmap-card-cat-num     { color: rgba(255,255,255,.92) !important; }
-.pp-cl-card .pp-cmap-card-level-label { color: rgba(255,255,255,.55) !important; }
-.pp-cl-card .pp-cmap-card-rule        { background: rgba(255,255,255,.22) !important; opacity: 1 !important; }
-.pp-cl-card .pp-cl-card-cat           { color: rgba(255,255,255,.60) !important; }
-.pp-cl-card .pp-cl-card-text          { color: rgba(255,255,255,.92) !important; }
-.pp-cl-card .pp-cl-card-split         { color: rgba(255,255,255,.50) !important; }
+/* ── Solid-colour card: text driven by --ppc-on (set from palette label in JS) ── */
+.pp-cl-card .pp-cmap-card-cat-num     { color: color-mix(in srgb, var(--ppc-on,#fff) 92%, transparent); }
+.pp-cl-card .pp-cmap-card-level-label { color: color-mix(in srgb, var(--ppc-on,#fff) 55%, transparent); }
+.pp-cl-card .pp-cmap-card-rule        { background: color-mix(in srgb, var(--ppc-on,#fff) 22%, transparent); opacity: 1; }
+.pp-cl-card .pp-cl-card-cat           { color: color-mix(in srgb, var(--ppc-on,#fff) 60%, transparent); }
+.pp-cl-card .pp-cl-card-text          { color: color-mix(in srgb, var(--ppc-on,#fff) 92%, transparent); }
+.pp-cl-card .pp-cl-card-split         { color: color-mix(in srgb, var(--ppc-on,#fff) 50%, transparent); }
 
 .pp-cl-card-body        { padding: var(--space-1) var(--space-2) var(--space-2); }
 .pp-cl-card-cat {
@@ -1081,6 +1081,13 @@ function initClustersTool(paneEl, sidebarEl) {
     { accent: '#c8991a', bg: '#fffdf5', label: '#fff' },
     { accent: '#888888', bg: '#f7f7f8', label: '#fff' },
   ];
+  // Returns '#fff' or '#000' based on luminance of a hex accent colour
+  function contrastFor(hex) {
+    const c = hex.replace('#','');
+    const r = parseInt(c.slice(0,2),16), g = parseInt(c.slice(2,4),16), b = parseInt(c.slice(4,6),16);
+    return (0.299*r + 0.587*g + 0.114*b) / 255 > 0.55 ? '#000' : '#fff';
+  }
+
   function colForIndex(i) {
     const pal = (typeof getPalette === 'function' ? getPalette() : null) || window.PP_PALETTE || FALLBACK_PALETTE;
     return pal[i % pal.length];
@@ -1095,6 +1102,7 @@ function initClustersTool(paneEl, sidebarEl) {
     card.className = 'pp-cl-card';
     card.style.setProperty('--ppc-bg',     col.accent);
     card.style.setProperty('--ppc-border', col.accent);
+    card.style.setProperty('--ppc-on',     contrastFor(col.accent));
     if (delay) card.style.animationDelay = delay + 'ms';
 
     const topRow = document.createElement('div');
