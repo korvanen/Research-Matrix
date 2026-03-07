@@ -2,7 +2,180 @@
 // utils-shared.js — shared data, theme, and UI utilities
 // Loaded by: index.html, tools/spreadsheet.html, tools/*.html
 // ════════════════════════════════════════════════════════════════
-console.log('[utils-shared.js v.6]');
+console.log('[utils-shared.js v.7]');
+
+// ════════════════════════════════════════════════════════════════
+// DARK / LIGHT MODE
+// Applies html.dark or html.light immediately on parse (before CSS
+// renders) so there is no flash of the wrong theme on any page.
+// The toggle button needs id="theme-toggle" and a label span with
+// id="theme-toggle-label" — wire-up happens on DOMContentLoaded.
+// Changes are broadcast to all other open tabs via localStorage.
+// ════════════════════════════════════════════════════════════════
+
+;(function () {
+  var STORAGE_KEY  = 'df-theme';
+  var html         = document.documentElement;
+
+  var DARK_TOKENS = [
+    '--md-sys-color-primary:#bcc2ff',
+    '--md-sys-color-on-primary:#1b1f8a',
+    '--md-sys-color-primary-container:#3140b0',
+    '--md-sys-color-on-primary-container:#dfe0ff',
+    '--md-sys-color-secondary:#9ad5b9',
+    '--md-sys-color-on-secondary:#003828',
+    '--md-sys-color-secondary-container:#005139',
+    '--md-sys-color-on-secondary-container:#b6edd8',
+    '--md-sys-color-tertiary:#cfbdff',
+    '--md-sys-color-on-tertiary:#3b0093',
+    '--md-sys-color-tertiary-container:#532da1',
+    '--md-sys-color-on-tertiary-container:#e9ddff',
+    '--md-sys-color-error:#ffb4ab',
+    '--md-sys-color-on-error:#690005',
+    '--md-sys-color-error-container:#93000a',
+    '--md-sys-color-on-error-container:#ffdad6',
+    '--md-sys-color-background:#1b1b1f',
+    '--md-sys-color-on-background:#e5e1e6',
+    '--md-sys-color-surface:#1b1b1f',
+    '--md-sys-color-on-surface:#e5e1e6',
+    '--md-sys-color-surface-variant:#47464f',
+    '--md-sys-color-on-surface-variant:#cac4d0',
+    '--md-sys-color-surface-container-highest:#36343b',
+    '--md-sys-color-surface-container-high:#2b2930',
+    '--md-sys-color-surface-container:#211f26',
+    '--md-sys-color-surface-container-low:#1d1b20',
+    '--md-sys-color-surface-container-lowest:#0f0d13',
+    '--md-sys-color-outline:#938f99',
+    '--md-sys-color-outline-variant:#47464f',
+    '--md-sys-color-inverse-surface:#e5e1e6',
+    '--md-sys-color-inverse-on-surface:#313033',
+    '--md-sys-color-inverse-primary:#4a56c8',
+    '--md-elev-1:0px 1px 2px rgba(0,0,0,.5),0px 1px 3px 1px rgba(0,0,0,.25)',
+    '--md-elev-2:0px 1px 2px rgba(0,0,0,.5),0px 2px 6px 2px rgba(0,0,0,.25)',
+    '--md-elev-3:0px 4px 8px 3px rgba(0,0,0,.25),0px 1px 3px rgba(0,0,0,.5)',
+    '--raw-black:#e5e1e6',
+    '--raw-white:#1b1b1f',
+    '--raw-visions-bg:color-mix(in srgb,#2e7d5e 15%,#1b1b1f)',
+    '--raw-relational-bg:color-mix(in srgb,#4a56c8 15%,#1b1b1f)',
+    '--raw-org-bg:color-mix(in srgb,#5e3d9e 15%,#1b1b1f)',
+    '--raw-physical-bg:color-mix(in srgb,#c44035 15%,#1b1b1f)',
+    '--raw-yellow-bg:color-mix(in srgb,#c8991a 15%,#1b1b1f)'
+  ].join(';');
+
+  var LIGHT_TOKENS = [
+    '--md-sys-color-primary:#4a56c8',
+    '--md-sys-color-on-primary:#ffffff',
+    '--md-sys-color-primary-container:#dfe0ff',
+    '--md-sys-color-on-primary-container:#00006e',
+    '--md-sys-color-secondary:#2e7d5e',
+    '--md-sys-color-on-secondary:#ffffff',
+    '--md-sys-color-secondary-container:#b6edd8',
+    '--md-sys-color-on-secondary-container:#00210f',
+    '--md-sys-color-tertiary:#5e3d9e',
+    '--md-sys-color-on-tertiary:#ffffff',
+    '--md-sys-color-tertiary-container:#e9ddff',
+    '--md-sys-color-on-tertiary-container:#20005e',
+    '--md-sys-color-error:#c44035',
+    '--md-sys-color-on-error:#ffffff',
+    '--md-sys-color-error-container:#ffdad6',
+    '--md-sys-color-on-error-container:#410002',
+    '--md-sys-color-background:#fdfbff',
+    '--md-sys-color-on-background:#1b1b1f',
+    '--md-sys-color-surface:#fdfbff',
+    '--md-sys-color-on-surface:#1b1b1f',
+    '--md-sys-color-surface-variant:#e4e1ec',
+    '--md-sys-color-on-surface-variant:#47464f',
+    '--md-sys-color-surface-container-highest:#e6e0e9',
+    '--md-sys-color-surface-container-high:#ece6f0',
+    '--md-sys-color-surface-container:#f3edf7',
+    '--md-sys-color-surface-container-low:#f7f2fa',
+    '--md-sys-color-surface-container-lowest:#ffffff',
+    '--md-sys-color-outline:#787680',
+    '--md-sys-color-outline-variant:#cac4d0',
+    '--md-sys-color-inverse-surface:#313033',
+    '--md-sys-color-inverse-on-surface:#f4eff4',
+    '--md-sys-color-inverse-primary:#bcc2ff',
+    '--md-elev-1:0px 1px 2px rgba(0,0,0,.3),0px 1px 3px 1px rgba(0,0,0,.15)',
+    '--md-elev-2:0px 1px 2px rgba(0,0,0,.3),0px 2px 6px 2px rgba(0,0,0,.15)',
+    '--md-elev-3:0px 4px 8px 3px rgba(0,0,0,.15),0px 1px 3px rgba(0,0,0,.3)',
+    '--raw-black:#111111',
+    '--raw-white:#ffffff',
+    '--raw-visions-bg:#f4faf7',
+    '--raw-relational-bg:#f4f5fd',
+    '--raw-org-bg:#f6f3fb',
+    '--raw-physical-bg:#fdf5f4',
+    '--raw-yellow-bg:#fffdf5'
+  ].join(';');
+
+  // Inject a <style> we fully control (beats the @media query when needed)
+  var styleEl    = document.createElement('style');
+  styleEl.id     = 'df-theme-override';
+  document.head.appendChild(styleEl);
+
+  function applyTheme(dark) {
+    html.classList.toggle('dark',  dark);
+    html.classList.toggle('light', !dark);
+    var osDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    // Only inject overrides when the user's choice conflicts with the OS;
+    // otherwise the @media rule in design-system.css handles it for free.
+    if (dark && !osDark) {
+      styleEl.textContent = 'html.dark :root{' + DARK_TOKENS + '}';
+    } else if (!dark && osDark) {
+      styleEl.textContent = 'html.light :root{' + LIGHT_TOKENS + '}';
+    } else {
+      styleEl.textContent = '';
+    }
+  }
+
+  // Apply immediately — this runs before the stylesheet is parsed
+  var saved       = localStorage.getItem(STORAGE_KEY);
+  var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  var isDark      = saved !== null ? saved === 'dark' : prefersDark;
+  applyTheme(isDark);
+
+  // Wire up the toggle button once DOM is ready
+  function init() {
+    var btn = document.getElementById('theme-toggle');
+    var lbl = document.getElementById('theme-toggle-label');
+    if (!btn) return; // page has no toggle — fine, theme still applies
+
+    function syncLabel() {
+      if (lbl) lbl.textContent = isDark ? 'Light mode' : 'Dark mode';
+    }
+    syncLabel();
+
+    btn.addEventListener('click', function () {
+      isDark = !isDark;
+      applyTheme(isDark);
+      syncLabel();
+      localStorage.setItem(STORAGE_KEY, isDark ? 'dark' : 'light');
+    });
+
+    // Follow OS if user has no explicit saved preference
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function (e) {
+      if (localStorage.getItem(STORAGE_KEY) === null) {
+        isDark = e.matches;
+        applyTheme(isDark);
+        syncLabel();
+      }
+    });
+  }
+
+  // Live-sync all other open tabs when another tab toggles
+  window.addEventListener('storage', function (e) {
+    if (e.key !== STORAGE_KEY) return;
+    isDark = e.newValue === 'dark';
+    applyTheme(isDark);
+    var lbl = document.getElementById('theme-toggle-label');
+    if (lbl) lbl.textContent = isDark ? 'Light mode' : 'Dark mode';
+  });
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();
 
 // ════════════════════════════════════════════════════════════════
 // SHEET URL HANDLING
