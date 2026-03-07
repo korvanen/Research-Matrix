@@ -6,7 +6,7 @@
 //   • Cluster cannot shrink below the minimum space needed to tile all its cards
 //   • makeResizable receives per-nest minW/minH — enforced during resize drag
 //   • Drag threshold (4 px) prevents accidental drags on short card clicks
-console.log('[utils-clusters.js V40]');
+console.log('[utils-clusters.js V50]');
 
 var CL_MIN_SPLIT_LENGTH = 60;
 
@@ -312,7 +312,7 @@ var CL_MIN_SPLIT_LENGTH = 60;
 }
 
 /* ── Card text — IDENTICAL color-mix pattern to concept-map ── */
-/* Uses `black` as the mix target, not var(--ppc-bg), so colours
+/* Uses black as the mix target, not var(--ppc-bg), so colours
    adapt correctly to both light and dark themes.                */
 .pp-cl-card .pp-cmap-card-cat-num { 
   font-family: var(--font-family-serif);
