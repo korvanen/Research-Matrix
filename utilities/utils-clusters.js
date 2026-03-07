@@ -6,7 +6,7 @@
 //   • Cluster cannot shrink below the minimum space needed to tile all its cards
 //   • makeResizable receives per-nest minW/minH — enforced during resize drag
 //   • Drag threshold (4 px) prevents accidental drags on short card clicks
-console.log('[utils-clusters.js V100000000000000000000000000]');
+console.log('[utils-clusters.js v3000000000000]');
 
 var CL_MIN_SPLIT_LENGTH = 60;
 
@@ -295,16 +295,19 @@ var CL_MIN_SPLIT_LENGTH = 60;
   to   { opacity: 1; transform: none; }
 }
 
-/* ── Card text — IDENTICAL color-mix pattern to concept-map ── */
-/* Uses black as the mix target, not var(--ppc-bg), so colours
-   adapt correctly to both light and dark themes.                */
-.pp-cl-card .pp-cmap-card-cat-num { 
+/* ── Card text colors — exact match to utils-concept-map.js ──
+   --ppc-bg = col.bg  (light tint)   — card background
+   --ppc-on = col.accent  (vivid)    — text base color
+   All text mixes the vivid accent toward black for hierarchy.
+   This replicates concept-map's color-mix(…accent…, black) pattern. */
+
+.pp-cl-card .pp-cmap-card-cat-num {
   font-family: var(--font-family-serif);
   font-size: 26px;
   line-height: 1;
   font-weight: 400;
   font-style: italic;
-  color: color-mix(in srgb, var(--ppc-on, #fff) 92%, black);
+  color: color-mix(in srgb, var(--ppc-on, #2e7d5e) 92%, black);
   letter-spacing: -0.02em;
   flex: 1;
   min-width: 0;
@@ -312,46 +315,21 @@ var CL_MIN_SPLIT_LENGTH = 60;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.pp-cl-card .pp-cmap-card-level-label { 
+.pp-cl-card .pp-cmap-card-level-label {
   font-size: 8px;
   font-weight: var(--font-weight-medium);
   letter-spacing: var(--letter-spacing-caps);
   text-transform: uppercase;
-  color: color-mix(in srgb, var(--ppc-on, #fff) 55%, black);
+  color: color-mix(in srgb, var(--ppc-on, #2e7d5e) 55%, black);
 }
-.pp-cl-card .pp-cmap-card-rule { 
+.pp-cl-card .pp-cmap-card-rule {
   height: 1px;
-  background: color-mix(in srgb, var(--ppc-on, #fff) 22%, black);
+  background: color-mix(in srgb, var(--ppc-on, #2e7d5e) 22%, black);
   margin: 8px 14px 0;
   flex-shrink: 0;
   opacity: 1;
 }
 .pp-cl-card .pp-cl-card-cat {
-  color: color-mix(in srgb, var(--ppc-on, #fff) 60%, black);
-}
-.pp-cl-card .pp-cl-card-text { 
-  font-family: var(--font-family-serif);
-  font-size: 13px;
-  font-weight: 400;
-  line-height: 1.35;
-  letter-spacing: -0.01em;
-  color: color-mix(in srgb, var(--ppc-on, #fff) 92%, black);
-  display: block;
-  overflow-wrap: break-word;
-  word-break: break-word;
-}
-.pp-cl-card .pp-cl-card-split {
-  color: color-mix(in srgb, var(--ppc-on, #fff) 50%, black);
-}
-
-.pp-cl-card-body {
-  padding: 8px 14px 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-
-.pp-cl-card-cat {
   font-size: 9px;
   font-weight: var(--font-weight-medium);
   letter-spacing: var(--letter-spacing-caps);
@@ -360,15 +338,33 @@ var CL_MIN_SPLIT_LENGTH = 60;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  color: color-mix(in srgb, var(--ppc-on, #2e7d5e) 60%, black);
 }
-
-.pp-cl-card-split {
+.pp-cl-card .pp-cl-card-text {
+  font-family: var(--font-family-serif);
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.35;
+  letter-spacing: -0.01em;
+  color: color-mix(in srgb, var(--ppc-on, #2e7d5e) 92%, black);
+  display: block;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+.pp-cl-card .pp-cl-card-split {
   font-size: 8px;
   font-weight: var(--font-weight-medium);
   letter-spacing: var(--letter-spacing-caps);
   text-transform: uppercase;
-  margin-top: auto;
-  flex-shrink: 0;
+  margin-top: 4px;
+  color: color-mix(in srgb, var(--ppc-on, #2e7d5e) 50%, black);
+}
+
+.pp-cl-card-body {
+  padding: 8px 14px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
 }
 
 /* ── Tooltip ─────────────────────────────────────────────── */
@@ -1252,9 +1248,15 @@ function initClustersTool(paneEl, sidebarEl) {
 
     const card = document.createElement('div');
     card.className = 'pp-cl-card';
-    // --ppc-on set to WCAG-contrast colour so color-mix(…, black) always works correctly
-    card.style.setProperty('--ppc-bg',  col.accent);
-    card.style.setProperty('--ppc-on',  contrastFor(col.accent));
+    // Match concept-map exactly: light tinted bg, vivid accent as text color
+    // --ppc-bg = col.bg  (light tint, e.g. #f4faf7)
+    // --ppc-on = col.accent  (vivid hue, used directly in color-mix → black)
+    // This gives: color-mix(in srgb, #2e7d5e 92%, black) = deep green text on light bg
+    card.style.setProperty('--ppc-bg', col.bg || col.accent);
+    card.style.setProperty('--ppc-on', col.accent);
+    // Accent border stripe instead of full accent background
+    card.style.borderLeftWidth  = '3px';
+    card.style.borderLeftColor  = col.accent;
     if (delay) card.style.animationDelay = delay + 'ms';
 
     const topRow = document.createElement('div');
