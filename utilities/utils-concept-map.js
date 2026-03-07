@@ -5,7 +5,7 @@
 //   • Text color (--ppc-on) now adapts based on html.dark/html.light class
 //   • Background and accent colors read from --raw-{theme}-bg and --raw-{theme}-mid
 //     which update automatically when theme changes
-console.log('[utils-concept-map.js [v.30]');
+console.log('[utils-concept-map.js [v.50]');
 
 // Level themes — must match order/names in THEMES (utils-shared.js)
 const CMAP_LEVEL_THEMES = ['yellow','visions','relational','organizational','physical','yellow'];
@@ -668,7 +668,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
       return 0.2126 * rs + 0.7152 * gs + 0.0722 * bs;
     }
     
-    const bgLum = getLuminance(theme.bg);
+    const bgLum = getLuminance(theme.accent);  // Use accent since that's the card background
     const label = bgLum > 0.5 ? '#1a1a1a' : '#ffffff';
     
     return { 
@@ -702,7 +702,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
       card.className='pp-cmap-card';
       card.style.cssText=`width:${CARD_W}px;position:absolute;z-index:${++_topZ}`;
       card.style.setProperty('--ppc-border', accent);
-      card.style.setProperty('--ppc-bg',     bg);     // Fixed: was 'accent', should be 'bg'
+      card.style.setProperty('--ppc-bg',     accent);  // Use accent (saturated color) like clusters tool
       card.style.setProperty('--ppc-on',     lc);
 
       const primaryRow=rows[i], isSplit=!!primaryRow._splitFrom;
