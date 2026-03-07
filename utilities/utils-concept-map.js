@@ -642,8 +642,18 @@ function initConceptMapTool(paneEl, sidebarEl) {
   // ── Color by hierarchy level — uses getPalette() like clusters ────────────
   // getPalette() returns the correct palette for current light/dark mode.
   // This ensures concept map colors match clusters tool exactly.
-  function depthColor(level) {
-    const idx = level - 1;
+function depthColor(level) {
+  const idx = level - 1;
+  const palette = (typeof getPalette === 'function') ? getPalette() : window.PP_PALETTE || [];
+  const paletteIdx = [0, 1, 2, 3, 4,5,6,7,0][Math.min(idx, 7)];
+  const theme = palette[paletteIdx] || { accent: '#888888', bg: '#f7f7f8', label: '#ffffff' };
+
+  function getLuminance(hex) { ... }
+
+  const bgLum = getLuminance(theme.accent);
+  const label = bgLum > 0.5 ? '#1a1a1a' : '#ffffff';
+  return { accent: theme.accent || '#888888', bg: theme.bg || '#f7f7f8', label };
+}
     
     // Get the palette (light or dark) from utils-shared.js
     const palette = (typeof getPalette === 'function') ? getPalette() : window.PP_PALETTE || [];
