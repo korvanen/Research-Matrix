@@ -824,7 +824,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
       var GAP_X=MM_PAD+10, GAP_Y=MM_PAD+20;
 
       function applyPositions(posMap) {
-        var ANIMATE_DURATION = 500;
+        var ANIMATE_DURATION = 2000;
 
         // Run collision detection on target positions first
         var targetRects = new Map();
