@@ -6,7 +6,7 @@
 //     – open/close arrow buttons wired to visible state via ds-panel-arrow--open / --close
 //   • Nest cards, tooltips, table cells, status badge all use semantic DS tokens
 //   • Dark-mode inherits automatically via CSS custom properties
-console.log('[utils-clusters.js V35]');
+console.log('[utils-clusters.js V36]');
 
 var CL_MIN_SPLIT_LENGTH = 60;
 
@@ -1081,16 +1081,23 @@ function initClustersTool(paneEl, sidebarEl) {
     { accent: '#c8991a', bg: '#fffdf5', label: '#fff' },
     { accent: '#888888', bg: '#f7f7f8', label: '#fff' },
   ];
-// Returns '#fff' or '#000' to maximize contrast against the given hex background color
-function contrastFor(hex) {
-  let c = hex.replace('#','');
-  if (c.length === 3) c = c.split('').map(ch => ch + ch).join('');
-  const r = parseInt(c.slice(0,2),16),
-        g = parseInt(c.slice(2,4),16),
-        b = parseInt(c.slice(4,6),16);
-  const brightness = (0.299*r + 0.587*g + 0.114*b) / 255;
-  return brightness > 0.55 ? '#fff' : '#000'; // inverted
-}
+
+  // Returns '#fff' or '#000' to maximize contrast against the given hex background color
+  function contrastFor(hex) {
+    let c = String(hex).trim();
+    if (c[0] === '#') c = c.slice(1);
+    if (c.length === 3) c = c.split('').map(ch => ch + ch).join('');
+    if (c.length === 8) c = c.slice(0, 6);
+    if (c.length !== 6) return '#fff';
+    const r = parseInt(c.slice(0, 2), 16) / 255;
+    const g = parseInt(c.slice(2, 4), 16) / 255;
+    const b = parseInt(c.slice(4, 6), 16) / 255;
+    const toLinear = v => (v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4));
+    const L = 0.2126 * toLinear(r) + 0.7152 * toLinear(g) + 0.0722 * toLinear(b);
+    const contrastWithWhite = (1.05) / (L + 0.05);
+    const contrastWithBlack = (L + 0.05) / 0.05;
+    return contrastWithWhite >= contrastWithBlack ? '#fff' : '#000';
+  }
 
   function colForIndex(i) {
     const pal = (typeof getPalette === 'function' ? getPalette() : null) || window.PP_PALETTE || FALLBACK_PALETTE;
