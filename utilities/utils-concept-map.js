@@ -5,7 +5,7 @@
 //     globals then hardcoded CMAP_FALLBACK_PALETTE for standalone/bridge mode.
 //   • CMAP_FALLBACK_PALETTE upgraded from 5 plain hex strings to 7 full
 //     { accent, bg, label } objects matching the global theme palette.
-console.log('[sidepanel-concept-map.js [v.6]');
+console.log('[sidepanel-concept-map.js [v.7]');
 // Level themes (used by THEMES fallback path only):
 const CMAP_LEVEL_THEMES = ['yellow','visions','relational','organizational','physical','yellow'];
 
@@ -20,7 +20,8 @@ const ORPHAN_RECOVERY_THRESHOLD = 0.85;
   s.textContent = `
 #pp-cmap-head {
   flex-shrink:0; padding:10px 12px 8px;
-  border-bottom:1px solid var(--sidebar-box-border,rgba(0,0,0,.1));
+  border-bottom:1px solid var(--md-sys-color-outline-variant);
+  background:var(--md-sys-color-surface-container-low);
   display:flex; flex-direction:column; gap:5px;
 }
 #pp-cmap-subtitle {
@@ -29,17 +30,19 @@ const ORPHAN_RECOVERY_THRESHOLD = 0.85;
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
 }
 #pp-cmap-status {
-  display:flex; align-items:center; gap:6px; padding:4px 8px; border-radius:6px;
+  display:inline-flex; align-items:center; gap:6px; padding:4px 8px;
+  border-radius:var(--radius-full); width:fit-content;
   font-size:9px; font-weight:600; letter-spacing:.07em; text-transform:uppercase;
+  border:1px solid transparent;
   transition:opacity .6s ease, background .4s ease;
 }
-#pp-cmap-status.cmap-loading { background:var(--md-sys-color-surface-container);color:var(--md-sys-color-on-surface-variant); }
-#pp-cmap-status.cmap-ready   { background:rgba(60,180,100,.12); color:rgba(30,130,60,.9); }
-#pp-cmap-status.cmap-error   { background:rgba(200,60,60,.10);  color:rgba(180,40,40,.85); }
+#pp-cmap-status.cmap-loading { background:color-mix(in srgb, var(--md-sys-color-on-surface) 5%, transparent);color:var(--md-sys-color-on-surface-variant);border-color:var(--md-sys-color-outline-variant); }
+#pp-cmap-status.cmap-ready   { background:color-mix(in srgb, var(--md-sys-color-secondary) 12%, transparent);color:var(--md-sys-color-secondary);border-color:color-mix(in srgb, var(--md-sys-color-secondary) 30%, transparent); }
+#pp-cmap-status.cmap-error   { background:color-mix(in srgb, var(--md-sys-color-error) 12%, transparent);color:var(--md-sys-color-error);border-color:color-mix(in srgb, var(--md-sys-color-error) 30%, transparent); }
 .pp-cmap-dot { width:6px;height:6px;border-radius:50%;flex-shrink:0;transition:background .4s; }
-#pp-cmap-status.cmap-loading .pp-cmap-dot { background:var(--md-sys-color-on-surface-variant);animation:pp-cmap-pulse 1.2s ease-in-out infinite; }
-#pp-cmap-status.cmap-ready .pp-cmap-dot   { background:rgba(40,160,80,.9); }
-#pp-cmap-status.cmap-error .pp-cmap-dot   { background:rgba(180,40,40,.85); }
+#pp-cmap-status.cmap-loading .pp-cmap-dot { background:var(--md-sys-color-outline);animation:pp-cmap-pulse 1.2s ease-in-out infinite; }
+#pp-cmap-status.cmap-ready .pp-cmap-dot   { background:var(--md-sys-color-secondary); }
+#pp-cmap-status.cmap-error .pp-cmap-dot   { background:var(--md-sys-color-error); }
 @keyframes pp-cmap-pulse { 0%,100%{opacity:.25;transform:scale(.85);}50%{opacity:1;transform:scale(1.1);} }
 
 /* ── Controls grid ── */
@@ -49,26 +52,26 @@ const ORPHAN_RECOVERY_THRESHOLD = 0.85;
 .pp-cmap-ctrl-col { display:flex; flex-direction:column; gap:2px; }
 
 #pp-cmap-rebuild {
-  border:none; border-radius:5px; padding:4px 8px; align-self:stretch;
-  font-size:8px; font-weight:700; letter-spacing:.07em; text-transform:uppercase;
-  background:var(--md-sys-color-surface-container);color:var(--md-sys-color-on-surface-variant); cursor:pointer;
-  transition:background .15s,color .15s; white-space:nowrap;
+  border:none; border-radius:var(--radius-full); padding:4px 12px; align-self:stretch;
+  font-size:9px; font-weight:600; letter-spacing:.07em; text-transform:uppercase;
+  background:var(--md-sys-color-secondary-container);color:var(--md-sys-color-on-secondary-container); cursor:pointer;
+  transition:background .15s,color .15s,box-shadow .15s; white-space:nowrap;
 }
-#pp-cmap-rebuild:hover { background:var(--md-sys-color-surface-container-high);color:var(--md-sys-color-on-surface); }
-#pp-cmap-rebuild.pp-cmap-busy { background:var(--md-sys-color-surface-container-low);color:var(--md-sys-color-on-surface-variant);cursor:default; }
+#pp-cmap-rebuild:hover { box-shadow:var(--md-elev-1); }
+#pp-cmap-rebuild.pp-cmap-busy { background:color-mix(in srgb, var(--md-sys-color-on-surface) 12%, transparent);color:color-mix(in srgb, var(--md-sys-color-on-surface) 38%, transparent);cursor:default; }
 
 #pp-cmap-layout-wrap { position:relative; align-self:stretch; }
 #pp-cmap-layout-btn {
-  height:100%; border:none; border-radius:5px; padding:4px 7px;
-  font-size:8px; font-weight:700; letter-spacing:.07em; text-transform:uppercase;
+  height:100%; border:1px solid var(--md-sys-color-outline-variant); border-radius:var(--radius-full); padding:4px 10px;
+  font-size:9px; font-weight:600; letter-spacing:.07em; text-transform:uppercase;
   background:var(--md-sys-color-surface-container);color:var(--md-sys-color-on-surface-variant); cursor:pointer;
-  transition:background .15s,color .15s; white-space:nowrap;
-  display:flex; align-items:center; gap:3px;
+  transition:background .15s,color .15s,box-shadow .15s; white-space:nowrap;
+  display:flex; align-items:center; gap:4px;
 }
-#pp-cmap-layout-btn:hover, #pp-cmap-layout-btn.open { background:var(--md-sys-color-surface-container-high);color:var(--md-sys-color-on-surface); }
+#pp-cmap-layout-btn:hover, #pp-cmap-layout-btn.open { background:var(--md-sys-color-surface-container-high);color:var(--md-sys-color-on-surface);box-shadow:var(--md-elev-1); }
 #pp-cmap-layout-menu {
   position:absolute; top:calc(100% + 5px); right:0; z-index:300;
-  background:var(--md-sys-color-surface-container-lowest);border:1px solid var(--md-sys-color-outline-variant); border-radius:9px;
+  background:var(--md-sys-color-surface-container-lowest);border:1px solid var(--md-sys-color-outline-variant); border-radius:var(--radius-md);
   box-shadow:var(--md-elev-3); padding:5px; min-width:148px;
   display:none; flex-direction:column; gap:1px;
   animation:pp-cmap-menu-in .15s cubic-bezier(0.22,1,0.36,1) both;
@@ -77,11 +80,11 @@ const ORPHAN_RECOVERY_THRESHOLD = 0.85;
 #pp-cmap-layout-menu.open { display:flex; }
 .pp-cmap-layout-opt {
   display:flex; align-items:center; gap:6px; width:100%; border:none; background:transparent;
-  text-align:left; padding:5px 9px; border-radius:6px; cursor:pointer;
+  text-align:left; padding:5px 9px; border-radius:var(--radius-sm); cursor:pointer;
   font-size:9px; font-weight:600; letter-spacing:.03em; color:var(--md-sys-color-on-surface-variant); transition:background .12s;
 }
 .pp-cmap-layout-opt:hover { background:var(--md-sys-color-surface-container); color:var(--md-sys-color-on-surface); }
-.pp-cmap-layout-opt.active { color:var(--color-topbar-sheet,#111); background:var(--md-sys-color-surface-container); }
+.pp-cmap-layout-opt.active { color:var(--md-sys-color-on-surface); background:var(--md-sys-color-surface-container); }
 .pp-cmap-layout-sep { height:1px; background:var(--md-sys-color-outline-variant); margin:3px 4px; }
 .pp-cmap-layout-group { font-size:7px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--md-sys-color-on-surface-variant);padding:4px 9px 2px; }
 
@@ -98,24 +101,39 @@ const ORPHAN_RECOVERY_THRESHOLD = 0.85;
 }
 #pp-cmap-zoom-hint {
   position:absolute; bottom:7px; right:9px; font-size:9px; font-weight:600;
-  letter-spacing:.05em; color:var(--md-sys-color-on-surface-variant); pointer-events:none; z-index:20;
+  letter-spacing:.05em; color:var(--md-sys-color-outline); pointer-events:none; z-index:20;
 }
 #pp-cmap-fit {
   position:absolute; bottom:28px; right:9px; z-index:25;
-  width:24px; height:24px; border:none; border-radius:5px; padding:0;
+  width:28px; height:28px; border:1px solid var(--md-sys-color-outline-variant); border-radius:var(--radius-sm); padding:0;
   background:var(--md-sys-color-surface-container);color:var(--md-sys-color-on-surface-variant); cursor:pointer;
-  display:grid; place-items:center; transition:background .15s,color .15s;
+  display:grid; place-items:center; transition:background .15s,color .15s,box-shadow .15s;
 }
-#pp-cmap-fit:hover { background:var(--md-sys-color-surface-container-high);color:var(--md-sys-color-on-surface); }
+#pp-cmap-fit:hover { background:var(--md-sys-color-surface-container-high);color:var(--md-sys-color-on-surface);box-shadow:var(--md-elev-1); }
 
 .pp-cmap-card {
   position:absolute; border-radius:9px;
-  border:1.5px solid var(--ppc-border,#aaa); background:var(--ppc-bg,#fff);
-  box-shadow:var(--md-elev-1); cursor:grab; user-select:none;
+  border:none; background:var(--ppc-bg,#fff);
+  box-shadow:var(--md-elev-2); cursor:grab; user-select:none;
   overflow:hidden; transition:box-shadow .15s;
 }
 .pp-cmap-card:active { cursor:grabbing; }
-.pp-cmap-card:hover  { box-shadow:var(--md-elev-2); }
+.pp-cmap-card:hover  { box-shadow:var(--md-elev-4); }
+
+/* ── Solid-color card: all text becomes white ── */
+.pp-cmap-card .pp-cmap-card-cat-num { color:rgba(255,255,255,0.92) !important; }
+.pp-cmap-card .pp-cmap-card-level-num { color:rgba(255,255,255,0.95) !important; }
+.pp-cmap-card .pp-cmap-card-level-label { color:rgba(255,255,255,0.55) !important; }
+.pp-cmap-card .pp-cmap-card-merged { color:rgba(255,255,255,0.5) !important; }
+.pp-cmap-card .pp-cmap-card-rule { background:rgba(255,255,255,0.22) !important; opacity:1 !important; }
+.pp-cmap-card .pp-cmap-cell-cat { color:rgba(255,255,255,0.6) !important; }
+.pp-cmap-card .pp-cmap-cell-text { color:rgba(255,255,255,0.92) !important; }
+.pp-cmap-card .pp-cmap-merge-sep { background:rgba(255,255,255,0.2) !important; border-color:transparent !important; }
+.pp-cmap-card .pp-cmap-card-footer { border-top-color:rgba(255,255,255,0.18) !important; }
+.pp-cmap-card .pp-cmap-sim-line { color:rgba(255,255,255,0.6) !important; }
+.pp-cmap-card .pp-cmap-sim-pct { color:rgba(255,255,255,0.92) !important; }
+.pp-cmap-card .pp-cmap-leaf-badge { color:rgba(255,255,255,0.55) !important; }
+
 .pp-cmap-card-head { padding:5px 9px 4px; display:flex; align-items:flex-start; gap:5px; flex-wrap:wrap; }
 .pp-cmap-level-badge {
   font-size:8px; font-weight:800; letter-spacing:.10em; text-transform:uppercase;
@@ -129,7 +147,7 @@ const ORPHAN_RECOVERY_THRESHOLD = 0.85;
 .pp-cmap-parent-count {
   font-size:8px; font-weight:700; letter-spacing:.06em; padding:1px 5px;
   border-radius:8px; flex-shrink:0; align-self:center;
-  background:rgba(124,92,191,.15); color:#7c5cbf;
+  background:rgba(255,255,255,.2); color:rgba(255,255,255,.9);
 }
 .pp-cmap-merged-count {
   font-size:8px; font-weight:700; letter-spacing:.07em;
@@ -251,7 +269,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
   const maxParSlider= paneEl.querySelector('#pp-cmap-maxpar');
   const maxParValEl = paneEl.querySelector('#pp-cmap-maxpar-val');
 
-  const CARD_W = 225;
+  const CARD_W = 170;
   const MM_PAD = 16;
 
   let _depth      = 5;
@@ -597,42 +615,30 @@ function initConceptMapTool(paneEl, sidebarEl) {
       const path=document.createElementNS(ns,'path');
       path.setAttribute('d',`M${a.x},${a.y} C${a.x+tA.dx*off},${a.y+tA.dy*off} ${b.x+tB.dx*off},${b.y+tB.dy*off} ${b.x},${b.y}`);
       path.setAttribute('fill','none'); path.setAttribute('stroke',color);
-      path.setAttribute('stroke-width',depth===0?'2.5':'1.5');
-      path.setAttribute('stroke-opacity',depth===0?'0.75':'0.55');
+      path.setAttribute('stroke-width',depth===0?'2.5':'2');
+      path.setAttribute('stroke-opacity',depth===0?'1':'0.9');
       path.setAttribute('stroke-dasharray',depth===0?'none':'5 3');
       _connSvg.appendChild(path);
       const dot=document.createElementNS(ns,'circle');
       dot.setAttribute('cx',String(b.x)); dot.setAttribute('cy',String(b.y)); dot.setAttribute('r','3.5');
-      dot.setAttribute('fill',color); dot.setAttribute('opacity','0.85');
+      dot.setAttribute('fill',color); dot.setAttribute('opacity','1');
       _connSvg.appendChild(dot);
     });
   }
 
   // ── Color by hierarchy level ──────────────────────────────────────────────
-  // Priority order:
-  //   1. window.PP_PALETTE  — set by script.js, single source of truth
-  //   2. THEMES globals     — available when running inside the main page
-  //   3. CMAP_FALLBACK_PALETTE — hardcoded safety net for standalone/bridge mode
-  //
-  // PP_PALETTE order: visions(0), relational(1), organizational(2), physical(3),
-  //                   yellow(4), default(5)
-  // Concept map level sequence: yellow(L1), visions(L2), relational(L3),
-  //   organizational(L4), physical(L5), yellow(L6), default(L7+)
-  // → Rotate PP_PALETTE: start at index 4 (yellow), then wrap through 0,1,2,3,4,5.
   const CMAP_FALLBACK_PALETTE = [
-    { accent: '#c8991a', bg: '#fffdf5', label: '#fff' }, // yellow         (level 1)
-    { accent: '#2e7d5e', bg: '#f4faf7', label: '#fff' }, // visions        (level 2)
-    { accent: '#4a56c8', bg: '#f4f5fd', label: '#fff' }, // relational     (level 3)
-    { accent: '#5e3d9e', bg: '#f6f3fb', label: '#fff' }, // organizational (level 4)
-    { accent: '#c44035', bg: '#fdf5f4', label: '#fff' }, // physical       (level 5)
-    { accent: '#c8991a', bg: '#fffdf5', label: '#fff' }, // yellow again   (level 6)
-    { accent: '#888888', bg: '#f7f7f8', label: '#fff' }, // default        (level 7+)
+    { accent: '#c8991a', bg: '#fffdf5', label: '#fff' },
+    { accent: '#2e7d5e', bg: '#f4faf7', label: '#fff' },
+    { accent: '#4a56c8', bg: '#f4f5fd', label: '#fff' },
+    { accent: '#5e3d9e', bg: '#f6f3fb', label: '#fff' },
+    { accent: '#c44035', bg: '#fdf5f4', label: '#fff' },
+    { accent: '#c8991a', bg: '#fffdf5', label: '#fff' },
+    { accent: '#888888', bg: '#f7f7f8', label: '#fff' },
   ];
 
   function depthColor(level) {
-    const idx = level - 1; // 0-based
-
-    // Use getPalette() if available (dark-mode aware), else fall back to PP_PALETTE
+    const idx = level - 1;
     const pal = (typeof getPalette === 'function' ? getPalette() : null)
              || window.PP_PALETTE
              || CMAP_FALLBACK_PALETTE;
@@ -642,7 +648,6 @@ function initConceptMapTool(paneEl, sidebarEl) {
       return rotated[Math.min(idx, rotated.length - 1)];
     }
 
-    // THEMES globals fallback
     if (typeof THEMES !== 'undefined') {
       const tname = (idx < CMAP_LEVEL_THEMES.length) ? CMAP_LEVEL_THEMES[idx] : 'default';
       const theme = THEMES[tname] || THEMES.default || {};
@@ -679,7 +684,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
       card.className='pp-cmap-card';
       card.style.cssText=`width:${CARD_W}px;position:absolute;z-index:${++_topZ}`;
       card.style.setProperty('--ppc-border',accent);
-      card.style.setProperty('--ppc-bg',bg);
+      card.style.setProperty('--ppc-bg',accent);
 
       // ── Top row: big category letter (left) + level block (right) ──────
       const primaryRow=rows[i], isSplit=!!primaryRow._splitFrom;
@@ -688,16 +693,12 @@ function initConceptMapTool(paneEl, sidebarEl) {
       const topRow=document.createElement('div');
       topRow.className='pp-cmap-card-top';
 
-      // Category letter/number — big italic serif, like the reference "31"
       const catNumEl=document.createElement('div');
       catNumEl.className='pp-cmap-card-cat-num';
-      // Use outer cluster/category letter if available, else level numeral
-      // Use all category tags joined — e.g. "4110", not sliced
       const allCats = primaryRow.row?.cats?.filter(c => c.trim()) || [];
       const catChar = allCats.length ? allCats.join(' · ') : String(level);
       catNumEl.textContent = catChar;
 
-      // Level block — top right
       const levelBlock=document.createElement('div');
       levelBlock.className='pp-cmap-card-level-block';
       const levelNum=document.createElement('div');
@@ -713,7 +714,6 @@ function initConceptMapTool(paneEl, sidebarEl) {
       topRow.appendChild(levelBlock);
       card.appendChild(topRow);
 
-      // Merged indicator (if card absorbed siblings)
       if (extras.length>0) {
         const mg=document.createElement('div');
         mg.className='pp-cmap-card-merged';
@@ -721,12 +721,10 @@ function initConceptMapTool(paneEl, sidebarEl) {
         card.appendChild(mg);
       }
 
-      // ── Thin rule ──────────────────────────────────────────────────────
       const rule=document.createElement('div');
       rule.className='pp-cmap-card-rule';
       card.appendChild(rule);
 
-      // ── Body: category tags + main concept text ────────────────────────
       const body=document.createElement('div');
       body.className='pp-cmap-card-body';
       allRows.forEach((ri,idx)=>{
@@ -747,7 +745,6 @@ function initConceptMapTool(paneEl, sidebarEl) {
       });
       card.appendChild(body);
 
-      // ── Footer: plain-text similarity percentages (no bars) ───────────
       const hasChildren=childrenOf[i].length>0;
       const hasParents=numParents>0;
 
