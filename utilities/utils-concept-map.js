@@ -251,7 +251,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
   const maxParSlider= paneEl.querySelector('#pp-cmap-maxpar');
   const maxParValEl = paneEl.querySelector('#pp-cmap-maxpar-val');
 
-  const CARD_W = 170;
+  const CARD_W = 225;
   const MM_PAD = 16;
 
   let _depth      = 5;
