@@ -1474,76 +1474,97 @@ mark.pkw {
 .pp-cmap-merged-count { display: none !important; }
 
 
-/* ── 16f. Cluster cards — same editorial style ───────────────────────────
-   Cluster cards are simpler: no hierarchy, just category + text.
-   --ppc-bg / --ppc-on are set by the patched buildCard() JS.          */
+/* ── 16f. Cluster cards — Bento-box layout (UPDATED) ───────────────────────────
+   
+   SAFE REPLACEMENT: Only replaces section 16f (cluster cards)
+   Does NOT touch sections 16a-16e (concept map cards)
+   
+   This creates a bento-box layout for clusters with:
+   - Flexible card sizing (140px–280px)
+   - Full text wrapping (no truncation)
+   - Cluster cards use same color system as concept map
+   
+   ──────────────────────────────────────────────────────────────────────── */
 
 .pp-cl-card {
   display: flex !important;
   flex-direction: column !important;
-  overflow: hidden !important;
-  border-radius: var(--radius-lg) !important;
-  border: 1px solid color-mix(in srgb, var(--ppc-on, var(--md-sys-color-outline-variant)) 15%, var(--ppc-bg, transparent)) !important;
+  overflow: visible !important;
+  border-radius: var(--radius-md) !important;
+  border: 1px solid var(--ppc-border, var(--md-sys-color-outline-variant)) !important;
   background: var(--ppc-bg, var(--md-sys-color-surface-container-low)) !important;
   box-shadow: var(--md-elev-1) !important;
   cursor: pointer !important;
   transition: box-shadow var(--transition-fast), transform var(--transition-fast) !important;
+  /* Flexible sizing between 140px and 280px */
+  min-width: 140px !important;
+  max-width: 280px !important;
+  /* Height auto-adjusts to content */
+  min-height: 80px !important;
+  height: auto !important;
+  /* Kill the injected left border override */
   border-left-width: 1px !important;
 }
 .pp-cl-card::before {
+  /* Completely disable the injected hover state-layer pseudo */
   display: none !important;
 }
 .pp-cl-card:hover {
   box-shadow: var(--md-elev-3) !important;
-  transform: translateY(-1px) !important;
+  transform: translateY(-2px) scale(1.02) !important;
+  z-index: 10 !important;
 }
 
 .pp-cl-card-body {
-  padding: 14px 14px 12px !important;
+  padding: 10px 14px 14px !important;
   display: flex !important;
   flex-direction: column !important;
-  gap: 3px !important;
+  gap: 6px !important;
   background: transparent !important;
   flex: 1 !important;
 }
 
-/* Category label */
+/* Category label — "STRATEGY · VISION" */
 .pp-cl-card-cat {
   font-family: var(--font-family) !important;
   font-size: 9px !important;
   font-weight: var(--font-weight-medium) !important;
   letter-spacing: var(--letter-spacing-caps) !important;
   text-transform: uppercase !important;
-  color: color-mix(in srgb, var(--ppc-on, var(--md-sys-color-on-surface-variant)) 65%, var(--ppc-bg, transparent)) !important;
-  margin-bottom: 3px !important;
+  color: var(--md-sys-color-on-surface-variant) !important;
+  opacity: .7 !important;
+  margin-bottom: 2px !important;
 }
 
-/* Main text — serif headline */
+/* Main text — serif headline with FULL WRAPPING (no truncation) */
 .pp-cl-card-text {
   font-family: var(--font-family-serif) !important;
-  font-size: 15px !important;
+  font-size: 14px !important;
   font-weight: 400 !important;
   font-style: normal !important;
-  line-height: 1.28 !important;
+  line-height: 1.35 !important;
   letter-spacing: -0.01em !important;
-  color: color-mix(in srgb, var(--ppc-on, var(--md-sys-color-on-surface)) 95%, var(--ppc-bg, transparent)) !important;
-  display: -webkit-box !important;
-  -webkit-line-clamp: 3 !important;
-  -webkit-box-orient: vertical !important;
-  overflow: hidden !important;
+  color: var(--md-sys-color-on-surface) !important;
+  /* BENTO-BOX: Remove line-clamp, allow full text wrapping */
+  display: block !important;
+  overflow-wrap: break-word !important;
+  word-break: break-word !important;
 }
 
 /* Segment label */
 .pp-cl-card-split {
   font-family: var(--font-family) !important;
-  font-size: 9px !important;
+  font-size: 8px !important;
   font-weight: var(--font-weight-medium) !important;
   letter-spacing: var(--letter-spacing-caps) !important;
   text-transform: uppercase !important;
-  color: color-mix(in srgb, var(--ppc-on, var(--md-sys-color-outline)) 55%, var(--ppc-bg, transparent)) !important;
+  color: var(--md-sys-color-outline) !important;
+  opacity: .6 !important;
   margin-top: 4px !important;
 }
 
+
+/* ── 16g. (Keep existing concept map styles unchanged) ───────────────────── */
 
 /* ── 16g. Side-panel mini-cards (.pp-cl-scard) ───────────────────────────  */
 
