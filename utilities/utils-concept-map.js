@@ -1,11 +1,11 @@
-// sidepanel-concept-map.js — Concept Map v17
-// v16 → v17 changes:
+// sidepanel-concept-map.js — Concept Map v18
+// v16 → v18 changes:
 //   • depthColor() now reads window.PP_PALETTE (set by script.js) as first
 //     priority so all tools share one color source. Falls back to THEMES
 //     globals then hardcoded CMAP_FALLBACK_PALETTE for standalone/bridge mode.
 //   • CMAP_FALLBACK_PALETTE upgraded from 5 plain hex strings to 7 full
 //     { accent, bg, label } objects matching the global theme palette.
-console.log('[utils-concept-map.js [v.17]');
+console.log('[utils-concept-map.js [v.18]');
 // Level themes (used by THEMES fallback path only):
 const CMAP_LEVEL_THEMES = ['yellow','visions','relational','organizational','physical','yellow'];
 
