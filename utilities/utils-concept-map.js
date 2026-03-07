@@ -5,7 +5,7 @@
 //     globals then hardcoded CMAP_FALLBACK_PALETTE for standalone/bridge mode.
 //   • CMAP_FALLBACK_PALETTE upgraded from 5 plain hex strings to 7 full
 //     { accent, bg, label } objects matching the global theme palette.
-console.log('[utils-concept-map.js [v.19]');
+console.log('[utils-concept-map.js [v.20]');
 // Level themes (used by THEMES fallback path only):
 const CMAP_LEVEL_THEMES = ['yellow','visions','relational','organizational','physical','yellow'];
 
