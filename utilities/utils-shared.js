@@ -522,3 +522,105 @@ window.TABS = window.TABS || [];
     window.dispatchEvent(new CustomEvent('sheet-load-error', { detail: { error: e } }));
   }
 })();
+// ══════════════════════════════════════════════════════════════════════════
+// PP-NAV-RAIL  — global collapsible tool side panel
+// Append this block to the end of utils-shared.js
+//
+// Usage in a tool init function:
+//
+//   const nav = PPNavRail.create(paneEl, {
+//     toolName: 'Concept Map',
+//     panelSections: [
+//       { label: 'Parameters', html: '<div>...sliders html...</div>' },
+//       { label: 'Layout',     html: '<div>...layout picker html...</div>' },
+//     ],
+//   });
+//
+//   // nav.mainEl   — append your canvas / world div here
+//   // nav.subtitleEl, nav.statusEl — live elements to update text on
+//   // All slider/button IDs inside panelSections html are queryable
+//   // from nav.panelEl via nav.panelEl.querySelector('#my-id')
+// ══════════════════════════════════════════════════════════════════════════
+window.PPNavRail = (function () {
+
+  // Menu hamburger SVG (3 lines)
+  var ICON_OPEN =
+    '<svg viewBox="0 0 18 14" width="16" height="14" fill="none" ' +
+    'stroke="currentColor" stroke-width="1.7" stroke-linecap="round">' +
+    '<line x1="1" y1="2"  x2="17" y2="2"/>' +
+    '<line x1="5" y1="7"  x2="17" y2="7"/>' +
+    '<line x1="1" y1="12" x2="17" y2="12"/>' +
+    '</svg>';
+
+  // Chevron-left SVG (panel is closed, button hints "open")
+  var ICON_CLOSED =
+    '<svg viewBox="0 0 10 14" width="10" height="14" fill="none" ' +
+    'stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">' +
+    '<polyline points="7,2 2,7 7,12"/>' +
+    '</svg>';
+
+  function create(paneEl, opts) {
+    var toolName       = opts.toolName       || 'Tool';
+    var panelSections  = opts.panelSections  || [];
+    var defaultOpen    = opts.defaultOpen !== false;
+
+    // Build sections HTML
+    var sectionsHTML = '';
+    panelSections.forEach(function (sec) {
+      sectionsHTML +=
+        '<div class="pp-side-panel-section">' +
+          '<div class="pp-side-panel-section-label">' + sec.label + '</div>' +
+          sec.html +
+        '</div>';
+    });
+
+    // Restructure paneEl as flex row layout
+    paneEl.style.cssText += ';display:flex;flex-direction:row;overflow:hidden;';
+
+    paneEl.innerHTML =
+      // ── Nav rail (always visible) ──
+      '<div class="pp-nav-rail">' +
+        '<button class="pp-nav-rail-toggle" title="Toggle controls">' +
+          (defaultOpen ? ICON_OPEN : ICON_CLOSED) +
+        '</button>' +
+      '</div>' +
+
+      // ── Collapsible side panel ──
+      '<div class="pp-side-panel' + (defaultOpen ? '' : ' pp-side-panel--collapsed') + '">' +
+        '<div class="pp-side-panel-header">' +
+          '<div class="pp-side-panel-tool-name">' + toolName + '</div>' +
+          '<div class="pp-side-panel-subtitle">Loading\u2026</div>' +
+          '<div class="pp-side-panel-status"></div>' +
+        '</div>' +
+        '<div class="pp-side-panel-body">' +
+          sectionsHTML +
+        '</div>' +
+      '</div>' +
+
+      // ── Main area (tool appends canvas here) ──
+      '<div class="pp-tool-main"></div>';
+
+    var toggleBtn  = paneEl.querySelector('.pp-nav-rail-toggle');
+    var panel      = paneEl.querySelector('.pp-side-panel');
+    var mainEl     = paneEl.querySelector('.pp-tool-main');
+    var subtitleEl = panel.querySelector('.pp-side-panel-subtitle');
+    var statusEl   = panel.querySelector('.pp-side-panel-status');
+
+    var open = defaultOpen;
+    toggleBtn.addEventListener('click', function () {
+      open = !open;
+      panel.classList.toggle('pp-side-panel--collapsed', !open);
+      toggleBtn.innerHTML = open ? ICON_OPEN : ICON_CLOSED;
+    });
+
+    return {
+      panelEl:    panel,
+      mainEl:     mainEl,
+      subtitleEl: subtitleEl,
+      statusEl:   statusEl,
+    };
+  }
+
+  return { create: create };
+})();
+
