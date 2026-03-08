@@ -1856,7 +1856,27 @@ html.light {
   min-width: 0;
 }
 
-/* ── Main area: takes all remaining width ── */
+/* ── Layout flat list (concept map) ── */
+#pp-cmap-layout-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.pp-cmap-layout-opt {
+  display: block; width: 100%;
+  text-align: left; border: none; background: none;
+  padding: 6px 4px;
+  font-size: 10px; font-weight: 600; letter-spacing: .03em;
+  color: var(--md-sys-color-outline);
+  cursor: pointer;
+  border-radius: var(--radius-xs);
+  transition: color .12s;
+}
+.pp-cmap-layout-opt:hover { color: var(--md-sys-color-on-surface-variant); }
+.pp-cmap-layout-opt.active {
+  color: var(--md-sys-color-on-surface);
+  font-weight: 700;
+}
 .pp-tool-main {
   flex: 1;
   min-width: 0;
