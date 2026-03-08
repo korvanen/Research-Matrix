@@ -689,7 +689,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
   function depthColor(level) {
     var idx = level - 1;
     var palette = (typeof getPalette === 'function') ? getPalette() : (window.PP_PALETTE || []);
-    var paletteIdx = [0, 1, 2, 3, 4, 0][Math.min(idx, 5)];
+    var paletteIdx = [0, 1, 2, 3, 4,,5,6,7, 0][Math.min(idx, 7)];
     var theme = palette[paletteIdx] || { accent: '#888888', bg: '#f7f7f8', label: '#ffffff' };
 
     // Compute contrast text color from accent luminance (no array destructuring)
