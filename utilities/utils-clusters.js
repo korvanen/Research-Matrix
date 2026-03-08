@@ -11,7 +11,7 @@
 //   • buildCard: --ppc-on now = contrastFor(col.accent) (white/#1a1a1a, same as concept-map)
 //   • buildCard: removed manual border-left accent stripe (concept-map doesn't use it)
 //   • CSS color-mix expressions in card text/cat/split now driven by --ppc-on/--ppc-bg
-console.log('[utils-clusters.js vSIDENAV');
+console.log('[utils-clusters.js v.Spreadsheet]');
 
 var CL_MIN_SPLIT_LENGTH = 60;
 
@@ -488,20 +488,20 @@ var CL_MIN_SPLIT_LENGTH = 60;
   text-align: left;
   white-space: nowrap;
   color: var(--md-sys-color-on-surface-variant);
-  border-right: 1px solid var(--md-sys-color-outline-variant);
-  border-bottom: 2px solid var(--md-sys-color-outline-variant);
+  border-right: 1px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 40%, transparent);
+  border-bottom: 2px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 60%, transparent);
 }
 .pp-cl-table th.pp-cl-th-corner {
   position: sticky; left: 0; z-index: 11;
   min-width: 28px; width: 28px;
   text-align: center;
-  border-right: 2px solid var(--md-sys-color-outline-variant);
+  border-right: 2px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 50%, transparent);
 }
 .pp-cl-table td {
   padding: var(--space-1);
   vertical-align: top;
-  border-right: 1px solid var(--md-sys-color-outline-variant);
-  border-bottom: 1px solid var(--md-sys-color-outline-variant);
+  border-right: 1px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 30%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 30%, transparent);
   min-width: 130px;
 }
 .pp-cl-table td.pp-cl-td-rowlabel {
@@ -515,7 +515,7 @@ var CL_MIN_SPLIT_LENGTH = 60;
   padding: var(--space-1) var(--space-2);
   white-space: nowrap;
   min-width: 28px; width: 28px;
-  border-right: 2px solid var(--md-sys-color-outline-variant);
+  border-right: 2px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 50%, transparent);
 }
 .pp-cl-table td.pp-cl-td-empty {
   background: color-mix(in srgb, var(--md-sys-color-on-surface) 3%, transparent);
@@ -1006,11 +1006,11 @@ function initClustersTool(paneEl, sidebarEl) {
   }
 
   // ── Tooltip ───────────────────────────────────────────────
-  function showTooltip(ev, r, text, accentColor, clusterLabel) {
+  function showTooltip(ev, r, accentColor, clusterLabel) {
     _ttRow = r;
     ttCluster.textContent = clusterLabel || '';
     ttCluster.style.color = accentColor;
-    ttText.textContent    = text.slice(0, 160) + (text.length > 160 ? '\u2026' : '');
+    ttText.style.display  = 'none';
     ttGoto.style.color    = accentColor;
     tooltip.classList.add('pp-cl-tt-visible');
     moveTooltip(ev);
@@ -1353,7 +1353,7 @@ function initClustersTool(paneEl, sidebarEl) {
     // Tooltip — only show when not mid-drag
     card.addEventListener('mouseenter', ev => {
       if (_nestDrag && _nestDrag.moved) return;
-      showTooltip(ev, r, parsed.body, col.accent, clusterLabel || '');
+      showTooltip(ev, r, col.accent, clusterLabel || '');
     });
     card.addEventListener('mousemove',  ev => {
       if (_nestDrag && _nestDrag.moved) { hideTooltip(); return; }
@@ -1364,21 +1364,60 @@ function initClustersTool(paneEl, sidebarEl) {
     return card;
   }
 
-  // ── Inner tiles (no sub-cluster dividers) ─────────────────
+  // ── Inner tiles — recursive, supports arbitrary depth ────
+  // Label rule: 'A' → 'A1' (letter prefix, no dot)
+  //             'A1' → 'A1.1' (digit suffix, add dot)
+  //             'A1.1' → 'A1.1.1' etc.
+  function subLabel(prefix, idx) {
+    const sep = /[A-Z]$/i.test(prefix) ? '' : '.';
+    return prefix + sep + (idx + 1);
+  }
+
+  function buildTilesRecursive(rows, prefixLbl, remainingDepth, col, frag, delayOffset) {
+    if (remainingDepth <= 0 || rows.length < 2) {
+      rows.forEach((r, ri) => frag.appendChild(buildCard(r, col, (delayOffset + ri) * 10, prefixLbl)));
+      return;
+    }
+    const asgn = autoCluster(rows, _innerMin, _innerMax);
+    const numGroups = Math.max(...asgn, 0) + 1;
+    if (numGroups <= 1) {
+      rows.forEach((r, ri) => frag.appendChild(buildCard(r, col, (delayOffset + ri) * 10, prefixLbl)));
+      return;
+    }
+    const groups = Array.from({ length: numGroups }, () => []);
+    rows.forEach((r, i) => groups[asgn[i]].push(r));
+    let delay = delayOffset;
+    groups.forEach((members, si) => {
+      if (!members.length) return;
+      const lbl    = subLabel(prefixLbl, si);
+      const subCol = colForIndex(si);
+      buildTilesRecursive(members, lbl, remainingDepth - 1, subCol, frag, delay);
+      delay += members.length;
+    });
+  }
+
   function buildInnerTiles(rows, subAsgn, col, outerLbl) {
     const frag = document.createDocumentFragment();
-    if (!subAsgn || _depth <= 1) {
+    if (_depth <= 1) {
       rows.forEach((r, ri) => frag.appendChild(buildCard(r, col, ri * 10, outerLbl)));
-    } else {
+      return frag;
+    }
+    // Use pre-computed aligned sub-assignments for depth=2 (visual consistency),
+    // recurse independently for depth 3+
+    if (_depth === 2 && subAsgn) {
       const numSub = Math.max(...subAsgn, 0) + 1;
       const groups = Array.from({ length: numSub }, () => []);
       rows.forEach((r, i) => groups[subAsgn[i]].push(r));
+      let delay = 0;
       groups.forEach((members, si) => {
         if (!members.length) return;
+        const lbl    = subLabel(outerLbl, si);
         const subCol = colForIndex(si);
-        const subLbl = innerLabel(outerLbl, si);
-        members.forEach((r, ri) => frag.appendChild(buildCard(r, subCol, ri * 10, subLbl)));
+        members.forEach((r, ri) => frag.appendChild(buildCard(r, subCol, (delay + ri) * 10, lbl)));
+        delay += members.length;
       });
+    } else {
+      buildTilesRecursive(rows, outerLbl, _depth - 1, col, frag, 0);
     }
     return frag;
   }
