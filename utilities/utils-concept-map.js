@@ -9,7 +9,7 @@
 //   • depthColor: added missing paletteIdx + theme variable (was ReferenceError)
 //   • depthColor: rewrote getLuminance without array destructuring (was SyntaxError)
 //   • Removed dead CMAP_LEVEL_THEMES constant
-console.log('[utils-concept-map.js v.3]');
+console.log('[utils-concept-map.js v.kkkkkkkkk]');
 
 const CMAP_PARENT_CHILD_THRESHOLD = 0.50;
 const CMAP_MIN_SPLIT_LENGTH = 60;
@@ -646,13 +646,14 @@ function initConceptMapTool(paneEl, sidebarEl) {
 
   var _connSvg=null, _connEdges=[];
 
-  function redrawConnectors() {
+  function redrawConnectors(liveOverride) {
     if (!_connSvg) return;
+    var rects = liveOverride || _liveRects;
     var ns='http://www.w3.org/2000/svg';
     _connSvg.innerHTML='';
     _connEdges.forEach(function(edge) {
       var fromId=edge.fromId, toId=edge.toId, color=edge.color, depth=edge.depth;
-      var ra=_liveRects.get(fromId), rb=_liveRects.get(toId); if (!ra||!rb) return;
+      var ra=rects.get(fromId), rb=rects.get(toId); if (!ra||!rb) return;
       function pts(r){ var x=r.x,y=r.y,w=r.w,h=r.h; return [{x:x+w*.25,y:y},{x:x+w*.5,y:y},{x:x+w*.75,y:y},{x:x+w*.25,y:y+h},{x:x+w*.5,y:y+h},{x:x+w*.75,y:y+h},{x:x,y:y+h*.33},{x:x,y:y+h*.67},{x:x+w,y:y+h*.33},{x:x+w,y:y+h*.67}]; }
       var pA=pts(ra), pB=pts(rb); var best=null, bd=Infinity;
       pA.forEach(function(a){ pB.forEach(function(b){ var d=Math.hypot(a.x-b.x,a.y-b.y); if(d<bd){bd=d;best={a:a,b:b};} }); });
@@ -714,10 +715,12 @@ function initConceptMapTool(paneEl, sidebarEl) {
   function renderConceptMap(hier) {
     // Capture old positions before wiping — used as animation start points
     var _oldRects = new Map(_liveRects);
-    var _oldCount = _oldRects.size;
+    var isFirstRender = (_oldRects.size === 0);
 
     world.innerHTML=''; emptyEl.style.display='none'; _liveRects.clear(); _connEdges=[]; _topZ=10;
-    _panX=0; _panY=0; _zoom=1; applyTransform();
+    // Only reset pan/zoom on first render — during re-renders keep current
+    // viewport so the animation isn't interrupted by a sudden transform snap
+    if (isFirstRender) { _panX=0; _panY=0; _zoom=1; applyTransform(); }
     if (!hier) { emptyEl.style.display='flex'; return; }
 
     var ns='http://www.w3.org/2000/svg';
@@ -842,7 +845,9 @@ function initConceptMapTool(paneEl, sidebarEl) {
         card.appendChild(leaf);
       }
 
-      world.appendChild(card); cardEls.set(i,card); _liveRects.set(i,{x:0,y:0,w:CARD_W,h:80});
+      world.appendChild(card); cardEls.set(i,card);
+      var _startR = _oldRects.size > 0 ? (_oldRects.get(Array.from(_oldRects.keys())[i % _oldRects.size]) || {x:0,y:0}) : {x:0,y:0};
+      _liveRects.set(i,{x:_startR.x,y:_startR.y,w:CARD_W,h:80});
       makeDraggable(card,i);
       (function(cardEl, cardId) {
         if (window.ResizeObserver) {
@@ -924,14 +929,25 @@ function initConceptMapTool(paneEl, sidebarEl) {
           _liveRects.set(id, { x: pos.x, y: pos.y, w: CARD_W, h: pos.h });
         });
 
-        // Keep connectors redrawn while cards slide
+        // Keep connectors tracking actual card positions each frame
+        var canvasRect = canvas.getBoundingClientRect();
         var startTime = performance.now();
         function animateConn(now) {
-          redrawConnectors();
+          // Sample actual painted positions via getBoundingClientRect,
+          // convert from screen space back to world space
+          var liveRects = new Map();
+          cardEls.forEach(function(el, id) {
+            var br = el.getBoundingClientRect();
+            var wx = (br.left - canvasRect.left - _panX) / _zoom;
+            var wy = (br.top  - canvasRect.top  - _panY) / _zoom;
+            var r  = _liveRects.get(id) || { w: CARD_W, h: 80 };
+            liveRects.set(id, { x: wx, y: wy, w: r.w, h: br.height || r.h });
+          });
+          redrawConnectors(liveRects);
           if (now - startTime < ANIMATE_DURATION + 220) requestAnimationFrame(animateConn);
           else {
             cardEls.forEach(function(el) { el.style.transition = ''; });
-            redrawConnectors();
+            redrawConnectors(); // final pass with _liveRects
           }
         }
         requestAnimationFrame(animateConn);
