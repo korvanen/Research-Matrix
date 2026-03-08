@@ -9,7 +9,7 @@
 //   • depthColor: added missing paletteIdx + theme variable (was ReferenceError)
 //   • depthColor: rewrote getLuminance without array destructuring (was SyntaxError)
 //   • Removed dead CMAP_LEVEL_THEMES constant
-console.log('[utils-concept-map.js v.hhhhhhaaaaahha]');
+console.log('[utils-concept-map.js v.queres?]');
 
 const CMAP_PARENT_CHILD_THRESHOLD = 0.50;
 const CMAP_MIN_SPLIT_LENGTH = 60;
@@ -205,7 +205,7 @@ const ORPHAN_RECOVERY_THRESHOLD = 0.85;
 }
 .pp-cmap-split-badge {
   font-size:9px; font-weight:700; letter-spacing:.05em; text-transform:uppercase;
-  color: color-mix(in srgb, var(--ppc-on,#fff) 55%, var(--ppc-bg,#888));
+  color: var(--ppc-on, #fff); opacity: 0.65;
   padding:4px 9px 6px; text-align:right; display:block;
 }
 `;
