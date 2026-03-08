@@ -9,7 +9,7 @@
 //   • depthColor: added missing paletteIdx + theme variable (was ReferenceError)
 //   • depthColor: rewrote getLuminance without array destructuring (was SyntaxError)
 //   • Removed dead CMAP_LEVEL_THEMES constant
-console.log('[utils-concept-map.js v.666]');
+console.log('[utils-concept-map.js v.0000]');
 
 const CMAP_PARENT_CHILD_THRESHOLD = 0.50;
 const CMAP_MIN_SPLIT_LENGTH = 60;
@@ -524,11 +524,39 @@ function initConceptMapTool(paneEl, sidebarEl) {
     var bestText='', bestIdx=0;
     cells.forEach(function(c,i){ if(c.trim().length>bestText.length){ bestText=c.trim(); bestIdx=i; } });
     if (bestText.length < 60) return [row];
-    var segments=sentenceSplit(bestText); if (segments.length<=1) return [row];
+    var segments=sentenceSplit(bestText);
+    if (segments.length<=1) return [row];
+
+    // Try to get per-sentence embeddings first
     var segVecs;
-    try { segVecs=await Promise.all(segments.map(function(s){ return window.EmbeddingUtils.getCachedEmbedding(s); })); } catch(e){ return [row]; }
-    var valid=segments.map(function(s,i){ return {text:s,vec:segVecs[i]}; }).filter(function(x){ return x.vec&&x.vec.length; });
-    if (valid.length<=1) return [row];
+    try { segVecs=await Promise.all(segments.map(function(s){ return window.EmbeddingUtils.getCachedEmbedding(s); })); }
+    catch(e){ segVecs=null; }
+
+    var valid=segVecs
+      ? segments.map(function(s,i){ return {text:s,vec:segVecs[i]}; }).filter(function(x){ return x.vec&&x.vec.length; })
+      : [];
+
+    // If embeddings unavailable for sentences (common — bridge only stores full-cell vectors),
+    // fall back to structural split: use the parent row's vector for all segments.
+    // This still produces multiple cards with x/n labels, grouped by topic proximity.
+    if (valid.length <= 1) {
+      var parentVec = row.vec;
+      if (!parentVec) return [row];
+      // Each segment gets the parent's vector — they'll cluster together, which is correct
+      // since they came from the same source cell. The split is purely structural/display.
+      return segments.map(function(seg, ni) {
+        return {
+          tabIdx: row.tabIdx, rowIdx: row.rowIdx,
+          headers: row.headers||[], title: row.title||'',
+          kws: row.kws||new Set(),
+          _splitFrom: catStr, _splitN: ni+1, _splitT: segments.length,
+          vec: parentVec,
+          row: { cells: cells.map(function(c,ci){ return ci===bestIdx ? seg : c; }), cats: cats }
+        };
+      });
+    }
+
+    // We have real per-sentence embeddings — do semantic grouping
     var SPLIT_THRESHOLD = 0.55;
     var n=valid.length;
     var sim=Array.from({length:n},function(_,i){ return Array.from({length:n},function(_,j){ return i===j?1:cosineSim(valid[i].vec,valid[j].vec); }); });
@@ -867,38 +895,38 @@ function initConceptMapTool(paneEl, sidebarEl) {
 
         var ids = Array.from(targetRects.keys());
 
-        // Cards were created at canvas center (visible). Force browser to
-        // paint them there first by reading offsetLeft, then animate to final.
-        ids.forEach(function(id) {
-          var el = cardEls.get(id);
-          if (el) el.offsetLeft; // force reflow — commits center position
-        });
+        // Step 1: force layout so browser measures cards at their center start position
+        ids.forEach(function(id) { var el=cardEls.get(id); if(el) el.offsetLeft; });
 
-        // Now set transitions and slide each card to its final position
-        ids.forEach(function(id, i) {
-          var el = cardEls.get(id);
-          if (!el) return;
-          var pos = targetRects.get(id);
-          var delay = Math.min(i * 20, 200);
-          el.style.transition =
-            'left ' + ANIMATE_DURATION + 'ms cubic-bezier(0.25,1,0.5,1) ' + delay + 'ms, ' +
-            'top '  + ANIMATE_DURATION + 'ms cubic-bezier(0.25,1,0.5,1) ' + delay + 'ms';
-          el.style.left = pos.x + 'px';
-          el.style.top  = pos.y + 'px';
-          _liveRects.set(id, { x: pos.x, y: pos.y, w: CARD_W, h: pos.h });
-        });
+        // Step 2: rAF — browser paints center state this frame
+        requestAnimationFrame(function() {
+          // Step 3: NOW set transitions + final positions in the NEXT frame
+          // Browser has a committed painted "from" state → transition actually fires
+          ids.forEach(function(id, i) {
+            var el = cardEls.get(id);
+            if (!el) return;
+            var pos = targetRects.get(id);
+            var delay = Math.min(i * 20, 200);
+            el.style.transition =
+              'left ' + ANIMATE_DURATION + 'ms cubic-bezier(0.25,1,0.5,1) ' + delay + 'ms, ' +
+              'top '  + ANIMATE_DURATION + 'ms cubic-bezier(0.25,1,0.5,1) ' + delay + 'ms';
+            el.style.left = pos.x + 'px';
+            el.style.top  = pos.y + 'px';
+            _liveRects.set(id, { x: pos.x, y: pos.y, w: CARD_W, h: pos.h });
+          });
 
-        // Animate connectors while cards are moving
-        var startTime = performance.now();
-        function animateConn(now) {
-          redrawConnectors();
-          if (now - startTime < ANIMATE_DURATION + 250) requestAnimationFrame(animateConn);
-          else {
-            cardEls.forEach(function(el) { el.style.transition = ''; });
+          // Animate connectors while cards are sliding
+          var startTime = performance.now();
+          function animateConn(now) {
             redrawConnectors();
+            if (now - startTime < ANIMATE_DURATION + 250) requestAnimationFrame(animateConn);
+            else {
+              cardEls.forEach(function(el) { el.style.transition = ''; });
+              redrawConnectors();
+            }
           }
-        }
-        requestAnimationFrame(animateConn);
+          requestAnimationFrame(animateConn);
+        });
 
         _everRendered = true;
       }
