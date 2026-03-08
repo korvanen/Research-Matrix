@@ -9,7 +9,7 @@
 //   • depthColor: added missing paletteIdx + theme variable (was ReferenceError)
 //   • depthColor: rewrote getLuminance without array destructuring (was SyntaxError)
 //   • Removed dead CMAP_LEVEL_THEMES constant
-console.log('[utils-concept-map.js v.39]');
+console.log('[utils-concept-map.js v.hhhhhffdhd]');
 
 const CMAP_PARENT_CHILD_THRESHOLD = 0.50;
 const CMAP_MIN_SPLIT_LENGTH = 60;
@@ -828,16 +828,6 @@ function initConceptMapTool(paneEl, sidebarEl) {
       var hasChildren=childrenOf[i].length>0;
       var hasParents=numParents>0;
 
-      if (isSplit) {
-        var splitBadge=document.createElement('div');
-        splitBadge.className='pp-cmap-split-pill';
-        splitBadge.textContent=primaryRow._splitN+'/'+primaryRow._splitT+' Split';
-        splitBadge.style.cssText='font-size:9px;font-weight:800;letter-spacing:.06em;'
-          +'text-transform:uppercase;color:'+lc+';background:rgba(0,0,0,0.20);'
-          +'border-radius:99px;padding:2px 8px;margin:4px 9px 6px;align-self:flex-end;display:block;';
-        card.appendChild(splitBadge);
-      }
-
       if (hasChildren||hasParents) {
         var footer=document.createElement('div');
         footer.className='pp-cmap-card-footer';
@@ -859,11 +849,26 @@ function initConceptMapTool(paneEl, sidebarEl) {
 
         if (hasParents) footer.appendChild(makeSimLine('\u2191', simToParents[i], numParents>1?numParents+' parents':'to parent'));
         if (hasChildren) footer.appendChild(makeSimLine('\u2193', simToChildren[i], 'to children'));
+        if (isSplit) {
+          var splitBadge=document.createElement('div');
+          splitBadge.style.cssText='font-size:9px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;'
+            +'color:'+lc+';background:rgba(0,0,0,0.20);border-radius:99px;padding:2px 8px;'
+            +'align-self:flex-end;margin-top:2px;';
+          splitBadge.textContent=primaryRow._splitN+'/'+primaryRow._splitT+' Split';
+          footer.appendChild(splitBadge);
+        }
         card.appendChild(footer);
       } else {
         var leaf=document.createElement('span');
         leaf.className='pp-cmap-leaf-badge';
-        leaf.textContent='Terminal concept';
+        if (isSplit) {
+          leaf.textContent=primaryRow._splitN+'/'+primaryRow._splitT+' Split';
+          leaf.style.cssText='font-size:9px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;'
+            +'color:'+lc+';background:rgba(0,0,0,0.20);border-radius:99px;padding:2px 8px;'
+            +'align-self:flex-end;margin:4px 9px 8px;display:block;';
+        } else {
+          leaf.textContent='Terminal concept';
+        }
         card.appendChild(leaf);
       }
 
