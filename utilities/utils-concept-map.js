@@ -9,7 +9,7 @@
 //   • depthColor: added missing paletteIdx + theme variable (was ReferenceError)
 //   • depthColor: rewrote getLuminance without array destructuring (was SyntaxError)
 //   • Removed dead CMAP_LEVEL_THEMES constant
-console.log('[utils-concept-map.js v.PANEL]');
+console.log('[utils-concept-map.js v.pneeeel]');
 
 const CMAP_PARENT_CHILD_THRESHOLD = 0.50;
 const CMAP_MIN_SPLIT_LENGTH = 60;
@@ -244,25 +244,14 @@ function initConceptMapTool(paneEl, sidebarEl) {
       {
         label: 'Layout',
         html:
-          '<div id="pp-cmap-layout-wrap">' +
-            '<button id="pp-cmap-layout-btn" title="Change layout">' +
-              '<svg viewBox="0 0 12 12" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="6" cy="6" r="2"/><circle cx="6" cy="6" r="5" stroke-dasharray="2 2"/></svg>' +
-              '<span id="pp-cmap-layout-label">Organic</span>' +
-            '</button>' +
-            '<div id="pp-cmap-layout-menu">' +
-              '<div class="pp-cmap-layout-group">Flow</div>' +
-              '<button class="pp-cmap-layout-opt" data-layout="hflow">Horizontal Flow</button>' +
-              '<button class="pp-cmap-layout-opt" data-layout="vflow">Vertical Flow</button>' +
-              '<div class="pp-cmap-layout-sep"></div>' +
-              '<div class="pp-cmap-layout-group">Tree</div>' +
-              '<button class="pp-cmap-layout-opt" data-layout="htree">Horizontal Tree</button>' +
-              '<button class="pp-cmap-layout-opt" data-layout="vtree">Vertical Tree</button>' +
-              '<button class="pp-cmap-layout-opt" data-layout="radial">Radial Tree</button>' +
-              '<div class="pp-cmap-layout-sep"></div>' +
-              '<div class="pp-cmap-layout-group">Other</div>' +
-              '<button class="pp-cmap-layout-opt" data-layout="circle">Circle</button>' +
-              '<button class="pp-cmap-layout-opt active" data-layout="organic">Organic</button>' +
-            '</div>' +
+          '<div id="pp-cmap-layout-list">' +
+            '<button class="pp-cmap-layout-opt" data-layout="hflow">Horizontal Flow</button>' +
+            '<button class="pp-cmap-layout-opt" data-layout="vflow">Vertical Flow</button>' +
+            '<button class="pp-cmap-layout-opt" data-layout="htree">Horizontal Tree</button>' +
+            '<button class="pp-cmap-layout-opt" data-layout="vtree">Vertical Tree</button>' +
+            '<button class="pp-cmap-layout-opt" data-layout="radial">Radial Tree</button>' +
+            '<button class="pp-cmap-layout-opt" data-layout="circle">Circle</button>' +
+            '<button class="pp-cmap-layout-opt active" data-layout="organic">Organic</button>' +
           '</div>',
       },
     ],
@@ -299,10 +288,6 @@ function initConceptMapTool(paneEl, sidebarEl) {
   const world       = paneEl.querySelector('#pp-cmap-world');
   const emptyEl     = paneEl.querySelector('#pp-cmap-empty');
   const rebuildBtn  = paneEl.querySelector('#pp-cmap-rebuild');
-  const fitBtn      = paneEl.querySelector('#pp-cmap-fit');
-  const layoutBtn   = paneEl.querySelector('#pp-cmap-layout-btn');
-  const layoutMenu  = paneEl.querySelector('#pp-cmap-layout-menu');
-  const layoutLabel = paneEl.querySelector('#pp-cmap-layout-label');
   const layoutOpts  = paneEl.querySelectorAll('.pp-cmap-layout-opt');
   const depthSlider = paneEl.querySelector('#pp-cmap-depth');
   const depthValEl  = paneEl.querySelector('#pp-cmap-depth-val');
@@ -355,16 +340,11 @@ function initConceptMapTool(paneEl, sidebarEl) {
 
   rebuildBtn.addEventListener('click', function() { clearTimeout(_rebuildTimer); _rendered = false; tryRender(); });
 
-  var LAYOUT_LABELS = { organic:'Organic', hflow:'Horizontal Flow', vflow:'Vertical Flow', htree:'Horizontal Tree', vtree:'Vertical Tree', radial:'Radial Tree', circle:'Circle' };
-  layoutBtn.addEventListener('click', function(e) { e.stopPropagation(); layoutMenu.classList.toggle('open'); layoutBtn.classList.toggle('open', layoutMenu.classList.contains('open')); });
-  document.addEventListener('click', function() { layoutMenu.classList.remove('open'); layoutBtn.classList.remove('open'); });
-  layoutMenu.addEventListener('click', function(e) { e.stopPropagation(); });
   layoutOpts.forEach(function(opt) {
     opt.addEventListener('click', function() {
       var l = opt.dataset.layout; if (!l) return;
-      _layout = l; layoutLabel.textContent = LAYOUT_LABELS[l] || l;
+      _layout = l;
       layoutOpts.forEach(function(o) { o.classList.toggle('active', o.dataset.layout === l); });
-      layoutMenu.classList.remove('open'); layoutBtn.classList.remove('open');
       if (_rendered) { _rendered = false; tryRender(); }
     });
   });
