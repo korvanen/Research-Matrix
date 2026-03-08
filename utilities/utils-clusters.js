@@ -1,21 +1,6 @@
 // utils-clusters.js — Clusters tool v38
-// v37 → v38 changes:
-//   • Fixed card width AND height — CARD_W × CARD_H constants, no auto-sizing
-//   • Text color mixes now use `black` (not var(--ppc-bg)) — matches concept-map exactly
-//   • Cluster drag activates on ANY card hover, not just the header strip
-//   • Cluster cannot shrink below the minimum space needed to tile all its cards
-//   • makeResizable receives per-nest minW/minH — enforced during resize drag
-//   • Drag threshold (4 px) prevents accidental drags on short card clicks
-// v38 → v38.1 changes:
-//   • buildCard: --ppc-bg now = col.accent (vivid, same as concept-map)
-//   • buildCard: --ppc-on now = contrastFor(col.accent) (white/#1a1a1a, same as concept-map)
-//   • buildCard: removed manual border-left accent stripe (concept-map doesn't use it)
-//   • CSS color-mix expressions in card text/cat/split now driven by --ppc-on/--ppc-bg
-// v38.2 fix:
-//   • maybySplitRow: removed early-exit guard on EmbeddingUtils so structural split
-//     still fires on the fast-path (pre-veced rows from sessionStorage) before
-//     EmbeddingUtils is ready. canEmbed flag now only gates per-sentence embedding attempt.
-console.log('[utils-clusters.js vggrtttootto]');
+
+console.log('[utils-clusters.js v20]');
 
 var CL_MIN_SPLIT_LENGTH = 60;
 
@@ -42,9 +27,8 @@ var CL_MIN_SPLIT_LENGTH = 60;
   letter-spacing: var(--letter-spacing-wide);
   line-height: 1.3;
   min-height: 14px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  word-break: break-word;
 }
 
 /* Status chip */
