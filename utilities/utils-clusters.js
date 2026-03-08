@@ -11,7 +11,7 @@
 //   • buildCard: --ppc-on now = contrastFor(col.accent) (white/#1a1a1a, same as concept-map)
 //   • buildCard: removed manual border-left accent stripe (concept-map doesn't use it)
 //   • CSS color-mix expressions in card text/cat/split now driven by --ppc-on/--ppc-bg
-console.log('[utils-clusters.js v3000000000000]');
+console.log('[utils-clusters.js vjhjhjhjhj]');
 
 var CL_MIN_SPLIT_LENGTH = 60;
 
@@ -498,11 +498,11 @@ var CL_MIN_SPLIT_LENGTH = 60;
   border-right: 2px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 50%, transparent);
 }
 .pp-cl-table td {
-  padding: var(--space-1);
+  padding: var(--space-2);
   vertical-align: top;
   border-right: 1px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 30%, transparent);
   border-bottom: 1px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 30%, transparent);
-  min-width: 130px;
+  width: calc(var(--pp-card-w, 225px) + 16px);
 }
 .pp-cl-table td.pp-cl-td-rowlabel {
   position: sticky; left: 0; z-index: 5;
@@ -537,6 +537,8 @@ var CL_MIN_SPLIT_LENGTH = 60;
   box-shadow: 0 1px 3px rgba(0,0,0,.18);
   transition: box-shadow var(--transition-fast), filter var(--transition-fast);
   border: none !important;
+  width: var(--pp-card-w, 225px);
+  flex-shrink: 0;
 }
 .pp-cl-scard:last-child { margin-bottom: 0; }
 .pp-cl-scard:hover { box-shadow: var(--md-elev-2); filter: brightness(1.07); }
