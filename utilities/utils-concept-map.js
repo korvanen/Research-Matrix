@@ -1,1675 +1,1102 @@
-/* ============================================================
-   DIMENSIONAL FRAMEWORK — Design System v3
-   Material Design 3  ·  Light + Dark  ·  design-system.css
-
-   CONTENTS
-   ─────────
-   1.  Fonts
-   2.  MD3 System Color Tokens  (light)
-   3.  MD3 System Color Tokens  (dark)
-   4.  Raw palette  (brand colors — unchanged)
-   5.  Semantic tokens  (mapped to MD3)
-   6.  Per-tab / sheet theme variables
-   7.  MD3 Elevation
-   8.  MD3 Shape tokens
-   9.  MD3 Typography scale
-   10. Reset & Base
-   11. Layout primitives   (topbar, shell)
-   12. Components
-       12a. Buttons
-       12b. Pill / segmented control
-       12c. Range sliders
-       12d. Cards
-       12e. Badge / status pill
-       12f. Tables
-       12g. Scrollbars
-       12h. Tooltips
-       12i. Empty / no-host states
-   13. Panel (draggable side panel)
-   14. Animations
-   15. Utilities
-   16. Product-label card system  (clusters + concept map)
-   ============================================================ */
-
-
-/* ── 1. Fonts ─────────────────────────────────────────────── */
-@import url('https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,300;0,400;0,500;0,700;1,400&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap');
-
-
-/* ══════════════════════════════════════════════════════════
-   2. MD3 System Color Tokens — LIGHT
-   Derived from brand palette:
-     Primary   = Relational blue  #4a56c8
-     Secondary = Visions green    #2e7d5e
-     Tertiary  = Org purple       #5e3d9e
-     Error     = Physical red     #c44035
-   ══════════════════════════════════════════════════════════ */
-:root {
-  /* Primary */
-  --md-sys-color-primary:                #4a56c8;
-  --md-sys-color-on-primary:             #ffffff;
-  --md-sys-color-primary-container:      #dfe0ff;
-  --md-sys-color-on-primary-container:   #00006e;
-
-  /* Secondary */
-  --md-sys-color-secondary:              #2e7d5e;
-  --md-sys-color-on-secondary:           #ffffff;
-  --md-sys-color-secondary-container:    #b6edd8;
-  --md-sys-color-on-secondary-container: #00210f;
-
-  /* Tertiary */
-  --md-sys-color-tertiary:               #5e3d9e;
-  --md-sys-color-on-tertiary:            #ffffff;
-  --md-sys-color-tertiary-container:     #e9ddff;
-  --md-sys-color-on-tertiary-container:  #20005e;
-
-  /* Error */
-  --md-sys-color-error:                  #c44035;
-  --md-sys-color-on-error:               #ffffff;
-  --md-sys-color-error-container:        #ffdad6;
-  --md-sys-color-on-error-container:     #410002;
-
-  /* Background */
-  --md-sys-color-background:             #fdfbff;
-  --md-sys-color-on-background:          #1b1b1f;
-
-  /* Surface family */
-  --md-sys-color-surface:                #fdfbff;
-  --md-sys-color-on-surface:             #1b1b1f;
-  --md-sys-color-surface-variant:        #e4e1ec;
-  --md-sys-color-on-surface-variant:     #47464f;
-  --md-sys-color-surface-container-highest: #e6e0e9;
-  --md-sys-color-surface-container-high:    #ece6f0;
-  --md-sys-color-surface-container:         #f3edf7;
-  --md-sys-color-surface-container-low:     #f7f2fa;
-  --md-sys-color-surface-container-lowest:  #ffffff;
-  --md-sys-color-surface-tint:           var(--md-sys-color-primary);
-
-  /* Outline */
-  --md-sys-color-outline:                #787680;
-  --md-sys-color-outline-variant:        #cac4d0;
-
-  /* Inverse */
-  --md-sys-color-inverse-surface:        #313033;
-  --md-sys-color-inverse-on-surface:     #f4eff4;
-  --md-sys-color-inverse-primary:        #bcc2ff;
-
-  /* Misc */
-  --md-sys-color-shadow:                 #000000;
-  --md-sys-color-scrim:                  #000000;
-
-  /* State layer opacities (MD3 spec) */
-  --md-sys-state-hover-opacity:          0.08;
-  --md-sys-state-pressed-opacity:        0.12;
-  --md-sys-state-focus-opacity:          0.12;
-  --md-sys-state-dragged-opacity:        0.16;
-}
-
-
-/* ══════════════════════════════════════════════════════════
-   3. MD3 System Color Tokens — DARK
-   ══════════════════════════════════════════════════════════ */
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    /* Primary */
-    --md-sys-color-primary:                #bcc2ff;
-    --md-sys-color-on-primary:             #1b1f8a;
-    --md-sys-color-primary-container:      #3140b0;
-    --md-sys-color-on-primary-container:   #dfe0ff;
-
-    /* Secondary */
-    --md-sys-color-secondary:              #9ad5b9;
-    --md-sys-color-on-secondary:           #003828;
-    --md-sys-color-secondary-container:    #005139;
-    --md-sys-color-on-secondary-container: #b6edd8;
-
-    /* Tertiary */
-    --md-sys-color-tertiary:               #cfbdff;
-    --md-sys-color-on-tertiary:            #3b0093;
-    --md-sys-color-tertiary-container:     #532da1;
-    --md-sys-color-on-tertiary-container:  #e9ddff;
-
-    /* Error */
-    --md-sys-color-error:                  #ffb4ab;
-    --md-sys-color-on-error:               #690005;
-    --md-sys-color-error-container:        #93000a;
-    --md-sys-color-on-error-container:     #ffdad6;
-
-    /* Background */
-    --md-sys-color-background:             #1b1b1f;
-    --md-sys-color-on-background:          #e5e1e6;
-
-    /* Surface family */
-    --md-sys-color-surface:                #1b1b1f;
-    --md-sys-color-on-surface:             #e5e1e6;
-    --md-sys-color-surface-variant:        #47464f;
-    --md-sys-color-on-surface-variant:     #cac4d0;
-    --md-sys-color-surface-container-highest: #36343b;
-    --md-sys-color-surface-container-high:    #2b2930;
-    --md-sys-color-surface-container:         #211f26;
-    --md-sys-color-surface-container-low:     #1d1b20;
-    --md-sys-color-surface-container-lowest:  #0f0d13;
-
-    /* Outline */
-    --md-sys-color-outline:                #938f99;
-    --md-sys-color-outline-variant:        #47464f;
-
-    /* Inverse */
-    --md-sys-color-inverse-surface:        #e5e1e6;
-    --md-sys-color-inverse-on-surface:     #313033;
-    --md-sys-color-inverse-primary:        #4a56c8;
-  }
-}
-
-
-
-/* ══════════════════════════════════════════════════════════
-   5. Semantic tokens  — mapped to MD3 system colors
-      All legacy names preserved for backward compatibility
-   ══════════════════════════════════════════════════════════ */
-:root {
-  /* Text */
-  --color-text-primary:     var(--md-sys-color-on-background);
-  --color-text-secondary:   var(--md-sys-color-on-surface-variant);
-  --color-text-muted:       var(--md-sys-color-outline);
-  --color-text-disabled:    color-mix(in srgb, var(--md-sys-color-on-surface) 38%, transparent);
-  --color-text-default:     var(--md-sys-color-on-surface);
-  --color-text-placeholder: var(--md-sys-color-outline);
-
-  /* Backgrounds */
-  --color-bg-page:          var(--md-sys-color-background);
-  --color-bg-surface:       var(--md-sys-color-surface-container-low);
-  --color-bg-overlay:       color-mix(in srgb, var(--md-sys-color-surface) 96%, transparent);
-  --color-bg-hover:         color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent);
-  --color-bg-pressed:       color-mix(in srgb, var(--md-sys-color-on-surface) 12%, transparent);
-
-  /* Borders */
-  --color-border-subtle:    var(--md-sys-color-outline-variant);
-  --color-border-default:   var(--md-sys-color-outline-variant);
-  --color-border-strong:    var(--md-sys-color-outline);
-
-  /* Accent (maps to MD3 primary) */
-  --color-accent:           var(--md-sys-color-primary);
-  --color-accent-fg:        var(--md-sys-color-on-primary);
-  --color-accent-hover:     color-mix(in srgb, var(--md-sys-color-primary) 92%, black);
-  --color-accent-subtle:    color-mix(in srgb, var(--md-sys-color-primary) 12%, transparent);
-
-  /* Topbar */
-  --topbar-height:          56px;   /* MD3 top app bar = 64px, tool bars 56px */
-  --topbar-bg:              var(--md-sys-color-surface);
-  --topbar-border:          var(--md-sys-color-outline-variant);
-  --topbar-shadow:          var(--md-elev-1);
-  --topbar-title-color:     var(--md-sys-color-on-surface);
-  --topbar-global-color:    var(--md-sys-color-on-surface-variant);
-
-  /* Tool pane */
-  --tool-pane-bg:           var(--md-sys-color-surface-container-low);
-
-  /* Panel / sidebar */
-  --panel-bg:               var(--md-sys-color-surface-container);
-  --panel-box-bg:           color-mix(in srgb, var(--md-sys-color-on-surface) 5%, transparent);
-  --panel-box-border:       var(--md-sys-color-outline-variant);
-  --panel-border:           var(--md-sys-color-outline-variant);
-
-  /* Scrollbar */
-  --scrollbar-track:        transparent;
-  --scrollbar-thumb:        var(--md-sys-color-outline-variant);
-  --scrollbar-thumb-hover:  var(--md-sys-color-outline);
-
-  /* Focus ring */
-  --focus-ring: 0 0 0 3px color-mix(in srgb, var(--md-sys-color-primary) 30%, transparent);
-
-  /* Transitions (MD3 motion tokens) */
-  --transition-fast:   0.1s cubic-bezier(0.2, 0, 0, 1);
-  --transition-base:   0.2s cubic-bezier(0.2, 0, 0, 1);
-  --transition-slow:   0.3s cubic-bezier(0.2, 0, 0, 1);
-  --transition-bounce: 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
-  /* MD3 named easing */
-  --md-motion-easing-standard:          cubic-bezier(0.2, 0, 0, 1);
-  --md-motion-easing-standard-decel:    cubic-bezier(0, 0, 0, 1);
-  --md-motion-easing-standard-accel:    cubic-bezier(0.3, 0, 1, 1);
-  --md-motion-easing-emphasized:        cubic-bezier(0.2, 0, 0, 1);
-  --md-motion-easing-emphasized-decel:  cubic-bezier(0.05, 0.7, 0.1, 1);
-  --md-motion-easing-emphasized-accel:  cubic-bezier(0.3, 0, 0.8, 0.15);
-
-  /* Typography */
-  --font-family:          'Roboto', 'Instrument Sans', system-ui, sans-serif;
-  --font-family-display:  'Roboto', system-ui, sans-serif;
-  --font-family-serif:    'Instrument Serif', Georgia, serif;
-
-  /* MD3 type scale sizes */
-  --font-size-xs:         11px;  /* Label Small */
-  --font-size-sm:         12px;  /* Label Medium / Body Small */
-  --font-size-base:       14px;  /* Body Medium */
-  --font-size-md:         14px;
-  --font-size-lg:         16px;  /* Body Large */
-  --font-size-title-sm:   14px;  /* Title Small */
-  --font-size-title-md:   16px;  /* Title Medium */
-  --font-size-title-lg:   22px;  /* Title Large */
-  --font-size-headline-sm: 24px;
-  --font-size-headline-md: 28px;
-  --font-size-headline-lg: 32px;
-  --font-size-display-sm:  36px;
-  --font-size-display-md:  45px;
-  --font-size-display-lg:  57px;
-
-  --font-weight-normal:   400;
-  --font-weight-medium:   500;
-  --font-weight-semibold: 600;
-  --font-weight-bold:     700;
-  --font-weight-black:    900;
-
-  --letter-spacing-wide:  0.04em;
-  --letter-spacing-wider: 0.08em;
-  --letter-spacing-caps:  0.1em;
-}
-
-/* Dark mode semantic token overrides */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --raw-black: #e5e1e6;
-    --raw-white: #1b1b1f;
-  }
-}
-
-
-/* ══════════════════════════════════════════════════════════
-   6. Per-tab / sheet theme variables  (unchanged names)
-   ══════════════════════════════════════════════════════════ */
-:root {
-  --bg-topbar:               var(--topbar-bg);
-  --bg-bottombar:            var(--md-sys-color-surface-container);
-  --bg-header:               var(--md-sys-color-surface-container-low);
-  --bg-cat:                  var(--md-sys-color-surface-container-low);
-  --bg-corner:               var(--md-sys-color-surface-container-low);
-  --bg-data:                 var(--md-sys-color-surface);
-  --bg-sidebar:              var(--md-sys-color-surface-container);
-  --color-data:              color-mix(in srgb, var(--md-sys-color-on-surface) 80%, transparent);
-  --color-cat:               var(--md-sys-color-on-surface-variant);
-  --color-header:            var(--md-sys-color-on-surface-variant);
-  --color-topbar-global:     var(--md-sys-color-on-surface-variant);
-  --color-topbar-sheet:      var(--md-sys-color-on-surface);
-  --border-main:             var(--md-sys-color-outline-variant);
-  --border-group:            var(--md-sys-color-outline);
-  --border-strong:           var(--md-sys-color-outline);
-  --border-corner:           var(--md-sys-color-outline);
-  --border-sticky:           var(--md-sys-color-outline);
-  --border-sidebar:          var(--md-sys-color-outline-variant);
-  --border-content-surround: var(--md-sys-color-outline-variant);
-  --highlight-cell:          color-mix(in srgb, var(--md-sys-color-primary) 10%, transparent);
-  --highlight-group:         color-mix(in srgb, var(--md-sys-color-primary) 7%, transparent);
-  --selected-cell:           color-mix(in srgb, var(--md-sys-color-primary) 25%, transparent);
-  --selected-group:          color-mix(in srgb, var(--md-sys-color-primary) 18%, transparent);
-  --tab-bg:                  var(--md-sys-color-surface-container);
-  --tab-border:              var(--md-sys-color-outline-variant);
-  --tab-active-bg:           var(--md-sys-color-surface);
-  --tab-color:               var(--md-sys-color-on-surface-variant);
-  --tab-active-color:        var(--md-sys-color-on-surface);
-  --drag-handle:             color-mix(in srgb, var(--md-sys-color-primary) 33%, transparent);
-  --sidebar-box-bg:          color-mix(in srgb, var(--md-sys-color-on-surface) 5%, transparent);
-  --sidebar-box-border:      var(--md-sys-color-outline-variant);
-  --tab-arrow-bg:            var(--md-sys-color-surface-container-high);
-  --tab-arrow-color:         var(--md-sys-color-on-surface);
-  --bg-content-surround:     var(--md-sys-color-surface-container);
-}
-
-
-
-
-
-/* ══════════════════════════════════════════════════════════
-   7. MD3 Elevation
-   MD3 uses tonal color overlays + shadows
-   ══════════════════════════════════════════════════════════ */
-:root {
-  --md-elev-0: none;
-  --md-elev-1: 0px 1px 2px rgba(0,0,0,0.3), 0px 1px 3px 1px rgba(0,0,0,0.15);
-  --md-elev-2: 0px 1px 2px rgba(0,0,0,0.3), 0px 2px 6px 2px rgba(0,0,0,0.15);
-  --md-elev-3: 0px 4px 8px 3px rgba(0,0,0,0.15), 0px 1px 3px rgba(0,0,0,0.3);
-  --md-elev-4: 0px 6px 10px 4px rgba(0,0,0,0.15), 0px 2px 3px rgba(0,0,0,0.3);
-  --md-elev-5: 0px 8px 12px 6px rgba(0,0,0,0.15), 0px 4px 4px rgba(0,0,0,0.3);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --md-elev-1: 0px 1px 2px rgba(0,0,0,0.5), 0px 1px 3px 1px rgba(0,0,0,0.25);
-    --md-elev-2: 0px 1px 2px rgba(0,0,0,0.5), 0px 2px 6px 2px rgba(0,0,0,0.25);
-    --md-elev-3: 0px 4px 8px 3px rgba(0,0,0,0.25), 0px 1px 3px rgba(0,0,0,0.5);
-    --md-elev-4: 0px 6px 10px 4px rgba(0,0,0,0.25), 0px 2px 3px rgba(0,0,0,0.5);
-    --md-elev-5: 0px 8px 12px 6px rgba(0,0,0,0.25), 0px 4px 4px rgba(0,0,0,0.5);
-  }
-}
-
-
-/* ══════════════════════════════════════════════════════════
-   8. MD3 Shape tokens
-   ══════════════════════════════════════════════════════════ */
-:root {
-  --radius-xs:   4px;   /* Extra Small */
-  --radius-sm:   8px;   /* Small */
-  --radius-md:   12px;  /* Medium */
-  --radius-lg:   16px;  /* Large */
-  --radius-xl:   28px;  /* Extra Large */
-  --radius-full: 9999px;
-
-  /* Spacing (MD3 uses 4px base grid) */
-  --space-1:  4px;
-  --space-2:  8px;
-  --space-3:  12px;
-  --space-4:  16px;
-  --space-5:  20px;
-  --space-6:  24px;
-  --space-7:  28px;
-  --space-8:  32px;
-}
-
-
-/* ══════════════════════════════════════════════════════════
-   9. MD3 Typography utility classes
-   ══════════════════════════════════════════════════════════ */
-.md-display-lg   { font-size:57px; line-height:64px; font-weight:400; letter-spacing:-0.25px; }
-.md-display-md   { font-size:45px; line-height:52px; font-weight:400; letter-spacing:0; }
-.md-display-sm   { font-size:36px; line-height:44px; font-weight:400; letter-spacing:0; }
-.md-headline-lg  { font-size:32px; line-height:40px; font-weight:400; letter-spacing:0; }
-.md-headline-md  { font-size:28px; line-height:36px; font-weight:400; letter-spacing:0; }
-.md-headline-sm  { font-size:24px; line-height:32px; font-weight:400; letter-spacing:0; }
-.md-title-lg     { font-size:22px; line-height:28px; font-weight:400; letter-spacing:0; }
-.md-title-md     { font-size:16px; line-height:24px; font-weight:500; letter-spacing:0.15px; }
-.md-title-sm     { font-size:14px; line-height:20px; font-weight:500; letter-spacing:0.1px; }
-.md-body-lg      { font-size:16px; line-height:24px; font-weight:400; letter-spacing:0.5px; }
-.md-body-md      { font-size:14px; line-height:20px; font-weight:400; letter-spacing:0.25px; }
-.md-body-sm      { font-size:12px; line-height:16px; font-weight:400; letter-spacing:0.4px; }
-.md-label-lg     { font-size:14px; line-height:20px; font-weight:500; letter-spacing:0.1px; }
-.md-label-md     { font-size:12px; line-height:16px; font-weight:500; letter-spacing:0.5px; }
-.md-label-sm     { font-size:11px; line-height:16px; font-weight:500; letter-spacing:0.5px; }
-
-
-/* ══════════════════════════════════════════════════════════
-   10. Reset & Base
-   ══════════════════════════════════════════════════════════ */
-*, *::before, *::after {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
-
-html {
-  font-size: 14px;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  color-scheme: light dark;
-}
-
-body {
-  font-family: var(--font-family);
-  font-size: var(--font-size-base);
-  font-weight: var(--font-weight-normal);
-  color: var(--md-sys-color-on-background);
-  background: var(--md-sys-color-background);
-  line-height: 1.5;
-}
-
-a {
-  color: inherit;
-  text-decoration: none;
-}
-
-button {
-  font-family: var(--font-family);
-  cursor: pointer;
-}
-
-input, textarea, select {
-  font-family: var(--font-family);
-  color-scheme: light dark;
-}
-
-
-/* ── Legacy DS typography classes (kept for compatibility) ── */
-.ds-label-caps {
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-medium);
-  letter-spacing: var(--letter-spacing-caps);
-  text-transform: uppercase;
-  color: var(--md-sys-color-on-surface-variant);
-  line-height: 1;
-}
-.ds-label-sm {
-  font-size: 11px;
-  font-weight: var(--font-weight-medium);
-  letter-spacing: var(--letter-spacing-wide);
-  text-transform: uppercase;
-}
-.ds-body-sm {
-  font-size: var(--font-size-sm);
-  line-height: 1.4;
-  color: var(--md-sys-color-on-surface-variant);
-}
-.ds-body {
-  font-size: var(--font-size-base);
-  line-height: 1.5;
-}
-.ds-mono {
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0;
-}
-
-
-/* ══════════════════════════════════════════════════════════
-   11. Layout Primitives
-   ══════════════════════════════════════════════════════════ */
-
-/* 11a. Topbar — MD3 Top App Bar */
-.ds-topbar {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0 16px 0 4px;
-  height: var(--topbar-height);
-  background: var(--md-sys-color-surface-container-low);
-  border-bottom: 1px solid var(--md-sys-color-outline-variant);
-  box-shadow: none;
-  z-index: 10;
-}
-
-.ds-topbar-back {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  font-family: var(--font-family);
-  font-size: 12px;
-  font-weight: var(--font-weight-medium);
-  letter-spacing: 0.5px;
-  color: var(--md-sys-color-on-surface-variant);
-  padding: 8px 12px;
-  border-radius: var(--radius-full);
-  transition: background var(--transition-fast), color var(--transition-fast);
-  flex-shrink: 0;
-  text-decoration: none;
-  /* MD3 icon button ripple */
-  position: relative;
-  overflow: hidden;
-}
-.ds-topbar-back::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: var(--md-sys-color-on-surface);
-  opacity: 0;
-  transition: opacity var(--transition-fast);
-  border-radius: inherit;
-}
-.ds-topbar-back:hover::before { opacity: var(--md-sys-state-hover-opacity); }
-.ds-topbar-back:hover { color: var(--md-sys-color-on-surface); }
-.ds-topbar-back svg { flex-shrink: 0; display: block; }
-
-.ds-topbar-title {
-  font-size: var(--font-size-title-lg);
-  font-weight: var(--font-weight-normal);
-  color: var(--md-sys-color-on-surface);
-  letter-spacing: 0;
-  flex: 1;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.ds-topbar-global {
-  font-size: 11px;
-  font-weight: var(--font-weight-medium);
-  color: var(--md-sys-color-on-surface-variant);
-  letter-spacing: var(--letter-spacing-wide);
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-
-/* 11b. Tool page shell */
-.ds-tool-shell {
-  display: flex;
-  flex-direction: column;
-  height: 100vh;
-  height: 100dvh;
-  overflow: hidden;
-  background: var(--md-sys-color-background);
-  font-family: var(--font-family);
-  font-size: var(--font-size-base);
-}
-
-
-/* ══════════════════════════════════════════════════════════
-   12. Components
-   ══════════════════════════════════════════════════════════ */
-
-/* ── 12a. Buttons — MD3 filled / tonal / outlined / text ── */
-.ds-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  border: none;
-  border-radius: var(--radius-full); /* MD3 buttons are fully rounded */
-  padding: 0 24px;
-  height: 40px;
-  font-family: var(--font-family);
-  font-size: var(--font-size-title-sm);
-  font-weight: var(--font-weight-medium);
-  letter-spacing: 0.1px;
-  cursor: pointer;
-  transition: box-shadow var(--transition-fast), background var(--transition-fast);
-  white-space: nowrap;
-  position: relative;
-  overflow: hidden;
-}
-.ds-btn::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  opacity: 0;
-  border-radius: inherit;
-  transition: opacity var(--transition-fast);
-}
-.ds-btn:hover::before  { opacity: var(--md-sys-state-hover-opacity); }
-.ds-btn:active::before { opacity: var(--md-sys-state-pressed-opacity); }
-
-/* Filled (primary) */
-.ds-btn-solid {
-  background: var(--md-sys-color-primary);
-  color: var(--md-sys-color-on-primary);
-  box-shadow: var(--md-elev-0);
-}
-.ds-btn-solid::before { background: var(--md-sys-color-on-primary); }
-.ds-btn-solid:hover { box-shadow: var(--md-elev-1); }
-.ds-btn-solid:disabled {
-  background: color-mix(in srgb, var(--md-sys-color-on-surface) 12%, transparent);
-  color: color-mix(in srgb, var(--md-sys-color-on-surface) 38%, transparent);
-  box-shadow: none;
-  cursor: not-allowed;
-}
-
-/* Tonal (ghost) */
-.ds-btn-ghost {
-  background: var(--md-sys-color-secondary-container);
-  color: var(--md-sys-color-on-secondary-container);
-}
-.ds-btn-ghost::before { background: var(--md-sys-color-on-secondary-container); }
-.ds-btn-ghost:hover { box-shadow: var(--md-elev-1); }
-.ds-btn-ghost:disabled {
-  background: color-mix(in srgb, var(--md-sys-color-on-surface) 12%, transparent);
-  color: color-mix(in srgb, var(--md-sys-color-on-surface) 38%, transparent);
-  box-shadow: none;
-  cursor: not-allowed;
-}
-
-
-/* ── 12b. Pill / segmented control — MD3 Segmented Button ── */
-.ds-pill {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  border: 1px solid var(--md-sys-color-outline);
-  border-radius: var(--radius-full);
-  padding: 0;
-  overflow: hidden;
-}
-
-.ds-pill-indicator {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  background: var(--md-sys-color-secondary-container);
-  border-radius: var(--radius-full);
-  transition: left 0.3s var(--md-motion-easing-emphasized),
-              width 0.3s var(--md-motion-easing-emphasized);
-  pointer-events: none;
-}
-
-.ds-pill-btn {
-  flex: 1;
-  position: relative;
-  z-index: 1;
-  border: none;
-  background: transparent;
-  border-radius: var(--radius-full);
-  padding: 6px 16px;
-  font-family: var(--font-family);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
-  letter-spacing: 0.1px;
-  color: var(--md-sys-color-on-surface-variant);
-  cursor: pointer;
-  transition: color var(--transition-fast);
-  white-space: nowrap;
-}
-.ds-pill-btn.active { color: var(--md-sys-color-on-secondary-container); }
-
-
-/* ── 12c. Range sliders ── */
-.ds-slider-group-label, .pp-group-label {
-  font-size: 11px;
-  font-weight: var(--font-weight-medium);
-  letter-spacing: var(--letter-spacing-caps);
-  text-transform: uppercase;
-  color: var(--md-sys-color-on-surface-variant);
-  line-height: 1;
-  margin-bottom: 2px;
-  
-   
-}
-
-.ds-slider-row, .pp-range-row {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-/* ── The individual slider style */
-.ds-slider-label, .pp-range-label {
-  font-size: 11px;
-  font-weight: var(--font-weight-medium);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--md-sys-color-on-surface-variant);
-  flex-shrink: 0;
-    width: 30px;
-   margin-right: 10px;
-}
-
-.ds-slider-val, .pp-range-val {
-  font-size: 11px;
-  font-weight: var(--font-weight-medium);
-  color: var(--md-sys-color-on-surface-variant);
-  flex-shrink: 0;
-  width: 26px;
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-}
-
-.ds-range-input, .pp-range {
-  -webkit-appearance: none;
-  appearance: none;
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  opacity: 0;
-  cursor: pointer;
-  margin: 0;
-  padding: 0;
-  z-index: 2;
-}
-
-.ds-range-wrap, .pp-range-wrap {
-  position: relative;
-  flex: 1;
-  min-width: 0;
-  height: 20px;
-}
-
-/* MD3 slider track: 4px tall, rounded */
-.ds-range-track, .pp-range-track {
-  position: absolute;
-  top: 50%;
-  left: 0;
-  right: 0;
-  height: 4px;
-  transform: translateY(-50%);
-  border-radius: var(--radius-full);
-  background: var(--md-sys-color-surface-variant);
-  overflow: hidden;
-  pointer-events: none;
-  transition: background var(--transition-base);
-}
-
-.ds-range-fill, .pp-range-fill {
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 0%;
-  border-radius: var(--radius-full);
-  background: var(--md-sys-color-primary);
-  opacity: 1;
-  pointer-events: none;
-  transition: width var(--transition-bounce);
-}
-
-/* MD3 slider thumb: 20px, uses primary color */
-.ds-range-thumb, .pp-range-thumb {
-  position: absolute;
-  top: 50%;
-  left: 0%;
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: var(--md-sys-color-primary);
-  box-shadow: var(--md-elev-1);
-  transform: translate(-50%, -50%);
-  pointer-events: none;
-  transition: left var(--transition-bounce),
-              transform var(--transition-fast),
-              box-shadow var(--transition-fast);
-}
-.ds-range-wrap:hover .ds-range-thumb,
-.pp-range-wrap:hover .pp-range-thumb {
-  transform: translate(-50%, -50%) scale(1.1);
-  box-shadow: var(--md-elev-2);
-}
-.ds-range-wrap.dragging .ds-range-thumb,
-.pp-range-wrap.pp-range-dragging .pp-range-thumb {
-  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
-  transform: translate(-50%, -50%) scale(1.15);
-  box-shadow: var(--md-elev-2);
-}
-.ds-range-wrap.dragging .ds-range-fill,
-.pp-range-wrap.pp-range-dragging .pp-range-fill { transition: none; }
-
-/* Accent variant (tertiary) */
-.ds-range-wrap--accent .ds-range-thumb,
-.pp-range-wrap--accent .pp-range-thumb {
-  background: var(--md-sys-color-tertiary);
-  box-shadow: 0 1px 4px color-mix(in srgb, var(--md-sys-color-tertiary) 40%, transparent);
-}
-.ds-range-wrap--accent .ds-range-fill,
-.pp-range-wrap--accent .pp-range-fill { background: var(--md-sys-color-tertiary); }
-
-/* Muted variant */
-.ds-range-wrap--muted .ds-range-thumb,
-.pp-range-wrap--muted .pp-range-thumb {
-  background: var(--md-sys-color-outline);
-  box-shadow: var(--md-elev-1);
-}
-.ds-range-wrap--muted .ds-range-fill,
-.pp-range-wrap--muted .pp-range-fill { background: var(--md-sys-color-outline); }
-
-
-/* ── 12d. Cards — MD3 Filled Card / Elevated Card ── */
-.ds-card {
-  border-radius: var(--radius-md);
-  border: none;
-  background: var(--md-sys-color-surface-container-low);
-  box-shadow: var(--md-elev-1);
-  transition: box-shadow var(--transition-fast), transform var(--transition-fast);
-  position: relative;
-  overflow: hidden;
-}
-.ds-card::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: var(--md-sys-color-on-surface);
-  opacity: 0;
-  transition: opacity var(--transition-fast);
-  pointer-events: none;
-}
-.ds-card:hover {
-  box-shadow: var(--md-elev-2);
-  transform: translateY(-1px);
-}
-.ds-card:hover::before { opacity: var(--md-sys-state-hover-opacity); }
-
-.ds-card-head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 12px 16px 8px;
-  border-bottom: 1px solid var(--md-sys-color-outline-variant);
-}
-
-.ds-card-body {
-  padding: 12px 16px 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.ds-card-accent-bar {
-  width: 3px;
-  height: 16px;
-  border-radius: var(--radius-full);
-  flex-shrink: 0;
-}
-
-
-/* ── 12e. Badge / status pill — MD3 Assist Chip style ── */
-.ds-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 12px;
-  border-radius: var(--radius-full);
-  font-size: 11px;
-  font-weight: var(--font-weight-medium);
-  letter-spacing: 0.5px;
-  flex-shrink: 0;
-  transition: background var(--transition-slow), color var(--transition-slow);
-  border: 1px solid var(--md-sys-color-outline-variant);
-}
-
-.ds-badge--connected {
-  background: color-mix(in srgb, var(--md-sys-color-secondary) 12%, transparent);
-  color: var(--md-sys-color-secondary);
-  border-color: color-mix(in srgb, var(--md-sys-color-secondary) 30%, transparent);
-}
-.ds-badge--waiting {
-  background: color-mix(in srgb, var(--md-sys-color-on-surface) 5%, transparent);
-  color: var(--md-sys-color-on-surface-variant);
-  border-color: var(--md-sys-color-outline-variant);
-}
-.ds-badge--disconnected {
-  background: color-mix(in srgb, var(--md-sys-color-error) 12%, transparent);
-  color: var(--md-sys-color-error);
-  border-color: color-mix(in srgb, var(--md-sys-color-error) 30%, transparent);
-}
-.ds-badge--loading {
-  background: color-mix(in srgb, var(--md-sys-color-on-surface) 5%, transparent);
-  color: var(--md-sys-color-on-surface-variant);
-  border-color: var(--md-sys-color-outline-variant);
-}
-.ds-badge--ready {
-  background: color-mix(in srgb, var(--md-sys-color-secondary) 12%, transparent);
-  color: var(--md-sys-color-secondary);
-  border-color: color-mix(in srgb, var(--md-sys-color-secondary) 30%, transparent);
-}
-.ds-badge--error {
-  background: color-mix(in srgb, var(--md-sys-color-error) 12%, transparent);
-  color: var(--md-sys-color-error);
-  border-color: color-mix(in srgb, var(--md-sys-color-error) 30%, transparent);
-}
-
-.ds-badge-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  flex-shrink: 0;
-  transition: background var(--transition-slow);
-}
-.ds-badge--waiting .ds-badge-dot,
-.ds-badge--loading .ds-badge-dot {
-  background: var(--md-sys-color-outline);
-  animation: ds-pulse 1.2s ease-in-out infinite;
-}
-.ds-badge--connected .ds-badge-dot,
-.ds-badge--ready     .ds-badge-dot { background: var(--md-sys-color-secondary); }
-.ds-badge--disconnected .ds-badge-dot,
-.ds-badge--error     .ds-badge-dot { background: var(--md-sys-color-error); }
-
-
-/* ── 12f. Tables — MD3 Data Table ── */
-.ds-table {
-  border-collapse: collapse;
-  width: 100%;
-  font-size: var(--font-size-sm);
-}
-.ds-table thead tr { position: sticky; top: 0; z-index: 10; }
-.ds-table th {
-  background: var(--md-sys-color-surface-container);
-  padding: 14px 16px 12px;
-  font-size: 11px;
-  font-weight: var(--font-weight-medium);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  text-align: left;
-  white-space: nowrap;
-  color: var(--md-sys-color-on-surface-variant);
-  border-right: 1px solid var(--md-sys-color-outline-variant);
-  border-bottom: 1px solid var(--md-sys-color-outline);
-}
-.ds-table td {
-  padding: 10px 16px;
-  vertical-align: top;
-  border-right: 1px solid var(--md-sys-color-outline-variant);
-  border-bottom: 1px solid var(--md-sys-color-outline-variant);
-  color: var(--md-sys-color-on-surface);
-}
-.ds-table tbody tr:hover {
-  background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent);
-}
-
-
-/* ── 12g. Scrollbars ── */
-.ds-scroll {
-  scrollbar-width: thin;
-  scrollbar-color: var(--md-sys-color-outline-variant) transparent;
-}
-.ds-scroll::-webkit-scrollbar { width: 4px; height: 4px; }
-.ds-scroll::-webkit-scrollbar-thumb {
-  background: var(--md-sys-color-outline-variant);
-  border-radius: var(--radius-full);
-}
-.ds-scroll::-webkit-scrollbar-track { background: transparent; }
-
-
-/* ── 12h. Tooltip — MD3 Plain Tooltip ── */
-.ds-tooltip {
-  position: fixed;
-  z-index: 9999;
-  pointer-events: none;
-  background: var(--md-sys-color-inverse-surface);
-  color: var(--md-sys-color-inverse-on-surface);
-  border-radius: var(--radius-xs);
-  padding: 6px 12px;
-  max-width: 200px;
-  box-shadow: var(--md-elev-2);
-  opacity: 0;
-  transition: opacity 0.15s var(--md-motion-easing-standard);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-normal);
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  line-height: 1.4;
-}
-.ds-tooltip.visible {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-
-/* ── 12i. Empty / no-host states ── */
-.ds-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  padding: 40px;
-  text-align: center;
-  color: var(--md-sys-color-on-surface-variant);
-  font-size: var(--font-size-sm);
-  line-height: 1.5;
-}
-
-.ds-no-host {
-  display: none;
-  position: absolute;
-  inset: 0;
-  background: color-mix(in srgb, var(--md-sys-color-surface) 92%, transparent);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  z-index: 50;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  text-align: center;
-  padding: 40px;
-}
-.ds-no-host.visible { display: flex; }
-.ds-no-host h2 {
-  font-size: var(--font-size-title-md);
-  font-weight: var(--font-weight-medium);
-  color: var(--md-sys-color-on-surface);
-  letter-spacing: 0.15px;
-}
-.ds-no-host p {
-  font-size: var(--font-size-base);
-  color: var(--md-sys-color-on-surface-variant);
-  line-height: 1.5;
-  max-width: 300px;
-}
-.ds-no-host a {
-  font-size: var(--font-size-base);
-  font-weight: var(--font-weight-medium);
-  color: var(--md-sys-color-primary);
-  text-decoration: none;
-}
-.ds-no-host a:hover { text-decoration: underline; }
-
-/* Citation pill */
-.pp-cite-pill {
-  display: inline-block;
-  margin-top: 4px;
-  padding: 2px 8px;
-  border-radius: var(--radius-full);
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-normal);
-  letter-spacing: 0.06em;
-  line-height: 1.4;
-  white-space: nowrap;
-  vertical-align: middle;
-  opacity: 0.85;
-}
-
-/* Keyword highlight */
-mark.pkw {
-  background: transparent;
-  border-bottom: 2px solid currentColor;
-  font-weight: var(--font-weight-medium);
-  padding: 0;
-  color: inherit;
-  transition: border-bottom-color var(--transition-fast);
-}
-
-
-/* ══════════════════════════════════════════════════════════
-   13. Panel — draggable/resizable side panel
-   ══════════════════════════════════════════════════════════ */
-.ds-panel {
-  display: flex;
-  flex-direction: row;
-  align-items: stretch;
-  overflow: hidden;
-  position: relative;
-  z-index: 15;
-  flex-shrink: 0;
-}
-.ds-panel--right { flex-direction: row; }
-.ds-panel--left  { flex-direction: row-reverse; }
-
-.ds-panel.is-overlapping {
-  position: absolute;
-  top: 0; bottom: 0;
-  z-index: 30;
-  box-shadow: var(--md-elev-3);
-}
-.ds-panel--right.is-overlapping { right: 0; }
-.ds-panel--left.is-overlapping  { left: 0; }
-.ds-panel.is-fullscreen { z-index: 40; }
-
-.ds-panel-handle {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  min-width: 16px;
-  background: var(--md-sys-color-surface-container);
-  border-left: 1px solid var(--md-sys-color-outline-variant);
-  cursor: col-resize;
-  gap: 4px;
-  user-select: none;
-  transition: background var(--transition-fast);
-}
-.ds-panel-handle:hover {
-  background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, var(--md-sys-color-surface-container));
-}
-.ds-panel-handle.dragging { cursor: col-resize; }
-.ds-panel--left .ds-panel-handle {
-  border-left: none;
-  border-right: 1px solid var(--md-sys-color-outline-variant);
-}
-
-.ds-panel-handle--fixed {
-  position: fixed;
-  z-index: 50;
-  display: none;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  cursor: col-resize;
-  background: var(--md-sys-color-surface-container);
-  border-left: 1px solid var(--md-sys-color-outline-variant);
-  user-select: none;
-}
-.ds-panel-handle--fixed.active { display: flex; }
-.ds-panel-handle--fixed.ds-panel--left {
-  border-left: none;
-  border-right: 1px solid var(--md-sys-color-outline-variant);
-}
-
-.ds-panel-arrows { display: flex; flex-direction: column; gap: 4px; }
-
-.ds-panel-arrow {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
-  border: none;
-  border-radius: var(--radius-full);
-  background: none;
-  color: var(--md-sys-color-on-surface-variant);
-  cursor: pointer;
-  padding: 0;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity var(--transition-fast),
-              color var(--transition-fast),
-              background var(--transition-fast);
-}
-.ds-panel-arrow.visible { opacity: 1; pointer-events: auto; }
-.ds-panel-arrow:hover {
-  color: var(--md-sys-color-on-surface);
-  background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent);
-}
-.ds-panel-arrow svg { width: 8px; height: 13px; pointer-events: none; }
-
-.ds-panel-body {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  background: var(--md-sys-color-surface-container);
-  border-left: 1px solid var(--md-sys-color-outline-variant);
-}
-.ds-panel--left .ds-panel-body {
-  border-left: none;
-  border-right: 1px solid var(--md-sys-color-outline-variant);
-}
-
-
-/* ══════════════════════════════════════════════════════════
-   14. Animations
-   ══════════════════════════════════════════════════════════ */
-@keyframes ds-pulse {
-  0%, 100% { opacity: 0.3; transform: scale(0.85); }
-  50%       { opacity: 1;  transform: scale(1.1); }
-}
-
-@keyframes ds-fade-up {
-  from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes ds-card-in {
-  from { opacity: 0; transform: translateY(4px) scale(0.98); }
-  to   { opacity: 1; transform: none; }
-}
-
-@keyframes ds-menu-in {
-  from { opacity: 0; transform: scale(0.92) translateY(-6px); }
-  to   { opacity: 1; transform: scale(1) translateY(0); }
-}
-
-/* MD3 ripple */
-@keyframes ds-ripple {
-  from { transform: scale(0); opacity: 0.3; }
-  to   { transform: scale(2.5); opacity: 0; }
-}
-
-
-/* ══════════════════════════════════════════════════════════
-   15. Utilities
-   ══════════════════════════════════════════════════════════ */
-.ds-truncate {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.ds-sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0,0,0,0);
-  white-space: nowrap;
-}
-
-.ds-flex-center  { display: flex; align-items: center; justify-content: center; }
-.ds-flex-between { display: flex; align-items: center; justify-content: space-between; }
-
-.ds-zoom-hint {
-  position: absolute;
-  bottom: 8px;
-  right: 12px;
-  font-size: 11px;
-  font-weight: var(--font-weight-medium);
-  letter-spacing: 0.05em;
-  color: var(--md-sys-color-outline);
-  pointer-events: none;
-  z-index: 20;
-}
-
-/* MD3 surface tint helper */
-.md-tint-1 { background-image: linear-gradient(color-mix(in srgb, var(--md-sys-color-primary)  5%, transparent), color-mix(in srgb, var(--md-sys-color-primary)  5%, transparent)); }
-.md-tint-2 { background-image: linear-gradient(color-mix(in srgb, var(--md-sys-color-primary)  8%, transparent), color-mix(in srgb, var(--md-sys-color-primary)  8%, transparent)); }
-.md-tint-3 { background-image: linear-gradient(color-mix(in srgb, var(--md-sys-color-primary) 11%, transparent), color-mix(in srgb, var(--md-sys-color-primary) 11%, transparent)); }
-.md-tint-4 { background-image: linear-gradient(color-mix(in srgb, var(--md-sys-color-primary) 12%, transparent), color-mix(in srgb, var(--md-sys-color-primary) 12%, transparent)); }
-.md-tint-5 { background-image: linear-gradient(color-mix(in srgb, var(--md-sys-color-primary) 14%, transparent), color-mix(in srgb, var(--md-sys-color-primary) 14%, transparent)); }
-
-/* MD3 elevation utility classes */
-.md-elev-0 { box-shadow: var(--md-elev-0); }
-.md-elev-1 { box-shadow: var(--md-elev-1); }
-.md-elev-2 { box-shadow: var(--md-elev-2); }
-.md-elev-3 { box-shadow: var(--md-elev-3); }
-.md-elev-4 { box-shadow: var(--md-elev-4); }
-.md-elev-5 { box-shadow: var(--md-elev-5); }
-
-
-/* ══════════════════════════════════════════════════════════════════════════
-   16. Editorial card system  (concept map + clusters)
-   ══════════════════════════════════════════════════════════════════════════
-
-   Visual anatomy (based on editorial magazine reference):
-
-     ┌──────────────────────────────────┐
-     │  [big cat letter]   [level num]  │  ← .pp-cmap-card-top
-     │                     LEVEL        │
-     ├──────────────────────────────────┤  ← .pp-cmap-card-rule
-     │  CATS · TAGS                     │  ← .pp-cmap-cell-cat
-     │  Concept text in italic serif    │  ← .pp-cmap-cell-text (Instrument Serif)
-     │  ↑ 84%  to parent                │  ← .pp-cmap-sim-line (plain text, no bars)
-     │  ↓ 71%  to children              │
-     └──────────────────────────────────┘
-       whole card = one solid theme colour (var(--ppc-bg))
-       thin border = derived from --ppc-on for cohesion
-       all text uses --ppc-on for proper contrast
-
-   Cards use NO ::before layout tricks — plain div structure only,
-   so offsetWidth/Height are reliable for connector geometry and
-   pointer-event drag works on both desktop and touchscreen.
-
-   --ppc-bg and --ppc-on are set inline per-card by JS.
-   --ppc-bg = theme background color (adapts to light/dark mode)
-   --ppc-on = contrasting text color (calculated from --ppc-bg luminance)
-   ══════════════════════════════════════════════════════════════════════════ */
-
-
-/* ── 16a. Concept-map card shell ──────────────────────────────────────────
-   position:absolute is set inline by JS.  We only override visual props.  */
+// utils-concept-map.js — Concept Map v20
+// v19 → v20 changes:
+//   • Fixed light/dark mode support: depthColor() now reads live CSS custom
+//     properties instead of static THEMES object values
+//   • Text color (--ppc-on) now adapts based on html.dark/html.light class
+//   • Background and accent colors read from --raw-{theme}-bg and --raw-{theme}-mid
+//     which update automatically when theme changes
+// v20 fixes:
+//   • depthColor: added missing paletteIdx + theme variable (was ReferenceError)
+//   • depthColor: rewrote getLuminance without array destructuring (was SyntaxError)
+//   • Removed dead CMAP_LEVEL_THEMES constant
+console.log('[utils-concept-map.js v.39]');
+
+const CMAP_PARENT_CHILD_THRESHOLD = 0.50;
+const CMAP_MIN_SPLIT_LENGTH = 60;
+const ORPHAN_RECOVERY_THRESHOLD = 0.85;
+
+(function injectCmapStyles() {
+  if (document.getElementById('pp-cmap-styles')) return;
+  const s = document.createElement('style');
+  s.id = 'pp-cmap-styles';
+  s.textContent = `
+#pp-cmap-head {
+  flex-shrink:0; padding:10px 12px 8px;
+  border-bottom:1px solid var(--md-sys-color-outline-variant);
+  background:var(--md-sys-color-surface-container-low);
+  display:flex; flex-direction:column; gap:5px;
+}
+#pp-cmap-subtitle {
+  font-size:11px; font-weight:500; color:var(--md-sys-color-on-surface-variant);
+  letter-spacing:.04em; line-height:1.3; min-height:14px;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+#pp-cmap-status {
+  display:inline-flex; align-items:center; gap:6px; padding:4px 8px;
+  border-radius:var(--radius-full); width:fit-content;
+  font-size:9px; font-weight:600; letter-spacing:.07em; text-transform:uppercase;
+  border:1px solid transparent;
+  transition:opacity .6s ease, background .4s ease;
+}
+#pp-cmap-status.cmap-loading { background:color-mix(in srgb, var(--md-sys-color-on-surface) 5%, transparent);color:var(--md-sys-color-on-surface-variant);border-color:var(--md-sys-color-outline-variant); }
+#pp-cmap-status.cmap-ready   { background:color-mix(in srgb, var(--md-sys-color-secondary) 12%, transparent);color:var(--md-sys-color-secondary);border-color:color-mix(in srgb, var(--md-sys-color-secondary) 30%, transparent); }
+#pp-cmap-status.cmap-error   { background:color-mix(in srgb, var(--md-sys-color-error) 12%, transparent);color:var(--md-sys-color-error);border-color:color-mix(in srgb, var(--md-sys-color-error) 30%, transparent); }
+.pp-cmap-dot { width:6px;height:6px;border-radius:50%;flex-shrink:0;transition:background .4s; }
+#pp-cmap-status.cmap-loading .pp-cmap-dot { background:var(--md-sys-color-outline);animation:pp-cmap-pulse 1.2s ease-in-out infinite; }
+#pp-cmap-status.cmap-ready .pp-cmap-dot   { background:var(--md-sys-color-secondary); }
+#pp-cmap-status.cmap-error .pp-cmap-dot   { background:var(--md-sys-color-error); }
+@keyframes pp-cmap-pulse { 0%,100%{opacity:.25;transform:scale(.85);}50%{opacity:1;transform:scale(1.1);} }
+
+/* ── Controls grid ── */
+#pp-cmap-controls {
+  display:grid; grid-template-columns:1fr 1fr 1fr auto auto; gap:6px; align-items:end;
+}
+.pp-cmap-ctrl-col { display:flex; flex-direction:column; gap:2px; }
+
+#pp-cmap-rebuild {
+  border:none; border-radius:var(--radius-full); padding:4px 12px; align-self:stretch;
+  font-size:9px; font-weight:600; letter-spacing:.07em; text-transform:uppercase;
+  background:var(--md-sys-color-secondary-container);color:var(--md-sys-color-on-secondary-container); cursor:pointer;
+  transition:background .15s,color .15s,box-shadow .15s; white-space:nowrap;
+}
+#pp-cmap-rebuild:hover { box-shadow:var(--md-elev-1); }
+#pp-cmap-rebuild.pp-cmap-busy { background:color-mix(in srgb, var(--md-sys-color-on-surface) 12%, transparent);color:color-mix(in srgb, var(--md-sys-color-on-surface) 38%, transparent);cursor:default; }
+
+#pp-cmap-layout-wrap { position:relative; align-self:stretch; }
+#pp-cmap-layout-btn {
+  height:100%; border:1px solid var(--md-sys-color-outline-variant); border-radius:var(--radius-full); padding:4px 10px;
+  font-size:9px; font-weight:600; letter-spacing:.07em; text-transform:uppercase;
+  background:var(--md-sys-color-surface-container);color:var(--md-sys-color-on-surface-variant); cursor:pointer;
+  transition:background .15s,color .15s,box-shadow .15s; white-space:nowrap;
+  display:flex; align-items:center; gap:4px;
+}
+#pp-cmap-layout-btn:hover, #pp-cmap-layout-btn.open { background:var(--md-sys-color-surface-container-high);color:var(--md-sys-color-on-surface);box-shadow:var(--md-elev-1); }
+#pp-cmap-layout-menu {
+  position:absolute; top:calc(100% + 5px); right:0; z-index:300;
+  background:var(--md-sys-color-surface-container-lowest);border:1px solid var(--md-sys-color-outline-variant); border-radius:var(--radius-md);
+  box-shadow:var(--md-elev-3); padding:5px; min-width:148px;
+  display:none; flex-direction:column; gap:1px;
+  animation:pp-cmap-menu-in .15s cubic-bezier(0.22,1,0.36,1) both;
+}
+@keyframes pp-cmap-menu-in { from{opacity:0;transform:scale(.92) translateY(-6px);}to{opacity:1;transform:scale(1) translateY(0);} }
+#pp-cmap-layout-menu.open { display:flex; }
+.pp-cmap-layout-opt {
+  display:flex; align-items:center; gap:6px; width:100%; border:none; background:transparent;
+  text-align:left; padding:5px 9px; border-radius:var(--radius-sm); cursor:pointer;
+  font-size:9px; font-weight:600; letter-spacing:.03em; color:var(--md-sys-color-on-surface-variant); transition:background .12s;
+}
+.pp-cmap-layout-opt:hover { background:var(--md-sys-color-surface-container); color:var(--md-sys-color-on-surface); }
+.pp-cmap-layout-opt.active { color:var(--md-sys-color-on-surface); background:var(--md-sys-color-surface-container); }
+.pp-cmap-layout-sep { height:1px; background:var(--md-sys-color-outline-variant); margin:3px 4px; }
+.pp-cmap-layout-group { font-size:7px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--md-sys-color-on-surface-variant);padding:4px 9px 2px; }
+
+#pp-cmap-canvas {
+  flex:1; min-height:0; position:relative; overflow:hidden; cursor:default; user-select:none;
+}
+#pp-cmap-canvas.pp-cmap-panning { cursor:grabbing !important; }
+#pp-cmap-world { position:absolute; top:0; left:0; width:100%; height:100%; transform-origin:0 0; }
+#pp-cmap-empty {
+  position:absolute; inset:0; display:flex; flex-direction:column;
+  align-items:center; justify-content:center; gap:8px;
+  font-size:11px; letter-spacing:.08em; text-transform:uppercase;
+  color:var(--md-sys-color-on-surface-variant); text-align:center; padding:24px; pointer-events:none;
+}
+#pp-cmap-zoom-hint {
+  position:absolute; bottom:7px; right:9px; font-size:9px; font-weight:600;
+  letter-spacing:.05em; color:var(--md-sys-color-outline); pointer-events:none; z-index:20;
+}
+#pp-cmap-fit {
+  position:absolute; bottom:28px; right:9px; z-index:25;
+  width:28px; height:28px; border:1px solid var(--md-sys-color-outline-variant); border-radius:var(--radius-sm); padding:0;
+  background:var(--md-sys-color-surface-container);color:var(--md-sys-color-on-surface-variant); cursor:pointer;
+  display:grid; place-items:center; transition:background .15s,color .15s,box-shadow .15s;
+}
+#pp-cmap-fit:hover { background:var(--md-sys-color-surface-container-high);color:var(--md-sys-color-on-surface);box-shadow:var(--md-elev-1); }
 
 .pp-cmap-card {
-  display: flex !important;
-  flex-direction: column !important;
-  overflow: hidden !important;
-  border-radius: var(--radius-lg) !important;
-  border: 1px solid color-mix(in srgb, var(--ppc-on, var(--md-sys-color-outline-variant)) 15%, var(--ppc-bg, transparent)) !important;
-  background: var(--ppc-bg, var(--md-sys-color-surface-container-low)) !important;
-  box-shadow: var(--md-elev-1) !important;
-  cursor: grab !important;
-  touch-action: none !important;
-  transition: box-shadow var(--transition-fast) !important;
+  position:absolute; border-radius:9px;
+  border:none; background:var(--ppc-bg,#fff);
+  box-shadow:var(--md-elev-2); cursor:grab; user-select:none;
+  overflow:hidden; transition:box-shadow .15s;
 }
-.pp-cmap-card::before { display: none !important; }
+.pp-cmap-card:active { cursor:grabbing; }
+.pp-cmap-card:hover  { box-shadow:var(--md-elev-4); }
 
-.pp-cmap-card:hover {
-  box-shadow: var(--md-elev-3) !important;
-}
-.pp-cmap-card:active { cursor: grabbing !important; }
-
-
-/* ── 16b. Top row: big category number (left) + level block (right) ───── */
-
+/* ── Card top layout ── */
 .pp-cmap-card-top {
-  display: flex !important;
-  align-items: flex-start !important;
-  justify-content: space-between !important;
-  padding: 14px 14px 0 !important;
-  flex-shrink: 0 !important;
+  display:flex; align-items:flex-start; justify-content:space-between;
+  padding:5px 9px 4px; gap:6px;
 }
-
-/* Big editorial letter/number */
 .pp-cmap-card-cat-num {
-  font-family: var(--font-family-serif) !important;
-  font-size: 52px !important;
-  line-height: 1 !important;
-  font-weight: 400 !important;
-  font-style: italic !important;
-  color: color-mix(in srgb, var(--ppc-on, var(--md-sys-color-on-surface)) 92%, var(--ppc-bg, transparent)) !important;
-  letter-spacing: -0.03em !important;
-  flex: 1 !important;
-  min-width: 0 !important;
-  overflow: hidden !important;
-  word-break: break-word !important;
+  font-size:11px; font-weight:800; letter-spacing:.02em; line-height:1.35;
+  flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
 }
-
-/* Level block — top right */
 .pp-cmap-card-level-block {
-  display: flex !important;
-  flex-direction: column !important;
-  align-items: flex-end !important;
-  padding-top: 4px !important;
+  display:flex; flex-direction:column; align-items:flex-end; flex-shrink:0;
 }
 .pp-cmap-card-level-num {
-  font-family: var(--font-family) !important;
-  font-size: 22px !important;
-  font-weight: var(--font-weight-bold) !important;
-  line-height: 1 !important;
-  color: color-mix(in srgb, var(--ppc-on, var(--md-sys-color-on-surface)) 95%, var(--ppc-bg, transparent)) !important;
-  letter-spacing: -0.02em !important;
+  font-size:14px; font-weight:900; line-height:1;
 }
 .pp-cmap-card-level-label {
-  font-family: var(--font-family) !important;
-  font-size: 9px !important;
-  font-weight: var(--font-weight-medium) !important;
-  letter-spacing: var(--letter-spacing-caps) !important;
-  text-transform: uppercase !important;
-  color: color-mix(in srgb, var(--ppc-on, var(--md-sys-color-on-surface)) 60%, var(--ppc-bg, transparent)) !important;
-  margin-top: 3px !important;
+  font-size:7px; font-weight:700; letter-spacing:.08em; text-transform:uppercase;
 }
-
-/* Merged ×N indicator */
 .pp-cmap-card-merged {
-  font-family: var(--font-family) !important;
-  font-size: 9px !important;
-  font-weight: var(--font-weight-bold) !important;
-  letter-spacing: .05em !important;
-  color: color-mix(in srgb, var(--ppc-on, var(--md-sys-color-on-surface)) 50%, var(--ppc-bg, transparent)) !important;
-  text-align: right !important;
-  padding: 0 14px 0 !important;
-  flex-shrink: 0 !important;
+  font-size:8px; font-weight:600; letter-spacing:.06em; text-transform:uppercase;
+  padding:0 9px 3px;
 }
-
-
-/* ── 16c. Divider rule ────────────────────────────────────────────────────  */
-
 .pp-cmap-card-rule {
-  width: calc(100% - 28px) !important;
-  height: 1px !important;
-  background: var(--ppc-on, var(--md-sys-color-outline-variant)) !important;
-  opacity: 0.2 !important;
-  margin: 10px 14px 0 !important;
-  flex-shrink: 0 !important;
+  height:1px; margin:0 9px; opacity:.5;
 }
 
+/* ── All text elements driven by --ppc-on ── */
+.pp-cmap-card .pp-cmap-card-cat-num    { color: color-mix(in srgb, var(--ppc-on,#fff) 92%, black); }
+.pp-cmap-card .pp-cmap-card-level-num  { color: color-mix(in srgb, var(--ppc-on,#fff) 95%, black); }
+.pp-cmap-card .pp-cmap-card-level-label { color: color-mix(in srgb, var(--ppc-on,#fff) 55%, var(--ppc-bg,#888)); }
+.pp-cmap-card .pp-cmap-card-merged     { color: color-mix(in srgb, var(--ppc-on,#fff) 50%, var(--ppc-bg,#888)); }
+.pp-cmap-card .pp-cmap-card-rule       { background: color-mix(in srgb, var(--ppc-on,#fff) 22%, var(--ppc-bg,#888)); opacity: 1; }
+.pp-cmap-card .pp-cmap-cell-cat        { color: color-mix(in srgb, var(--ppc-on,#fff) 60%, var(--ppc-bg,#888)); }
+.pp-cmap-card .pp-cmap-cell-text       { color: color-mix(in srgb, var(--ppc-on,#fff) 92%, black); }
+.pp-cmap-card .pp-cmap-merge-sep       { background: color-mix(in srgb, var(--ppc-on,#fff) 20%, var(--ppc-bg,#888)); border-color: transparent; }
+.pp-cmap-card .pp-cmap-card-footer     { border-top-color: color-mix(in srgb, var(--ppc-on,#fff) 18%, var(--ppc-bg,#888)); }
+.pp-cmap-card .pp-cmap-sim-line        { color: color-mix(in srgb, var(--ppc-on,#fff) 60%, var(--ppc-bg,#888)); }
+.pp-cmap-card .pp-cmap-sim-pct         { color: color-mix(in srgb, var(--ppc-on,#fff) 92%, black); }
+.pp-cmap-card .pp-cmap-leaf-badge      { color: color-mix(in srgb, var(--ppc-on,#fff) 55%, var(--ppc-bg,#888)); }
 
-/* ── 16d. Card body — category tag + main text ────────────────────────── */
-
-.pp-cmap-card-body {
-  padding: 8px 14px 10px !important;
-  display: flex !important;
-  flex-direction: column !important;
-  gap: 4px !important;
-  background: transparent !important;
-  flex: 1 !important;
+.pp-cmap-card-head { padding:5px 9px 4px; display:flex; align-items:flex-start; gap:5px; flex-wrap:wrap; }
+.pp-cmap-level-badge {
+  font-size:8px; font-weight:800; letter-spacing:.10em; text-transform:uppercase;
+  opacity:.9; flex:1; min-width:0; line-height:1.4;
 }
-
-/* Merge separator inside body */
-.pp-cmap-merge-sep {
-  height: 1px !important;
-  background: color-mix(in srgb, var(--ppc-on, var(--md-sys-color-outline-variant)) 15%, var(--ppc-bg, transparent)) !important;
-  margin: 4px 0 !important;
+.pp-cmap-split-pill { font-size:8px; font-weight:800; letter-spacing:.06em; opacity:.9; flex:1; min-width:0; line-height:1.4; }
+.pp-cmap-split-fraction {
+  font-size:9px; font-weight:900; letter-spacing:.04em; opacity:.8; flex-shrink:0;
+  align-self:center; padding:1px 6px; border-radius:8px;
 }
-
-/* Category micro-caps tag */
+.pp-cmap-parent-count {
+  font-size:8px; font-weight:700; letter-spacing:.06em; padding:1px 5px;
+  border-radius:8px; flex-shrink:0; align-self:center;
+  background:color-mix(in srgb, var(--ppc-on,#fff) 20%, transparent); color:color-mix(in srgb, var(--ppc-on,#fff) 90%, transparent);
+}
+.pp-cmap-merged-count {
+  font-size:8px; font-weight:700; letter-spacing:.07em;
+  padding:1px 6px; border-radius:10px; margin-left:auto; opacity:.7; flex-shrink:0;
+}
+.pp-cmap-card-body { padding:6px 9px 4px; display:flex; flex-direction:column; gap:4px; }
 .pp-cmap-cell-cat {
-  font-family: var(--font-family) !important;
-  font-size: 9px !important;
-  font-weight: var(--font-weight-medium) !important;
-  letter-spacing: var(--letter-spacing-caps) !important;
-  text-transform: uppercase !important;
-  color: color-mix(in srgb, var(--ppc-on, var(--md-sys-color-on-surface-variant)) 65%, var(--ppc-bg, transparent)) !important;
-  margin-bottom: 1px !important;
+  font-size:8px; font-weight:700; letter-spacing:.08em; text-transform:uppercase;
+  color:var(--md-sys-color-on-surface-variant); margin-bottom:1px;
 }
-
-/* Main concept text — large serif */
-.pp-cmap-cell-text {
-  font-family: var(--font-family-serif) !important;
-  font-size: 15px !important;
-  font-weight: 400 !important;
-  font-style: normal !important;
-  line-height: 1.28 !important;
-  letter-spacing: -0.01em !important;
-  color: color-mix(in srgb, var(--ppc-on, var(--md-sys-color-on-surface)) 95%, var(--ppc-bg, transparent)) !important;
-  word-break: break-word !important;
-  overflow-wrap: break-word !important;
-}
-
-/* Split-origin badge */
-.pp-cmap-split-num {
-  font-family: var(--font-family) !important;
-  font-size: 9px !important;
-  font-weight: var(--font-weight-medium) !important;
-  letter-spacing: var(--letter-spacing-caps) !important;
-  text-transform: uppercase !important;
-  color: color-mix(in srgb, var(--ppc-on, var(--md-sys-color-on-surface)) 60%, var(--ppc-bg, transparent)) !important;
-}
-
-
-/* ── 16e. Footer — plain-text similarity lines (no bars) ──────────────── */
-
+.pp-cmap-cell-text { font-size:10px; line-height:1.38; color:var(--md-sys-color-on-surface); word-break:break-word; overflow-wrap:break-word; }
+.pp-cmap-merge-sep { border-top:1px solid var(--md-sys-color-outline-variant); margin:3px 0; }
 .pp-cmap-card-footer {
-  padding: 6px 14px 10px !important;
-  border-top: 1px solid transparent !important;
-  border-top-color: color-mix(in srgb, var(--ppc-on, var(--md-sys-color-outline-variant)) 12%, transparent) !important;
-  display: flex !important;
-  flex-direction: column !important;
-  gap: 2px !important;
-  background: transparent !important;
+  padding:4px 9px 7px; border-top:1px solid var(--md-sys-color-outline-variant); margin-top:2px;
+  display:flex; flex-direction:column; gap:3px;
 }
-
-/* Each sim line: "↑ 84%  to parent" */
-.pp-cmap-sim-line {
-  font-family: var(--font-family) !important;
-  font-size: 10px !important;
-  font-weight: var(--font-weight-medium) !important;
-  color: color-mix(in srgb, var(--ppc-on, var(--md-sys-color-outline)) 70%, var(--ppc-bg, transparent)) !important;
-  display: flex !important;
-  align-items: center !important;
-  gap: 4px !important;
-  letter-spacing: .02em !important;
+.pp-cmap-sim-row { display:flex; align-items:center; gap:5px; }
+.pp-cmap-sim-arrow {
+  font-size:9px; font-weight:800; flex-shrink:0; width:10px; text-align:center; opacity:.55;
 }
-.pp-cmap-sim-pct {
-  font-weight: var(--font-weight-bold) !important;
-  color: color-mix(in srgb, var(--ppc-on, var(--md-sys-color-on-surface)) 90%, var(--ppc-bg, transparent)) !important;
-}
-
-/* Leaf badge */
+.pp-cmap-sim-bar { flex:1; height:3px; border-radius:2px; background:var(--md-sys-color-surface-container-high); overflow:hidden; }
+.pp-cmap-sim-fill { height:100%; border-radius:2px; transition:width .3s ease; }
+.pp-cmap-sim-label { font-size:9px; font-weight:700; letter-spacing:.04em; flex-shrink:0; color:var(--md-sys-color-on-surface-variant); min-width:52px; }
 .pp-cmap-leaf-badge {
-  font-family: var(--font-family) !important;
-  font-size: 9px !important;
-  font-weight: var(--font-weight-medium) !important;
-  letter-spacing: var(--letter-spacing-caps) !important;
-  text-transform: uppercase !important;
-  color: color-mix(in srgb, var(--ppc-on, var(--md-sys-color-outline)) 55%, var(--ppc-bg, transparent)) !important;
-  padding: 6px 14px 10px !important;
-  display: block !important;
-  background: transparent !important;
+  font-size:8px; font-weight:600; letter-spacing:.06em; text-transform:uppercase;
+  color:var(--md-sys-color-on-surface-variant); padding:4px 9px 7px; display:block;
 }
-
-/* Hide old bar-based sim elements (replaced by sim-line) */
-.pp-cmap-sim-row,
-.pp-cmap-sim-bar,
-.pp-cmap-sim-fill,
-.pp-cmap-sim-arrow,
-.pp-cmap-sim-label { display: none !important; }
-
-/* Hide old head strip (replaced by card-top) */
-.pp-cmap-card-head { display: none !important; }
-
-/* Hide old level/split badges that lived in the head */
-.pp-cmap-level-badge,
-.pp-cmap-split-badge,
-.pp-cmap-split-fraction,
-.pp-cmap-parent-count,
-.pp-cmap-merged-count { display: none !important; }
-
-
-/* ── 16f. Cluster cards — Bento-box layout (UPDATED) ───────────────────────────
-   
-   SAFE REPLACEMENT: Only replaces section 16f (cluster cards)
-   Does NOT touch sections 16a-16e (concept map cards)
-   
-   This creates a bento-box layout for clusters with:
-   - Flexible card sizing (140px–280px)
-   - Full text wrapping (no truncation)
-   - Cluster cards use same color system as concept map
-   
-   ──────────────────────────────────────────────────────────────────────── */
-
-.pp-cl-card {
-  display: flex !important;
-  flex-direction: column !important;
-  overflow: visible !important;
-  border-radius: var(--radius-md) !important;
-  border: 1px solid var(--ppc-border, var(--md-sys-color-outline-variant)) !important;
-  background: var(--ppc-bg, var(--md-sys-color-surface-container-low)) !important;
-  box-shadow: var(--md-elev-1) !important;
-  cursor: pointer !important;
-  transition: box-shadow var(--transition-fast), transform var(--transition-fast) !important;
-  /* Flexible sizing between 140px and 280px */
-  min-width: 140px !important;
-  max-width: 280px !important;
-  /* Height auto-adjusts to content */
-  min-height: 80px !important;
-  height: auto !important;
-  /* Kill the injected left border override */
-  border-left-width: 1px !important;
+.pp-cmap-split-pill {
+  font-size:9px; font-weight:700; letter-spacing:.05em; text-transform:uppercase;
+  color: var(--ppc-on, #fff); opacity: 0.65;
+  padding:4px 9px 6px; text-align:right; display:block;
 }
-.pp-cl-card::before {
-  /* Completely disable the injected hover state-layer pseudo */
-  display: none !important;
+`;
+  document.head.appendChild(s);
+})();
+
+// ════════════════════════════════════════════════════════════════════════════
+function initConceptMapTool(paneEl, sidebarEl) {
+
+  const DRAG_DELAY = 600;
+
+  paneEl.innerHTML =
+    '<div id="pp-cmap-head">' +
+      '<div id="pp-cmap-subtitle">Waiting for embeddings\u2026</div>' +
+      '<div id="pp-cmap-status" class="cmap-loading">' +
+        '<div class="pp-cmap-dot"></div><span id="pp-cmap-label">Embeddings loading\u2026</span>' +
+      '</div>' +
+      '<div id="pp-cmap-controls">' +
+        '<div class="pp-cmap-ctrl-col">' +
+          '<div class="pp-group-label">Max Depth</div>' +
+          '<div class="pp-range-row">' +
+            '<span class="pp-range-label">Lvl</span>' +
+            '<input class="pp-range" id="pp-cmap-depth" type="range" min="1" max="8" value="5" step="1">' +
+            '<span class="pp-range-val" id="pp-cmap-depth-val">5</span>' +
+          '</div>' +
+        '</div>' +
+        '<div class="pp-cmap-ctrl-col">' +
+          '<div class="pp-group-label">Link Threshold</div>' +
+          '<div class="pp-range-row">' +
+            '<span class="pp-range-label">Min</span>' +
+            '<input class="pp-range" id="pp-cmap-thresh" type="range" min="20" max="90" value="50" step="5">' +
+            '<span class="pp-range-val" id="pp-cmap-thresh-val">50%</span>' +
+          '</div>' +
+        '</div>' +
+        '<div class="pp-cmap-ctrl-col">' +
+          '<div class="pp-group-label" style="color:#7c5cbf">Max Parents</div>' +
+          '<div class="pp-range-row">' +
+            '<span class="pp-range-label" style="color:#7c5cbf">Par</span>' +
+            '<input class="pp-range pp-range--accent" id="pp-cmap-maxpar" type="range" min="1" max="6" value="1" step="1">' +
+            '<span class="pp-range-val" id="pp-cmap-maxpar-val" style="color:#7c5cbf">1</span>' +
+          '</div>' +
+        '</div>' +
+        '<div id="pp-cmap-layout-wrap">' +
+          '<button id="pp-cmap-layout-btn" title="Change layout">' +
+            '<svg viewBox="0 0 12 12" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="6" cy="6" r="2"/><circle cx="6" cy="6" r="5" stroke-dasharray="2 2"/></svg>' +
+            '<span id="pp-cmap-layout-label">Radial</span>' +
+          '</button>' +
+          '<div id="pp-cmap-layout-menu">' +
+            '<div class="pp-cmap-layout-group">Layout</div>' +
+            '<button class="pp-cmap-layout-opt active" data-layout="radial">Radial</button>' +
+            '<button class="pp-cmap-layout-opt" data-layout="vtree">Vertical Tree</button>' +
+            '<button class="pp-cmap-layout-opt" data-layout="htree">Horizontal Tree</button>' +
+            '<button class="pp-cmap-layout-opt" data-layout="vflow">Vertical Flow</button>' +
+            '<div class="pp-cmap-layout-sep"></div>' +
+            '<button class="pp-cmap-layout-opt" data-layout="organic">Organic</button>' +
+          '</div>' +
+        '</div>' +
+        '<button id="pp-cmap-rebuild">Rebuild</button>' +
+      '</div>' +
+    '</div>' +
+    '<div id="pp-cmap-canvas">' +
+      '<div id="pp-cmap-world"></div>' +
+      '<div id="pp-cmap-empty">Concept map will appear<br>once the spreadsheet loads</div>' +
+      '<button id="pp-cmap-fit" title="Fit all into view">' +
+        '<svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">' +
+          '<path d="M1 5V2h3M12 2h3v3M15 11v3h-3M4 14H1v-3"/>' +
+          '<rect x="4" y="4" width="8" height="8" rx="1" opacity=".4"/>' +
+        '</svg>' +
+      '</button>' +
+      '<div id="pp-cmap-zoom-hint">scroll = zoom \u00b7 RMB drag = pan \u00b7 pinch/2-finger = touch</div>' +
+    '</div>';
+
+  if (typeof upgradeSlider === 'function') {
+    paneEl.querySelectorAll('.pp-range').forEach(upgradeSlider);
+  }
+
+  const subtitleEl  = paneEl.querySelector('#pp-cmap-subtitle');
+  const statusEl    = paneEl.querySelector('#pp-cmap-status');
+  const labelEl     = paneEl.querySelector('#pp-cmap-label');
+  const canvas      = paneEl.querySelector('#pp-cmap-canvas');
+  const world       = paneEl.querySelector('#pp-cmap-world');
+  const emptyEl     = paneEl.querySelector('#pp-cmap-empty');
+  const rebuildBtn  = paneEl.querySelector('#pp-cmap-rebuild');
+  const fitBtn      = paneEl.querySelector('#pp-cmap-fit');
+  const layoutBtn   = paneEl.querySelector('#pp-cmap-layout-btn');
+  const layoutMenu  = paneEl.querySelector('#pp-cmap-layout-menu');
+  const layoutLabel = paneEl.querySelector('#pp-cmap-layout-label');
+  const layoutOpts  = paneEl.querySelectorAll('.pp-cmap-layout-opt');
+  const depthSlider = paneEl.querySelector('#pp-cmap-depth');
+  const depthValEl  = paneEl.querySelector('#pp-cmap-depth-val');
+  const threshSlider= paneEl.querySelector('#pp-cmap-thresh');
+  const threshValEl = paneEl.querySelector('#pp-cmap-thresh-val');
+  const maxParSlider= paneEl.querySelector('#pp-cmap-maxpar');
+  const maxParValEl = paneEl.querySelector('#pp-cmap-maxpar-val');
+
+  const CARD_W = 225;
+  const MM_PAD = 16;
+
+  let _depth      = 5;
+  let _threshold  = CMAP_PARENT_CHILD_THRESHOLD;
+  let _maxParents = 1;
+  let _layout     = 'organic';
+  let _rows       = null;
+  let _rendered   = false;
+  let _everRendered = false;
+  let _rebuildTimer = null;
+  let _topZ       = 10;
+  let _panX = 0, _panY = 0, _zoom = 1;
+  let _liveRects  = new Map();
+
+  function applyTransform() {
+    world.style.transform = 'translate(' + _panX + 'px,' + _panY + 'px) scale(' + _zoom + ')';
+  }
+
+  function setStatus(state, text) {
+    statusEl.className = 'cmap-' + state;
+    labelEl.textContent = text;
+    statusEl.style.opacity = '1';
+    if (state === 'ready') setTimeout(function() { statusEl.style.opacity = '0'; }, 3200);
+  }
+
+  [
+    { el: depthSlider,  valEl: depthValEl,  read: function() { _depth = +depthSlider.value; depthValEl.textContent = _depth; } },
+    { el: threshSlider, valEl: threshValEl, read: function() { _threshold = +threshSlider.value / 100; threshValEl.textContent = threshSlider.value + '%'; } },
+    { el: maxParSlider, valEl: maxParValEl, read: function() { _maxParents = +maxParSlider.value; maxParValEl.textContent = _maxParents; } },
+  ].forEach(function(item) {
+    item.el.addEventListener('input', function() {
+      item.read();
+      clearTimeout(_rebuildTimer);
+      rebuildBtn.classList.add('pp-cmap-busy');
+      _rebuildTimer = setTimeout(function() {
+        rebuildBtn.classList.remove('pp-cmap-busy');
+        _rendered = false; tryRender();
+      }, DRAG_DELAY);
+    });
+  });
+
+  rebuildBtn.addEventListener('click', function() { clearTimeout(_rebuildTimer); _rendered = false; tryRender(); });
+
+  var LAYOUT_LABELS = { radial:'Radial', vtree:'Vertical Tree', htree:'Horizontal Tree', vflow:'Vertical Flow', organic:'Organic' };
+  layoutBtn.addEventListener('click', function(e) { e.stopPropagation(); layoutMenu.classList.toggle('open'); layoutBtn.classList.toggle('open', layoutMenu.classList.contains('open')); });
+  document.addEventListener('click', function() { layoutMenu.classList.remove('open'); layoutBtn.classList.remove('open'); });
+  layoutMenu.addEventListener('click', function(e) { e.stopPropagation(); });
+  layoutOpts.forEach(function(opt) {
+    opt.addEventListener('click', function() {
+      var l = opt.dataset.layout; if (!l) return;
+      _layout = l; layoutLabel.textContent = LAYOUT_LABELS[l] || l;
+      layoutOpts.forEach(function(o) { o.classList.toggle('active', o.dataset.layout === l); });
+      layoutMenu.classList.remove('open'); layoutBtn.classList.remove('open');
+      if (_rendered) { _rendered = false; tryRender(); }
+    });
+  });
+
+  function fitAll() {
+    if (!_liveRects.size) return;
+    var minX=Infinity, minY=Infinity, maxX=-Infinity, maxY=-Infinity;
+    _liveRects.forEach(function(r) { minX=Math.min(minX,r.x); minY=Math.min(minY,r.y); maxX=Math.max(maxX,r.x+(r.w||CARD_W)); maxY=Math.max(maxY,r.y+(r.h||80)); });
+    if (!isFinite(minX)) return;
+    var W=canvas.clientWidth||400, H=canvas.clientHeight||400, pad=32;
+    var scaleX=(W-pad*2)/Math.max(maxX-minX,1), scaleY=(H-pad*2)/Math.max(maxY-minY,1);
+    _zoom=Math.min(scaleX,scaleY,2.5);
+    _panX=pad-minX*_zoom+(W-pad*2-(maxX-minX)*_zoom)/2;
+    _panY=pad-minY*_zoom+(H-pad*2-(maxY-minY)*_zoom)/2;
+    applyTransform();
+  }
+  fitBtn.addEventListener('click', fitAll);
+
+  var _panning=false, _panSX=0, _panSY=0, _panBX=0, _panBY=0;
+
+  canvas.addEventListener('mousedown', function(ev) {
+    if (ev.button !== 2) return;
+    _panning=true; _panSX=ev.clientX; _panSY=ev.clientY; _panBX=_panX; _panBY=_panY;
+    canvas.classList.add('pp-cmap-panning'); ev.preventDefault();
+  });
+  document.addEventListener('mousemove', function(ev) {
+    if (!_panning) return;
+    _panX=_panBX+(ev.clientX-_panSX); _panY=_panBY+(ev.clientY-_panSY); applyTransform();
+  });
+  document.addEventListener('mouseup', function(ev) {
+    if (ev.button !== 2 || !_panning) return;
+    _panning=false; canvas.classList.remove('pp-cmap-panning');
+  });
+  canvas.addEventListener('contextmenu', function(ev) { ev.preventDefault(); });
+
+  canvas.addEventListener('wheel', function(ev) {
+    ev.preventDefault();
+    var rect=canvas.getBoundingClientRect(), mx=ev.clientX-rect.left, my=ev.clientY-rect.top;
+    if (ev.ctrlKey || (Math.abs(ev.deltaY) >= 50 && Math.abs(ev.deltaX) < 50)) {
+      var dz=ev.deltaY>0?0.94:1/0.94, nz=Math.max(0.15,Math.min(4,_zoom*dz));
+      _panX=mx-(mx-_panX)*nz/_zoom; _panY=my-(my-_panY)*nz/_zoom; _zoom=nz;
+    } else {
+      _panX-=ev.deltaX; _panY-=ev.deltaY;
+    }
+    applyTransform();
+  }, {passive:false});
+
+  var _pointers = new Map();
+  var _cardDrag   = null;
+  var _pinchState = null;
+
+  canvas.style.touchAction = 'none';
+
+  canvas.addEventListener('pointerdown', function(ev) {
+    if (ev.target.closest('.pp-cmap-card')) return;
+    canvas.setPointerCapture(ev.pointerId);
+    _pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+    if (_pointers.size === 2) {
+      var pts = Array.from(_pointers.values());
+      _pinchState = {
+        midX: (pts[0].x + pts[1].x) / 2, midY: (pts[0].y + pts[1].y) / 2,
+        dist: Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y),
+        panX: _panX, panY: _panY, zoom: _zoom,
+      };
+    } else {
+      _pinchState = null;
+    }
+  });
+
+  canvas.addEventListener('pointermove', function(ev) {
+    if (!_pointers.has(ev.pointerId)) return;
+    var prev = _pointers.get(ev.pointerId);
+    _pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+    if (_pointers.size === 1 && !_pinchState) {
+      ev.preventDefault();
+      _panX += ev.clientX - prev.x;
+      _panY += ev.clientY - prev.y;
+      applyTransform();
+      return;
+    }
+    if (_pinchState && _pointers.size >= 2) {
+      ev.preventDefault();
+      var pts     = Array.from(_pointers.values());
+      var newMidX = (pts[0].x + pts[1].x) / 2;
+      var newMidY = (pts[0].y + pts[1].y) / 2;
+      var newDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+      var rect    = canvas.getBoundingClientRect();
+      var cmx     = newMidX - rect.left;
+      var cmy     = newMidY - rect.top;
+      var sf      = newDist / _pinchState.dist;
+      var nz      = Math.max(0.15, Math.min(4, _pinchState.zoom * sf));
+      var origCmx = _pinchState.midX - rect.left;
+      var origCmy = _pinchState.midY - rect.top;
+      _zoom = nz;
+      _panX = cmx - (origCmx - _pinchState.panX) * nz / _pinchState.zoom + (newMidX - _pinchState.midX);
+      _panY = cmy - (origCmy - _pinchState.panY) * nz / _pinchState.zoom + (newMidY - _pinchState.midY);
+      applyTransform();
+      redrawConnectors();
+    }
+  });
+
+  function _canvasPointerEnd(ev) {
+    _pointers.delete(ev.pointerId);
+    if (_pointers.size < 2) { _pinchState = null; }
+  }
+  canvas.addEventListener('pointerup',     _canvasPointerEnd);
+  canvas.addEventListener('pointercancel', _canvasPointerEnd);
+
+  function makeDraggable(el, cid) {
+    el.dataset.cid = String(cid);
+    el.style.touchAction = 'none';
+
+    el.addEventListener('pointerdown', function(ev) {
+      if (ev.button !== undefined && ev.button !== 0) return;
+      ev.stopPropagation();
+      el.setPointerCapture(ev.pointerId);
+      var r = _liveRects.get(cid) || { x: 0, y: 0 };
+      _cardDrag = { el: el, cid: cid, pointerId: ev.pointerId, ox: ev.clientX, oy: ev.clientY, sx: r.x, sy: r.y };
+      el.style.zIndex = String(++_topZ);
+      ev.preventDefault();
+    });
+
+    el.addEventListener('pointermove', function(ev) {
+      if (!_cardDrag || ev.pointerId !== _cardDrag.pointerId) return;
+      ev.preventDefault();
+      var dx = (ev.clientX - _cardDrag.ox) / _zoom;
+      var dy = (ev.clientY - _cardDrag.oy) / _zoom;
+      var nx = _cardDrag.sx + dx;
+      var ny = _cardDrag.sy + dy;
+      var r  = _liveRects.get(cid) || { w: CARD_W, h: 80 };
+      el.style.left = nx + 'px';
+      el.style.top  = ny + 'px';
+      _liveRects.set(cid, { x: nx, y: ny, w: r.w, h: r.h });
+      redrawConnectors();
+    });
+
+    el.addEventListener('pointerup',     function(ev) { if (_cardDrag && ev.pointerId === _cardDrag.pointerId) _cardDrag = null; });
+    el.addEventListener('pointercancel', function(ev) { if (_cardDrag && ev.pointerId === _cardDrag.pointerId) _cardDrag = null; });
+  }
+
+  function cosineSim(a, b) {
+    if (!a||!b||a.length!==b.length) return 0;
+    var dot=0, na=0, nb=0;
+    for (var i=0;i<a.length;i++) { dot+=a[i]*b[i]; na+=a[i]*a[i]; nb+=b[i]*b[i]; }
+    return (na&&nb) ? Math.max(0,Math.min(1,dot/(Math.sqrt(na)*Math.sqrt(nb)))) : 0;
+  }
+
+  function avgVec(vecs) {
+    var valid=vecs.filter(Boolean); if (!valid.length) return null;
+    var dim=valid[0].length, sum=new Float32Array(dim);
+    valid.forEach(function(v){ v.forEach(function(x,i){ sum[i]+=x; }); });
+    return Array.from(sum).map(function(x){ return x/valid.length; });
+  }
+
+  function sentenceSplit(text) {
+    return text
+      .replace(/\r\n|\r/g, '\n')
+      .replace(/([.!?])\s+(?=[A-Z])/g, '$1\n')
+      .replace(/([;])\s+/g, '$1\n')
+      .replace(/\n{2,}/g, '\n')
+      .replace(/:\s{1,3}(?=\S)/g, ':\n')
+      .replace(/\s+[—–]\s+/g, '\n')
+      .split('\n')
+      .map(function(s){ return s.trim(); })
+      .filter(function(s){ return s.length >= 30; });
+  }
+
+  async function maybySplitRow(row) {
+    var cells=row.row&&row.row.cells?row.row.cells:(row.cells||[]);
+    var cats=row.row&&row.row.cats?row.row.cats.filter(function(c){ return c.trim(); }):[];
+    var catStr=cats.join(' \u00b7 ')||'Cell';
+    var bestText='', bestIdx=0;
+    cells.forEach(function(c,i){ if(c.trim().length>bestText.length){ bestText=c.trim(); bestIdx=i; } });
+    if (bestText.length < 60) return [row];
+    var segments=sentenceSplit(bestText);
+    if (segments.length<=1) return [row];
+
+    // Try to get per-sentence embeddings first
+    var segVecs;
+    try { segVecs=await Promise.all(segments.map(function(s){ return window.EmbeddingUtils.getCachedEmbedding(s); })); }
+    catch(e){ segVecs=null; }
+
+    var valid=segVecs
+      ? segments.map(function(s,i){ return {text:s,vec:segVecs[i]}; }).filter(function(x){ return x.vec&&x.vec.length; })
+      : [];
+
+    // If embeddings unavailable for sentences (common — bridge only stores full-cell vectors),
+    // fall back to structural split: use the parent row's vector for all segments.
+    // This still produces multiple cards with x/n labels, grouped by topic proximity.
+    if (valid.length <= 1) {
+      var parentVec = row.vec;
+      if (!parentVec) return [row];
+      // Each segment gets the parent's vector — they'll cluster together, which is correct
+      // since they came from the same source cell. The split is purely structural/display.
+      return segments.map(function(seg, ni) {
+        return {
+          tabIdx: row.tabIdx, rowIdx: row.rowIdx,
+          headers: row.headers||[], title: row.title||'',
+          kws: row.kws||new Set(),
+          _splitFrom: catStr, _splitN: ni+1, _splitT: segments.length,
+          vec: parentVec,
+          row: { cells: cells.map(function(c,ci){ return ci===bestIdx ? seg : c; }), cats: cats }
+        };
+      });
+    }
+
+    // We have real per-sentence embeddings — do semantic grouping
+    var SPLIT_THRESHOLD = 0.55;
+    var n=valid.length;
+    var sim=Array.from({length:n},function(_,i){ return Array.from({length:n},function(_,j){ return i===j?1:cosineSim(valid[i].vec,valid[j].vec); }); });
+    var groupOf=new Array(n).fill(-1); var numGroups=0;
+    for (var i=0;i<n;i++) {
+      if (groupOf[i]!==-1) continue; var g=numGroups++; groupOf[i]=g;
+      for (var j=i+1;j<n;j++) {
+        if (groupOf[j]!==-1) continue;
+        var membersOfG=valid.map(function(_,k){ return k; }).filter(function(k){ return groupOf[k]===g; });
+        var allSimilar=membersOfG.every(function(k){ return sim[k][j]>=SPLIT_THRESHOLD; });
+        if (allSimilar) groupOf[j]=g;
+      }
+    }
+    if (numGroups<=1) return [row];
+    var t=numGroups, groups=Array.from({length:t},function(){ return []; });
+    valid.forEach(function(seg,i){ groups[groupOf[i]].push(seg); });
+    return groups.map(function(segs,ni){ return { tabIdx:row.tabIdx, rowIdx:row.rowIdx, headers:row.headers||[], title:row.title||'', kws:row.kws||new Set(), _splitFrom:catStr, _splitN:ni+1, _splitT:t, vec:avgVec(segs.map(function(s){ return s.vec; })), row:{cells:cells.map(function(c,ci){ return ci===bestIdx?segs.map(function(s){ return s.text; }).join(' '):''; }), cats:cats} }; });
+  }
+
+  async function splitAllRows(rows) {
+    var result=[];
+    for (var i=0; i<rows.length; i++) { var parts=await maybySplitRow(rows[i]); parts.forEach(function(r){ result.push(r); }); }
+    return result;
+  }
+
+  function buildHierarchy(rows) {
+    var n=rows.length; if (n<2) return null;
+
+    // Split siblings share the same parent vec — exclude them from comparing against each other
+    function areSplitSiblings(i, j) {
+      return rows[i]._splitFrom && rows[j]._splitFrom && rows[i]._splitFrom === rows[j]._splitFrom
+        && rows[i].tabIdx === rows[j].tabIdx && rows[i].rowIdx === rows[j].rowIdx;
+    }
+
+    var scores=new Float32Array(n);
+    for (var i=0;i<n;i++) { var sum=0, cnt=0; for (var j=0;j<n;j++) { if (i!==j&&!areSplitSiblings(i,j)) { sum+=cosineSim(rows[i].vec,rows[j].vec); cnt++; } } scores[i]=cnt?sum/cnt:0; }
+
+    var rankOrder=Array.from({length:n},function(_,i){ return i; }).sort(function(a,b){ return scores[b]-scores[a]; });
+    var levels=new Int32Array(n);
+    rankOrder.forEach(function(ri,rank){ levels[ri]=Math.max(1,Math.min(_depth,Math.floor(rank*_depth/n)+1)); });
+
+    var parentsOf    = new Map();
+    var parentSimsOf = new Map();
+
+    for (var i=0;i<n;i++) {
+      parentsOf.set(i,[]); parentSimsOf.set(i,[]);
+      if (levels[i]===1) continue;
+      var candidates=[];
+      for (var j=0;j<n;j++) {
+        if (j===i||levels[j]!==levels[i]-1||areSplitSiblings(i,j)) continue;
+        var s=cosineSim(rows[i].vec,rows[j].vec);
+        if (s>=_threshold) candidates.push({j:j,s:s});
+      }
+      candidates.sort(function(a,b){ return b.s-a.s; });
+      var kept=candidates.slice(0,_maxParents);
+      parentsOf.set(i,kept.map(function(c){ return c.j; }));
+      parentSimsOf.set(i,kept.map(function(c){ return c.s; }));
+    }
+
+    var relaxed=_threshold*ORPHAN_RECOVERY_THRESHOLD;
+    for (var i=0;i<n;i++) {
+      if (levels[i]<=1||parentsOf.get(i).length>0) continue;
+      var bestJ=-1, bestSim=relaxed;
+      for (var j=0;j<n;j++) {
+        if (j===i||levels[j]>=levels[i]||areSplitSiblings(i,j)) continue;
+        var s=cosineSim(rows[i].vec,rows[j].vec); if (s>bestSim){ bestSim=s; bestJ=j; }
+      }
+      if (bestJ!==-1) { levels[i]=levels[bestJ]+1; parentsOf.set(i,[bestJ]); parentSimsOf.set(i,[bestSim]); }
+      else levels[i]=1;
+    }
+
+    var childrenOf=Array.from({length:n},function(){ return []; });
+    for (var i=0;i<n;i++) { parentsOf.get(i).forEach(function(p){ if(!childrenOf[p].includes(i)) childrenOf[p].push(i); }); }
+
+    var simToChildren=new Float32Array(n);
+    for (var i=0;i<n;i++) { if (!childrenOf[i].length) continue; var sum=0; childrenOf[i].forEach(function(c){ sum+=cosineSim(rows[i].vec,rows[c].vec); }); simToChildren[i]=sum/childrenOf[i].length; }
+
+    var simToParents=new Float32Array(n);
+    for (var i=0;i<n;i++) { var pars=parentsOf.get(i)||[]; if (!pars.length) continue; var sum=0; pars.forEach(function(p){ sum+=cosineSim(rows[i].vec,rows[p].vec); }); simToParents[i]=sum/pars.length; }
+
+    var absorbedInto=new Int32Array(n).fill(-1), mergeExtras=new Map();
+    var mkKey=function(i){ return levels[i]+':p'+parentsOf.get(i).slice().sort(function(a,b){ return a-b; }).join(',')+':c'+childrenOf[i].slice().sort(function(a,b){ return a-b; }).join(','); };
+    var seenKeys=new Map();
+    for (var i=0;i<n;i++) {
+      if (!childrenOf[i].length) continue;
+      var k=mkKey(i);
+      if (seenKeys.has(k)) { var primary=seenKeys.get(k); absorbedInto[i]=primary; if (!mergeExtras.has(primary)) mergeExtras.set(primary,[]); mergeExtras.get(primary).push(i); }
+      else seenKeys.set(k,i);
+    }
+
+    return { rows:rows, n:n, levels:levels, parentsOf:parentsOf, parentSimsOf:parentSimsOf, childrenOf:childrenOf, simToChildren:simToChildren, simToParents:simToParents, absorbedInto:absorbedInto, mergeExtras:mergeExtras };
+  }
+
+  var _connSvg=null, _connEdges=[];
+
+  function redrawConnectors() {
+    if (!_connSvg) return;
+    var rects = _liveRects;
+    var ns='http://www.w3.org/2000/svg';
+    _connSvg.innerHTML='';
+    _connEdges.forEach(function(edge) {
+      var fromId=edge.fromId, toId=edge.toId, color=edge.color, depth=edge.depth;
+      var ra=rects.get(fromId), rb=rects.get(toId); if (!ra||!rb) return;
+      function pts(r){ var x=r.x,y=r.y,w=r.w,h=r.h; return [{x:x+w*.25,y:y},{x:x+w*.5,y:y},{x:x+w*.75,y:y},{x:x+w*.25,y:y+h},{x:x+w*.5,y:y+h},{x:x+w*.75,y:y+h},{x:x,y:y+h*.33},{x:x,y:y+h*.67},{x:x+w,y:y+h*.33},{x:x+w,y:y+h*.67}]; }
+      var pA=pts(ra), pB=pts(rb); var best=null, bd=Infinity;
+      pA.forEach(function(a){ pB.forEach(function(b){ var d=Math.hypot(a.x-b.x,a.y-b.y); if(d<bd){bd=d;best={a:a,b:b};} }); });
+      if (!best) return;
+      var a=best.a, b=best.b, dist=Math.hypot(b.x-a.x,b.y-a.y), off=Math.min(dist*.4,80);
+      function tang(pt,r){ var t=3; if(Math.abs(pt.y-r.y)<t) return{dx:0,dy:-1}; if(Math.abs(pt.y-(r.y+r.h))<t) return{dx:0,dy:1}; if(Math.abs(pt.x-r.x)<t) return{dx:-1,dy:0}; if(Math.abs(pt.x-(r.x+r.w))<t) return{dx:1,dy:0}; return{dx:0,dy:1}; }
+      var tA=tang(a,ra), tB=tang(b,rb);
+      var path=document.createElementNS(ns,'path');
+      path.setAttribute('d','M'+a.x+','+a.y+' C'+(a.x+tA.dx*off)+','+(a.y+tA.dy*off)+' '+(b.x+tB.dx*off)+','+(b.y+tB.dy*off)+' '+b.x+','+b.y);
+      path.setAttribute('fill','none'); path.setAttribute('stroke',color);
+      path.setAttribute('stroke-width',depth===0?'2.5':'2');
+      path.setAttribute('stroke-opacity',depth===0?'1':'0.9');
+      path.setAttribute('stroke-dasharray',depth===0?'none':'5 3');
+      _connSvg.appendChild(path);
+      var dotChild=document.createElementNS(ns,'circle');
+      dotChild.setAttribute('cx',String(b.x)); dotChild.setAttribute('cy',String(b.y)); dotChild.setAttribute('r','3.5');
+      dotChild.setAttribute('fill',color); dotChild.setAttribute('opacity','1');
+      _connSvg.appendChild(dotChild);
+      var dotParent=document.createElementNS(ns,'circle');
+      dotParent.setAttribute('cx',String(a.x)); dotParent.setAttribute('cy',String(a.y)); dotParent.setAttribute('r','4');
+      dotParent.setAttribute('fill',color); dotParent.setAttribute('opacity','0.9');
+      dotParent.setAttribute('stroke','#ffffff'); dotParent.setAttribute('stroke-width','1.5');
+      _connSvg.appendChild(dotParent);
+    });
+  }
+
+  // ── Color by hierarchy level ──────────────────────────────
+  // paletteIdx maps level (1-based) to palette slot.
+  // Edit this array to change which theme each level uses.
+  // e.g. [0,1,2,3,4,5,6,7] uses all 8 themes in order.
+  function depthColor(level) {
+    var idx = level - 1;
+    var palette = (typeof getPalette === 'function') ? getPalette() : (window.PP_PALETTE || []);
+    var paletteIdx = [0, 1, 2, 3, 4, 0][Math.min(idx, 5)];
+    var theme = palette[paletteIdx] || { accent: '#888888', bg: '#f7f7f8', label: '#ffffff' };
+
+    // Compute contrast text color from accent luminance (no array destructuring)
+    function getLuminance(hex) {
+      var c = String(hex).replace('#', '');
+      if (c.length === 3) c = c[0]+c[0]+c[1]+c[1]+c[2]+c[2];
+      var rgb = parseInt(c, 16);
+      var r = ((rgb >> 16) & 0xff) / 255;
+      var g = ((rgb >> 8)  & 0xff) / 255;
+      var b = (rgb & 0xff) / 255;
+      function toLinear(v) { return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }
+      return 0.2126 * toLinear(r) + 0.7152 * toLinear(g) + 0.0722 * toLinear(b);
+    }
+
+    var lum = getLuminance(theme.accent);
+    var label = lum > 0.5 ? '#1a1a1a' : '#ffffff';
+
+    return {
+      accent: theme.accent || '#888888',
+      bg:     theme.bg     || '#f7f7f8',
+      label:  label
+    };
+  }
+
+  function renderConceptMap(hier) {
+    // Capture old positions before wiping — used as animation start points
+    var _oldRects = new Map(_liveRects);
+    var isFirstRender = (_oldRects.size === 0);
+
+    world.innerHTML=''; emptyEl.style.display='none'; _liveRects.clear(); _connEdges=[]; _topZ=10;
+    // Only reset pan/zoom on first render — during re-renders keep current
+    // viewport so the animation isn't interrupted by a sudden transform snap
+    if (isFirstRender) { _panX=0; _panY=0; _zoom=1; applyTransform(); }
+    if (!hier) { emptyEl.style.display='flex'; return; }
+
+    var ns='http://www.w3.org/2000/svg';
+    _connSvg=document.createElementNS(ns,'svg');
+    _connSvg.style.cssText='position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:1';
+    world.appendChild(_connSvg);
+
+    var rows=hier.rows, n=hier.n, levels=hier.levels, parentsOf=hier.parentsOf,
+        childrenOf=hier.childrenOf, simToChildren=hier.simToChildren,
+        simToParents=hier.simToParents, absorbedInto=hier.absorbedInto, mergeExtras=hier.mergeExtras;
+    var cardEls=new Map();
+
+    for (var i=0;i<n;i++) {
+      if (absorbedInto[i]!==-1) continue;
+      var level=levels[i];
+      var dc = depthColor(level);
+      var accent=dc.accent, lc=dc.label, bg=dc.bg;
+      var extras=mergeExtras.get(i)||[], allRows=[i].concat(extras);
+
+      var card=document.createElement('div');
+      card.className='pp-cmap-card';
+      // Start card at an old position for morph animation.
+      // Distribute across old positions round-robin so every new card has a "from" spot.
+      var _oldKeys = Array.from(_oldRects.keys());
+      var _startPos = _oldKeys.length > 0
+        ? _oldRects.get(_oldKeys[i % _oldKeys.length])
+        : { x: canvas.clientWidth/2 - CARD_W/2, y: canvas.clientHeight/2 - 40 };
+      card.style.cssText='width:'+CARD_W+'px;position:absolute;z-index:'+(++_topZ)
+        +';left:'+_startPos.x+'px;top:'+_startPos.y+'px;transition:none';
+      card.style.setProperty('--ppc-border', accent);
+      card.style.setProperty('--ppc-bg',     accent);
+      card.style.setProperty('--ppc-on',     lc);
+
+      var primaryRow=rows[i], isSplit=!!primaryRow._splitFrom;
+      if (isSplit) console.log('[concept-map] card',i,'isSplit=true _splitN='+primaryRow._splitN+'/'+primaryRow._splitT);
+      var numParents=(parentsOf.get(i)||[]).length;
+
+      var topRow=document.createElement('div');
+      topRow.className='pp-cmap-card-top';
+
+      var catNumEl=document.createElement('div');
+      catNumEl.className='pp-cmap-card-cat-num';
+      var allCats = primaryRow.row&&primaryRow.row.cats ? primaryRow.row.cats.filter(function(c){ return c.trim(); }) : [];
+      var catChar = allCats.length ? allCats.join(' \u00b7 ') : String(level);
+      catNumEl.textContent = catChar;
+
+      var levelBlock=document.createElement('div');
+      levelBlock.className='pp-cmap-card-level-block';
+      var levelNum=document.createElement('div');
+      levelNum.className='pp-cmap-card-level-num';
+      levelNum.textContent = String(level);
+      var levelLbl=document.createElement('div');
+      levelLbl.className='pp-cmap-card-level-label';
+      levelLbl.textContent = 'Level';
+      levelBlock.appendChild(levelNum);
+      levelBlock.appendChild(levelLbl);
+
+      topRow.appendChild(catNumEl);
+      topRow.appendChild(levelBlock);
+      card.appendChild(topRow);
+
+      if (extras.length>0) {
+        var mg=document.createElement('div');
+        mg.className='pp-cmap-card-merged';
+        mg.textContent='\u00d7'+allRows.length+' merged';
+        card.appendChild(mg);
+      }
+
+      var rule=document.createElement('div');
+      rule.className='pp-cmap-card-rule';
+      card.appendChild(rule);
+
+      var body=document.createElement('div');
+      body.className='pp-cmap-card-body';
+      allRows.forEach(function(ri,idx){
+        if (idx>0) { var sep=document.createElement('div'); sep.className='pp-cmap-merge-sep'; body.appendChild(sep); }
+        var r=rows[ri], cells=r.row&&r.row.cells?r.row.cells:(r.cells||[]);
+        var cats=r.row&&r.row.cats?r.row.cats.filter(function(c){ return c.trim(); }):[];
+        var best=cells.reduce(function(b,c){ return c.trim().length>b.length?c.trim():b; },'');
+        var parsed=typeof parseCitation==='function'?parseCitation(best):{body:best};
+        if (cats.length) {
+          var ce=document.createElement('div');
+          ce.className='pp-cmap-cell-cat';
+          ce.textContent=cats.join(' \u00b7 ');
+          body.appendChild(ce);
+        }
+        var te=document.createElement('div');
+        te.className='pp-cmap-cell-text';
+        te.textContent=parsed.body;
+        body.appendChild(te);
+      });
+      card.appendChild(body);
+
+      var hasChildren=childrenOf[i].length>0;
+      var hasParents=numParents>0;
+
+      if (isSplit) {
+        var splitBadge=document.createElement('div');
+        splitBadge.className='pp-cmap-split-pill';
+        splitBadge.textContent=primaryRow._splitN+'/'+primaryRow._splitT+' Split';
+        splitBadge.style.cssText='font-size:9px;font-weight:800;letter-spacing:.06em;'
+          +'text-transform:uppercase;color:'+lc+';background:rgba(0,0,0,0.20);'
+          +'border-radius:99px;padding:2px 8px;margin:4px 9px 6px;align-self:flex-end;display:block;';
+        card.appendChild(splitBadge);
+      }
+
+      if (hasChildren||hasParents) {
+        var footer=document.createElement('div');
+        footer.className='pp-cmap-card-footer';
+
+        function makeSimLine(arrow, sim, label) {
+          var pct=Math.round(sim*100);
+          var line=document.createElement('div');
+          line.className='pp-cmap-sim-line';
+          var pctEl=document.createElement('span');
+          pctEl.className='pp-cmap-sim-pct';
+          pctEl.textContent=pct+'%';
+          line.innerHTML='<span>'+arrow+'</span>';
+          line.appendChild(pctEl);
+          var lblEl=document.createElement('span');
+          lblEl.textContent=' '+label;
+          line.appendChild(lblEl);
+          return line;
+        }
+
+        if (hasParents) footer.appendChild(makeSimLine('\u2191', simToParents[i], numParents>1?numParents+' parents':'to parent'));
+        if (hasChildren) footer.appendChild(makeSimLine('\u2193', simToChildren[i], 'to children'));
+        card.appendChild(footer);
+      } else {
+        var leaf=document.createElement('span');
+        leaf.className='pp-cmap-leaf-badge';
+        leaf.textContent='Terminal concept';
+        card.appendChild(leaf);
+      }
+
+      world.appendChild(card); cardEls.set(i,card);
+      var _startR = _oldRects.size > 0 ? (_oldRects.get(Array.from(_oldRects.keys())[i % _oldRects.size]) || {x:0,y:0}) : {x:0,y:0};
+      _liveRects.set(i,{x:_startR.x,y:_startR.y,w:CARD_W,h:80});
+      makeDraggable(card,i);
+      (function(cardEl, cardId) {
+        if (window.ResizeObserver) {
+          new ResizeObserver(function(){ var r=_liveRects.get(cardId); if(r){r.h=cardEl.offsetHeight;redrawConnectors();} }).observe(cardEl);
+        }
+      })(card, i);
+    }
+
+    for (var i=0;i<n;i++) {
+      if (absorbedInto[i]!==-1) continue;
+      (parentsOf.get(i)||[]).forEach(function(par){
+        var parPrimary=absorbedInto[par]!==-1?absorbedInto[par]:par;
+        if (!cardEls.has(i)||!cardEls.has(parPrimary)) return;
+        var dc=depthColor(levels[parPrimary]);
+        _connEdges.push({fromId:parPrimary,toId:i,color:dc.accent,depth:levels[parPrimary]-1});
+      });
+    }
+
+    requestAnimationFrame(function(){
+      var W=canvas.clientWidth||500, H=canvas.clientHeight||500;
+      var nodeIds=[]; cardEls.forEach(function(_,id){ nodeIds.push(id); });
+      var byLevel=new Map();
+      nodeIds.forEach(function(id){ var lv=levels[id]; if(!byLevel.has(lv)) byLevel.set(lv,[]); byLevel.get(lv).push(id); });
+      var maxLevel=Math.max.apply(null, Array.from(byLevel.keys()).concat([1]));
+
+      var primaryParentOf=new Map(), childrenOfPrimary=new Map();
+      nodeIds.forEach(function(id){ childrenOfPrimary.set(id,[]); });
+      _connEdges.forEach(function(e){
+        if (!primaryParentOf.has(e.toId)) { primaryParentOf.set(e.toId,e.fromId); if(childrenOfPrimary.has(e.fromId)) childrenOfPrimary.get(e.fromId).push(e.toId); }
+      });
+      var roots=nodeIds.filter(function(id){ return !primaryParentOf.has(id); });
+      var cH=function(id){ var el=cardEls.get(id); return el?(el.offsetHeight||80):80; };
+      var GAP_X=MM_PAD+10, GAP_Y=MM_PAD+20;
+
+      function applyPositions(posMap) {
+
+        // Collision detection on target positions
+        var targetRects = new Map();
+        posMap.forEach(function(pos, id) {
+          targetRects.set(id, { x: pos.x, y: pos.y, w: CARD_W, h: cH(id) });
+        });
+        for (var pass = 0; pass < 30; pass++) {
+          var moved = false;
+          targetRects.forEach(function(ra, ka) {
+            targetRects.forEach(function(rb, kb) {
+              if (ka === kb) return;
+              if (ra.x < rb.x+rb.w+MM_PAD && ra.x+ra.w+MM_PAD > rb.x &&
+                  ra.y < rb.y+rb.h+MM_PAD && ra.y+ra.h+MM_PAD > rb.y) {
+                var dR=rb.x+rb.w+MM_PAD-ra.x, dL=ra.x+ra.w+MM_PAD-rb.x;
+                var dD=rb.y+rb.h+MM_PAD-ra.y, dU=ra.y+ra.h+MM_PAD-rb.y;
+                if (Math.min(dR,dL) <= Math.min(dD,dU)) ra.x += dR<dL ? dR : -dL;
+                else ra.y += dD<dU ? dD : -dU;
+                moved = true;
+              }
+            });
+          });
+          if (!moved) break;
+        }
+
+        var ids = Array.from(targetRects.keys());
+
+        // Capture start positions from current card styles
+        var startRects = new Map();
+        ids.forEach(function(id) {
+          var el = cardEls.get(id);
+          if (!el) return;
+          el.style.transition = 'none'; // disable CSS transitions — we drive everything in JS
+          startRects.set(id, {
+            x: parseFloat(el.style.left) || 0,
+            y: parseFloat(el.style.top)  || 0
+          });
+        });
+
+        // Easing: cubic-bezier approximation of ease-out
+        function easeOut(t) { return 1 - Math.pow(1 - t, 3); }
+
+        var DURATION = 700;
+        var startTime = null;
+        var stagger = Math.min(18, 180 / Math.max(ids.length, 1));
+
+        function frame(now) {
+          if (!startTime) startTime = now;
+          var elapsed = now - startTime;
+
+          ids.forEach(function(id, i) {
+            var el = cardEls.get(id);
+            if (!el) return;
+            var delay = i * stagger;
+            var t = Math.max(0, Math.min(1, (elapsed - delay) / DURATION));
+            var et = easeOut(t);
+            var from = startRects.get(id);
+            var to   = targetRects.get(id);
+            var cx = from.x + (to.x - from.x) * et;
+            var cy = from.y + (to.y - from.y) * et;
+            el.style.left = cx + 'px';
+            el.style.top  = cy + 'px';
+            // Keep _liveRects in sync so connectors draw at real current positions
+            var r = _liveRects.get(id) || { w: CARD_W, h: 80 };
+            _liveRects.set(id, { x: cx, y: cy, w: r.w, h: r.h });
+          });
+
+          redrawConnectors(); // always reads _liveRects which is current interpolated pos
+
+          var maxDelay = (ids.length - 1) * stagger;
+          if (elapsed < DURATION + maxDelay) {
+            requestAnimationFrame(frame);
+          } else {
+            // Snap to exact final positions
+            ids.forEach(function(id) {
+              var el = cardEls.get(id);
+              var to = targetRects.get(id);
+              if (!el || !to) return;
+              el.style.left = to.x + 'px';
+              el.style.top  = to.y + 'px';
+              _liveRects.set(id, { x: to.x, y: to.y, w: to.w, h: to.h });
+            });
+            redrawConnectors();
+          }
+        }
+
+        requestAnimationFrame(frame);
+
+        _everRendered = true;
+      }
+
+      function layoutRadial() {
+        var pos=new Map(), cx=W/2, cy=H/2;
+        byLevel.forEach(function(ids,lv){ var R=maxLevel===1?0:(0.12+0.20*(lv-1))*Math.min(W,H); ids.forEach(function(id,idx){ var h=cH(id); if(lv===1&&ids.length===1){pos.set(id,{x:cx-CARD_W/2,y:cy-h/2});return;} var a=(2*Math.PI*idx/ids.length)-Math.PI/2; pos.set(id,{x:cx+R*Math.cos(a)-CARD_W/2,y:cy+R*Math.sin(a)-h/2}); }); });
+        applyPositions(pos);
+      }
+      function subtreeW(id){ var kids=childrenOfPrimary.get(id)||[]; if(!kids.length) return CARD_W; return kids.reduce(function(s,k){ return s+subtreeW(k); },0)+GAP_X*(kids.length-1); }
+      function layoutTree(vertical) {
+        var pos=new Map();
+        function place(id,left,depth){ var kids=childrenOfPrimary.get(id)||[], myW=subtreeW(id), cx=left+myW/2, h=cH(id), rowY=depth*(90+GAP_Y); if(vertical) pos.set(id,{x:cx-CARD_W/2,y:rowY}); else pos.set(id,{x:rowY,y:cx-h/2}); var childLeft=left; kids.forEach(function(kid){ place(kid,childLeft,depth+1); childLeft+=subtreeW(kid)+GAP_X; }); }
+        var totalW=roots.reduce(function(s,r){ return s+subtreeW(r); },0)+GAP_X*(roots.length-1); var curX=W/2-totalW/2;
+        roots.forEach(function(r){ place(r,curX,0); curX+=subtreeW(r)+GAP_X; });
+        applyPositions(pos);
+      }
+      function layoutFlow(vertical) {
+        var pos=new Map();
+        byLevel.forEach(function(ids,lv){ var layerH=Math.max.apply(null,ids.map(cH).concat([80])), totalW=ids.length*(CARD_W+GAP_X)-GAP_X, startX=W/2-totalW/2, rowY=(lv-1)*(layerH+GAP_Y*2); ids.forEach(function(id,idx){ var h=cH(id); if(vertical) pos.set(id,{x:startX+idx*(CARD_W+GAP_X),y:rowY+(layerH-h)/2}); else pos.set(id,{x:rowY,y:startX+idx*(CARD_W+GAP_X)}); }); });
+        applyPositions(pos);
+      }
+      function layoutOrganic() {
+        var px={}, py={};
+        nodeIds.forEach(function(id,i){ var a=(2*Math.PI*i/nodeIds.length)-Math.PI/2, R=Math.min(W,H)*.35; px[id]=W/2+R*Math.cos(a); py[id]=H/2+R*Math.sin(a); });
+        var AREA=W*H, k=Math.sqrt(AREA/Math.max(nodeIds.length,1))*.9; var temp=Math.min(W,H)*.25;
+        for (var it=0;it<80;it++) {
+          var dx={}, dy={}; nodeIds.forEach(function(id){ dx[id]=0; dy[id]=0; });
+          for (var ii=0;ii<nodeIds.length;ii++) for (var jj=ii+1;jj<nodeIds.length;jj++) { var u=nodeIds[ii],v=nodeIds[jj]; var ddx=px[u]-px[v],ddy=py[u]-py[v]; var d=Math.sqrt(ddx*ddx+ddy*ddy)||.01,f=k*k/d; ddx/=d;ddy/=d; dx[u]+=ddx*f;dy[u]+=ddy*f;dx[v]-=ddx*f;dy[v]-=ddy*f; }
+          _connEdges.forEach(function(e){ var u=e.fromId,v=e.toId; if(!px.hasOwnProperty(u)||!px.hasOwnProperty(v)) return; var ddx=px[v]-px[u],ddy=py[v]-py[u]; var d=Math.sqrt(ddx*ddx+ddy*ddy)||.01,f=d*d/k; ddx/=d;ddy/=d; dx[u]+=ddx*f;dy[u]+=ddy*f;dx[v]-=ddx*f;dy[v]-=ddy*f; });
+          nodeIds.forEach(function(id){ var d=Math.sqrt(dx[id]*dx[id]+dy[id]*dy[id])||.01,disp=Math.min(d,temp); px[id]+=dx[id]/d*disp;py[id]+=dy[id]/d*disp; }); temp*=.93;
+        }
+        var pos=new Map(); nodeIds.forEach(function(id){ var h=cH(id); pos.set(id,{x:px[id]-CARD_W/2,y:py[id]-h/2}); }); applyPositions(pos);
+      }
+
+      switch (_layout) {
+        case 'vtree': layoutTree(true); break;
+        case 'htree': layoutTree(false); break;
+        case 'vflow': layoutFlow(true); break;
+        case 'organic': layoutOrganic(); break;
+        default: layoutRadial(); break;
+      }
+      // fitAll intentionally not called here — user controls viewport
+    });
+  }
+
+  function tryRender() {
+    if (_rendered) return;
+    if (!window.EmbeddingUtils||!window.EmbeddingUtils.isReady()) return;
+    if (typeof buildRowIndex!=='function') return;
+    if (_rows) { doRender(); return; }
+    var rawRows=buildRowIndex(); if (!rawRows.length) return;
+    setStatus('loading','Embedding '+rawRows.length+' cells\u2026'); emptyEl.style.display='none';
+    Promise.all(rawRows.map(function(r){ var text=(r.row&&r.row.cells?r.row.cells:(r.cells||[])).join(' ').trim(); if(!text) return Promise.resolve(null); return window.EmbeddingUtils.getCachedEmbedding(text).then(function(vec){ return {key:r.tabIdx+':'+r.rowIdx,vec:vec}; }).catch(function(){ return null; }); })).then(function(results){
+      var vectors=new Map(); results.forEach(function(res){ if(res&&res.vec) vectors.set(res.key,res.vec); });
+      if (!vectors.size){ setStatus('error','No vectors available'); return; }
+      var embedded=rawRows.filter(function(r){ return vectors.has(r.tabIdx+':'+r.rowIdx); });
+      if (embedded.length<3){ setStatus('error','Not enough data (\u22653 cells needed)'); return; }
+      embedded.forEach(function(r){ r.vec=vectors.get(r.tabIdx+':'+r.rowIdx); }); _rows=embedded; doRender();
+    });
+  }
+
+  async function doRender() {
+    rebuildBtn.classList.remove('pp-cmap-busy');
+    setStatus('loading','Splitting cells\u2026');
+    var workRows;
+    try { workRows=await splitAllRows(_rows); } catch(e){ console.warn('[concept-map] split error:',e); workRows=_rows; }
+    var splitCount=workRows.length-_rows.length;
+    setStatus('loading','Building hierarchy for '+workRows.length+' concepts\u2026');
+    setTimeout(function(){
+      try {
+        var hier=buildHierarchy(workRows);
+        if (!hier){ setStatus('error','Not enough data'); return; }
+        var visibleCount=0, multiParentCount=0;
+        var levelCounts=new Map();
+        for (var i=0;i<hier.n;i++) {
+          if (hier.absorbedInto[i]!==-1) continue; visibleCount++;
+          var lv=hier.levels[i]; levelCounts.set(lv,(levelCounts.get(lv)||0)+1);
+          if ((hier.parentsOf.get(i)||[]).length>1) multiParentCount++;
+        }
+        var levelStr=Array.from(levelCounts.keys()).sort(function(a,b){ return a-b; }).map(function(l){ return 'L'+l+': '+levelCounts.get(l); }).join(' \u00b7 ');
+        var splitStr=splitCount>0?' \u00b7 '+splitCount+' split'+(splitCount===1?'':'s'):'';
+        var mpStr=multiParentCount>0?' \u00b7 '+multiParentCount+' multi-parent':'';
+        renderConceptMap(hier);
+        subtitleEl.textContent=visibleCount+' cards \u00b7 '+levelStr+splitStr+mpStr;
+        setStatus('ready','Done'); _rendered=true;
+      } catch(err){ console.error('[concept-map]',err); setStatus('error','Failed: '+err.message); }
+    },20);
+  }
+
+  if (window.EmbeddingUtils&&window.EmbeddingUtils.isReady()) setTimeout(tryRender,120);
+  document.addEventListener('embeddings-ready',function(){ setTimeout(tryRender,120); });
+  window.addEventListener('embedding-progress',function(ev){ if(!_rendered) setStatus('loading','Indexing\u2026 '+ev.detail.pct+'%'); });
+  window.addEventListener('embedder-ready',function(){ setTimeout(tryRender,120); });
+  window.addEventListener('df-theme-change', function() { _rendered=false; tryRender(); });
+
+  return {
+    reset: function() {
+      _rendered=false; _everRendered=false; _rows=null; _liveRects.clear(); _connEdges=[]; _connSvg=null;
+      world.innerHTML=''; emptyEl.style.display='flex'; _panX=0; _panY=0; _zoom=1; applyTransform();
+    },
+    resize: function() {
+      if (_rendered) fitAll();
+    },
+    start: function() {
+      setTimeout(tryRender, 120);
+    }
+  };
 }
-.pp-cl-card:hover {
-  box-shadow: var(--md-elev-3) !important;
-  transform: translateY(-2px) scale(1.02) !important;
-  z-index: 10 !important;
-}
-
-.pp-cl-card-body {
-  padding: 10px 14px 14px !important;
-  display: flex !important;
-  flex-direction: column !important;
-  gap: 6px !important;
-  background: transparent !important;
-  flex: 1 !important;
-}
-
-/* Category label — "STRATEGY · VISION" */
-.pp-cl-card-cat {
-  font-family: var(--font-family) !important;
-  font-size: 9px !important;
-  font-weight: var(--font-weight-medium) !important;
-  letter-spacing: var(--letter-spacing-caps) !important;
-  text-transform: uppercase !important;
-  color: var(--md-sys-color-on-surface-variant) !important;
-  opacity: .7 !important;
-  margin-bottom: 2px !important;
-}
-
-/* Main text — serif headline with FULL WRAPPING (no truncation) */
-.pp-cl-card-text {
-  font-family: var(--font-family-serif) !important;
-  font-size: 14px !important;
-  font-weight: 400 !important;
-  font-style: normal !important;
-  line-height: 1.35 !important;
-  letter-spacing: -0.01em !important;
-  color: var(--md-sys-color-on-surface) !important;
-  /* BENTO-BOX: Remove line-clamp, allow full text wrapping */
-  display: block !important;
-  overflow-wrap: break-word !important;
-  word-break: break-word !important;
-}
-
-/* Segment label */
-.pp-cl-card-split {
-  font-family: var(--font-family) !important;
-  font-size: 8px !important;
-  font-weight: var(--font-weight-medium) !important;
-  letter-spacing: var(--letter-spacing-caps) !important;
-  text-transform: uppercase !important;
-  color: var(--md-sys-color-outline) !important;
-  opacity: .6 !important;
-  margin-top: 4px !important;
-}
-
-
-/* ── 16g. (Keep existing concept map styles unchanged) ───────────────────── */
-
-/* ── 16g. Side-panel mini-cards (.pp-cl-scard) ───────────────────────────  */
-
-.pp-cl-scard {
-  border-radius: var(--radius-sm) !important;
-  border: 1px solid var(--md-sys-color-outline-variant) !important;
-  border-left: 3px solid transparent !important;
-  background: var(--md-sys-color-surface) !important;
-  padding: var(--space-1) var(--space-2) !important;
-  font-size: var(--font-size-sm) !important;
-  line-height: 1.4 !important;
-  color: var(--md-sys-color-on-surface) !important;
-  transition: background var(--transition-fast), box-shadow var(--transition-fast) !important;
-}
-.pp-cl-scard:hover {
-  background: color-mix(in srgb, var(--md-sys-color-primary) 5%, var(--md-sys-color-surface)) !important;
-  box-shadow: var(--md-elev-1) !important;
-}
-/* ══════════════════════════════════════════════════════════
-   html.dark / html.light — class-based theme overrides
-   These come LAST so they beat every @media rule above.
-   Set by utils-shared.js on toggle.
-   ══════════════════════════════════════════════════════════ */
-
-html.dark {
-  --md-sys-color-primary:                #bcc2ff;
-  --md-sys-color-on-primary:             #1b1f8a;
-  --md-sys-color-primary-container:      #3140b0;
-  --md-sys-color-on-primary-container:   #dfe0ff;
-  --md-sys-color-secondary:              #9ad5b9;
-  --md-sys-color-on-secondary:           #003828;
-  --md-sys-color-secondary-container:    #005139;
-  --md-sys-color-on-secondary-container: #b6edd8;
-  --md-sys-color-tertiary:               #cfbdff;
-  --md-sys-color-on-tertiary:            #3b0093;
-  --md-sys-color-tertiary-container:     #532da1;
-  --md-sys-color-on-tertiary-container:  #e9ddff;
-  --md-sys-color-error:                  #ffb4ab;
-  --md-sys-color-on-error:               #690005;
-  --md-sys-color-error-container:        #93000a;
-  --md-sys-color-on-error-container:     #ffdad6;
-  --md-sys-color-background:             #1b1b1f;
-  --md-sys-color-on-background:          #e5e1e6;
-  --md-sys-color-surface:                #1b1b1f;
-  --md-sys-color-on-surface:             #e5e1e6;
-  --md-sys-color-surface-variant:        #47464f;
-  --md-sys-color-on-surface-variant:     #cac4d0;
-  --md-sys-color-surface-container-highest: #36343b;
-  --md-sys-color-surface-container-high:    #2b2930;
-  --md-sys-color-surface-container:         #211f26;
-  --md-sys-color-surface-container-low:     #1d1b20;
-  --md-sys-color-surface-container-lowest:  #0f0d13;
-  --md-sys-color-outline:                #938f99;
-  --md-sys-color-outline-variant:        #47464f;
-  --md-sys-color-inverse-surface:        #e5e1e6;
-  --md-sys-color-inverse-on-surface:     #313033;
-  --md-sys-color-inverse-primary:        #4a56c8;
-  --raw-black:         #e5e1e6;
-  --raw-white:         #1b1b1f;
-  --md-elev-1: 0px 1px 2px rgba(0,0,0,0.5), 0px 1px 3px 1px rgba(0,0,0,0.25);
-  --md-elev-2: 0px 1px 2px rgba(0,0,0,0.5), 0px 2px 6px 2px rgba(0,0,0,0.25);
-  --md-elev-3: 0px 4px 8px 3px rgba(0,0,0,0.25), 0px 1px 3px rgba(0,0,0,0.5);
-  --md-elev-4: 0px 6px 10px 4px rgba(0,0,0,0.25), 0px 2px 3px rgba(0,0,0,0.5);
-  --md-elev-5: 0px 8px 12px 6px rgba(0,0,0,0.25), 0px 4px 4px rgba(0,0,0,0.5);
-}
-
-html.light {
-  --md-sys-color-primary:                #4a56c8;
-  --md-sys-color-on-primary:             #ffffff;
-  --md-sys-color-primary-container:      #dfe0ff;
-  --md-sys-color-on-primary-container:   #00006e;
-  --md-sys-color-secondary:              #2e7d5e;
-  --md-sys-color-on-secondary:           #ffffff;
-  --md-sys-color-secondary-container:    #b6edd8;
-  --md-sys-color-on-secondary-container: #00210f;
-  --md-sys-color-tertiary:               #5e3d9e;
-  --md-sys-color-on-tertiary:            #ffffff;
-  --md-sys-color-tertiary-container:     #e9ddff;
-  --md-sys-color-on-tertiary-container:  #20005e;
-  --md-sys-color-error:                  #c44035;
-  --md-sys-color-on-error:               #ffffff;
-  --md-sys-color-error-container:        #ffdad6;
-  --md-sys-color-on-error-container:     #410002;
-  --md-sys-color-background:             #fdfbff;
-  --md-sys-color-on-background:          #1b1b1f;
-  --md-sys-color-surface:                #fdfbff;
-  --md-sys-color-on-surface:             #1b1b1f;
-  --md-sys-color-surface-variant:        #e4e1ec;
-  --md-sys-color-on-surface-variant:     #47464f;
-  --md-sys-color-surface-container-highest: #e6e0e9;
-  --md-sys-color-surface-container-high:    #ece6f0;
-  --md-sys-color-surface-container:         #f3edf7;
-  --md-sys-color-surface-container-low:     #f7f2fa;
-  --md-sys-color-surface-container-lowest:  #ffffff;
-  --md-sys-color-outline:                #787680;
-  --md-sys-color-outline-variant:        #cac4d0;
-  --md-sys-color-inverse-surface:        #313033;
-  --md-sys-color-inverse-on-surface:     #f4eff4;
-  --md-sys-color-inverse-primary:        #bcc2ff;
-  --raw-black:         #111111;
-  --raw-white:         #ffffff;
-  --md-elev-1: 0px 1px 2px rgba(0,0,0,0.3),  0px 1px 3px 1px rgba(0,0,0,0.15);
-  --md-elev-2: 0px 1px 2px rgba(0,0,0,0.3),  0px 2px 6px 2px rgba(0,0,0,0.15);
-  --md-elev-3: 0px 4px 8px 3px rgba(0,0,0,0.15), 0px 1px 3px rgba(0,0,0,0.3);
-  --md-elev-4: 0px 6px 10px 4px rgba(0,0,0,0.15), 0px 2px 3px rgba(0,0,0,0.3);
-  --md-elev-5: 0px 8px 12px 6px rgba(0,0,0,0.15), 0px 4px 4px rgba(0,0,0,0.3);
-}
-
