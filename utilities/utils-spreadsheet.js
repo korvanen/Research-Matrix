@@ -1,86 +1,28 @@
 // ════════════════════════════════════════════════════════════════
-// utils-spreadsheet.js — spreadsheet viewer (clean rewrite)
-// Depends on: utils-shared.js (TABS, parseCitation, getPalette)
+// utils-spreadsheet.js — spreadsheet viewer
+// Depends on: utils-shared.js (TABS, parseCitation, processSheetData)
 // ════════════════════════════════════════════════════════════════
-console.log('[utils-spreadsheet.js v. 2]');
+console.log('[utils-spreadsheet.js v.3]');
 
 // ── DOM refs ──────────────────────────────────────────────────
-const elTopbarGlobal  = document.getElementById('topbar-global');
-const elTopbarSheet   = document.getElementById('topbar-sheet');
-const elCorner        = document.getElementById('corner');
-const elHeaderScroll  = document.getElementById('header-scroll');
-const elHeaderRow     = document.getElementById('header-row');
-const elCatScroll     = document.getElementById('cat-scroll');
-const elCatBody       = document.getElementById('cat-body');
-const elDataScroll    = document.getElementById('data-scroll');
-const elDataBody      = document.getElementById('data-body');
-const elTabBar        = document.getElementById('tab-bar');
-const elSidebar       = document.getElementById('sidebar');
-const elSidebarBox    = document.getElementById('sidebar-box');
-const elDragHandle    = document.getElementById('drag-handle');
-const elLoadingOverlay = document.getElementById('loading-overlay');
+const elTopbarSheetName = document.getElementById('topbar-sheet-name');
+const elCorner          = document.getElementById('corner');
+const elHeaderScroll    = document.getElementById('header-scroll');
+const elHeaderRow       = document.getElementById('header-row');
+const elCatScroll       = document.getElementById('cat-scroll');
+const elCatBody         = document.getElementById('cat-body');
+const elDataScroll      = document.getElementById('data-scroll');
+const elDataBody        = document.getElementById('data-body');
+const elTabBar          = document.getElementById('tab-bar');
+const elLoadingOverlay  = document.getElementById('loading-overlay');
 
 // ── State ─────────────────────────────────────────────────────
-let activeTab      = 0;
-let numCatCols     = 1;
-let selectedEls    = [];
-const SIDEBAR_DEFAULT_W = 420;
-const SIDEBAR_MIN_W     = 0;
-const SIDEBAR_MAX_W     = () => window.innerWidth * 0.88;
-const CAT_COL_W         = 120;
-const DATA_COL_MIN_W    = 180;
+let activeTab   = 0;
+let numCatCols  = 1;
+let selectedEls = [];
 
-// ── App title ─────────────────────────────────────────────────
-elTopbarGlobal.textContent = 'Dimensional Framework';
-
-// ════════════════════════════════════════════════════════════════
-// SIDEBAR DRAG RESIZE
-// ════════════════════════════════════════════════════════════════
-
-let _sidebarW = SIDEBAR_DEFAULT_W;
-
-function setSidebarWidth(w) {
-  _sidebarW = Math.max(SIDEBAR_MIN_W, Math.min(SIDEBAR_MAX_W(), w));
-  elSidebar.style.width = _sidebarW + 'px';
-  updateLayout();
-}
-
-// Drag handle
-{
-  let dragging = false, startX = 0, startW = 0;
-
-  elDragHandle.addEventListener('mousedown', e => {
-    dragging = true; startX = e.clientX; startW = _sidebarW;
-    document.body.style.cursor = 'col-resize';
-    document.body.style.userSelect = 'none';
-    e.preventDefault();
-  });
-  document.addEventListener('mousemove', e => {
-    if (!dragging) return;
-    setSidebarWidth(startW + (startX - e.clientX));
-  });
-  document.addEventListener('mouseup', () => {
-    if (!dragging) return;
-    dragging = false;
-    document.body.style.cursor = '';
-    document.body.style.userSelect = '';
-    // Snap closed if dragged narrow
-    if (_sidebarW < 80) setSidebarWidth(0);
-  });
-}
-
-// Arrow buttons
-document.getElementById('handle-arrow-open')?.addEventListener('click',  () => setSidebarWidth(SIDEBAR_DEFAULT_W));
-document.getElementById('handle-arrow-close')?.addEventListener('click', () => setSidebarWidth(0));
-document.getElementById('handle-arrow-open-fixed')?.addEventListener('click',  () => setSidebarWidth(SIDEBAR_DEFAULT_W));
-document.getElementById('handle-arrow-close-fixed')?.addEventListener('click', () => setSidebarWidth(0));
-
-// Init sidebar width
-setSidebarWidth(SIDEBAR_DEFAULT_W);
-
-// Expose for utils-panel.js / sidepanel tools
-window.sidebarEl    = elSidebarBox;
-window.sidebarBoxEl = elSidebarBox;
+const CAT_COL_W      = 120;
+const DATA_COL_MIN_W = 200;
 
 // ════════════════════════════════════════════════════════════════
 // CATEGORY SPANNING
@@ -118,7 +60,7 @@ function buildSpans(rows, numLevels) {
 }
 
 // ════════════════════════════════════════════════════════════════
-// RENDER SHEET
+// RENDER
 // ════════════════════════════════════════════════════════════════
 
 function renderSheet(data) {
@@ -141,7 +83,7 @@ function renderSheet(data) {
     elHeaderRow.appendChild(th);
   });
 
-  // Category rows
+  // Category column
   elCatBody.innerHTML = '';
   data.rows.forEach((row, ri) => {
     const tr = document.createElement('tr');
@@ -158,7 +100,7 @@ function renderSheet(data) {
     elCatBody.appendChild(tr);
   });
 
-  // Data rows
+  // Data
   elDataBody.innerHTML = '';
   data.rows.forEach((row, ri) => {
     const tr = document.createElement('tr');
@@ -180,7 +122,9 @@ function renderSheet(data) {
 // ════════════════════════════════════════════════════════════════
 
 function updateLayout(numDataCols) {
-  numDataCols = numDataCols || elDataBody.querySelector('tr')?.querySelectorAll('td').length || 1;
+  numDataCols = numDataCols
+    || elDataBody.querySelector('tr')?.querySelectorAll('td').length
+    || 1;
 
   const totalCatW = numCatCols * CAT_COL_W;
   elCorner.style.width = totalCatW + 'px';
@@ -189,18 +133,58 @@ function updateLayout(numDataCols) {
     td.style.width = td.style.minWidth = CAT_COL_W + 'px';
   });
 
-  const available  = elDataScroll.clientWidth || (window.innerWidth - _sidebarW - totalCatW - 20);
+  const available  = elDataScroll.clientWidth || 800;
   const natural    = Math.floor(available / numDataCols);
   const colW       = Math.max(natural, DATA_COL_MIN_W);
-  const tableW     = colW * numDataCols;
   const usePercent = natural >= DATA_COL_MIN_W;
+  const tableW     = colW * numDataCols;
 
   document.getElementById('header-table').style.width = usePercent ? '100%' : tableW + 'px';
   document.getElementById('data-table').style.width   = usePercent ? '100%' : tableW + 'px';
   elHeaderRow.querySelectorAll('th').forEach(th => { th.style.width = th.style.minWidth = colW + 'px'; });
   elDataBody.querySelectorAll('td').forEach(td => { td.style.width = td.style.minWidth = colW + 'px'; });
 
-  requestAnimationFrame(() => requestAnimationFrame(syncRowHeights));
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    applyRotations();
+    syncRowHeights();
+  }));
+}
+
+// ── Category text rotation ────────────────────────────────────
+const _rotatedMinH = new Map();
+
+function applyRotations() {
+  _rotatedMinH.clear();
+  elCatBody.querySelectorAll('td.cat-rotated').forEach(td => {
+    const inner = td.querySelector('.cat-inner');
+    if (inner) td.textContent = inner.textContent;
+    td.classList.remove('cat-rotated');
+    td.style.height = '';
+  });
+  Array.from(elCatBody.querySelectorAll('tr')).forEach((tr, rowIdx) => {
+    Array.from(tr.querySelectorAll('td')).forEach(td => {
+      const text = td.textContent.trim();
+      if (!text) return;
+      const catW  = td.getBoundingClientRect().width;
+      const probe = Object.assign(document.createElement('span'), {
+        style: `position:absolute;visibility:hidden;white-space:nowrap;font-size:${getComputedStyle(td).fontSize};font-family:${getComputedStyle(td).fontFamily};font-weight:${getComputedStyle(td).fontWeight};letter-spacing:${getComputedStyle(td).letterSpacing};text-transform:${getComputedStyle(td).textTransform}`
+      });
+      probe.textContent = text;
+      document.body.appendChild(probe);
+      const textW = probe.getBoundingClientRect().width;
+      document.body.removeChild(probe);
+      if (textW <= catW - 24) return;
+      td.classList.add('cat-rotated');
+      const inner = document.createElement('span');
+      inner.className   = 'cat-inner';
+      inner.textContent = text;
+      td.textContent    = '';
+      td.appendChild(inner);
+      const neededH = Math.ceil(textW) + 12;
+      inner.style.width = neededH + 'px';
+      _rotatedMinH.set(rowIdx, { neededH, rowspan: td.rowSpan || 1 });
+    });
+  });
 }
 
 function syncRowHeights() {
@@ -209,36 +193,39 @@ function syncRowHeights() {
   dataRows.forEach(tr => tr.style.height = '');
   catRows.forEach(tr  => tr.style.height = '');
   void elDataBody.offsetHeight;
+
+  // Apply rotation min heights
+  const naturalH = dataRows.map(tr => tr.getBoundingClientRect().height);
+  _rotatedMinH.forEach(({ neededH, rowspan }, startRow) => {
+    const cumH = naturalH.slice(startRow, startRow + rowspan).reduce((a, b) => a + b, 0);
+    if (cumH >= neededH) return;
+    const newH = naturalH[startRow] + (neededH - cumH);
+    dataRows[startRow].style.height = newH + 'px';
+    catRows[startRow].style.height  = newH + 'px';
+    naturalH[startRow] = newH;
+  });
+
+  // Sync cat and data row heights
   dataRows.forEach((dataRow, i) => {
     const catRow = catRows[i];
     if (!catRow) return;
-    const h = Math.max(
-      dataRow.getBoundingClientRect().height,
-      catRow.getBoundingClientRect().height
-    );
+    const h = Math.max(dataRow.getBoundingClientRect().height, catRow.getBoundingClientRect().height);
     dataRow.style.height = h + 'px';
     catRow.style.height  = h + 'px';
   });
-  // Keep scrollbars aligned
-  const scrollbarH = elDataScroll.offsetHeight - elDataScroll.clientHeight;
-  const scrollbarW = elDataScroll.offsetWidth  - elDataScroll.clientWidth;
-  elCatScroll.style.paddingBottom   = scrollbarH + 'px';
-  elHeaderScroll.style.paddingRight = scrollbarW + 'px';
+
+  // Keep scrollbar gutters aligned
+  elCatScroll.style.paddingBottom   = (elDataScroll.offsetHeight - elDataScroll.clientHeight) + 'px';
+  elHeaderScroll.style.paddingRight = (elDataScroll.offsetWidth  - elDataScroll.clientWidth)  + 'px';
 }
 
 if (window.ResizeObserver) {
   new ResizeObserver(() => requestAnimationFrame(syncRowHeights)).observe(elDataScroll);
 }
 
-window.addEventListener('resize', () => {
-  setSidebarWidth(_sidebarW);
-  updateLayout();
-});
+window.addEventListener('resize', () => updateLayout());
 
-// ════════════════════════════════════════════════════════════════
-// SCROLL SYNC
-// ════════════════════════════════════════════════════════════════
-
+// ── Scroll sync ───────────────────────────────────────────────
 elDataScroll.addEventListener('scroll', () => {
   elHeaderScroll.scrollLeft = elDataScroll.scrollLeft;
   elCatScroll.scrollTop     = elDataScroll.scrollTop;
@@ -249,9 +236,8 @@ elDataScroll.addEventListener('scroll', () => {
 // ════════════════════════════════════════════════════════════════
 
 function clearHighlights() {
-  document.querySelectorAll('.highlight-cell, .highlight-group').forEach(el =>
-    el.classList.remove('highlight-cell', 'highlight-group')
-  );
+  document.querySelectorAll('.highlight-cell, .highlight-group')
+    .forEach(el => el.classList.remove('highlight-cell', 'highlight-group'));
 }
 
 function clearSelection() {
@@ -269,17 +255,17 @@ function getTargets(el) {
   if (catTd) {
     const catRows  = Array.from(elCatBody.querySelectorAll('tr'));
     const tr       = catTd.closest('tr');
-    const rowIndex = catRows.indexOf(tr);
+    const rowIdx   = catRows.indexOf(tr);
     const span     = catTd.rowSpan || 1;
     const colIdx   = Array.from(tr.children).indexOf(catTd);
     Array.from(elDataBody.querySelectorAll('tr'))
-      .slice(rowIndex, rowIndex + span)
+      .slice(rowIdx, rowIdx + span)
       .forEach(r => r.querySelectorAll('td').forEach(c => group.push(c)));
     elCatBody.querySelectorAll('td').forEach(td => {
       const ttr = td.closest('tr');
       const ri  = catRows.indexOf(ttr);
       const ci  = Array.from(ttr.children).indexOf(td);
-      if (ri >= rowIndex && ri < rowIndex + span && ci >= colIdx) group.push(td);
+      if (ri >= rowIdx && ri < rowIdx + span && ci >= colIdx) group.push(td);
     });
     focal.push(catTd);
     return { focal, group };
@@ -299,84 +285,34 @@ function getTargets(el) {
   return null;
 }
 
-function applyHighlight(targets) {
-  if (!targets) return;
-  targets.group.forEach(el => el.classList.add('highlight-group'));
-  targets.focal.forEach(el => { el.classList.remove('highlight-group'); el.classList.add('highlight-cell'); });
+function applyHighlight({ focal, group }) {
+  group.forEach(el => el.classList.add('highlight-group'));
+  focal.forEach(el => { el.classList.remove('highlight-group'); el.classList.add('highlight-cell'); });
 }
 
-function applySelection(targets) {
-  if (!targets) return;
+function applySelection({ focal, group }) {
   clearSelection();
-  targets.group.forEach(el => { el.classList.add('selected-group'); selectedEls.push(el); });
-  targets.focal.forEach(el => {
+  group.forEach(el => { el.classList.add('selected-group'); selectedEls.push(el); });
+  focal.forEach(el => {
     el.classList.remove('selected-group'); el.classList.add('selected-cell');
     if (!selectedEls.includes(el)) selectedEls.push(el);
   });
 }
 
 [elDataBody, elCatBody, elHeaderRow].forEach(container => {
-  container.addEventListener('mouseover',  e => { clearHighlights(); applyHighlight(getTargets(e.target)); });
+  container.addEventListener('mouseover',  e => { clearHighlights(); const t = getTargets(e.target); if (t) applyHighlight(t); });
   container.addEventListener('mouseleave', clearHighlights);
   container.addEventListener('click', e => {
-    const targets = getTargets(e.target);
-    if (!targets) return;
-    const isSelected = targets.focal[0]?.classList.contains('selected-cell');
-    if (isSelected) clearSelection();
-    else applySelection(targets);
+    const t = getTargets(e.target);
+    if (!t) return;
+    if (t.focal[0]?.classList.contains('selected-cell')) clearSelection();
+    else applySelection(t);
     e.stopPropagation();
   });
 });
-document.addEventListener('click',   e => { if (!e.target.closest('#sidebar')) clearSelection(); });
+
+document.addEventListener('click',   e => { if (!e.target.closest('.sheet-area')) clearSelection(); });
 document.addEventListener('keydown', e => { if (e.key === 'Escape') clearSelection(); });
-
-// ════════════════════════════════════════════════════════════════
-// GOTO NAVIGATION  (used by sidebar panels)
-// ════════════════════════════════════════════════════════════════
-
-function _bestCol(match) {
-  if (!match?.row?.cells) return 0;
-  const cells = match.row.cells;
-  let best = 0, bestScore = -1;
-  cells.forEach((cell, ci) => {
-    if (!cell?.trim()) return;
-    let score = 0;
-    if (match.shared && typeof match.shared.forEach === 'function') {
-      const kws = typeof panelExtractKW === 'function' ? panelExtractKW(cell) : [];
-      match.shared.forEach(k => { if (kws.includes(k)) score++; });
-    }
-    if (score > bestScore || best === 0) { bestScore = score; best = ci; }
-  });
-  return best;
-}
-
-function panelGoTo(match, colIdx) {
-  const tabIdx    = match.tabIdx;
-  const rowIdx    = match.rowIdx;
-  const targetCol = typeof colIdx === 'number' ? colIdx : _bestCol(match);
-  const needSwitch = activeTab !== tabIdx;
-
-  if (needSwitch) { activeTab = tabIdx; buildTabBar(); showTab(tabIdx); }
-
-  function doSelect() {
-    clearSelection();
-    const rows = Array.from(elDataBody.querySelectorAll('tr'));
-    const tr   = rows[rowIdx];
-    if (!tr) return;
-    const tds = tr.querySelectorAll('td');
-    const td  = tds[targetCol] || tds[0];
-    if (!td) return;
-    const targets = getTargets(td);
-    if (targets) applySelection(targets);
-    else td.classList.add('selected-cell');
-    td.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  }
-
-  needSwitch ? setTimeout(doSelect, 150) : requestAnimationFrame(doSelect);
-}
-
-// Expose globally for sidepanel tools
-window.panelGoTo = panelGoTo;
 
 // ════════════════════════════════════════════════════════════════
 // TAB BAR
@@ -393,9 +329,7 @@ function buildTabBar() {
     el.textContent = label;
     el.addEventListener('click', () => {
       if (i === activeTab) return;
-      activeTab = i;
-      buildTabBar();
-      showTab(i);
+      activeTab = i; buildTabBar(); showTab(i);
     });
     elTabBar.appendChild(el);
   });
@@ -409,14 +343,15 @@ function showTab(idx) {
   if (!window.TABS?.[idx]) return;
   const data = typeof processSheetData === 'function' ? processSheetData(TABS[idx].grid) : null;
   if (!data) { elDataBody.innerHTML = '<tr><td>No data</td></tr>'; return; }
-  elTopbarSheet.textContent = data.title || TABS[idx].name || '';
-  elDataScroll.scrollTop    = 0;
-  elDataScroll.scrollLeft   = 0;
+  elTopbarSheetName.textContent = data.title || TABS[idx].name || '';
+  elDataScroll.scrollTop  = 0;
+  elDataScroll.scrollLeft = 0;
+  clearSelection();
   renderSheet(data);
 }
 
 // ════════════════════════════════════════════════════════════════
-// INIT — wait for TABS to be populated by utils-shared.js
+// INIT
 // ════════════════════════════════════════════════════════════════
 
 function _waitForTabs() {
