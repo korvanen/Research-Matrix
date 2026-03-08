@@ -9,7 +9,7 @@
 //   • depthColor: added missing paletteIdx + theme variable (was ReferenceError)
 //   • depthColor: rewrote getLuminance without array destructuring (was SyntaxError)
 //   • Removed dead CMAP_LEVEL_THEMES constant
-console.log('[utils-concept-map.js v.gggggggg]');
+console.log('[utils-concept-map.js v.hhhhhhaaaaahha]');
 
 const CMAP_PARENT_CHILD_THRESHOLD = 0.50;
 const CMAP_MIN_SPLIT_LENGTH = 60;
@@ -202,6 +202,11 @@ const ORPHAN_RECOVERY_THRESHOLD = 0.85;
 .pp-cmap-leaf-badge {
   font-size:8px; font-weight:600; letter-spacing:.06em; text-transform:uppercase;
   color:var(--md-sys-color-on-surface-variant); padding:4px 9px 7px; display:block;
+}
+.pp-cmap-split-badge {
+  font-size:9px; font-weight:700; letter-spacing:.05em; text-transform:uppercase;
+  color: color-mix(in srgb, var(--ppc-on,#fff) 55%, var(--ppc-bg,#888));
+  padding:4px 9px 6px; text-align:right; display:block;
 }
 `;
   document.head.appendChild(s);
@@ -585,8 +590,14 @@ function initConceptMapTool(paneEl, sidebarEl) {
   function buildHierarchy(rows) {
     var n=rows.length; if (n<2) return null;
 
+    // Split siblings share the same parent vec — exclude them from comparing against each other
+    function areSplitSiblings(i, j) {
+      return rows[i]._splitFrom && rows[j]._splitFrom && rows[i]._splitFrom === rows[j]._splitFrom
+        && rows[i].tabIdx === rows[j].tabIdx && rows[i].rowIdx === rows[j].rowIdx;
+    }
+
     var scores=new Float32Array(n);
-    for (var i=0;i<n;i++) { var sum=0; for (var j=0;j<n;j++) { if (i!==j) sum+=cosineSim(rows[i].vec,rows[j].vec); } scores[i]=sum/(n-1); }
+    for (var i=0;i<n;i++) { var sum=0, cnt=0; for (var j=0;j<n;j++) { if (i!==j&&!areSplitSiblings(i,j)) { sum+=cosineSim(rows[i].vec,rows[j].vec); cnt++; } } scores[i]=cnt?sum/cnt:0; }
 
     var rankOrder=Array.from({length:n},function(_,i){ return i; }).sort(function(a,b){ return scores[b]-scores[a]; });
     var levels=new Int32Array(n);
@@ -600,7 +611,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
       if (levels[i]===1) continue;
       var candidates=[];
       for (var j=0;j<n;j++) {
-        if (j===i||levels[j]!==levels[i]-1) continue;
+        if (j===i||levels[j]!==levels[i]-1||areSplitSiblings(i,j)) continue;
         var s=cosineSim(rows[i].vec,rows[j].vec);
         if (s>=_threshold) candidates.push({j:j,s:s});
       }
@@ -615,7 +626,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
       if (levels[i]<=1||parentsOf.get(i).length>0) continue;
       var bestJ=-1, bestSim=relaxed;
       for (var j=0;j<n;j++) {
-        if (j===i||levels[j]>=levels[i]) continue;
+        if (j===i||levels[j]>=levels[i]||areSplitSiblings(i,j)) continue;
         var s=cosineSim(rows[i].vec,rows[j].vec); if (s>bestSim){ bestSim=s; bestJ=j; }
       }
       if (bestJ!==-1) { levels[i]=levels[bestJ]+1; parentsOf.set(i,[bestJ]); parentSimsOf.set(i,[bestSim]); }
@@ -770,10 +781,10 @@ function initConceptMapTool(paneEl, sidebarEl) {
       levelBlock.className='pp-cmap-card-level-block';
       var levelNum=document.createElement('div');
       levelNum.className='pp-cmap-card-level-num';
-      levelNum.textContent = isSplit ? (primaryRow._splitN+'/'+primaryRow._splitT) : String(level);
+      levelNum.textContent = String(level);
       var levelLbl=document.createElement('div');
       levelLbl.className='pp-cmap-card-level-label';
-      levelLbl.textContent = isSplit ? 'Split' : 'Level';
+      levelLbl.textContent = 'Level';
       levelBlock.appendChild(levelNum);
       levelBlock.appendChild(levelLbl);
 
@@ -815,6 +826,13 @@ function initConceptMapTool(paneEl, sidebarEl) {
 
       var hasChildren=childrenOf[i].length>0;
       var hasParents=numParents>0;
+
+      if (isSplit) {
+        var splitBadge=document.createElement('div');
+        splitBadge.className='pp-cmap-split-badge';
+        splitBadge.textContent=primaryRow._splitN+'/'+primaryRow._splitT+' Split';
+        card.appendChild(splitBadge);
+      }
 
       if (hasChildren||hasParents) {
         var footer=document.createElement('div');
