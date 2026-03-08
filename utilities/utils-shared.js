@@ -725,6 +725,29 @@ window.PPNavRail = (function () {
       subtitleEl: subtitleEl,
       statusEl:   statusEl,
     };
+
+    window.injectToolNav = function(currentTool) {
+  var tools = [
+    { href: 'spreadsheet.html',  label: 'Spreadsheet', d: '<rect x="1.5" y="1.5" width="15" height="15" rx="2"/><line x1="1.5" y1="6.5" x2="16.5" y2="6.5"/><line x1="1.5" y1="11.5" x2="16.5" y2="11.5"/><line x1="7" y1="6.5" x2="7" y2="16.5"/><line x1="12" y1="6.5" x2="12" y2="16.5"/>' },
+    { href: 'find-matches.html', label: 'Find Matches', d: '<circle cx="8" cy="8" r="5.5"/><line x1="12.5" y1="12.5" x2="16.5" y2="16.5"/>' },
+    { href: 'concept-map.html',  label: 'Concept Map',  d: '<circle cx="9" cy="4" r="2"/><circle cx="3.5" cy="14" r="2"/><circle cx="9" cy="14" r="2"/><circle cx="14.5" cy="14" r="2"/><line x1="9" y1="6" x2="3.5" y2="12"/><line x1="9" y1="6" x2="9" y2="12"/><line x1="9" y1="6" x2="14.5" y2="12"/>' },
+    { href: 'clusters.html',     label: 'Clusters',     d: '<circle cx="5" cy="5" r="3"/><circle cx="13" cy="5" r="3"/><circle cx="5" cy="13" r="3"/><circle cx="13" cy="13" r="3"/>' }
+  ];
+  var rail = document.querySelector('.pp-nav-rail');
+  if (!rail) return;
+  var spacer = document.createElement('div');
+  spacer.style.flex = '1';
+  rail.appendChild(spacer);
+  tools.forEach(function(t) {
+    var a = document.createElement('a');
+    a.className = 'pp-nav-item' + (t.href === currentTool ? ' active' : '');
+    a.href = t.href;
+    a.title = t.label;
+    a.innerHTML = '<svg viewBox="0 0 18 18" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">' + t.d + '</svg>';
+    a.addEventListener('click', function(e) { e.stopPropagation(); });
+    rail.appendChild(a);
+  });
+};
   }
 
   return { create: create };
