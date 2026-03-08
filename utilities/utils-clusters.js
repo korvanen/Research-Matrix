@@ -529,49 +529,46 @@ var CL_MIN_SPLIT_LENGTH = 60;
 }
 
 .pp-cl-scard {
-  background: var(--ppc-bg, #555);
+  background: var(--ppc-bg, #666) !important;
   border-radius: var(--radius-sm);
-  margin-bottom: var(--space-1);
+  margin-bottom: 6px;
   cursor: pointer;
   overflow: hidden;
   box-shadow: 0 1px 3px rgba(0,0,0,.18);
   transition: box-shadow var(--transition-fast), filter var(--transition-fast);
+  border: none !important;
 }
 .pp-cl-scard:last-child { margin-bottom: 0; }
 .pp-cl-scard:hover { box-shadow: var(--md-elev-2); filter: brightness(1.07); }
 
-/* Sub-group label divider inside a sheet cell */
+/* Sub-group label inside a sheet cell */
 .pp-cl-scard-group-label {
   font-size: 8px; font-weight: 800; letter-spacing: .10em; text-transform: uppercase;
-  color: var(--md-sys-color-outline);
-  padding: 6px 4px 3px;
+  padding: 8px 4px 3px;
+  margin-top: 4px;
 }
-.pp-cl-scard-group-label:first-child { padding-top: 2px; }
+.pp-cl-scard-group-label:first-child { padding-top: 2px; margin-top: 0; }
 
-/* Card internals — same classes as canvas card, same CSS vars */
+/* Card internals inherit --ppc-on/--ppc-bg from the card element */
 .pp-cl-scard .pp-cl-card-cat {
-  font-size: 9px !important;
-  font-weight: var(--font-weight-medium) !important;
-  letter-spacing: var(--letter-spacing-caps) !important;
-  text-transform: uppercase !important;
+  font-size: 9px !important; font-weight: 600 !important;
+  letter-spacing: .06em !important; text-transform: uppercase !important;
   color: color-mix(in srgb, var(--ppc-on, #fff) 60%, var(--ppc-bg, transparent)) !important;
-  padding: 7px 10px 0;
+  padding: 7px 10px 0 !important;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .pp-cl-scard .pp-cl-card-text {
   font-family: var(--font-family-serif) !important;
-  font-size: 12px !important;
-  font-weight: 400 !important;
-  line-height: 1.35 !important;
+  font-size: 12px !important; font-weight: 400 !important; line-height: 1.35 !important;
   color: color-mix(in srgb, var(--ppc-on, #fff) 92%, var(--ppc-bg, transparent)) !important;
-  padding: 5px 10px 8px;
+  padding: 5px 10px 8px !important;
   overflow-wrap: break-word; word-break: break-word;
 }
 .pp-cl-scard .pp-cl-card-split {
   font-size: 8px !important; font-weight: 700 !important;
   letter-spacing: .06em !important; text-transform: uppercase !important;
   color: color-mix(in srgb, var(--ppc-on, #fff) 50%, var(--ppc-bg, transparent)) !important;
-  padding: 0 10px 6px;
+  padding: 0 10px 6px !important;
 }
 `;
   document.head.appendChild(s);
@@ -793,6 +790,7 @@ function initClustersTool(paneEl, sidebarEl) {
     card.className = 'pp-cl-scard';
     card.style.setProperty('--ppc-bg', col.accent);
     card.style.setProperty('--ppc-on', on);
+    card.style.background = col.accent;
 
     if (cats.length) {
       const ce = document.createElement('div');
