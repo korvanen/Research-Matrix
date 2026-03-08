@@ -11,7 +11,7 @@
 //   • buildCard: --ppc-on now = contrastFor(col.accent) (white/#1a1a1a, same as concept-map)
 //   • buildCard: removed manual border-left accent stripe (concept-map doesn't use it)
 //   • CSS color-mix expressions in card text/cat/split now driven by --ppc-on/--ppc-bg
-console.log('[utils-clusters.js vhmmmm]');
+console.log('[utils-clusters.js vhershg]');
 
 var CL_MIN_SPLIT_LENGTH = 60;
 
@@ -1037,7 +1037,8 @@ function initClustersTool(paneEl, sidebarEl) {
 
     // Fallback: if no per-sentence embeddings, split structurally using parent vec
     if (valid.length <= 1) {
-      if (!row.vec) return [row];
+      if (!row.vec) { console.log('[clusters] split skipped - no row.vec'); return [row]; }
+      console.log('[clusters] structural split into', segments.length, 'segments');
       return segments.map((seg, ni) => ({
         tabIdx: row.tabIdx, rowIdx: row.rowIdx,
         headers: row.headers || [], title: row.title || '',
