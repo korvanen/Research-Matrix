@@ -2,7 +2,7 @@
 // utils-spreadsheet.js — spreadsheet viewer
 // Depends on: utils-shared.js (TABS, parseCitation, processSheetData)
 // ════════════════════════════════════════════════════════════════
-console.log('[utils-spreadsheet.js v.3]');
+console.log('[utils-spreadsheet.js v.5]');
 
 // ── DOM refs ──────────────────────────────────────────────────
 const elTopbarSheetName = document.getElementById('topbar-sheet-name');
@@ -144,10 +144,11 @@ function updateLayout(numDataCols) {
   elHeaderRow.querySelectorAll('th').forEach(th => { th.style.width = th.style.minWidth = colW + 'px'; });
   elDataBody.querySelectorAll('td').forEach(td => { td.style.width = td.style.minWidth = colW + 'px'; });
 
-  requestAnimationFrame(() => requestAnimationFrame(() => {
+  requestAnimationFrame(() => {
+    void elDataScroll.offsetHeight; // force reflow
     applyRotations();
-    syncRowHeights();
-  }));
+    setTimeout(syncRowHeights, 0);
+  });
 }
 
 // ── Category text rotation ────────────────────────────────────
@@ -220,12 +221,12 @@ function syncRowHeights() {
 }
 
 if (window.ResizeObserver) {
-  new ResizeObserver(() => requestAnimationFrame(syncRowHeights)).observe(elDataScroll);
+  new ResizeObserver(() => setTimeout(syncRowHeights, 50)).observe(elDataScroll);
 }
 
-window.addEventListener('resize', () => updateLayout());
+window.addEventListener('resize', () => { updateLayout(); });
 
-// ── Scroll sync ───────────────────────────────────────────────
+// ── Scroll sync — cat-scroll is overflow:hidden, driven entirely by JS ───
 elDataScroll.addEventListener('scroll', () => {
   elHeaderScroll.scrollLeft = elDataScroll.scrollLeft;
   elCatScroll.scrollTop     = elDataScroll.scrollTop;
