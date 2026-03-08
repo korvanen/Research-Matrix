@@ -574,9 +574,6 @@ const sidePanel = createSidePanel(document.querySelector('.main'), {
   onClose:  () => { buildTabBar(); updateLayout(); },
 });
 
-// Expose for utils-sidepanel.js panelGoTo compatibility
-const sidebar = sidePanel.el;
-const sidebarBox = sidePanel.bodyEl;
 // ════════════════════════════════════════════════════════════════
 // HOVER & SELECTION EVENTS
 // ════════════════════════════════════════════════════════════════
