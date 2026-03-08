@@ -17,8 +17,6 @@
       font-size: var(--font-size-base);
       color: var(--md-sys-color-on-background);
     }
-
-    /* The main pane that holds the head bar + canvas */
     #cl-pane {
       flex: 1;
       min-height: 0;
@@ -27,17 +25,9 @@
       overflow: hidden;
       position: relative;
     }
-
-    /*
-      #pp-cl-sheet-host is created by utils-clusters.js and appended
-      inside #pp-cl-canvas.  createSidePanel() needs a positioned host.
-      The host itself is absolute-positioned (see CSS in utils-clusters.js),
-      so createSidePanel will size it as a right-side panel inside the canvas.
-    */
   </style>
 </head>
 <body>
-
   <div class="ds-topbar">
     <a class="ds-topbar-back" href="../index.html">
       <svg viewBox="0 0 14 14" width="12" height="12" fill="none"
@@ -48,56 +38,61 @@
       Back
     </a>
     <div class="ds-topbar-title">Cluster Map</div>
+
+    <a class="pp-nav-item" href="spreadsheet.html" title="Spreadsheet">
+      <svg viewBox="0 0 18 18" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="1.5" y="1.5" width="15" height="15" rx="2"/><line x1="1.5" y1="6.5" x2="16.5" y2="6.5"/><line x1="1.5" y1="11.5" x2="16.5" y2="11.5"/><line x1="7" y1="6.5" x2="7" y2="16.5"/><line x1="12" y1="6.5" x2="12" y2="16.5"/></svg>
+    </a>
+    <a class="pp-nav-item" href="find-matches.html" title="Find Matches">
+      <svg viewBox="0 0 18 18" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="5.5"/><line x1="12.5" y1="12.5" x2="16.5" y2="16.5"/></svg>
+    </a>
+    <a class="pp-nav-item" href="concept-map.html" title="Concept Map">
+      <svg viewBox="0 0 18 18" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="4" r="2"/><circle cx="3.5" cy="14" r="2"/><circle cx="9" cy="14" r="2"/><circle cx="14.5" cy="14" r="2"/><line x1="9" y1="6" x2="3.5" y2="12"/><line x1="9" y1="6" x2="9" y2="12"/><line x1="9" y1="6" x2="14.5" y2="12"/></svg>
+    </a>
+    <a class="pp-nav-item active" href="clusters.html" title="Clusters">
+      <svg viewBox="0 0 18 18" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="5" r="3"/><circle cx="13" cy="5" r="3"/><circle cx="5" cy="13" r="3"/><circle cx="13" cy="13" r="3"/></svg>
+    </a>
+    <div class="pp-nav-divider" style="width:1px;height:20px;margin:0 4px;background:var(--md-sys-color-outline-variant);"></div>
+
     <div class="ds-badge ds-badge--waiting" id="cl-connection-badge">
       <div class="ds-badge-dot"></div>
       <span id="cl-badge-text">Connecting…</span>
     </div>
   </div>
-
   <div id="cl-pane">
     <div class="ds-no-host" id="cl-no-host">
       <h2>Data not available</h2>
       <p>Return to the <a href="../index.html">home page</a> to load data first.</p>
     </div>
   </div>
-
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="../utilities/utils-keywords.js?v=7"></script>
   <script src="../utilities/utils-shared.js?v=9e3a42a4"></script>
   <script src="../utilities/utils-panel.js?v=7"></script>
   <script src="../utilities/embedding-bridge.js?v=7"></script>
   <script src="../utilities/utils-clusters.js?v=c1fe6c7d"></script>
-
+  <script src="../utilities/utils-bottom-nav.js"></script>
   <script>
     var _bridgeRows = null;
-
     function buildRowIndex() { return _bridgeRows || []; }
-
     function panelGoTo(match, colIdx) {
       window.location.href = '../tools/spreadsheet.html#goto='
         + match.tabIdx + ':' + match.rowIdx + ':' + (colIdx || 0);
     }
-
     if (typeof parseCitation === 'undefined') {
       window.parseCitation = function(text) {
         return { body: String(text || ''), citation: null };
       };
     }
-
     window.EmbeddingUtils = { isReady: function() { return !!_bridgeRows; } };
-
     var badgeEl   = document.getElementById('cl-connection-badge');
     var badgeText = document.getElementById('cl-badge-text');
     var noHost    = document.getElementById('cl-no-host');
-
     function setBadge(state, text) {
       badgeEl.className = 'ds-badge ds-badge--' + state;
       badgeText.textContent = text;
     }
-
     var paneEl      = document.getElementById('cl-pane');
     var clusterTool = initClustersTool(paneEl, null);
-
     EmbeddingBridge.guest(function(rows) {
       noHost.classList.remove('visible');
       setBadge('connected', rows.length + ' entries live');
@@ -110,7 +105,6 @@
         }));
       }, 100);
     });
-
     window.addEventListener('bridge-no-host', function() {
       setBadge('disconnected', 'No data — visit home page first');
       noHost.classList.add('visible');
