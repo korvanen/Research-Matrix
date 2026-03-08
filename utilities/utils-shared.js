@@ -2,23 +2,16 @@
 // utils-shared.js — shared data, theme, and UI utilities
 // Loaded by: index.html, tools/spreadsheet.html, tools/*.html
 // ════════════════════════════════════════════════════════════════
-console.log('[utils-shared.js v.11]');
+console.log('[utils-shared.js v.1]');
 
 // ════════════════════════════════════════════════════════════════
 // DARK / LIGHT MODE
-// Toggles html.dark / html.light on <html>.
-// design-system.css has matching html.dark :root and html.light :root
-// rules that override the @media (prefers-color-scheme) blocks,
-// so the whole page re-themes instantly with no JS token injection.
-// The toggle button needs id="theme-toggle" and a label span with
-// id="theme-toggle-label". Changes broadcast to all tabs via localStorage.
 // ════════════════════════════════════════════════════════════════
 
 ;(function () {
   var STORAGE_KEY = 'df-theme';
   var html        = document.documentElement;
 
-  // Inject a <style> we fully control (beats the @media query when needed)
   var styleEl    = document.createElement('style');
   styleEl.id     = 'df-theme-override';
   document.head.appendChild(styleEl);
@@ -26,22 +19,18 @@ console.log('[utils-shared.js v.11]');
   function applyTheme(dark) {
     html.classList.toggle('dark',  dark);
     html.classList.toggle('light', !dark);
-    // design-system.css has html.dark :root and html.light :root rules
-    // that override every @media (prefers-color-scheme) block — no JS injection needed.
     styleEl.textContent = '';
   }
 
-  // Apply immediately — this runs before the stylesheet is parsed
   var saved       = localStorage.getItem(STORAGE_KEY);
   var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
   var isDark      = saved !== null ? saved === 'dark' : prefersDark;
   applyTheme(isDark);
 
-  // Wire up the toggle button once DOM is ready
   function init() {
     var btn = document.getElementById('theme-toggle');
     var lbl = document.getElementById('theme-toggle-label');
-    if (!btn) return; // page has no toggle — fine, theme still applies
+    if (!btn) return;
 
     function syncLabel() {
       if (lbl) lbl.textContent = isDark ? 'Light mode' : 'Dark mode';
@@ -56,7 +45,6 @@ console.log('[utils-shared.js v.11]');
       window.dispatchEvent(new CustomEvent('df-theme-change', { detail: { dark: isDark } }));
     });
 
-    // Follow OS if user has no explicit saved preference
     window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function (e) {
       if (localStorage.getItem(STORAGE_KEY) === null) {
         isDark = e.matches;
@@ -66,7 +54,6 @@ console.log('[utils-shared.js v.11]');
     });
   }
 
-  // Live-sync all other open tabs when another tab toggles
   window.addEventListener('storage', function (e) {
     if (e.key !== STORAGE_KEY) return;
     isDark = e.newValue === 'dark';
@@ -76,9 +63,6 @@ console.log('[utils-shared.js v.11]');
     window.dispatchEvent(new CustomEvent('df-theme-change', { detail: { dark: isDark } }));
   });
 
-  // Wire up the button. setTimeout(0) guarantees the DOM is ready regardless
-  // of whether DOMContentLoaded has fired yet — works whether the script loads
-  // synchronously mid-body or is deferred.
   setTimeout(init, 0);
 })();
 
@@ -217,54 +201,38 @@ function modifyColor(hex, { lightness = 0, saturation = 0, hue = 0, alpha } = {}
 
 // ════════════════════════════════════════════════════════════════
 // THEME DEFINITIONS — single source of truth
-// To add a theme: add one entry here. Everything else is computed.
-// To edit a theme: change the hex here. No other files need editing.
-//
-// Fields:
-//   base      — the primary brand colour (mid tone)
-//   tabIndex  — which spreadsheet tab slot uses this theme (0-based)
-//               can be omitted if the theme isn't tied to a tab
 // ════════════════════════════════════════════════════════════════
 
 const THEME_DEFS = [
-  { name: 'Dark Purple',      base: '#3A1C36', tabIndex: 0 },
-  { name: 'Dark Berry',     base: '#6E1E3A', tabIndex: 1 },
-  { name: 'Carrot',         base: '#076A40', tabIndex: 2 },
-  { name: 'Lemon Curd', base: '#FADD8B', tabIndex: 3 },
-  { name: 'Baby Blue',       base: '#A4BDE0', tabIndex: 4 },
-  { name: 'Sailor Blue',       base: '#274FBB', tabIndex: 5 },
+  { name: 'Dark Purple',  base: '#3A1C36', tabIndex: 0 },
+  { name: 'Dark Berry',   base: '#6E1E3A', tabIndex: 1 },
+  { name: 'Carrot',       base: '#076A40', tabIndex: 2 },
+  { name: 'Lemon Curd',   base: '#FADD8B', tabIndex: 3 },
+  { name: 'Baby Blue',    base: '#A4BDE0', tabIndex: 4 },
+  { name: 'Sailor Blue',  base: '#274FBB', tabIndex: 5 },
   { name: 'Forest',       base: '#25533F', tabIndex: 6 },
-  { name: 'Limeade',       base: '#C90763', tabIndex: 7 },
-  { name: 'default',        base: '#a1a1a1'               },
+  { name: 'Limeade',      base: '#C90763', tabIndex: 7 },
+  { name: 'default',      base: '#a1a1a1'               },
 ];
-
-// ── Derived values ─────────────────────────────────────────────
-// Compute all tokens from each theme's base colour.
-// These functions mirror what makeTheme() used to do, but now drive
-// both the CSS variables (injected below) and the JS palette arrays.
 
 function _themeAccent(base)      { return modifyColor(base, { lightness:  0.05, saturation:  0.05 }); }
 function _themeMid(base)         { return modifyColor(base, { lightness:  0.08 }); }
 function _themeDark(base)        { return modifyColor(base, { lightness: -0.15, saturation: -0.05 }); }
 function _themeLight(base)       { return modifyColor(base, { lightness:  0.28, saturation: -0.15 }); }
-// Light bg: push to near-white by targeting high absolute lightness
 function _themeBgLight(base) {
   const hsl = rgbToHsl(hexToRgb(base));
   return rgbToHex(hslToRgb({ h: hsl.h, s: Math.max(0, hsl.s - 0.45), l: 0.96 }));
 }
-// Dark bg: push to near-black by targeting low absolute lightness
 function _themeBgDark(base) {
   const hsl = rgbToHsl(hexToRgb(base));
   return rgbToHex(hslToRgb({ h: hsl.h, s: Math.max(0, hsl.s - 0.20), l: 0.10 }));
 }
-// Dark accent: brighten significantly for readability on dark bg
 function _themeAccentDark(base) {
   const hsl = rgbToHsl(hexToRgb(base));
   const targetL = Math.min(0.72, Math.max(0.62, hsl.l + 0.28));
   return rgbToHex(hslToRgb({ h: hsl.h, s: Math.max(0, hsl.s - 0.05), l: targetL }));
 }
 
-// Build the CSS custom-property block for one theme
 function _themeTokens(name, base) {
   return [
     `--raw-${name}-dark:  ${_themeDark(base)}`,
@@ -279,14 +247,11 @@ function _themeTokensDark(name, base) {
   return `--raw-${name}-bg: ${_themeBgDark(base)}`;
 }
 
-// Inject all theme raw tokens + palette tokens into a <style> tag so
-// design-system.css doesn't need to know about individual themes at all.
 (function injectThemeTokens() {
   const lightVars = THEME_DEFS
     .map(t => _themeTokens(t.name, t.base))
     .join(';\n  ');
 
-  // palette-N tokens: ordered by tabIndex (tabs in index order), then default last
   const tabThemes = THEME_DEFS.filter(t => t.tabIndex !== undefined)
     .sort((a, b) => a.tabIndex - b.tabIndex);
   const paletteLight = tabThemes
@@ -315,9 +280,6 @@ html.light { ${THEME_DEFS.map(t => `--raw-${t.name}-bg: ${_themeBgLight(t.base)}
   el.textContent = css;
 })();
 
-// ── Palette arrays for JS card rendering ──────────────────────
-// getPalette() returns the right set for the current light/dark mode.
-
 const _tabThemesSorted = THEME_DEFS
   .filter(t => t.tabIndex !== undefined)
   .sort((a, b) => a.tabIndex - b.tabIndex);
@@ -340,10 +302,9 @@ function getPalette() {
     : _PALETTE_LIGHT;
 }
 
-window.PP_PALETTE = _PALETTE_LIGHT; // legacy static reference
+window.PP_PALETTE = _PALETTE_LIGHT;
 window.getPalette = getPalette;
 
-// ── Legacy THEMES / TAB_THEMES for any code that still reads them ─
 const TAB_THEMES = _tabThemesSorted.map(t => t.name);
 
 function makeTheme(base) {
@@ -522,25 +483,10 @@ window.TABS = window.TABS || [];
     window.dispatchEvent(new CustomEvent('sheet-load-error', { detail: { error: e } }));
   }
 })();
-// ══════════════════════════════════════════════════════════════════════════
-// PP-NAV-RAIL  — global collapsible tool side panel
-// Append this block to the end of utils-shared.js
-//
-// Usage in a tool init function:
-//
-//   const nav = PPNavRail.create(paneEl, {
-//     toolName: 'Concept Map',
-//     panelSections: [
-//       { label: 'Parameters', html: '<div>...sliders html...</div>' },
-//       { label: 'Layout',     html: '<div>...layout picker html...</div>' },
-//     ],
-//   });
-//
-//   // nav.mainEl   — append your canvas / world div here
-//   // nav.subtitleEl, nav.statusEl — live elements to update text on
-//   // All slider/button IDs inside panelSections html are queryable
-//   // from nav.panelEl via nav.panelEl.querySelector('#my-id')
-// ══════════════════════════════════════════════════════════════════════════
+
+// ════════════════════════════════════════════════════════════════
+// PP-NAV-RAIL — global collapsible tool side panel
+// ════════════════════════════════════════════════════════════════
 window.PPNavRail = (function () {
 
   var ICON_OPEN =
@@ -561,6 +507,7 @@ window.PPNavRail = (function () {
     var toolName      = opts.toolName      || 'Tool';
     var panelSections = opts.panelSections || [];
     var defaultOpen   = opts.defaultOpen !== false;
+    var railExtra     = opts.railExtra     || '';  // ← ADDED: extra HTML injected into the rail
 
     var sectionsHTML = '';
     panelSections.forEach(function(sec) {
@@ -578,6 +525,7 @@ window.PPNavRail = (function () {
         '<button class="pp-nav-rail-toggle" title="Toggle controls">' +
           (defaultOpen ? ICON_OPEN : ICON_CLOSED) +
         '</button>' +
+        railExtra +                              // ← ADDED: renders sheet-btn, export-btn, etc.
       '</div>' +
       '<div class="pp-side-panel' + (defaultOpen ? '' : ' pp-side-panel--collapsed') + '">' +
         '<div class="pp-side-panel-header">' +
@@ -642,4 +590,3 @@ window.injectToolNav = function(currentTool) {
     rail.appendChild(a);
   });
 };
-
