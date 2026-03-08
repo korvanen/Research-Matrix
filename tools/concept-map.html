@@ -165,7 +165,7 @@
       var rail = document.querySelector('.pp-nav-rail');
       if (!rail) return;
       var divider = document.createElement('div');
-      divider.style.cssText = 'width:60%;height:1px;background:var(--md-sys-color-outline-variant);margin:4px auto;flex-shrink:0;';
+      divider.style.cssText = 'width:60%;height:1px;background:var(--md-sys-color-outline-variant);margin:auto auto 4px;flex-shrink:0;';
       rail.appendChild(divider);
       [
         { href: 'spreadsheet.html',  title: 'Spreadsheet',  active: false, d: '<rect x="1.5" y="1.5" width="15" height="15" rx="2"/><line x1="1.5" y1="6.5" x2="16.5" y2="6.5"/><line x1="1.5" y1="11.5" x2="16.5" y2="11.5"/><line x1="7" y1="6.5" x2="7" y2="16.5"/><line x1="12" y1="6.5" x2="12" y2="16.5"/>' },
@@ -178,6 +178,7 @@
         a.href = t.href;
         a.title = t.title;
         a.innerHTML = '<svg viewBox="0 0 18 18" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">' + t.d + '</svg>';
+        a.addEventListener('click', function(e) { e.stopPropagation(); });
         rail.appendChild(a);
       });
     })();
