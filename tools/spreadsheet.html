@@ -266,6 +266,50 @@
   <script src="../utilities/embedding-bridge.js?v=1a2b3c4d"></script>
   <script src="../utilities/utils-spreadsheet.js?v=1a2b3c4d"></script>
   <script type="module" src="../utilities/utils-embedding.js?v=1a2b3c4d"></script>
-  <script>injectToolNav('spreadsheet.html');</script>
+  <script>
+    (function () {
+      var ICON_OPEN =
+        '<svg viewBox="0 0 18 14" width="16" height="14" fill="none" ' +
+        'stroke="currentColor" stroke-width="1.7" stroke-linecap="round">' +
+        '<line x1="1" y1="2"  x2="17" y2="2"/>' +
+        '<line x1="5" y1="7"  x2="17" y2="7"/>' +
+        '<line x1="1" y1="12" x2="17" y2="12"/>' +
+        '</svg>';
+      var ICON_CLOSED =
+        '<svg viewBox="0 0 10 14" width="10" height="14" fill="none" ' +
+        'stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">' +
+        '<polyline points="7,2 2,7 7,12"/>' +
+        '</svg>';
+
+      // Insert toggle button at the top of the rail
+      var rail = document.querySelector('.pp-nav-rail');
+      if (!rail) return;
+
+      var toggleBtn = document.createElement('button');
+      toggleBtn.className = 'pp-nav-rail-toggle';
+      toggleBtn.title = 'Toggle nav';
+      toggleBtn.innerHTML = ICON_OPEN;
+      rail.appendChild(toggleBtn);
+
+      // Inject tool nav icons (adds spacer + icons)
+      injectToolNav('spreadsheet.html');
+
+      // Wire collapse — hide tool icons, shrink rail width
+      var open = true;
+      toggleBtn.addEventListener('click', function () {
+        open = !open;
+        toggleBtn.innerHTML = open ? ICON_OPEN : ICON_CLOSED;
+        rail.querySelectorAll('.pp-nav-item').forEach(function (el) {
+          el.style.visibility = open ? '' : 'hidden';
+          el.style.pointerEvents = open ? '' : 'none';
+        });
+        // Also hide the spacer
+        rail.querySelectorAll('div[style*="flex"]').forEach(function (el) {
+          el.style.display = open ? '' : 'none';
+        });
+        rail.style.width = open ? '' : '44px';
+      });
+    })();
+  </script>
 </body>
 </html>
