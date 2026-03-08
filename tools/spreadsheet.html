@@ -7,213 +7,233 @@
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="../design-system.css?v=5f3df7d8">
   <style>
-    html, body { height: 100%; overflow: hidden; }
+    html, body { height: 100%; overflow: hidden; margin: 0; }
 
-    .app-grid {
-      display: grid;
-      grid-template-rows: var(--topbar-height) 1fr auto;
-      grid-template-columns: 1fr auto;
-      grid-template-areas:
-        "topbar  topbar"
-        "main    sidebar"
-        "bottom  sidebar";
-      height: 100vh;
-      height: 100dvh;
-      overflow: hidden;
-    }
-
-    #topbar {
-      grid-area: topbar;
-      display: flex;
-      flex-direction: row;
-      align-items: stretch;
-      height: var(--topbar-height);
-      background: var(--color-bg-surface);
-      border-bottom: 1px solid var(--color-border-subtle);
-      box-shadow: 0 1px 0 rgba(0,0,0,0.04);
-      overflow: hidden;
-      z-index: 20;
-    }
-    #topbar-global {
-      display: flex;
-      align-items: center;
-      padding: 0 12px;
-      flex-shrink: 0;
-      border-right: 1px solid var(--color-border-subtle);
-    }
-    #topbar-sheet {
-      display: flex;
-      align-items: center;
-      padding: 0 8px;
-      flex: 1;
-      min-width: 0;
-      overflow: hidden;
-    }
-
-    .main {
-      grid-area: main;
-      position: relative;
-      overflow: hidden;
+    .app-shell {
       display: flex;
       flex-direction: column;
-    }
-    .loading-overlay {
-      position: absolute;
-      inset: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: var(--color-bg-page);
-      font-size: var(--font-size-sm);
-      color: var(--color-text-muted);
-      z-index: 10;
+      height: 100vh; height: 100dvh;
+      overflow: hidden;
     }
 
-    .grid-area {
+    /* ── Topbar ── */
+    #topbar {
+      display: flex; align-items: stretch;
+      height: var(--topbar-height, 48px);
+      flex-shrink: 0;
+      background: var(--md-sys-color-surface);
+      border-bottom: 1px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 60%, transparent);
+      z-index: 20;
+    }
+    .topbar-back {
+      display: flex; align-items: center; gap: 6px;
+      padding: 0 14px;
+      font-size: var(--font-size-xs);
+      font-weight: var(--font-weight-bold);
+      letter-spacing: var(--letter-spacing-caps);
+      text-transform: uppercase;
+      color: var(--md-sys-color-on-surface-variant);
+      text-decoration: none;
+      border-right: 1px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 60%, transparent);
+      flex-shrink: 0;
+      transition: color var(--transition-fast), background var(--transition-fast);
+    }
+    .topbar-back:hover {
+      color: var(--md-sys-color-on-surface);
+      background: color-mix(in srgb, var(--md-sys-color-on-surface) 5%, transparent);
+    }
+    #topbar-title {
+      display: flex; align-items: center;
+      padding: 0 16px;
+      font-size: var(--font-size-xs);
+      font-weight: var(--font-weight-bold);
+      letter-spacing: var(--letter-spacing-caps);
+      text-transform: uppercase;
+      color: var(--md-sys-color-on-surface-variant);
+      border-right: 1px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 60%, transparent);
+      flex-shrink: 0;
+    }
+    #topbar-sheet-name {
+      display: flex; align-items: center;
+      padding: 0 16px;
+      font-size: var(--font-size-sm);
+      font-weight: var(--font-weight-medium);
+      color: var(--md-sys-color-on-surface);
+      flex: 1; min-width: 0;
+    }
+
+    /* ── Spreadsheet grid ── */
+    .sheet-area {
+      flex: 1; min-height: 0;
+      position: relative;
       display: grid;
       grid-template-rows: auto 1fr;
       grid-template-columns: auto 1fr;
-      grid-template-areas:
-        "corner  header"
-        "cats    data";
-      flex: 1;
-      min-height: 0;
+      grid-template-areas: "corner header" "cats data";
       overflow: hidden;
     }
-    .corner       { grid-area: corner; background: var(--color-bg-surface); border-right: 1px solid var(--color-border-subtle); border-bottom: 1px solid var(--color-border-subtle); z-index: 2; }
-    .header-scroll { grid-area: header; overflow: hidden; border-bottom: 1px solid var(--color-border-subtle); }
-    .cat-scroll   { grid-area: cats; overflow-y: auto; overflow-x: hidden; border-right: 1px solid var(--color-border-subtle); }
+    .corner {
+      grid-area: corner;
+      background: var(--md-sys-color-surface-container);
+      border-right: 1px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 50%, transparent);
+      border-bottom: 2px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 70%, transparent);
+      z-index: 3;
+    }
+    .header-scroll {
+      grid-area: header; overflow: hidden; z-index: 2;
+      border-bottom: 2px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 70%, transparent);
+    }
+    .cat-scroll {
+      grid-area: cats; overflow-y: auto; overflow-x: hidden; z-index: 1;
+      border-right: 1px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 50%, transparent);
+    }
     .cat-scroll::-webkit-scrollbar { display: none; }
-    .data-scroll  { grid-area: data; overflow: auto; }
+    .data-scroll { grid-area: data; overflow: auto; }
     .data-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
-    .data-scroll::-webkit-scrollbar-track { background: var(--color-bg-page); }
-    .data-scroll::-webkit-scrollbar-thumb { background: var(--color-border-default); border-radius: var(--radius-full); }
+    .data-scroll::-webkit-scrollbar-track { background: var(--md-sys-color-background); }
+    .data-scroll::-webkit-scrollbar-thumb { background: var(--md-sys-color-outline-variant); border-radius: var(--radius-full); }
 
-    .sheet { border-collapse: collapse; font-size: var(--font-size-sm); font-family: var(--font-family); }
+    /* ── Tables ── */
+    .sheet-table { border-collapse: collapse; font-size: var(--font-size-sm); font-family: var(--font-family); }
 
+    #header-row th {
+      background: var(--md-sys-color-surface-container);
+      padding: 10px 16px;
+      font-size: var(--font-size-xs);
+      font-weight: var(--font-weight-bold);
+      letter-spacing: var(--letter-spacing-caps);
+      text-transform: uppercase;
+      color: var(--md-sys-color-on-surface-variant);
+      text-align: left; white-space: nowrap;
+      border-right: 1px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 40%, transparent);
+    }
+    #header-row th:last-child { border-right: none; }
+
+    #cat-body td {
+      background: var(--md-sys-color-surface-container-low);
+      padding: 10px 12px;
+      font-size: var(--font-size-xs);
+      font-weight: var(--font-weight-bold);
+      letter-spacing: .03em; text-transform: uppercase;
+      color: var(--md-sys-color-on-surface-variant);
+      vertical-align: middle;
+      border-bottom: 1px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 30%, transparent);
+      border-right: 1px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 40%, transparent);
+      white-space: nowrap;
+    }
+    #cat-body td.group-end {
+      border-bottom: 2px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 65%, transparent);
+    }
+    #cat-body td.cat-rotated { text-align: center; overflow: hidden; position: relative; }
+    .cat-inner {
+      display: inline-block;
+      transform-origin: center center;
+      transform: rotate(-90deg) translateX(-50%);
+      white-space: nowrap; position: absolute; left: 50%;
+    }
+
+    #data-body td {
+      padding: 10px 16px;
+      vertical-align: top;
+      color: var(--md-sys-color-on-surface);
+      line-height: 1.55;
+      border-bottom: 1px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 25%, transparent);
+      border-right: 1px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 25%, transparent);
+    }
+    #data-body td:last-child { border-right: none; }
+    #data-body td.group-end {
+      border-bottom: 2px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 55%, transparent);
+    }
+
+    /* Hover + selection */
+    #data-body td.highlight-group, #cat-body td.highlight-group {
+      background: color-mix(in srgb, var(--md-sys-color-primary) 6%, transparent);
+    }
+    #data-body td.highlight-cell, #cat-body td.highlight-cell, #header-row th.highlight-cell {
+      background: color-mix(in srgb, var(--md-sys-color-primary) 12%, transparent);
+    }
+    #data-body td.selected-group, #cat-body td.selected-group {
+      background: color-mix(in srgb, var(--md-sys-color-primary) 10%, transparent);
+    }
+    #data-body td.selected-cell, #cat-body td.selected-cell, #header-row th.selected-cell {
+      background: color-mix(in srgb, var(--md-sys-color-primary) 18%, transparent);
+      outline: 2px solid var(--md-sys-color-primary);
+      outline-offset: -2px;
+    }
+
+    /* ── Tab bar ── */
     .bottombar {
-      grid-area: bottom;
-      height: 36px;
-      display: flex;
-      align-items: stretch;
-      background: var(--color-bg-surface);
-      border-top: 1px solid var(--color-border-subtle);
-      overflow: hidden;
+      flex-shrink: 0; height: 36px;
+      display: flex; align-items: stretch;
+      background: var(--md-sys-color-surface);
+      border-top: 1px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 60%, transparent);
       z-index: 10;
     }
     .tab-bar {
-      display: flex;
-      align-items: stretch;
-      flex: 1;
-      overflow-x: auto;
-      overflow-y: hidden;
-      padding: 0 4px;
-      gap: 2px;
+      display: flex; align-items: stretch;
+      flex: 1; overflow-x: auto; overflow-y: hidden;
+      padding: 0 8px; gap: 2px;
     }
     .tab-bar::-webkit-scrollbar { display: none; }
+    .tab {
+      display: flex; align-items: center;
+      padding: 0 16px;
+      font-size: var(--font-size-xs);
+      font-weight: var(--font-weight-medium);
+      color: var(--md-sys-color-on-surface-variant);
+      cursor: pointer; white-space: nowrap;
+      border-radius: var(--radius-xs) var(--radius-xs) 0 0;
+      transition: background var(--transition-fast), color var(--transition-fast);
+    }
+    .tab:hover { background: color-mix(in srgb, var(--md-sys-color-on-surface) 6%, transparent); color: var(--md-sys-color-on-surface); }
+    .tab.active {
+      color: var(--md-sys-color-primary);
+      font-weight: var(--font-weight-bold);
+      box-shadow: inset 0 -2px 0 var(--md-sys-color-primary);
+    }
 
-    .sidebar {
-      grid-area: sidebar;
-      display: flex;
-      flex-direction: row;
-      align-items: stretch;
-      overflow: hidden;
-      position: relative;
-      z-index: 15;
-    }
-    .drag-handle {
-      width: 20px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      background: var(--color-bg-surface);
-      border-left: 1px solid var(--color-border-subtle);
-      cursor: col-resize;
-      flex-shrink: 0;
-      gap: 4px;
-      user-select: none;
-    }
-    .handle-arrows { display: flex; flex-direction: column; gap: 4px; }
-    .handle-arrow {
+    /* ── Loading ── */
+    .loading-overlay {
+      position: absolute; inset: 0;
       display: flex; align-items: center; justify-content: center;
-      width: 16px; height: 16px;
-      background: none; border: none;
-      color: var(--color-text-muted); cursor: pointer;
-      border-radius: var(--radius-sm);
-      transition: color var(--transition-fast), background var(--transition-fast);
-      padding: 0;
-    }
-    .handle-arrow:hover { color: var(--raw-black); background: var(--color-bg-hover); }
-    .handle-arrow svg { width: 8px; height: 12px; }
-    .sidebar-box { flex: 1; min-width: 0; overflow: hidden; display: flex; flex-direction: column; }
-
-    .drag-handle-fixed {
-      position: fixed;
-      top: var(--topbar-height);
-      right: 0;
-      bottom: 36px;
-      width: 20px;
+      background: var(--md-sys-color-background);
+      font-size: var(--font-size-sm);
+      color: var(--md-sys-color-on-surface-variant);
       z-index: 30;
-      border-left: 1px solid var(--color-border-subtle);
-      background: var(--color-bg-surface);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
     }
-
-    /* Back link in topbar */
-    .topbar-back {
-      display: flex;
-      align-items: center;
-      gap: 5px;
-      padding: 0 12px;
-      font-size: 11px;
-      font-weight: 600;
-      color: var(--color-text-muted);
-      text-decoration: none;
-      border-right: 1px solid var(--color-border-subtle);
-      transition: color var(--transition-fast);
-      flex-shrink: 0;
-    }
-    .topbar-back:hover { color: var(--raw-black); }
   </style>
 </head>
 <body>
-
-  <div class="app-grid">
+  <div class="app-shell">
 
     <div id="topbar">
       <a class="topbar-back" href="../index.html">
-        <svg viewBox="0 0 14 14" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <svg viewBox="0 0 14 14" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M9 2L4 7l5 5"/>
         </svg>
         Back
       </a>
-      <div id="topbar-global"></div>
-      <div id="topbar-sheet"></div>
+      <div id="topbar-title">Dimensional Framework</div>
+      <div id="topbar-sheet-name"></div>
     </div>
 
-    <div class="main">
+    <div class="sheet-area">
       <div class="loading-overlay" id="loading-overlay">Loading…</div>
-      <div class="grid-area" id="grid-area">
-        <div class="corner" id="corner"></div>
-        <div class="header-scroll" id="header-scroll">
-          <table class="sheet header-table" id="header-table">
-            <thead><tr id="header-row"></tr></thead>
-          </table>
-        </div>
-        <div class="cat-scroll" id="cat-scroll">
-          <table class="sheet cat-table" id="cat-table">
-            <tbody id="cat-body"></tbody>
-          </table>
-        </div>
-        <div class="data-scroll" id="data-scroll">
-          <table class="sheet data-table" id="data-table">
-            <tbody id="data-body"></tbody>
-          </table>
-        </div>
+      <div class="corner"        id="corner"></div>
+      <div class="header-scroll" id="header-scroll">
+        <table class="sheet-table" id="header-table">
+          <thead><tr id="header-row"></tr></thead>
+        </table>
+      </div>
+      <div class="cat-scroll" id="cat-scroll">
+        <table class="sheet-table" id="cat-table">
+          <tbody id="cat-body"></tbody>
+        </table>
+      </div>
+      <div class="data-scroll" id="data-scroll">
+        <table class="sheet-table" id="data-table">
+          <tbody id="data-body"></tbody>
+        </table>
       </div>
     </div>
 
@@ -221,40 +241,13 @@
       <div class="tab-bar" id="tab-bar"></div>
     </div>
 
-    <div class="sidebar" id="sidebar">
-      <div class="drag-handle" id="drag-handle">
-        <div class="handle-arrows">
-          <button class="handle-arrow" id="handle-arrow-open" aria-label="Open sidebar">
-            <svg viewBox="0 0 10 16" fill="none"><polyline points="7,2 2,8 7,14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          </button>
-          <button class="handle-arrow" id="handle-arrow-close" aria-label="Close sidebar">
-            <svg viewBox="0 0 10 16" fill="none"><polyline points="3,2 8,8 3,14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          </button>
-        </div>
-      </div>
-      <div class="sidebar-box" id="sidebar-box"></div>
-    </div>
-
-    <div class="drag-handle drag-handle-fixed" id="drag-handle-fixed">
-      <div class="handle-arrows">
-        <button class="handle-arrow" id="handle-arrow-open-fixed" aria-label="Open sidebar">
-          <svg viewBox="0 0 10 16" fill="none"><polyline points="7,2 2,8 7,14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        </button>
-        <button class="handle-arrow" id="handle-arrow-close-fixed" aria-label="Close sidebar">
-          <svg viewBox="0 0 10 16" fill="none"><polyline points="3,2 8,8 3,14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        </button>
-      </div>
-    </div>
-
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="../utilities/utils-shared.js?v=9e3a42a4"></script>
-  <script src="../utilities/utils-keywords.js"></script>
-  <script src="../utilities/utils-panel.js"></script>
-  <script src="../utilities/embedding-bridge.js"></script>
-  <script src="../utilities/utils-spreadsheet.js?v=c51f6ab8"></script>
-  <script type="module" src="../utilities/utils-embedding.js"></script>
-
+  <script src="../utilities/utils-keywords.js?v=1a2b3c4d"></script>
+  <script src="../utilities/embedding-bridge.js?v=1a2b3c4d"></script>
+  <script src="../utilities/utils-spreadsheet.js?v=1a2b3c4d"></script>
+  <script type="module" src="../utilities/utils-embedding.js?v=1a2b3c4d"></script>
 </body>
 </html>
