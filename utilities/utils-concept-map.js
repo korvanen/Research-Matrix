@@ -9,7 +9,10 @@
 //   • depthColor: added missing paletteIdx + theme variable (was ReferenceError)
 //   • depthColor: rewrote getLuminance without array destructuring (was SyntaxError)
 //   • Removed dead CMAP_LEVEL_THEMES constant
-console.log('[utils-concept-map.js v.hhhhhffdhd]');
+console.log('[utils-concept-map.js v.3]');
+
+  const CARD_W = 225;
+  const MM_PAD = 16;
 
 const CMAP_PARENT_CHILD_THRESHOLD = 0.50;
 const CMAP_MIN_SPLIT_LENGTH = 60;
@@ -251,16 +254,21 @@ function initConceptMapTool(paneEl, sidebarEl) {
         '<div id="pp-cmap-layout-wrap">' +
           '<button id="pp-cmap-layout-btn" title="Change layout">' +
             '<svg viewBox="0 0 12 12" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="6" cy="6" r="2"/><circle cx="6" cy="6" r="5" stroke-dasharray="2 2"/></svg>' +
-            '<span id="pp-cmap-layout-label">Radial</span>' +
+            '<span id="pp-cmap-layout-label">Organic</span>' +
           '</button>' +
           '<div id="pp-cmap-layout-menu">' +
-            '<div class="pp-cmap-layout-group">Layout</div>' +
-            '<button class="pp-cmap-layout-opt active" data-layout="radial">Radial</button>' +
-            '<button class="pp-cmap-layout-opt" data-layout="vtree">Vertical Tree</button>' +
-            '<button class="pp-cmap-layout-opt" data-layout="htree">Horizontal Tree</button>' +
+            '<div class="pp-cmap-layout-group">Flow</div>' +
+            '<button class="pp-cmap-layout-opt" data-layout="hflow">Horizontal Flow</button>' +
             '<button class="pp-cmap-layout-opt" data-layout="vflow">Vertical Flow</button>' +
             '<div class="pp-cmap-layout-sep"></div>' +
-            '<button class="pp-cmap-layout-opt" data-layout="organic">Organic</button>' +
+            '<div class="pp-cmap-layout-group">Tree</div>' +
+            '<button class="pp-cmap-layout-opt" data-layout="htree">Horizontal Tree</button>' +
+            '<button class="pp-cmap-layout-opt" data-layout="vtree">Vertical Tree</button>' +
+            '<button class="pp-cmap-layout-opt" data-layout="radial">Radial Tree</button>' +
+            '<div class="pp-cmap-layout-sep"></div>' +
+            '<div class="pp-cmap-layout-group">Other</div>' +
+            '<button class="pp-cmap-layout-opt" data-layout="circle">Circle</button>' +
+            '<button class="pp-cmap-layout-opt active" data-layout="organic">Organic</button>' +
           '</div>' +
         '</div>' +
         '<button id="pp-cmap-rebuild">Rebuild</button>' +
@@ -301,8 +309,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
   const maxParSlider= paneEl.querySelector('#pp-cmap-maxpar');
   const maxParValEl = paneEl.querySelector('#pp-cmap-maxpar-val');
 
-  const CARD_W = 225;
-  const MM_PAD = 16;
+
 
   let _depth      = 5;
   let _threshold  = CMAP_PARENT_CHILD_THRESHOLD;
@@ -345,7 +352,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
 
   rebuildBtn.addEventListener('click', function() { clearTimeout(_rebuildTimer); _rendered = false; tryRender(); });
 
-  var LAYOUT_LABELS = { radial:'Radial', vtree:'Vertical Tree', htree:'Horizontal Tree', vflow:'Vertical Flow', organic:'Organic' };
+  var LAYOUT_LABELS = { organic:'Organic', hflow:'Horizontal Flow', vflow:'Vertical Flow', htree:'Horizontal Tree', vtree:'Vertical Tree', radial:'Radial Tree', circle:'Circle' };
   layoutBtn.addEventListener('click', function(e) { e.stopPropagation(); layoutMenu.classList.toggle('open'); layoutBtn.classList.toggle('open', layoutMenu.classList.contains('open')); });
   document.addEventListener('click', function() { layoutMenu.classList.remove('open'); layoutBtn.classList.remove('open'); });
   layoutMenu.addEventListener('click', function(e) { e.stopPropagation(); });
@@ -1000,43 +1007,154 @@ function initConceptMapTool(paneEl, sidebarEl) {
         _everRendered = true;
       }
 
-      function layoutRadial() {
+      // ── CIRCLE — nodes evenly spaced on a circle, BFS-ordered so connected nodes sit adjacent ──
+      function layoutCircle() {
         var pos=new Map(), cx=W/2, cy=H/2;
-        byLevel.forEach(function(ids,lv){ var R=maxLevel===1?0:(0.12+0.20*(lv-1))*Math.min(W,H); ids.forEach(function(id,idx){ var h=cH(id); if(lv===1&&ids.length===1){pos.set(id,{x:cx-CARD_W/2,y:cy-h/2});return;} var a=(2*Math.PI*idx/ids.length)-Math.PI/2; pos.set(id,{x:cx+R*Math.cos(a)-CARD_W/2,y:cy+R*Math.sin(a)-h/2}); }); });
+        var order=[], visited=new Set();
+        var queue=roots.slice();
+        while (queue.length) { var id=queue.shift(); if (visited.has(id)) continue; visited.add(id); order.push(id); (childrenOfPrimary.get(id)||[]).forEach(function(c){ queue.push(c); }); }
+        nodeIds.forEach(function(id){ if (!visited.has(id)) order.push(id); });
+        var n=order.length, R=Math.min(W,H)*0.38;
+        order.forEach(function(id,i){ var a=(2*Math.PI*i/n)-Math.PI/2, h=cH(id); pos.set(id,{x:cx+R*Math.cos(a)-CARD_W/2,y:cy+R*Math.sin(a)-h/2}); });
         applyPositions(pos);
       }
+
+      // ── RADIAL TREE — root at center, children on concentric rings by depth ──
+      function layoutRadial() {
+        var pos=new Map(), cx=W/2, cy=H/2;
+        // Single root at center; if multiple roots treat them as level-1 ring
+        if (roots.length===1 && byLevel.size > 1) {
+          var rootId=roots[0], h=cH(rootId);
+          pos.set(rootId,{x:cx-CARD_W/2, y:cy-h/2});
+          byLevel.forEach(function(ids,lv){
+            if (lv===1) return; // root already placed
+            var R=(0.18+(lv-2)*0.20)*Math.min(W,H);
+            ids.forEach(function(id,idx){ var h2=cH(id), a=(2*Math.PI*idx/ids.length)-Math.PI/2; pos.set(id,{x:cx+R*Math.cos(a)-CARD_W/2,y:cy+R*Math.sin(a)-h2/2}); });
+          });
+        } else {
+          // Fallback: concentric rings by level
+          byLevel.forEach(function(ids,lv){
+            var R=maxLevel===1?0:(0.12+0.20*(lv-1))*Math.min(W,H);
+            ids.forEach(function(id,idx){ var h=cH(id); if(lv===1&&ids.length===1){pos.set(id,{x:cx-CARD_W/2,y:cy-h/2});return;} var a=(2*Math.PI*idx/ids.length)-Math.PI/2; pos.set(id,{x:cx+R*Math.cos(a)-CARD_W/2,y:cy+R*Math.sin(a)-h/2}); });
+          });
+        }
+        applyPositions(pos);
+      }
+
+      // ── TREE — recursive subtree placement, roots at top (vtree) or left (htree) ──
       function subtreeW(id){ var kids=childrenOfPrimary.get(id)||[]; if(!kids.length) return CARD_W; return kids.reduce(function(s,k){ return s+subtreeW(k); },0)+GAP_X*(kids.length-1); }
+      function subtreeH(id){ var kids=childrenOfPrimary.get(id)||[]; if(!kids.length) return cH(id); return kids.reduce(function(s,k){ return Math.max(s,subtreeH(k)); },0)+cH(id)+GAP_Y*2; }
       function layoutTree(vertical) {
         var pos=new Map();
-        function place(id,left,depth){ var kids=childrenOfPrimary.get(id)||[], myW=subtreeW(id), cx=left+myW/2, h=cH(id), rowY=depth*(90+GAP_Y); if(vertical) pos.set(id,{x:cx-CARD_W/2,y:rowY}); else pos.set(id,{x:rowY,y:cx-h/2}); var childLeft=left; kids.forEach(function(kid){ place(kid,childLeft,depth+1); childLeft+=subtreeW(kid)+GAP_X; }); }
-        var totalW=roots.reduce(function(s,r){ return s+subtreeW(r); },0)+GAP_X*(roots.length-1); var curX=W/2-totalW/2;
+        function place(id,left,depth){
+          var kids=childrenOfPrimary.get(id)||[], myW=subtreeW(id), mid=left+myW/2, h=cH(id);
+          var rowY=depth*(120+GAP_Y);
+          if (vertical) pos.set(id,{x:mid-CARD_W/2,y:rowY});
+          else pos.set(id,{x:rowY,y:mid-h/2});
+          var childLeft=left;
+          kids.forEach(function(kid){ place(kid,childLeft,depth+1); childLeft+=subtreeW(kid)+GAP_X; });
+        }
+        var totalW=roots.reduce(function(s,r){ return s+subtreeW(r); },0)+GAP_X*(roots.length-1);
+        var curX=vertical ? W/2-totalW/2 : GAP_Y;
         roots.forEach(function(r){ place(r,curX,0); curX+=subtreeW(r)+GAP_X; });
         applyPositions(pos);
       }
+
+      // ── FLOW — strict lanes by hierarchy level, nodes spread evenly in each lane ──
       function layoutFlow(vertical) {
         var pos=new Map();
-        byLevel.forEach(function(ids,lv){ var layerH=Math.max.apply(null,ids.map(cH).concat([80])), totalW=ids.length*(CARD_W+GAP_X)-GAP_X, startX=W/2-totalW/2, rowY=(lv-1)*(layerH+GAP_Y*2); ids.forEach(function(id,idx){ var h=cH(id); if(vertical) pos.set(id,{x:startX+idx*(CARD_W+GAP_X),y:rowY+(layerH-h)/2}); else pos.set(id,{x:rowY,y:startX+idx*(CARD_W+GAP_X)}); }); });
+        var levelList=[]; byLevel.forEach(function(ids,lv){ levelList.push({lv:lv,ids:ids}); });
+        levelList.sort(function(a,b){ return a.lv-b.lv; });
+        var layerOffset=0;
+        levelList.forEach(function(layer){
+          var ids=layer.ids;
+          var layerMaxH=Math.max.apply(null,ids.map(cH).concat([80]));
+          var totalSpan=ids.length*(CARD_W+GAP_X)-GAP_X;
+          ids.forEach(function(id,idx){
+            var h=cH(id);
+            var span=vertical ? W : H;
+            var start=span/2-totalSpan/2;
+            if (vertical) pos.set(id,{x:start+idx*(CARD_W+GAP_X), y:layerOffset+(layerMaxH-h)/2});
+            else           pos.set(id,{x:layerOffset+(layerMaxH-h)/2, y:start+idx*(CARD_W+GAP_X)});
+          });
+          layerOffset+=layerMaxH+GAP_Y*3;
+        });
         applyPositions(pos);
       }
+
+      // ── ORGANIC — force-directed, clusters naturally emerge ──
+      // Uses Fruchterman-Reingold with semantic similarity as edge weights:
+      // connected nodes attract, all nodes repel, clusters form naturally.
       function layoutOrganic() {
         var px={}, py={};
-        nodeIds.forEach(function(id,i){ var a=(2*Math.PI*i/nodeIds.length)-Math.PI/2, R=Math.min(W,H)*.35; px[id]=W/2+R*Math.cos(a); py[id]=H/2+R*Math.sin(a); });
-        var AREA=W*H, k=Math.sqrt(AREA/Math.max(nodeIds.length,1))*.9; var temp=Math.min(W,H)*.25;
-        for (var it=0;it<80;it++) {
+        // Seed positions: spread on circle with slight jitter so force sim has room to work
+        nodeIds.forEach(function(id,i){
+          var a=(2*Math.PI*i/nodeIds.length)-Math.PI/2;
+          var R=Math.min(W,H)*.30;
+          px[id]=W/2+R*Math.cos(a)+(Math.random()-.5)*80;
+          py[id]=H/2+R*Math.sin(a)+(Math.random()-.5)*80;
+        });
+
+        var AREA=W*H, k=Math.sqrt(AREA/Math.max(nodeIds.length,1))*1.1;
+        var temp=Math.min(W,H)*.3;
+
+        for (var it=0;it<200;it++) {
           var dx={}, dy={}; nodeIds.forEach(function(id){ dx[id]=0; dy[id]=0; });
-          for (var ii=0;ii<nodeIds.length;ii++) for (var jj=ii+1;jj<nodeIds.length;jj++) { var u=nodeIds[ii],v=nodeIds[jj]; var ddx=px[u]-px[v],ddy=py[u]-py[v]; var d=Math.sqrt(ddx*ddx+ddy*ddy)||.01,f=k*k/d; ddx/=d;ddy/=d; dx[u]+=ddx*f;dy[u]+=ddy*f;dx[v]-=ddx*f;dy[v]-=ddy*f; }
-          _connEdges.forEach(function(e){ var u=e.fromId,v=e.toId; if(!px.hasOwnProperty(u)||!px.hasOwnProperty(v)) return; var ddx=px[v]-px[u],ddy=py[v]-py[u]; var d=Math.sqrt(ddx*ddx+ddy*ddy)||.01,f=d*d/k; ddx/=d;ddy/=d; dx[u]+=ddx*f;dy[u]+=ddy*f;dx[v]-=ddx*f;dy[v]-=ddy*f; });
-          nodeIds.forEach(function(id){ var d=Math.sqrt(dx[id]*dx[id]+dy[id]*dy[id])||.01,disp=Math.min(d,temp); px[id]+=dx[id]/d*disp;py[id]+=dy[id]/d*disp; }); temp*=.93;
+
+          // Repulsion between all pairs
+          for (var ii=0;ii<nodeIds.length;ii++) {
+            for (var jj=ii+1;jj<nodeIds.length;jj++) {
+              var u=nodeIds[ii],v=nodeIds[jj];
+              var ddx=px[u]-px[v], ddy=py[u]-py[v];
+              var d=Math.sqrt(ddx*ddx+ddy*ddy)||.01;
+              var f=k*k/d;
+              dx[u]+=ddx/d*f; dy[u]+=ddy/d*f;
+              dx[v]-=ddx/d*f; dy[v]-=ddy/d*f;
+            }
+          }
+
+          // Attraction along edges (weighted by depth — deeper edges pull harder)
+          _connEdges.forEach(function(e){
+            var u=e.fromId,v=e.toId;
+            if (!px.hasOwnProperty(u)||!px.hasOwnProperty(v)) return;
+            var ddx=px[v]-px[u], ddy=py[v]-py[u];
+            var d=Math.sqrt(ddx*ddx+ddy*ddy)||.01;
+            var w=e.depth===0?1.4:1.0;
+            var f=d*d/k*w;
+            dx[u]+=ddx/d*f; dy[u]+=ddy/d*f;
+            dx[v]-=ddx/d*f; dy[v]-=ddy/d*f;
+          });
+
+          // Gravity toward center so graph doesn't drift off canvas
+          var grav=0.04;
+          nodeIds.forEach(function(id){
+            dx[id]+=(W/2-px[id])*grav;
+            dy[id]+=(H/2-py[id])*grav;
+          });
+
+          // Apply with temperature cooling
+          nodeIds.forEach(function(id){
+            var d=Math.sqrt(dx[id]*dx[id]+dy[id]*dy[id])||.01;
+            var disp=Math.min(d,temp);
+            px[id]+=dx[id]/d*disp;
+            py[id]+=dy[id]/d*disp;
+          });
+          temp*=0.95;
         }
-        var pos=new Map(); nodeIds.forEach(function(id){ var h=cH(id); pos.set(id,{x:px[id]-CARD_W/2,y:py[id]-h/2}); }); applyPositions(pos);
+
+        var pos=new Map();
+        nodeIds.forEach(function(id){ var h=cH(id); pos.set(id,{x:px[id]-CARD_W/2,y:py[id]-h/2}); });
+        applyPositions(pos);
       }
 
       switch (_layout) {
-        case 'vtree': layoutTree(true); break;
-        case 'htree': layoutTree(false); break;
-        case 'vflow': layoutFlow(true); break;
-        case 'organic': layoutOrganic(); break;
-        default: layoutRadial(); break;
+        case 'hflow':  layoutFlow(false); break;
+        case 'vflow':  layoutFlow(true);  break;
+        case 'htree':  layoutTree(false); break;
+        case 'vtree':  layoutTree(true);  break;
+        case 'radial': layoutRadial();    break;
+        case 'circle': layoutCircle();    break;
+        default:       layoutOrganic();   break;
       }
       // fitAll intentionally not called here — user controls viewport
     });
