@@ -51,7 +51,7 @@
   </div>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="../utilities/utils-keywords.js?v=7"></script>
-  <script src="../utilities/utils-shared.js?v=ad61c2d7"></script>
+  <script src="../utilities/utils-shared.js?v=9e3a42a4"></script>
   <script src="../utilities/utils-panel.js?v=7"></script>
   <script src="../utilities/embedding-bridge.js?v=7"></script>
   <script src="../utilities/utils-clusters.js?v=c1fe6c7d"></script>
@@ -79,9 +79,7 @@
     var paneEl      = document.getElementById('cl-pane');
     var clusterTool = initClustersTool(paneEl, null);
 
-    // ── Tool switcher in left rail defined in utils-shared.js ──────────────────────────────
-injectToolNav('concept-map.html');  
-    
+    injectToolNav('clusters.html');
     EmbeddingBridge.guest(function(rows) {
       noHost.classList.remove('visible');
       setBadge('connected', rows.length + ' entries live');
