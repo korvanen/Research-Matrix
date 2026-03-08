@@ -36,18 +36,10 @@
       position: relative;
     }
 
-    /* ── MD3 token overrides for concept map nodes/cards ────────────────────
-       utils-concept-map.js may inject hardcoded colours. These rules sit
-       after the utility styles and re-apply design-system tokens, so they
-       win regardless of what the utility sets.  Use !important sparingly —
-       only on properties that are set inline or in injected sheets.        */
-
-    /* Canvas background */
     .cm-canvas, #cm-canvas, [id*="canvas"] {
       background: var(--md-sys-color-background) !important;
     }
 
-    /* Node cards — filled card style */
     .cm-node, .cmap-node, [class*="cm-node"], [class*="cmap-node"] {
       background: var(--md-sys-color-surface-container-low) !important;
       border: 1px solid var(--md-sys-color-outline-variant) !important;
@@ -61,25 +53,21 @@
       background: var(--md-sys-color-surface-container) !important;
     }
 
-    /* Node label text */
     .cm-node-label, .cmap-node-label,
     [class*="cm-node"] span, [class*="cmap-node"] span,
     [class*="cm-node"] div, [class*="cmap-node"] div {
       color: var(--md-sys-color-on-surface) !important;
     }
 
-    /* Category / type label inside card */
     .cm-node-cat, .cmap-node-cat,
     [class*="cm-node-cat"], [class*="cmap-node-cat"] {
       color: var(--md-sys-color-on-surface-variant) !important;
     }
 
-    /* Edge / connector lines */
     .cm-edge, .cmap-edge,
     [class*="cm-edge"] path,
     [class*="cmap-edge"] path,
 
-    /* Selected / highlighted node */
     .cm-node.selected, .cmap-node.selected,
     [class*="cm-node"].selected {
       background: var(--md-sys-color-primary-container) !important;
@@ -88,7 +76,6 @@
       box-shadow: var(--md-elev-2) !important;
     }
 
-    /* Tooltip */
     .cm-tooltip, .cmap-tooltip,
     [class*="cm-tooltip"], [class*="cmap-tooltip"] {
       background: var(--md-sys-color-inverse-surface) !important;
@@ -97,7 +84,6 @@
       box-shadow: var(--md-elev-2) !important;
     }
 
-    /* Controls / panel */
     .cm-controls, .cmap-controls,
     .cm-panel, .cmap-panel,
     [class*="cm-control"], [class*="cmap-control"],
@@ -120,6 +106,21 @@
       Back
     </a>
     <div class="ds-topbar-title">Concept Map</div>
+
+    <a class="pp-nav-item" href="spreadsheet.html" title="Spreadsheet">
+      <svg viewBox="0 0 18 18" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="1.5" y="1.5" width="15" height="15" rx="2"/><line x1="1.5" y1="6.5" x2="16.5" y2="6.5"/><line x1="1.5" y1="11.5" x2="16.5" y2="11.5"/><line x1="7" y1="6.5" x2="7" y2="16.5"/><line x1="12" y1="6.5" x2="12" y2="16.5"/></svg>
+    </a>
+    <a class="pp-nav-item" href="find-matches.html" title="Find Matches">
+      <svg viewBox="0 0 18 18" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="5.5"/><line x1="12.5" y1="12.5" x2="16.5" y2="16.5"/></svg>
+    </a>
+    <a class="pp-nav-item active" href="concept-map.html" title="Concept Map">
+      <svg viewBox="0 0 18 18" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="4" r="2"/><circle cx="3.5" cy="14" r="2"/><circle cx="9" cy="14" r="2"/><circle cx="14.5" cy="14" r="2"/><line x1="9" y1="6" x2="3.5" y2="12"/><line x1="9" y1="6" x2="9" y2="12"/><line x1="9" y1="6" x2="14.5" y2="12"/></svg>
+    </a>
+    <a class="pp-nav-item" href="clusters.html" title="Clusters">
+      <svg viewBox="0 0 18 18" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="5" r="3"/><circle cx="13" cy="5" r="3"/><circle cx="5" cy="13" r="3"/><circle cx="13" cy="13" r="3"/></svg>
+    </a>
+    <div class="pp-nav-divider" style="width:1px;height:20px;margin:0 4px;background:var(--md-sys-color-outline-variant);"></div>
+
     <div class="ds-badge ds-badge--waiting" id="cm-connection-badge">
       <div class="ds-badge-dot"></div>
       <span id="cm-badge-text">Connecting…</span>
@@ -135,43 +136,32 @@
     </div>
   </div>
 
-  <!--
-    Load scripts SYNCHRONOUSLY (no defer / async).
-    With defer, execution order vs DOMContentLoaded is unreliable — the
-    inline script below would run before initConceptMapTool / createSidePanel
-    are defined.  Sync loading guarantees everything is available immediately.
-  -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="../utilities/utils-shared.js?v=9e3a42a4"></script>
   <script src="../utilities/utils-panel.js?v=7"></script>
   <script src="../utilities/embedding-bridge.js?v=7"></script>
   <script src="../utilities/utils-concept-map.js?v=34cf09cc"></script>
+  <script src="../utilities/utils-bottom-nav.js"></script>
 
   <script>
-    // ── buildRowIndex MUST be on window ──────────────────────────────────────
-    // utils-concept-map.js calls:  typeof buildRowIndex === 'function'
-    // If it is scoped inside DOMContentLoaded it is invisible to the utility.
     window._cmBridgeRows = null;
 
     window.buildRowIndex = function() {
       return window._cmBridgeRows || [];
     };
 
-    // parseCitation fallback (utils-shared.js normally provides this)
     if (typeof parseCitation === 'undefined') {
       window.parseCitation = function(text) {
         return { body: String(text || ''), citation: null };
       };
     }
 
-    // ── EmbeddingUtils stub — replaced once bridge fires ─────────────────────
     window.EmbeddingUtils = {
       isReady:            function() { return false; },
       getCachedEmbedding: function()  { return Promise.resolve(null); },
       getVectorSync:      function()  { return null; }
     };
 
-    // ── DOM refs ─────────────────────────────────────────────────────────────
     var badgeEl   = document.getElementById('cm-connection-badge');
     var badgeText = document.getElementById('cm-badge-text');
     var noHost    = document.getElementById('cm-no-host');
@@ -183,18 +173,11 @@
       badgeText.textContent = text;
     }
 
-    // ── Init concept map — paneEl is in the DOM at this point ────────────────
     var cmTool = initConceptMapTool(paneEl, null);
 
-    // ── Side panel ───────────────────────────────────────────────────────────
-    // Placed on the right so it doesn't obscure the map controls on the left.
-    // The panel starts closed (defaultFraction: 0 would hide it immediately;
-    // we use 0.35 so the user can drag it open, and snap-close at 10%).
-    // On every resize/open/close we call cmTool.resize() so fitAll() uses the
-    // correct canvas dimensions.
     var cmPanel = createSidePanel(layout, {
       side:              'right',
-      defaultFraction:   0,          // start closed — user drags to open
+      defaultFraction:   0,
       minFraction:       0,
       maxFraction:       0.65,
       snapCloseFraction: 0.10,
@@ -203,15 +186,12 @@
       onClose:  function() { if (cmTool && cmTool.resize) cmTool.resize(); },
     });
 
-    // ── EmbeddingBridge guest ─────────────────────────────────────────────────
     EmbeddingBridge.guest(function(rows) {
       noHost.classList.remove('visible');
       setBadge('connected', rows.length + ' entries live');
 
-      // Store rows so window.buildRowIndex() returns them
       window._cmBridgeRows = rows;
 
-      // Build text→vector lookup from pre-computed bridge vectors
       var textToVec = new Map();
       rows.forEach(function(r) {
         if (!r.vec) return;
@@ -229,7 +209,6 @@
         var t   = text ? text.trim() : '';
         var vec = textToVec.get(t);
         if (vec) return Promise.resolve(vec);
-        // prefix-match fallback for split segments
         var prefix = t.slice(0, 40);
         var found  = null;
         textToVec.forEach(function(v, k) {
@@ -238,7 +217,6 @@
         return Promise.resolve(found || null);
       };
 
-      // Reset stale state then render
       cmTool.reset();
       cmTool.start();
     });
@@ -248,27 +226,14 @@
       noHost.classList.add('visible');
     });
 
-    // ── Touch drag support ────────────────────────────────────────────────────
-    // utils-concept-map.js only wires mousedown/mousemove/mouseup on draggable
-    // nodes.  This block adds equivalent touchstart/touchmove/touchend so cards
-    // are draggable on phones and tablets.
-    //
-    // Strategy: intercept touchstart on any draggable card element, then mirror
-    // the touch as synthetic MouseEvents so the existing drag logic fires.
-    // We also handle single-finger canvas pan by converting it to right-click
-    // drag (which the canvas pan handler listens for) OR by directly updating
-    // the pan offset if the tool exposes it.
     (function patchTouchDrag() {
-      // Wait for the tool to render its DOM before patching
       function patch() {
         var canvas = paneEl.querySelector('[class*="canvas"], [id*="canvas"]');
         if (!canvas) { setTimeout(patch, 300); return; }
 
-        // 1. Single-finger canvas pan (one touch on canvas background)
         var panStart = null;
         canvas.addEventListener('touchstart', function(e) {
           if (e.touches.length !== 1) return;
-          // Only pan if the touch is NOT on a draggable node
           var target = e.touches[0].target;
           if (target.closest && target.closest('[class*="cm-node"],[class*="cmap-node"],[class*="pp-cm-node"]')) return;
           panStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
@@ -280,7 +245,6 @@
           var dx = e.touches[0].clientX - panStart.x;
           var dy = e.touches[0].clientY - panStart.y;
           panStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-          // Synthesise a right-button mousemove so the canvas pan handler picks it up
           var world = canvas.querySelector('[class*="world"],[id*="world"]');
           if (world) {
             var cur = new DOMMatrix(window.getComputedStyle(world).transform);
@@ -290,7 +254,6 @@
 
         canvas.addEventListener('touchend', function() { panStart = null; }, { passive: true });
 
-        // 2. Node drag — convert touch on a draggable node to mouse events
         canvas.addEventListener('touchstart', function(e) {
           if (e.touches.length !== 1) return;
           var node = e.touches[0].target.closest && e.touches[0].target.closest(
@@ -299,7 +262,6 @@
           if (!node) return;
 
           var t0 = e.touches[0];
-          // Fire mousedown on the node to trigger the tool's existing drag handler
           node.dispatchEvent(new MouseEvent('mousedown', {
             bubbles: true, cancelable: true,
             clientX: t0.clientX, clientY: t0.clientY, button: 0
