@@ -11,7 +11,7 @@
 //   • buildCard: --ppc-on now = contrastFor(col.accent) (white/#1a1a1a, same as concept-map)
 //   • buildCard: removed manual border-left accent stripe (concept-map doesn't use it)
 //   • CSS color-mix expressions in card text/cat/split now driven by --ppc-on/--ppc-bg
-console.log('[utils-clusters.js vheh]');
+console.log('[utils-clusters.js v3000000000000]');
 
 var CL_MIN_SPLIT_LENGTH = 60;
 
@@ -529,22 +529,49 @@ var CL_MIN_SPLIT_LENGTH = 60;
 }
 
 .pp-cl-scard {
-  background: var(--md-sys-color-surface);
-  border: 1px solid var(--md-sys-color-outline-variant);
-  border-radius: var(--radius-xs);
-  border-left: 3px solid transparent;
-  padding: var(--space-1) var(--space-2) var(--space-1);
+  background: var(--ppc-bg, #555);
+  border-radius: var(--radius-sm);
   margin-bottom: var(--space-1);
   cursor: pointer;
-  font-size: var(--font-size-sm);
-  line-height: 1.4;
-  color: var(--md-sys-color-on-surface);
-  transition: background var(--transition-fast), box-shadow var(--transition-fast);
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0,0,0,.18);
+  transition: box-shadow var(--transition-fast), filter var(--transition-fast);
 }
 .pp-cl-scard:last-child { margin-bottom: 0; }
-.pp-cl-scard:hover {
-  background: color-mix(in srgb, var(--md-sys-color-on-surface) 5%, transparent);
-  box-shadow: var(--md-elev-1);
+.pp-cl-scard:hover { box-shadow: var(--md-elev-2); filter: brightness(1.07); }
+
+/* Sub-group label divider inside a sheet cell */
+.pp-cl-scard-group-label {
+  font-size: 8px; font-weight: 800; letter-spacing: .10em; text-transform: uppercase;
+  color: var(--md-sys-color-outline);
+  padding: 6px 4px 3px;
+}
+.pp-cl-scard-group-label:first-child { padding-top: 2px; }
+
+/* Card internals — same classes as canvas card, same CSS vars */
+.pp-cl-scard .pp-cl-card-cat {
+  font-size: 9px !important;
+  font-weight: var(--font-weight-medium) !important;
+  letter-spacing: var(--letter-spacing-caps) !important;
+  text-transform: uppercase !important;
+  color: color-mix(in srgb, var(--ppc-on, #fff) 60%, var(--ppc-bg, transparent)) !important;
+  padding: 7px 10px 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.pp-cl-scard .pp-cl-card-text {
+  font-family: var(--font-family-serif) !important;
+  font-size: 12px !important;
+  font-weight: 400 !important;
+  line-height: 1.35 !important;
+  color: color-mix(in srgb, var(--ppc-on, #fff) 92%, var(--ppc-bg, transparent)) !important;
+  padding: 5px 10px 8px;
+  overflow-wrap: break-word; word-break: break-word;
+}
+.pp-cl-scard .pp-cl-card-split {
+  font-size: 8px !important; font-weight: 700 !important;
+  letter-spacing: .06em !important; text-transform: uppercase !important;
+  color: color-mix(in srgb, var(--ppc-on, #fff) 50%, var(--ppc-bg, transparent)) !important;
+  padding: 0 10px 6px;
 }
 `;
   document.head.appendChild(s);
@@ -755,25 +782,95 @@ function initClustersTool(paneEl, sidebarEl) {
   });
   sheetPanel.setContent(sheetPanelContent);
 
+  function buildSheetCard(r, col) {
+    const cells  = r.row && r.row.cells ? r.row.cells : (r.cells || []);
+    const cats   = r.row && r.row.cats  ? r.row.cats.filter(c => c.trim()) : [];
+    const best   = cells.reduce((b, c) => c.length > b.length ? c : b, '');
+    const parsed = typeof parseCitation === 'function' ? parseCitation(best) : { body: best };
+    const on     = contrastFor(col.accent);
+
+    const card = document.createElement('div');
+    card.className = 'pp-cl-scard';
+    card.style.setProperty('--ppc-bg', col.accent);
+    card.style.setProperty('--ppc-on', on);
+
+    if (cats.length) {
+      const ce = document.createElement('div');
+      ce.className = 'pp-cl-card-cat';
+      ce.textContent = cats.join(' · ');
+      card.appendChild(ce);
+    }
+    const te = document.createElement('div');
+    te.className = 'pp-cl-card-text';
+    te.textContent = parsed.body || best;
+    card.appendChild(te);
+    if (r._splitFrom) {
+      const sp = document.createElement('div');
+      sp.className = 'pp-cl-card-split';
+      sp.textContent = r._splitN + '/' + r._splitT + ' Split';
+      card.appendChild(sp);
+    }
+    card.addEventListener('click', () => { if (typeof panelGoTo === 'function') panelGoTo(r, 0); });
+    return card;
+  }
+
+  // Recursively render rows into a container using autoCluster at each depth level.
+  // prefixLbl is the label so far (e.g. 'A1'), remainingDepth counts down.
+  function renderSheetGroup(container, rows, prefixLbl, remainingDepth, col) {
+    if (remainingDepth <= 0 || rows.length < 2) {
+      rows.forEach(r => container.appendChild(buildSheetCard(r, col)));
+      return;
+    }
+    const asgn = autoCluster(rows, _innerMin, _innerMax);
+    const numGroups = Math.max(...asgn, 0) + 1;
+    if (numGroups <= 1) {
+      rows.forEach(r => container.appendChild(buildSheetCard(r, col)));
+      return;
+    }
+    const groups = Array.from({ length: numGroups }, () => []);
+    rows.forEach((r, i) => groups[asgn[i]].push(r));
+    groups.forEach((members, si) => {
+      if (!members.length) return;
+      const lbl    = subLabel(prefixLbl, si);
+      const subCol = colForIndex(si);
+      const hdr = document.createElement('div');
+      hdr.className = 'pp-cl-scard-group-label';
+      hdr.textContent = lbl;
+      hdr.style.color = subCol.accent;
+      container.appendChild(hdr);
+      renderSheetGroup(container, members, lbl, remainingDepth - 1, subCol);
+    });
+  }
+
   function updateSheetPanel() {
     if (!_clusterState) return;
-    const { nonEmpty, alignedAsgns } = _clusterState;
+    const { nonEmpty } = _clusterState;
     if (!nonEmpty || !nonEmpty.length) {
       sheetBody.innerHTML = '<div class="pp-cl-panel-empty">No clusters yet.</div>';
       return;
     }
 
+    // Columns = outer clusters. Rows = depth-2 sub-groups (aligned across clusters).
+    // For depth ≥ 3 each cell is further subdivided recursively via renderSheetGroup.
     const cols = nonEmpty.map((members, ci) => {
-      const subAsgn = alignedAsgns ? alignedAsgns[ci] : null;
-      const numSub  = subAsgn ? Math.max(...subAsgn, 0) + 1 : 1;
-      const groups  = Array.from({ length: numSub }, () => []);
-      if (subAsgn) members.forEach((r, i) => groups[subAsgn[i]].push(r));
-      else groups[0] = members.slice();
-      return { label: outerLabel(ci), col: colForIndex(ci), groups };
+      const outerLbl = outerLabel(ci);
+      const col      = colForIndex(ci);
+
+      // depth-2 row split (aligned)
+      let groups;
+      if (_depth >= 2 && members.length >= 2) {
+        const asgn     = autoCluster(members, _innerMin, _innerMax);
+        const numSub   = Math.max(...asgn, 0) + 1;
+        groups = Array.from({ length: numSub }, () => []);
+        members.forEach((r, i) => groups[asgn[i]].push(r));
+      } else {
+        groups = [members.slice()];
+      }
+      return { outerLbl, col, groups };
     });
 
     const maxRows = Math.max(...cols.map(c => c.groups.length));
-    sheetDesc.textContent = cols.length + ' col \u00b7 ' + maxRows + ' row' + (maxRows === 1 ? '' : 's');
+    sheetDesc.textContent = cols.length + ' col · ' + maxRows + ' row' + (maxRows === 1 ? '' : 's');
 
     const table = document.createElement('table');
     table.className = 'pp-cl-table';
@@ -785,7 +882,7 @@ function initClustersTool(paneEl, sidebarEl) {
     hrow.appendChild(thC);
     cols.forEach(c => {
       const th = document.createElement('th');
-      th.textContent = c.label + ' cluster';
+      th.textContent = c.outerLbl + ' cluster';
       th.style.color     = c.col.accent;
       th.style.borderTop = '3px solid ' + c.col.accent;
       hrow.appendChild(th);
@@ -804,21 +901,11 @@ function initClustersTool(paneEl, sidebarEl) {
         const td      = document.createElement('td');
         const members = c.groups[ri] || [];
         if (!members.length) {
-          td.className = 'pp-cl-td-empty'; td.textContent = '\u2014';
+          td.className = 'pp-cl-td-empty'; td.textContent = '—';
         } else {
-          members.forEach(r => {
-            const cells  = r.row && r.row.cells ? r.row.cells : (r.cells || []);
-            const best   = cells.reduce((b, x) => x.length > b.length ? x : b, '');
-            const parsed = typeof parseCitation === 'function' ? parseCitation(best) : { body: best };
-            const scard  = document.createElement('div');
-            scard.className             = 'pp-cl-scard';
-            scard.style.borderLeftColor = c.col.accent;
-            const txt = parsed.body || best;
-            scard.textContent = txt.length > 130 ? txt.slice(0, 130) + '\u2026' : txt;
-            scard.title = txt;
-            scard.addEventListener('click', () => { if (typeof panelGoTo === 'function') panelGoTo(r, 0); });
-            td.appendChild(scard);
-          });
+          const rowLbl = subLabel(c.outerLbl, ri); // e.g. A1, B2
+          // depth-2 is already expressed by the row; deeper levels go inside the cell
+          renderSheetGroup(td, members, rowLbl, _depth - 2, c.col);
         }
         tr.appendChild(td);
       });
