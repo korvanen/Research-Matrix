@@ -829,73 +829,64 @@ function initClustersTool(paneEl, sidebarEl) {
     if (!_clusterState || !_clusterState.nonEmpty || !_clusterState.nonEmpty.length) return;
     const { nonEmpty } = _clusterState;
 
-    // Build the same column/row structure as the sheet panel
-    const cols = nonEmpty.map((members, ci) => {
-      const outerLbl = outerLabel(ci);
-      let groups;
-      if (_depth >= 2 && members.length >= 2) {
-        const asgn   = autoCluster(members, _innerMin, _innerMax);
-        const numSub = Math.max(...asgn, 0) + 1;
-        groups = Array.from({ length: numSub }, () => []);
-        members.forEach((r, i) => groups[asgn[i]].push(r));
-      } else {
-        groups = [members.slice()];
+    // Collect flat list: { outerLbl, subLbl, text, cats }
+    // Uses the same recursive clustering as the canvas/sheet
+    const entries = [];
+
+    function collectEntries(rows, prefixLbl, remainingDepth) {
+      if (remainingDepth <= 0 || rows.length < 2) {
+        rows.forEach(r => {
+          const cells  = r.row && r.row.cells ? r.row.cells : (r.cells || []);
+          const cats   = r.row && r.row.cats  ? r.row.cats.filter(c => c.trim()) : [];
+          const best   = cells.reduce((b, c) => c.length > b.length ? c : b, '');
+          const parsed = typeof parseCitation === 'function' ? parseCitation(best) : { body: best };
+          entries.push({
+            outerLbl: prefixLbl.replace(/[0-9.]+$/, '') || prefixLbl,
+            subLbl:   prefixLbl,
+            text:     (parsed.body || best).trim(),
+            cats:     cats.join(', '),
+          });
+        });
+        return;
       }
-      return { outerLbl, groups };
+      const asgn      = autoCluster(rows, _innerMin, _innerMax);
+      const numGroups = Math.max(...asgn, 0) + 1;
+      if (numGroups <= 1) { collectEntries(rows, prefixLbl, 0); return; }
+      const groups = Array.from({ length: numGroups }, () => []);
+      rows.forEach((r, i) => groups[asgn[i]].push(r));
+      groups.forEach((grp, si) => {
+        if (grp.length) collectEntries(grp, subLabel(prefixLbl, si), remainingDepth - 1);
+      });
+    }
+
+    nonEmpty.forEach((members, ci) => {
+      const lbl = outerLabel(ci);
+      collectEntries(members, lbl, _depth - 1);
     });
 
-    const maxRows = Math.max(...cols.map(c => c.groups.length));
+    // Sort by outerLbl then subLbl so clusters stay together
+    entries.sort((a, b) => a.subLbl < b.subLbl ? -1 : a.subLbl > b.subLbl ? 1 : 0);
 
-    // Build aoa (array of arrays) for SheetJS
-    // Row 0: headers  [ '#', 'A Cluster', 'B Cluster', … ]
-    const headers = ['#', ...cols.map(c => c.outerLbl + ' Cluster')];
-    const aoa = [headers];
+    const hasCats = entries.some(e => e.cats);
+    const headers = ['#', 'Cluster', 'Sub-cluster', 'Text', ...(hasCats ? ['Categories'] : [])];
+    const aoa = [headers, ...entries.map((e, i) => [
+      i + 1,
+      e.outerLbl,
+      e.subLbl,
+      e.text,
+      ...(hasCats ? [e.cats] : []),
+    ])];
 
-    // Helper: flatten a group of rows into a single cell string, with sub-labels if depth>2
-    function cellText(members, rowLbl) {
-      if (_depth <= 2 || members.length < 2) {
-        return members.map(r => {
-          const cells = r.row && r.row.cells ? r.row.cells : (r.cells || []);
-          const best  = cells.reduce((b, c) => c.length > b.length ? c : b, '');
-          const parsed = typeof parseCitation === 'function' ? parseCitation(best) : { body: best };
-          return (parsed.body || best).trim();
-        }).join('\n\n');
-      }
-      // depth 3+: recurse with sub-labels
-      const asgn     = autoCluster(members, _innerMin, _innerMax);
-      const numGroups = Math.max(...asgn, 0) + 1;
-      if (numGroups <= 1) return cellText(members, rowLbl, 0);
-      const groups  = Array.from({ length: numGroups }, () => []);
-      members.forEach((r, i) => groups[asgn[i]].push(r));
-      return groups.map((grp, si) => {
-        const lbl = subLabel(rowLbl, si);
-        const body = grp.map(r => {
-          const cells = r.row && r.row.cells ? r.row.cells : (r.cells || []);
-          const best  = cells.reduce((b, c) => c.length > b.length ? c : b, '');
-          const parsed = typeof parseCitation === 'function' ? parseCitation(best) : { body: best };
-          return (parsed.body || best).trim();
-        }).join('\n');
-        return '[' + lbl + ']\n' + body;
-      }).filter(Boolean).join('\n\n');
-    }
-
-    for (let ri = 0; ri < maxRows; ri++) {
-      const row = [ri + 1];
-      cols.forEach(c => {
-        const members = c.groups[ri] || [];
-        const rowLbl  = subLabel(c.outerLbl, ri);
-        row.push(members.length ? cellText(members, rowLbl) : '');
-      });
-      aoa.push(row);
-    }
-
-    // Use SheetJS if available, otherwise fall back to CSV
     if (window.XLSX) {
       const wb = window.XLSX.utils.book_new();
       const ws = window.XLSX.utils.aoa_to_sheet(aoa);
-      // Set column widths: # narrow, clusters wide
-      ws['!cols'] = [{ wch: 4 }, ...cols.map(() => ({ wch: 38 }))];
-      // Wrap text in all data cells
+      ws['!cols'] = [
+        { wch: 5 },   // #
+        { wch: 10 },  // Cluster
+        { wch: 14 },  // Sub-cluster
+        { wch: 72 },  // Text
+        ...(hasCats ? [{ wch: 28 }] : []),
+      ];
       const range = window.XLSX.utils.decode_range(ws['!ref']);
       for (let R = 0; R <= range.e.r; R++) {
         for (let C = 0; C <= range.e.c; C++) {
@@ -912,7 +903,7 @@ function initClustersTool(paneEl, sidebarEl) {
       // CSV fallback
       const csv = aoa.map(row =>
         row.map(cell => {
-          const s = String(cell).replace(/"/g, '""');
+          const s = String(cell ?? '').replace(/"/g, '""');
           return /[,"\n]/.test(s) ? '"' + s + '"' : s;
         }).join(',')
       ).join('\n');
