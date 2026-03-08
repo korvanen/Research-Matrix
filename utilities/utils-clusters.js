@@ -11,7 +11,7 @@
 //   • buildCard: --ppc-on now = contrastFor(col.accent) (white/#1a1a1a, same as concept-map)
 //   • buildCard: removed manual border-left accent stripe (concept-map doesn't use it)
 //   • CSS color-mix expressions in card text/cat/split now driven by --ppc-on/--ppc-bg
-console.log('[utils-clusters.js vhershg]');
+console.log('[utils-clusters.js vSIDENAV');
 
 var CL_MIN_SPLIT_LENGTH = 60;
 
@@ -553,25 +553,53 @@ var CL_MIN_SPLIT_LENGTH = 60;
 // ════════════════════════════════════════════════════════════════════════════
 function initClustersTool(paneEl, sidebarEl) {
 
-  paneEl.innerHTML =
-    '<div id="pp-cl-head">' +
-      '<div id="pp-cl-subtitle">Waiting for embeddings\u2026</div>' +
-      '<div id="pp-cl-status" class="cl-loading"><div class="pp-cl-dot"></div><span id="pp-cl-label">Embeddings loading\u2026</span></div>' +
-      '<div id="pp-cl-controls"><div id="pp-cl-sliders">' +
-        '<div class="pp-cl-slider-col"><div class="pp-group-label">Outer</div>' +
-          '<div class="pp-range-row"><span class="pp-range-label">Min</span><input class="pp-range" id="pp-cl-omin" type="range" min="2" max="20" value="2" step="1"><span class="pp-range-val" id="pp-cl-omin-val">2</span></div>' +
-          '<div class="pp-range-row"><span class="pp-range-label">Max</span><input class="pp-range" id="pp-cl-omax" type="range" min="2" max="20" value="12" step="1"><span class="pp-range-val" id="pp-cl-omax-val">12</span></div>' +
-        '</div>' +
-        '<div class="pp-cl-slider-col"><div class="pp-group-label">Inner</div>' +
-          '<div class="pp-range-row"><span class="pp-range-label">Min</span><input class="pp-range pp-range--muted" id="pp-cl-imin" type="range" min="2" max="12" value="2" step="1"><span class="pp-range-val" id="pp-cl-imin-val">2</span></div>' +
-          '<div class="pp-range-row"><span class="pp-range-label">Max</span><input class="pp-range pp-range--muted" id="pp-cl-imax" type="range" min="2" max="12" value="4" step="1"><span class="pp-range-val" id="pp-cl-imax-val">4</span></div>' +
-        '</div>' +
-        '<div class="pp-cl-slider-col"><div class="pp-group-label">Depth</div>' +
-          '<div class="pp-range-row"><span class="pp-range-label">Lvl</span><input class="pp-range pp-range--accent" id="pp-cl-depth" type="range" min="1" max="4" value="2" step="1"><span class="pp-range-val" id="pp-cl-depth-val">2</span></div>' +
-        '</div>' +
-        '<div class="pp-cl-btn-col"><button id="pp-cl-recluster">Re-cluster</button></div>' +
-      '</div></div>' +
-    '</div>' +
+  // ── Build nav rail + side panel via global PPNavRail component ──
+  const nav = window.PPNavRail.create(paneEl, {
+    toolName: 'Clusters',
+    panelSections: [
+      {
+        label: 'Outer Clusters',
+        html:
+          '<div class="pp-range-row">' +
+            '<span class="pp-range-label">Min</span>' +
+            '<input class="pp-range" id="pp-cl-omin" type="range" min="2" max="20" value="2" step="1">' +
+            '<span class="pp-range-val" id="pp-cl-omin-val">2</span>' +
+          '</div>' +
+          '<div class="pp-range-row">' +
+            '<span class="pp-range-label">Max</span>' +
+            '<input class="pp-range" id="pp-cl-omax" type="range" min="2" max="20" value="12" step="1">' +
+            '<span class="pp-range-val" id="pp-cl-omax-val">12</span>' +
+          '</div>',
+      },
+      {
+        label: 'Inner Clusters',
+        html:
+          '<div class="pp-range-row">' +
+            '<span class="pp-range-label">Min</span>' +
+            '<input class="pp-range pp-range--muted" id="pp-cl-imin" type="range" min="2" max="12" value="2" step="1">' +
+            '<span class="pp-range-val" id="pp-cl-imin-val">2</span>' +
+          '</div>' +
+          '<div class="pp-range-row">' +
+            '<span class="pp-range-label">Max</span>' +
+            '<input class="pp-range pp-range--muted" id="pp-cl-imax" type="range" min="2" max="12" value="4" step="1">' +
+            '<span class="pp-range-val" id="pp-cl-imax-val">4</span>' +
+          '</div>',
+      },
+      {
+        label: 'Depth',
+        html:
+          '<div class="pp-range-row">' +
+            '<span class="pp-range-label">Lvl</span>' +
+            '<input class="pp-range pp-range--accent" id="pp-cl-depth" type="range" min="1" max="4" value="2" step="1">' +
+            '<span class="pp-range-val" id="pp-cl-depth-val">2</span>' +
+          '</div>' +
+          '<button id="pp-cl-recluster" style="margin-top:4px">Re-cluster</button>',
+      },
+    ],
+  });
+
+  // ── Inject canvas into main area ──
+  nav.mainEl.innerHTML =
     '<div id="pp-cl-canvas">' +
       '<div id="pp-cl-canvas-world"></div>' +
       '<div id="pp-cl-empty">Clusters will appear<br>once embeddings finish</div>' +
@@ -587,7 +615,13 @@ function initClustersTool(paneEl, sidebarEl) {
     paneEl.querySelectorAll('.pp-range').forEach(upgradeSlider);
   }
 
-  const subtitle     = paneEl.querySelector('#pp-cl-subtitle');
+  // Status chip in panel header's status slot
+  nav.statusEl.innerHTML =
+    '<div id="pp-cl-status" class="cl-loading">' +
+      '<div class="pp-cl-dot"></div><span id="pp-cl-label">Embeddings loading\u2026</span>' +
+    '</div>';
+
+  const subtitle     = nav.subtitleEl;
   const statusEl     = paneEl.querySelector('#pp-cl-status');
   const labelEl      = paneEl.querySelector('#pp-cl-label');
   const canvas       = paneEl.querySelector('#pp-cl-canvas');
