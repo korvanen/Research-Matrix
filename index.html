@@ -10,8 +10,6 @@
     body {
       overflow-x: hidden;
       min-height: 100vh;
-      /* Room for fixed bottom nav */
-      padding-bottom: 60px;
     }
 
     /* ── Nav ── */
@@ -25,20 +23,17 @@
       max-width: 1280px;
       margin: 0 auto;
     }
-
     .logo-text {
       font-size: 15px;
       font-weight: var(--font-weight-semibold);
       letter-spacing: -0.02em;
     }
-
     .nav-links {
       display: flex;
       gap: 40px;
       align-items: flex-end;
       padding-bottom: 2px;
     }
-
     .nav-link {
       font-size: 15px;
       font-weight: var(--font-weight-medium);
@@ -55,7 +50,6 @@
       max-width: 1280px;
       margin: 0 auto;
     }
-
     .intro-content {
       display: flex;
       flex-direction: row;
@@ -65,7 +59,6 @@
       border-bottom: 1px solid var(--raw-black);
       width: 100%;
     }
-
     .hero-headline {
       font-size: clamp(42px, 5vw, 64px);
       font-weight: var(--font-weight-normal);
@@ -73,7 +66,6 @@
       line-height: 1.08;
       max-width: 680px;
     }
-
     .hero-right {
       display: flex;
       flex-direction: column;
@@ -82,7 +74,6 @@
       align-self: flex-end;
       max-width: 300px;
     }
-
     .hero-sub {
       font-size: var(--font-size-lg);
       font-weight: var(--font-weight-normal);
@@ -93,359 +84,139 @@
     }
 
     /* ── Sheet loader ── */
-    .sheet-loader {
-      width: 100%;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-    .sheet-loader-row {
-      display: flex;
-      gap: 6px;
-      align-items: center;
-    }
+    .sheet-loader { width: 100%; display: flex; flex-direction: column; gap: 6px; }
+    .sheet-loader-row { display: flex; gap: 6px; align-items: center; }
     .sheet-url-input {
-      flex: 1;
-      min-width: 0;
-      height: 30px;
-      padding: 0 9px;
+      flex: 1; min-width: 0; height: 30px; padding: 0 9px;
       border: 1px solid rgba(0,0,0,0.18);
       border-radius: var(--radius-md);
       background: var(--color-bg-page);
-      font-family: var(--font-family);
-      font-size: 12px;
-      color: var(--color-text-default);
-      outline: none;
+      font-family: var(--font-family); font-size: 12px;
+      color: var(--color-text-default); outline: none;
       transition: border-color var(--transition-fast);
     }
     .sheet-url-input:focus { border-color: rgba(0,0,0,0.5); }
     .sheet-url-input::placeholder { color: var(--color-text-placeholder); }
-
     .sheet-btn {
-      height: 30px;
-      padding: 0 11px;
+      height: 30px; padding: 0 11px;
       border-radius: var(--radius-md);
       border: 1px solid rgba(0,0,0,0.18);
       background: transparent;
-      font-family: var(--font-family);
-      font-size: 12px;
+      font-family: var(--font-family); font-size: 12px;
       font-weight: var(--font-weight-medium);
       color: var(--color-text-muted);
-      cursor: pointer;
-      white-space: nowrap;
-      flex-shrink: 0;
+      cursor: pointer; white-space: nowrap; flex-shrink: 0;
       letter-spacing: -0.01em;
       transition: border-color var(--transition-fast), color var(--transition-fast);
     }
-    .sheet-btn:hover:not(:disabled) {
-      border-color: rgba(0,0,0,0.4);
-      color: var(--raw-black);
-    }
+    .sheet-btn:hover:not(:disabled) { border-color: rgba(0,0,0,0.4); color: var(--raw-black); }
     .sheet-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-    .sheet-btn--primary {
-      background: var(--raw-black);
-      color: #fff;
-      border-color: var(--raw-black);
-    }
-    .sheet-btn--primary:hover:not(:disabled) {
-      background: #222;
-      border-color: #222;
-      color: #fff;
-    }
-
+    .sheet-btn--primary { background: var(--raw-black); color: #fff; border-color: var(--raw-black); }
+    .sheet-btn--primary:hover:not(:disabled) { background: #222; border-color: #222; color: #fff; }
     .sheet-loader-status {
-      font-size: 11px;
-      color: var(--color-text-muted);
-      text-align: right;
-      min-height: 14px;
-      letter-spacing: -0.01em;
+      font-size: 11px; color: var(--color-text-muted);
+      text-align: right; min-height: 14px; letter-spacing: -0.01em;
     }
     .sheet-loader-status.error   { color: #c0392b; }
     .sheet-loader-status.success { color: #27ae60; }
-
     .sheet-active-url {
-      font-size: 11px;
-      color: var(--color-text-placeholder);
-      display: flex;
-      align-items: center;
-      justify-content: flex-end;
-      gap: 5px;
+      font-size: 11px; color: var(--color-text-placeholder);
+      display: flex; align-items: center; justify-content: flex-end; gap: 5px;
     }
-    .sheet-active-dot {
-      width: 6px; height: 6px;
-      border-radius: 50%;
-      background: #27ae60;
-      flex-shrink: 0;
-    }
+    .sheet-active-dot { width: 6px; height: 6px; border-radius: 50%; background: #27ae60; flex-shrink: 0; }
     .sheet-active-dot.loading { background: #f39c12; }
     .sheet-active-dot.error   { background: #c0392b; }
 
     /* ── Tools section ── */
     .tools-section {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      padding: 20px 24px 20px;
-      max-width: 1280px;
-      margin: 0 auto;
+      display: flex; flex-direction: column; gap: 10px;
+      padding: 20px 24px 20px; max-width: 1280px; margin: 0 auto;
     }
-
-    .section-label {
-      font-size: 24px;
-      font-weight: var(--font-weight-normal);
-      letter-spacing: -0.02em;
-    }
-
-    .tools-content {
-      display: flex;
-      flex-direction: column;
-      gap: 0;
-      padding-bottom: 80px;
-      width: 100%;
-    }
-
+    .section-label { font-size: 24px; font-weight: var(--font-weight-normal); letter-spacing: -0.02em; }
+    .tools-content { display: flex; flex-direction: column; gap: 0; padding-bottom: 80px; width: 100%; }
     .tool-row {
-      display: flex;
-      flex-direction: row;
-      justify-content: space-between;
-      align-items: flex-start;
-      padding: 28px 0;
+      display: flex; flex-direction: row; justify-content: space-between;
+      align-items: flex-start; padding: 28px 0;
       border-bottom: 1px solid rgba(0,0,0,0.12);
-      gap: 40px;
-      cursor: pointer;
-      text-decoration: none;
-      color: inherit;
+      gap: 40px; cursor: pointer; text-decoration: none; color: inherit;
       transition: background var(--transition-fast);
     }
     .tool-row:hover { background: rgba(0,0,0,0.02); }
     .tool-row:first-child { border-top: 1px solid rgba(0,0,0,0.12); }
-
-    .tool-left {
-      display: flex;
-      flex-direction: row;
-      align-items: flex-start;
-      gap: 32px;
-      flex: 1;
-    }
-
+    .tool-left { display: flex; flex-direction: row; align-items: flex-start; gap: 32px; flex: 1; }
     .tool-number {
-      font-size: 11px;
-      font-weight: var(--font-weight-semibold);
-      letter-spacing: 0.06em;
-      color: var(--color-text-muted);
-      padding-top: 3px;
-      min-width: 24px;
+      font-size: 11px; font-weight: var(--font-weight-semibold);
+      letter-spacing: 0.06em; color: var(--color-text-muted);
+      padding-top: 3px; min-width: 24px;
     }
-
-    .tool-accent {
-      width: 4px;
-      border-radius: 2px;
-      align-self: stretch;
-      min-height: 60px;
-      flex-shrink: 0;
-    }
-
-    .tool-info {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-
-    .tool-name {
-      font-size: 28px;
-      font-weight: var(--font-weight-normal);
-      letter-spacing: -0.03em;
-      line-height: 1.1;
-    }
-
+    .tool-accent { width: 4px; border-radius: 2px; align-self: stretch; min-height: 60px; flex-shrink: 0; }
+    .tool-info { display: flex; flex-direction: column; gap: 8px; }
+    .tool-name { font-size: 28px; font-weight: var(--font-weight-normal); letter-spacing: -0.03em; line-height: 1.1; }
     .tool-desc {
-      font-size: 14px;
-      font-weight: var(--font-weight-normal);
-      color: var(--color-text-muted);
-      letter-spacing: -0.02em;
-      line-height: 1.5;
-      max-width: 380px;
+      font-size: 14px; font-weight: var(--font-weight-normal);
+      color: var(--color-text-muted); letter-spacing: -0.02em; line-height: 1.5; max-width: 380px;
     }
-
-    .tool-tags {
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
-      margin-top: 4px;
-    }
-
+    .tool-tags { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
     .tool-tag {
-      font-size: 10px;
-      font-weight: var(--font-weight-semibold);
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-      color: var(--color-text-muted);
-      border: 1px solid rgba(0,0,0,0.15);
-      border-radius: var(--radius-full);
-      padding: 3px 10px;
+      font-size: 10px; font-weight: var(--font-weight-semibold);
+      letter-spacing: 0.06em; text-transform: uppercase;
+      color: var(--color-text-muted); border: 1px solid rgba(0,0,0,0.15);
+      border-radius: var(--radius-full); padding: 3px 10px;
     }
-
     .tool-arrow {
-      font-size: 20px;
-      color: var(--color-text-muted);
-      align-self: center;
+      font-size: 20px; color: var(--color-text-muted); align-self: center;
       transition: transform var(--transition-base), color var(--transition-fast);
     }
-    .tool-row:hover .tool-arrow {
-      transform: translate(4px, -4px);
-      color: var(--raw-black);
-    }
+    .tool-row:hover .tool-arrow { transform: translate(4px, -4px); color: var(--raw-black); }
 
     /* ── Footer ── */
     footer { border-top: 1px solid var(--raw-black); }
-
-    .footer-section {
-      display: flex;
-      flex-direction: column;
-      padding: 20px 24px;
-      max-width: 1280px;
-      margin: 0 auto;
-    }
-
+    .footer-section { display: flex; flex-direction: column; padding: 20px 24px; max-width: 1280px; margin: 0 auto; }
     .footer-bottom {
-      display: flex;
-      flex-direction: row;
-      justify-content: space-between;
-      align-items: center;
-      padding-bottom: 4px;
+      display: flex; flex-direction: row;
+      justify-content: space-between; align-items: center; padding-bottom: 4px;
     }
-
-    .footer-copy,
-    .footer-version {
-      font-size: 13px;
-      color: var(--color-text-muted);
-      letter-spacing: -0.01em;
-    }
+    .footer-copy, .footer-version { font-size: 13px; color: var(--color-text-muted); letter-spacing: -0.01em; }
     .footer-version { letter-spacing: 0.04em; font-variant-numeric: tabular-nums; }
 
     /* ── Dark mode toggle ── */
     .theme-toggle {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      background: none;
-      border: 1px solid rgba(128,128,128,0.25);
-      border-radius: var(--radius-full);
-      padding: 5px 12px 5px 8px;
-      cursor: pointer;
-      font-family: var(--font-family);
-      font-size: 12px;
-      font-weight: var(--font-weight-medium);
-      color: var(--color-text-muted);
+      display: flex; align-items: center; gap: 8px;
+      background: none; border: 1px solid rgba(128,128,128,0.25);
+      border-radius: var(--radius-full); padding: 5px 12px 5px 8px;
+      cursor: pointer; font-family: var(--font-family); font-size: 12px;
+      font-weight: var(--font-weight-medium); color: var(--color-text-muted);
       letter-spacing: -0.01em;
       transition: border-color var(--transition-fast), color var(--transition-fast), background var(--transition-fast);
     }
-    .theme-toggle:hover {
-      border-color: rgba(128,128,128,0.5);
-      color: var(--color-text-default);
-    }
-
+    .theme-toggle:hover { border-color: rgba(128,128,128,0.5); color: var(--color-text-default); }
     .theme-toggle-track {
-      width: 28px;
-      height: 16px;
-      border-radius: 8px;
-      background: rgba(128,128,128,0.2);
-      position: relative;
-      flex-shrink: 0;
+      width: 28px; height: 16px; border-radius: 8px;
+      background: rgba(128,128,128,0.2); position: relative; flex-shrink: 0;
       transition: background var(--transition-fast);
     }
     .theme-toggle-thumb {
-      position: absolute;
-      top: 2px;
-      left: 2px;
-      width: 12px;
-      height: 12px;
-      border-radius: 50%;
-      background: var(--color-text-muted);
+      position: absolute; top: 2px; left: 2px; width: 12px; height: 12px;
+      border-radius: 50%; background: var(--color-text-muted);
       transition: transform var(--transition-fast), background var(--transition-fast);
     }
-
     html.dark .theme-toggle-track  { background: rgba(255,255,255,0.25); }
     html.dark .theme-toggle-thumb  { transform: translateX(12px); background: #fff; }
     html.dark .theme-toggle        { color: rgba(255,255,255,0.5); border-color: rgba(255,255,255,0.15); }
     html.dark .theme-toggle:hover  { border-color: rgba(255,255,255,0.35); color: rgba(255,255,255,0.9); }
 
     /* ── Animations ── */
-    .fade-in {
-      opacity: 0;
-      transform: translateY(16px);
-      animation: ds-fade-up 0.6s ease forwards;
-    }
+    .fade-in { opacity: 0; transform: translateY(16px); animation: ds-fade-up 0.6s ease forwards; }
     .fade-in:nth-child(1) { animation-delay: 0.05s; }
     .fade-in:nth-child(2) { animation-delay: 0.12s; }
     .fade-in:nth-child(3) { animation-delay: 0.20s; }
-
-    /* ── Footer ── */
-    footer { border-top: 1px solid var(--raw-black); }
-    .footer-section {
-      display: flex;
-      flex-direction: column;
-      padding: 20px 24px;
-      max-width: 1280px;
-      margin: 0 auto;
-    }
-    .footer-bottom {
-      display: flex;
-      flex-direction: row;
-      justify-content: space-between;
-      align-items: center;
-      padding-bottom: 4px;
-    }
-    .footer-copy, .footer-version {
-      font-size: 13px;
-      color: var(--color-text-muted);
-      letter-spacing: -0.01em;
-    }
-    .footer-version { letter-spacing: 0.04em; font-variant-numeric: tabular-nums; }
-
-    .theme-toggle {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      background: none;
-      border: 1px solid rgba(128,128,128,0.25);
-      border-radius: var(--radius-full);
-      padding: 5px 12px 5px 8px;
-      cursor: pointer;
-      font-family: var(--font-family);
-      font-size: 12px;
-      font-weight: var(--font-weight-medium);
-      color: var(--color-text-muted);
-      letter-spacing: -0.01em;
-      transition: border-color var(--transition-fast), color var(--transition-fast);
-    }
-    .theme-toggle:hover { border-color: rgba(128,128,128,0.5); color: var(--color-text-default); }
-    .theme-toggle-track {
-      width: 28px; height: 16px;
-      border-radius: 8px;
-      background: rgba(128,128,128,0.2);
-      position: relative; flex-shrink: 0;
-      transition: background var(--transition-fast);
-    }
-    .theme-toggle-thumb {
-      position: absolute; top: 2px; left: 2px;
-      width: 12px; height: 12px;
-      border-radius: 50%;
-      background: var(--color-text-muted);
-      transition: transform var(--transition-fast), background var(--transition-fast);
-    }
-    html.dark .theme-toggle-track  { background: rgba(255,255,255,0.25); }
-    html.dark .theme-toggle-thumb  { transform: translateX(12px); background: #fff; }
-    html.dark .theme-toggle        { color: rgba(255,255,255,0.5); border-color: rgba(255,255,255,0.15); }
-    html.dark .theme-toggle:hover  { border-color: rgba(255,255,255,0.35); color: rgba(255,255,255,0.9); }
 
     /* ── Responsive ── */
     @media (max-width: 900px) {
       .intro-content { flex-direction: column; gap: 30px; }
       .hero-right { align-items: flex-start; text-align: left; max-width: 100%; }
       .hero-sub { text-align: left; }
-      .sheet-loader-status,
-      .sheet-active-url { justify-content: flex-start; text-align: left; }
+      .sheet-loader-status, .sheet-active-url { justify-content: flex-start; text-align: left; }
     }
     @media (max-width: 600px) {
       .nav-links { gap: 20px; }
@@ -471,20 +242,12 @@
   <section class="hero-section">
     <div class="intro-content fade-in">
       <h1 class="hero-headline">A research tool for<br>navigating complex<br>dimensional data.</h1>
-
       <div class="hero-right">
         <p class="hero-sub">Spreadsheet analytical tool</p>
-
         <div class="sheet-loader">
           <div class="sheet-loader-row">
-            <input
-              class="sheet-url-input"
-              id="sheet-url-input"
-              type="text"
-              placeholder="Paste a Google Sheets link…"
-              autocomplete="off"
-              spellcheck="false"
-            />
+            <input class="sheet-url-input" id="sheet-url-input" type="text"
+              placeholder="Paste a Google Sheets link…" autocomplete="off" spellcheck="false"/>
             <button class="sheet-btn sheet-btn--primary" id="sheet-load-btn">Load</button>
             <button class="sheet-btn" id="sheet-default-btn">Use default</button>
           </div>
@@ -495,7 +258,6 @@
           </div>
         </div>
       </div>
-
     </div>
   </section>
 
@@ -503,7 +265,6 @@
     <span class="section-label">Tools</span>
     <div class="tools-content">
 
-      <!-- Spreadsheet row — now clickable via bottom nav too -->
       <a class="tool-row" href="tools/spreadsheet.html">
         <div class="tool-left">
           <span class="tool-number">01</span>
@@ -579,44 +340,26 @@
     <div class="footer-section">
       <div class="footer-bottom">
         <span class="footer-copy">Dimensional Framework</span>
-
         <button class="theme-toggle" id="theme-toggle" aria-label="Toggle dark mode">
           <div class="theme-toggle-track">
             <div class="theme-toggle-thumb"></div>
           </div>
           <span id="theme-toggle-label">Dark mode</span>
         </button>
-
         <span class="footer-version">v2.0 — 2026</span>
       </div>
     </div>
   </footer>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <div class="footer-section">
-      <div class="footer-bottom">
-        <span class="footer-copy">Dimensional Framework</span>
-        <button class="theme-toggle" id="theme-toggle" aria-label="Toggle dark mode">
-          <div class="theme-toggle-track">
-            <div class="theme-toggle-thumb"></div>
-          </div>
-          <span id="theme-toggle-label">Dark mode</span>
-        </button>
-        <span class="footer-version">v2.0 — 2026</span>
-      </div>
-    </div>
-  </footer>
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="utilities/embedding-bridge.js?v=4"></script>
-<script src="utilities/utils-keywords.js?v=4"></script>
-<script src="utilities/utils-shared.js?v=cb2af0e7"></script>
-<script type="module" src="utilities/utils-embedding.js?v=4"></script>
+  <script src="utilities/embedding-bridge.js?v=4"></script>
+  <script src="utilities/utils-keywords.js?v=4"></script>
+  <script src="utilities/utils-shared.js?v=9e3a42a4"></script>
+  <script type="module" src="utilities/utils-embedding.js?v=4"></script>
 
   <script>console.log('[index.html v.10]');</script>
 
   <script>
-    // ── Sheet loader ──────────────────────────────────────────────────────────
     var input      = document.getElementById('sheet-url-input');
     var loadBtn    = document.getElementById('sheet-load-btn');
     var defaultBtn = document.getElementById('sheet-default-btn');
@@ -652,17 +395,12 @@
       if (!val)             return setStatus('Paste a Google Sheets URL first.', 'error');
       if (!isSheetUrl(val)) return setStatus("That doesn't look like a Google Sheets link.", 'error');
       if (!sheetExportUrl(val)) return setStatus('Could not parse the sheet ID.', 'error');
-
       setStatus('Fetching…');
       loadBtn.disabled = true;
-
       fetchODS(val)
         .then(function(all) {
           var tabs = all.filter(function(s) { return s.name.includes('MX'); });
-          if (!tabs.length) {
-            loadBtn.disabled = false;
-            return setStatus('No MX tabs found — check the tab names.', 'error');
-          }
+          if (!tabs.length) { loadBtn.disabled = false; return setStatus('No MX tabs found — check the tab names.', 'error'); }
           saveSheetUrl(val);
           setStatus('Loaded ' + tabs.length + ' tab' + (tabs.length === 1 ? '' : 's') + '. Reloading…', 'success');
           setTimeout(function() { location.reload(); }, 700);
