@@ -1,254 +1,292 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Spreadsheet — Dimensional Framework</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Concept Map — Dimensional Framework</title>
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="../design-system.css?v=5f3df7d8">
   <style>
-    html, body { height: 100%; overflow: hidden; margin: 0; }
-
-    .app-shell {
-      display: flex;
-      flex-direction: column;
+    body {
       height: 100vh; height: 100dvh;
       overflow: hidden;
-    }
-
-    /* ── Topbar ── */
-    #topbar {
-      display: flex; align-items: stretch;
-      height: var(--topbar-height, 44px);
-      flex-shrink: 0;
-      background: var(--md-sys-color-surface);
-      border-bottom: 1px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 60%, transparent);
-      z-index: 20;
-    }
-    .topbar-back {
-      display: flex; align-items: center; gap: 6px;
-      padding: 0 14px;
-      font-size: var(--font-size-xs);
-      font-weight: var(--font-weight-bold);
-      letter-spacing: var(--letter-spacing-caps);
-      text-transform: uppercase;
-      color: var(--md-sys-color-on-surface-variant);
-      text-decoration: none;
-      border-right: 1px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 60%, transparent);
-      flex-shrink: 0;
-      transition: color var(--transition-fast), background var(--transition-fast);
-    }
-    .topbar-back:hover {
-      color: var(--md-sys-color-on-surface);
-      background: color-mix(in srgb, var(--md-sys-color-on-surface) 5%, transparent);
-    }
-    #topbar-title {
-      display: flex; align-items: center;
-      padding: 0 16px;
-      font-size: var(--font-size-xs);
-      font-weight: var(--font-weight-bold);
-      letter-spacing: var(--letter-spacing-caps);
-      text-transform: uppercase;
-      color: var(--md-sys-color-on-surface-variant);
-      border-right: 1px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 60%, transparent);
-      flex-shrink: 0;
-      white-space: nowrap;
-    }
-    #topbar-sheet-name {
-      display: flex; align-items: center;
-      padding: 0 16px;
-      font-size: var(--font-size-sm);
-      font-weight: var(--font-weight-medium);
-      color: var(--md-sys-color-on-surface);
-      flex: 1; min-width: 0;
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    }
-
-    /* ── Spreadsheet grid ── */
-    .sheet-area {
-      flex: 1; min-height: 0;
-      position: relative;
-      display: grid;
-      grid-template-rows: auto 1fr;
-      grid-template-columns: auto 1fr;
-      grid-template-areas: "corner header" "cats data";
-      overflow: hidden;
-    }
-    .corner {
-      grid-area: corner;
-      background: var(--md-sys-color-surface-container);
-      border-right: 1px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 50%, transparent);
-      border-bottom: 2px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 70%, transparent);
-      z-index: 3;
-    }
-    .header-scroll {
-      grid-area: header; overflow: hidden; z-index: 2;
-      border-bottom: 2px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 70%, transparent);
-    }
-    .cat-scroll {
-      grid-area: cats; overflow: hidden; z-index: 1;
-      border-right: 1px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 50%, transparent);
-    }
-    .data-scroll { grid-area: data; overflow: auto; }
-    .data-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
-    .data-scroll::-webkit-scrollbar-track { background: var(--md-sys-color-background); }
-    .data-scroll::-webkit-scrollbar-thumb { background: var(--md-sys-color-outline-variant); border-radius: var(--radius-full); }
-
-    /* ── Tables ── */
-    .sheet-table { border-collapse: collapse; font-size: var(--font-size-sm); font-family: var(--font-family); }
-
-    #header-row th {
-      background: var(--md-sys-color-surface-container);
-      padding: 10px 16px;
-      font-size: var(--font-size-xs);
-      font-weight: var(--font-weight-bold);
-      letter-spacing: var(--letter-spacing-caps);
-      text-transform: uppercase;
-      color: var(--md-sys-color-on-surface-variant);
-      text-align: left; white-space: nowrap;
-      border-right: 1px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 40%, transparent);
-    }
-    #header-row th:last-child { border-right: none; }
-
-    #cat-body td {
-      background: var(--md-sys-color-surface-container-low);
-      padding: 10px 12px;
-      font-size: var(--font-size-xs);
-      font-weight: var(--font-weight-bold);
-      letter-spacing: .03em; text-transform: uppercase;
-      color: var(--md-sys-color-on-surface-variant);
-      vertical-align: middle;
-      border-bottom: 1px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 30%, transparent);
-      border-right: 1px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 40%, transparent);
-      white-space: nowrap;
-    }
-    #cat-body td.group-end {
-      border-bottom: 2px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 65%, transparent);
-    }
-    #cat-body td.cat-rotated { text-align: center; overflow: hidden; position: relative; }
-    .cat-inner {
-      display: inline-block;
-      transform-origin: center center;
-      transform: rotate(-90deg) translateX(-50%);
-      white-space: nowrap; position: absolute; left: 50%;
-    }
-
-    #data-body td {
-      padding: 10px 16px;
-      vertical-align: top;
-      color: var(--md-sys-color-on-surface);
-      line-height: 1.55;
-      border-bottom: 1px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 25%, transparent);
-      border-right: 1px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 25%, transparent);
-    }
-    #data-body td:last-child { border-right: none; }
-    #data-body td.group-end {
-      border-bottom: 2px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 55%, transparent);
-    }
-
-    /* Hover + selection */
-    #data-body td.highlight-group, #cat-body td.highlight-group {
-      background: color-mix(in srgb, var(--md-sys-color-primary) 6%, transparent);
-    }
-    #data-body td.highlight-cell, #cat-body td.highlight-cell, #header-row th.highlight-cell {
-      background: color-mix(in srgb, var(--md-sys-color-primary) 12%, transparent);
-    }
-    #data-body td.selected-group, #cat-body td.selected-group {
-      background: color-mix(in srgb, var(--md-sys-color-primary) 10%, transparent);
-    }
-    #data-body td.selected-cell, #cat-body td.selected-cell, #header-row th.selected-cell {
-      background: color-mix(in srgb, var(--md-sys-color-primary) 18%, transparent);
-      outline: 2px solid var(--md-sys-color-primary);
-      outline-offset: -2px;
-    }
-
-    /* ── Tab bar ── */
-    .bottombar {
-      flex-shrink: 0; height: 36px;
-      display: flex; align-items: stretch;
-      background: var(--md-sys-color-surface);
-      border-top: 1px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 60%, transparent);
-      z-index: 10;
-    }
-    .tab-bar {
-      display: flex; align-items: stretch;
-      flex: 1; overflow-x: auto; overflow-y: hidden;
-      padding: 0 8px; gap: 2px;
-    }
-    .tab-bar::-webkit-scrollbar { display: none; }
-    .tab {
-      display: flex; align-items: center;
-      padding: 0 16px;
-      font-size: var(--font-size-xs);
-      font-weight: var(--font-weight-medium);
-      color: var(--md-sys-color-on-surface-variant);
-      cursor: pointer; white-space: nowrap;
-      border-radius: var(--radius-xs) var(--radius-xs) 0 0;
-      transition: background var(--transition-fast), color var(--transition-fast);
-    }
-    .tab:hover { background: color-mix(in srgb, var(--md-sys-color-on-surface) 6%, transparent); color: var(--md-sys-color-on-surface); }
-    .tab.active {
-      color: var(--md-sys-color-primary);
-      font-weight: var(--font-weight-bold);
-      box-shadow: inset 0 -2px 0 var(--md-sys-color-primary);
-    }
-
-    /* ── Loading ── */
-    .loading-overlay {
-      position: absolute; inset: 0;
-      display: flex; align-items: center; justify-content: center;
+      display: flex;
+      flex-direction: column;
       background: var(--md-sys-color-background);
-      font-size: var(--font-size-sm);
-      color: var(--md-sys-color-on-surface-variant);
-      z-index: 30;
+      font-family: var(--font-family);
+      font-size: var(--font-size-base);
+      color: var(--md-sys-color-on-background);
+    }
+
+    .cm-layout {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: row;
+      overflow: hidden;
+      position: relative;
+    }
+
+    #cm-pane {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .cm-canvas, #cm-canvas, [id*="canvas"] {
+      background: var(--md-sys-color-background) !important;
+    }
+
+    .cm-node, .cmap-node, [class*="cm-node"], [class*="cmap-node"] {
+      background: var(--md-sys-color-surface-container-low) !important;
+      border: 1px solid var(--md-sys-color-outline-variant) !important;
+      border-radius: var(--radius-sm) !important;
+      box-shadow: var(--md-elev-1) !important;
+      color: var(--md-sys-color-on-surface) !important;
+    }
+    .cm-node:hover, .cmap-node:hover,
+    [class*="cm-node"]:hover, [class*="cmap-node"]:hover {
+      box-shadow: var(--md-elev-2) !important;
+      background: var(--md-sys-color-surface-container) !important;
+    }
+
+    .cm-node-label, .cmap-node-label,
+    [class*="cm-node"] span, [class*="cmap-node"] span,
+    [class*="cm-node"] div, [class*="cmap-node"] div {
+      color: var(--md-sys-color-on-surface) !important;
+    }
+
+    .cm-node-cat, .cmap-node-cat,
+    [class*="cm-node-cat"], [class*="cmap-node-cat"] {
+      color: var(--md-sys-color-on-surface-variant) !important;
+    }
+
+    .cm-edge, .cmap-edge,
+    [class*="cm-edge"] path,
+    [class*="cmap-edge"] path,
+
+    .cm-node.selected, .cmap-node.selected,
+    [class*="cm-node"].selected {
+      background: var(--md-sys-color-primary-container) !important;
+      border-color: var(--md-sys-color-primary) !important;
+      color: var(--md-sys-color-on-primary-container) !important;
+      box-shadow: var(--md-elev-2) !important;
+    }
+
+    .cm-tooltip, .cmap-tooltip,
+    [class*="cm-tooltip"], [class*="cmap-tooltip"] {
+      background: var(--md-sys-color-inverse-surface) !important;
+      color: var(--md-sys-color-inverse-on-surface) !important;
+      border-radius: var(--radius-xs) !important;
+      box-shadow: var(--md-elev-2) !important;
+    }
+
+    .cm-controls, .cmap-controls,
+    .cm-panel, .cmap-panel,
+    [class*="cm-control"], [class*="cmap-control"],
+    [id*="cm-control"], [id*="cmap-control"] {
+      background: var(--md-sys-color-surface-container) !important;
+      border-color: var(--md-sys-color-outline-variant) !important;
+      color: var(--md-sys-color-on-surface-variant) !important;
     }
   </style>
 </head>
 <body>
-  <div class="app-shell">
 
-    <div id="topbar">
-      <a class="topbar-back" href="../index.html">
-        <svg viewBox="0 0 14 14" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M9 2L4 7l5 5"/>
-        </svg>
-        Back
-      </a>
-      <div id="topbar-title">Dimensional Framework</div>
-      <div id="topbar-sheet-name"></div>
+  <div class="ds-topbar">
+    <a class="ds-topbar-back" href="../index.html">
+      <svg viewBox="0 0 14 14" width="12" height="12" fill="none"
+           stroke="currentColor" stroke-width="2"
+           stroke-linecap="round" stroke-linejoin="round">
+        <path d="M9 2L4 7l5 5"/>
+      </svg>
+      Back
+    </a>
+    <div class="ds-topbar-title">Concept Map</div>
+
+    <a class="pp-nav-item" href="spreadsheet.html" title="Spreadsheet">
+      <svg viewBox="0 0 18 18" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="1.5" y="1.5" width="15" height="15" rx="2"/><line x1="1.5" y1="6.5" x2="16.5" y2="6.5"/><line x1="1.5" y1="11.5" x2="16.5" y2="11.5"/><line x1="7" y1="6.5" x2="7" y2="16.5"/><line x1="12" y1="6.5" x2="12" y2="16.5"/></svg>
+    </a>
+    <a class="pp-nav-item" href="find-matches.html" title="Find Matches">
+      <svg viewBox="0 0 18 18" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="5.5"/><line x1="12.5" y1="12.5" x2="16.5" y2="16.5"/></svg>
+    </a>
+    <a class="pp-nav-item active" href="concept-map.html" title="Concept Map">
+      <svg viewBox="0 0 18 18" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="4" r="2"/><circle cx="3.5" cy="14" r="2"/><circle cx="9" cy="14" r="2"/><circle cx="14.5" cy="14" r="2"/><line x1="9" y1="6" x2="3.5" y2="12"/><line x1="9" y1="6" x2="9" y2="12"/><line x1="9" y1="6" x2="14.5" y2="12"/></svg>
+    </a>
+    <a class="pp-nav-item" href="clusters.html" title="Clusters">
+      <svg viewBox="0 0 18 18" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="5" r="3"/><circle cx="13" cy="5" r="3"/><circle cx="5" cy="13" r="3"/><circle cx="13" cy="13" r="3"/></svg>
+    </a>
+    <div class="pp-nav-divider" style="width:1px;height:20px;margin:0 4px;background:var(--md-sys-color-outline-variant);"></div>
+
+    <div class="ds-badge ds-badge--waiting" id="cm-connection-badge">
+      <div class="ds-badge-dot"></div>
+      <span id="cm-badge-text">Connecting…</span>
     </div>
+  </div>
 
-    <div class="sheet-area">
-      <div class="loading-overlay" id="loading-overlay">Loading…</div>
-      <div class="corner"        id="corner"></div>
-      <div class="header-scroll" id="header-scroll">
-        <table class="sheet-table" id="header-table">
-          <thead><tr id="header-row"></tr></thead>
-        </table>
-      </div>
-      <div class="cat-scroll" id="cat-scroll">
-        <table class="sheet-table" id="cat-table">
-          <tbody id="cat-body"></tbody>
-        </table>
-      </div>
-      <div class="data-scroll" id="data-scroll">
-        <table class="sheet-table" id="data-table">
-          <tbody id="data-body"></tbody>
-        </table>
+  <div class="cm-layout">
+    <div id="cm-pane">
+      <div class="ds-no-host" id="cm-no-host">
+        <h2>Data not available</h2>
+        <p>Return to the <a href="../index.html">home page</a> to load data first.</p>
       </div>
     </div>
-
-    <div class="bottombar">
-      <div class="tab-bar" id="tab-bar"></div>
-    </div>
-
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="../utilities/utils-shared.js?v=9e3a42a4"></script>
-  <script src="../utilities/utils-keywords.js?v=1a2b3c4d"></script>
-  <script src="../utilities/embedding-bridge.js?v=1a2b3c4d"></script>
-  <script src="../utilities/utils-spreadsheet.js?v=1a2b3c4d"></script>
-  <script type="module" src="../utilities/utils-embedding.js?v=1a2b3c4d"></script>
+  <script src="../utilities/utils-panel.js?v=7"></script>
+  <script src="../utilities/embedding-bridge.js?v=7"></script>
+  <script src="../utilities/utils-concept-map.js?v=34cf09cc"></script>
+  <script src="../utilities/utils-bottom-nav.js"></script>
+
+  <script>
+    window._cmBridgeRows = null;
+
+    window.buildRowIndex = function() {
+      return window._cmBridgeRows || [];
+    };
+
+    if (typeof parseCitation === 'undefined') {
+      window.parseCitation = function(text) {
+        return { body: String(text || ''), citation: null };
+      };
+    }
+
+    window.EmbeddingUtils = {
+      isReady:            function() { return false; },
+      getCachedEmbedding: function()  { return Promise.resolve(null); },
+      getVectorSync:      function()  { return null; }
+    };
+
+    var badgeEl   = document.getElementById('cm-connection-badge');
+    var badgeText = document.getElementById('cm-badge-text');
+    var noHost    = document.getElementById('cm-no-host');
+    var paneEl    = document.getElementById('cm-pane');
+    var layout    = document.querySelector('.cm-layout');
+
+    function setBadge(state, text) {
+      badgeEl.className     = 'ds-badge ds-badge--' + state;
+      badgeText.textContent = text;
+    }
+
+    var cmTool = initConceptMapTool(paneEl, null);
+
+    var cmPanel = createSidePanel(layout, {
+      side:              'right',
+      defaultFraction:   0,
+      minFraction:       0,
+      maxFraction:       0.65,
+      snapCloseFraction: 0.10,
+      onResize: function() { if (cmTool && cmTool.resize) cmTool.resize(); },
+      onOpen:   function() { if (cmTool && cmTool.resize) cmTool.resize(); },
+      onClose:  function() { if (cmTool && cmTool.resize) cmTool.resize(); },
+    });
+
+    EmbeddingBridge.guest(function(rows) {
+      noHost.classList.remove('visible');
+      setBadge('connected', rows.length + ' entries live');
+
+      window._cmBridgeRows = rows;
+
+      var textToVec = new Map();
+      rows.forEach(function(r) {
+        if (!r.vec) return;
+        var cells = (r.row && r.row.cells) ? r.row.cells : (r.cells || []);
+        var fullText = cells.join(' ').trim();
+        if (fullText) textToVec.set(fullText, r.vec);
+        cells.forEach(function(c) {
+          if (c && c.trim()) textToVec.set(c.trim(), r.vec);
+        });
+      });
+
+      window.EmbeddingUtils.isReady = function() { return true; };
+
+      window.EmbeddingUtils.getCachedEmbedding = function(text) {
+        var t   = text ? text.trim() : '';
+        var vec = textToVec.get(t);
+        if (vec) return Promise.resolve(vec);
+        var prefix = t.slice(0, 40);
+        var found  = null;
+        textToVec.forEach(function(v, k) {
+          if (!found && k.startsWith(prefix)) found = v;
+        });
+        return Promise.resolve(found || null);
+      };
+
+      cmTool.reset();
+      cmTool.start();
+    });
+
+    window.addEventListener('bridge-no-host', function() {
+      setBadge('disconnected', 'No data — visit home page first');
+      noHost.classList.add('visible');
+    });
+
+    (function patchTouchDrag() {
+      function patch() {
+        var canvas = paneEl.querySelector('[class*="canvas"], [id*="canvas"]');
+        if (!canvas) { setTimeout(patch, 300); return; }
+
+        var panStart = null;
+        canvas.addEventListener('touchstart', function(e) {
+          if (e.touches.length !== 1) return;
+          var target = e.touches[0].target;
+          if (target.closest && target.closest('[class*="cm-node"],[class*="cmap-node"],[class*="pp-cm-node"]')) return;
+          panStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+        }, { passive: true });
+
+        canvas.addEventListener('touchmove', function(e) {
+          if (!panStart || e.touches.length !== 1) return;
+          e.preventDefault();
+          var dx = e.touches[0].clientX - panStart.x;
+          var dy = e.touches[0].clientY - panStart.y;
+          panStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+          var world = canvas.querySelector('[class*="world"],[id*="world"]');
+          if (world) {
+            var cur = new DOMMatrix(window.getComputedStyle(world).transform);
+            world.style.transform = 'translate(' + (cur.m41 + dx) + 'px,' + (cur.m42 + dy) + 'px) scale(' + cur.a + ')';
+          }
+        }, { passive: false });
+
+        canvas.addEventListener('touchend', function() { panStart = null; }, { passive: true });
+
+        canvas.addEventListener('touchstart', function(e) {
+          if (e.touches.length !== 1) return;
+          var node = e.touches[0].target.closest && e.touches[0].target.closest(
+            '[class*="cm-node"],[class*="cmap-node"],[class*="pp-cm-node"],[class*="pp-cmap-node"]'
+          );
+          if (!node) return;
+
+          var t0 = e.touches[0];
+          node.dispatchEvent(new MouseEvent('mousedown', {
+            bubbles: true, cancelable: true,
+            clientX: t0.clientX, clientY: t0.clientY, button: 0
+          }));
+
+          function onMove(ev) {
+            if (ev.touches.length !== 1) return;
+            ev.preventDefault();
+            document.dispatchEvent(new MouseEvent('mousemove', {
+              bubbles: true, cancelable: true,
+              clientX: ev.touches[0].clientX, clientY: ev.touches[0].clientY
+            }));
+          }
+          function onEnd() {
+            document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, button: 0 }));
+            document.removeEventListener('touchmove', onMove);
+            document.removeEventListener('touchend', onEnd);
+          }
+          document.addEventListener('touchmove', onMove, { passive: false });
+          document.addEventListener('touchend', onEnd, { passive: true });
+        }, { passive: true });
+      }
+      setTimeout(patch, 400);
+    })();
+  </script>
+
 </body>
 </html>
