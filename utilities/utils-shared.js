@@ -726,7 +726,11 @@ window.PPNavRail = (function () {
       statusEl:   statusEl,
     };
 
-    window.injectToolNav = function(currentTool) {
+  return { create: create };
+})();
+
+// ── Tool nav injector ─────────────────────────────────────────
+window.injectToolNav = function(currentTool) {
   var tools = [
     { href: 'spreadsheet.html',  label: 'Spreadsheet', d: '<rect x="1.5" y="1.5" width="15" height="15" rx="2"/><line x1="1.5" y1="6.5" x2="16.5" y2="6.5"/><line x1="1.5" y1="11.5" x2="16.5" y2="11.5"/><line x1="7" y1="6.5" x2="7" y2="16.5"/><line x1="12" y1="6.5" x2="12" y2="16.5"/>' },
     { href: 'find-matches.html', label: 'Find Matches', d: '<circle cx="8" cy="8" r="5.5"/><line x1="12.5" y1="12.5" x2="16.5" y2="16.5"/>' },
@@ -748,8 +752,5 @@ window.PPNavRail = (function () {
     rail.appendChild(a);
   });
 };
-  }
 
-  return { create: create };
-})();
 
