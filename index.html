@@ -10,6 +10,8 @@
     body {
       overflow-x: hidden;
       min-height: 100vh;
+      /* Room for fixed bottom nav */
+      padding-bottom: 60px;
     }
 
     /* ── Nav ── */
@@ -343,7 +345,6 @@
       color: var(--color-text-default);
     }
 
-    /* The pill track */
     .theme-toggle-track {
       width: 28px;
       height: 16px;
@@ -353,7 +354,6 @@
       flex-shrink: 0;
       transition: background var(--transition-fast);
     }
-    /* The sliding thumb */
     .theme-toggle-thumb {
       position: absolute;
       top: 2px;
@@ -365,11 +365,120 @@
       transition: transform var(--transition-fast), background var(--transition-fast);
     }
 
-    /* Toggle visual states driven by html.dark / html.light */
     html.dark .theme-toggle-track  { background: rgba(255,255,255,0.25); }
     html.dark .theme-toggle-thumb  { transform: translateX(12px); background: #fff; }
     html.dark .theme-toggle        { color: rgba(255,255,255,0.5); border-color: rgba(255,255,255,0.15); }
     html.dark .theme-toggle:hover  { border-color: rgba(255,255,255,0.35); color: rgba(255,255,255,0.9); }
+
+    /* ════════════════════════════════════════════════
+       BOTTOM TOOL NAV BAR
+       Fixed strip at viewport bottom. Each icon button
+       loads the tool in a full-screen iframe overlay.
+    ════════════════════════════════════════════════ */
+    .bottom-nav {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      z-index: 100;
+      height: 52px;
+      background: var(--md-sys-color-surface-container-low);
+      border-top: 1px solid var(--md-sys-color-outline-variant);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      padding: 0 12px;
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+
+    .bottom-nav-btn {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 3px;
+      width: 64px;
+      height: 44px;
+      border: none;
+      border-radius: var(--radius-md);
+      background: transparent;
+      color: var(--md-sys-color-outline);
+      cursor: pointer;
+      font-family: var(--font-family);
+      font-size: 9px;
+      font-weight: var(--font-weight-medium);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      transition: background var(--transition-fast), color var(--transition-fast);
+      position: relative;
+      flex-shrink: 0;
+    }
+    .bottom-nav-btn svg {
+      display: block;
+      flex-shrink: 0;
+    }
+    .bottom-nav-btn:hover {
+      background: var(--md-sys-color-surface-container);
+      color: var(--md-sys-color-on-surface);
+    }
+    .bottom-nav-btn.active {
+      background: var(--md-sys-color-secondary-container);
+      color: var(--md-sys-color-on-secondary-container);
+    }
+
+    /* Active indicator dot */
+    .bottom-nav-btn.active::after {
+      content: '';
+      position: absolute;
+      bottom: 4px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+      background: var(--md-sys-color-secondary);
+    }
+
+    /* Divider between home and tools */
+    .bottom-nav-divider {
+      width: 1px;
+      height: 24px;
+      background: var(--md-sys-color-outline-variant);
+      flex-shrink: 0;
+      margin: 0 4px;
+    }
+
+    /* ════════════════════════════════════════════════
+       TOOL OVERLAY — full-screen iframe panel
+       Slides up from the bottom nav, covers the page.
+    ════════════════════════════════════════════════ */
+    .tool-overlay {
+      position: fixed;
+      inset: 0;
+      bottom: 52px; /* sits above the nav bar */
+      z-index: 90;
+      background: var(--md-sys-color-background);
+      display: flex;
+      flex-direction: column;
+      transform: translateY(100%);
+      transition: transform 0.32s cubic-bezier(0.4, 0, 0.2, 1);
+      pointer-events: none;
+    }
+    .tool-overlay.open {
+      transform: translateY(0);
+      pointer-events: all;
+    }
+
+    .tool-overlay-frame {
+      flex: 1;
+      border: none;
+      display: block;
+      width: 100%;
+      height: 100%;
+      background: var(--md-sys-color-background);
+    }
 
     /* ── Animations ── */
     .fade-in {
@@ -393,6 +502,7 @@
       .nav-links { gap: 20px; }
       .tool-name { font-size: 22px; }
       .footer-bottom { flex-direction: column; gap: 12px; align-items: flex-start; }
+      .bottom-nav-btn { width: 52px; font-size: 8px; }
     }
   </style>
 </head>
@@ -402,6 +512,7 @@
     <div class="nav-contain">
       <span class="logo-text">Dimensional Framework</span>
       <div class="nav-links">
+        <a class="nav-link" href="tools/spreadsheet.html">Spreadsheet</a>
         <a class="nav-link" href="tools/find-matches.html">Find Matches</a>
         <a class="nav-link" href="tools/concept-map.html">Concept Map</a>
         <a class="nav-link" href="tools/clusters.html">Clusters</a>
@@ -444,9 +555,27 @@
     <span class="section-label">Tools</span>
     <div class="tools-content">
 
-      <a class="tool-row" href="tools/find-matches.html">
+      <!-- Spreadsheet row — now clickable via bottom nav too -->
+      <div class="tool-row" data-tool="tools/spreadsheet.html" style="cursor:pointer">
         <div class="tool-left">
           <span class="tool-number">01</span>
+          <div class="tool-accent" style="background:var(--md-sys-color-outline);"></div>
+          <div class="tool-info">
+            <span class="tool-name">Spreadsheet</span>
+            <span class="tool-desc">Browse your raw data in a structured, tab-navigable spreadsheet view. Category columns span rows, headers sync with scroll, and highlights follow your cursor.</span>
+            <div class="tool-tags">
+              <span class="tool-tag">Browse</span>
+              <span class="tool-tag">Raw data</span>
+              <span class="tool-tag">Spreadsheet</span>
+            </div>
+          </div>
+        </div>
+        <span class="tool-arrow">↗</span>
+      </div>
+
+      <div class="tool-row" data-tool="tools/find-matches.html" style="cursor:pointer">
+        <div class="tool-left">
+          <span class="tool-number">02</span>
           <div class="tool-accent" style="background:var(--raw-visions);"></div>
           <div class="tool-info">
             <span class="tool-name">Find Matches</span>
@@ -459,11 +588,11 @@
           </div>
         </div>
         <span class="tool-arrow">↗</span>
-      </a>
+      </div>
 
-      <a class="tool-row" href="tools/concept-map.html">
+      <div class="tool-row" data-tool="tools/concept-map.html" style="cursor:pointer">
         <div class="tool-left">
-          <span class="tool-number">02</span>
+          <span class="tool-number">03</span>
           <div class="tool-accent" style="background:var(--raw-relational);"></div>
           <div class="tool-info">
             <span class="tool-name">Concept Map</span>
@@ -476,11 +605,11 @@
           </div>
         </div>
         <span class="tool-arrow">↗</span>
-      </a>
+      </div>
 
-      <a class="tool-row" href="tools/clusters.html">
+      <div class="tool-row" data-tool="tools/clusters.html" style="cursor:pointer">
         <div class="tool-left">
-          <span class="tool-number">03</span>
+          <span class="tool-number">04</span>
           <div class="tool-accent" style="background:var(--raw-org);"></div>
           <div class="tool-info">
             <span class="tool-name">Clusters</span>
@@ -493,7 +622,7 @@
           </div>
         </div>
         <span class="tool-arrow">↗</span>
-      </a>
+      </div>
 
     </div>
   </section>
@@ -503,7 +632,6 @@
       <div class="footer-bottom">
         <span class="footer-copy">Dimensional Framework</span>
 
-        <!-- Dark mode toggle -->
         <button class="theme-toggle" id="theme-toggle" aria-label="Toggle dark mode">
           <div class="theme-toggle-track">
             <div class="theme-toggle-thumb"></div>
@@ -516,16 +644,140 @@
     </div>
   </footer>
 
+  <!-- ═══════════════════════════════════════════════════════
+       TOOL OVERLAY — iframe fills the viewport above the nav
+  ═══════════════════════════════════════════════════════ -->
+  <div class="tool-overlay" id="tool-overlay" role="dialog" aria-modal="true" aria-label="Tool panel">
+    <iframe
+      class="tool-overlay-frame"
+      id="tool-frame"
+      title="Tool"
+      allowfullscreen
+    ></iframe>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════
+       BOTTOM TOOL NAV BAR
+  ═══════════════════════════════════════════════════════ -->
+  <nav class="bottom-nav" aria-label="Tools">
+
+    <!-- Home -->
+    <button class="bottom-nav-btn active" id="btn-home" data-tool="" aria-label="Home">
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M2 7.5L9 2l7 5.5V16a1 1 0 01-1 1H3a1 1 0 01-1-1V7.5z"/>
+        <path d="M6.5 17V11h5v6"/>
+      </svg>
+      Home
+    </button>
+
+    <div class="bottom-nav-divider"></div>
+
+    <!-- Spreadsheet -->
+    <button class="bottom-nav-btn" id="btn-spreadsheet" data-tool="tools/spreadsheet.html" aria-label="Spreadsheet">
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="1.5" y="1.5" width="15" height="15" rx="2"/>
+        <line x1="1.5" y1="6.5" x2="16.5" y2="6.5"/>
+        <line x1="1.5" y1="11.5" x2="16.5" y2="11.5"/>
+        <line x1="7" y1="6.5" x2="7" y2="16.5"/>
+        <line x1="12" y1="6.5" x2="12" y2="16.5"/>
+      </svg>
+      Sheets
+    </button>
+
+    <!-- Find Matches -->
+    <button class="bottom-nav-btn" id="btn-find-matches" data-tool="tools/find-matches.html" aria-label="Find Matches">
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="8" cy="8" r="5.5"/>
+        <line x1="12.5" y1="12.5" x2="16.5" y2="16.5"/>
+        <line x1="5.5" y1="8" x2="10.5" y2="8"/>
+        <line x1="8" y1="5.5" x2="8" y2="10.5"/>
+      </svg>
+      Matches
+    </button>
+
+    <!-- Concept Map -->
+    <button class="bottom-nav-btn" id="btn-concept-map" data-tool="tools/concept-map.html" aria-label="Concept Map">
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="9" cy="4" r="2"/>
+        <circle cx="3.5" cy="14" r="2"/>
+        <circle cx="14.5" cy="14" r="2"/>
+        <circle cx="9" cy="14" r="2"/>
+        <line x1="9" y1="6" x2="3.5" y2="12"/>
+        <line x1="9" y1="6" x2="9" y2="12"/>
+        <line x1="9" y1="6" x2="14.5" y2="12"/>
+      </svg>
+      Map
+    </button>
+
+    <!-- Clusters -->
+    <button class="bottom-nav-btn" id="btn-clusters" data-tool="tools/clusters.html" aria-label="Clusters">
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="5" cy="5" r="3"/>
+        <circle cx="13" cy="5" r="3"/>
+        <circle cx="5" cy="13" r="3"/>
+        <circle cx="13" cy="13" r="3"/>
+      </svg>
+      Clusters
+    </button>
+
+  </nav>
+
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="utilities/embedding-bridge.js?v=4"></script>
 <script src="utilities/utils-keywords.js?v=4"></script>
 <script src="utilities/utils-shared.js?v=9e3a42a4"></script>
 <script type="module" src="utilities/utils-embedding.js?v=4"></script>
 
-  <script>console.log('[index.html v.9]');</script>
+  <script>console.log('[index.html v.10]');</script>
 
   <script>
-    // ── Dark mode: handled by utilities/utils-shared.js ──
+    // ── Bottom nav + overlay ──────────────────────────────────────────────────
+    var overlay    = document.getElementById('tool-overlay');
+    var frame      = document.getElementById('tool-frame');
+    var navBtns    = document.querySelectorAll('.bottom-nav-btn');
+    var activeBtn  = document.getElementById('btn-home');
+
+    function openTool(url, btn) {
+      if (!url) {
+        // Home — close overlay
+        overlay.classList.remove('open');
+        frame.src = '';
+        navBtns.forEach(function(b) { b.classList.remove('active'); });
+        document.getElementById('btn-home').classList.add('active');
+        return;
+      }
+      frame.src = url;
+      overlay.classList.add('open');
+      navBtns.forEach(function(b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+    }
+
+    navBtns.forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var tool = btn.dataset.tool || '';
+        openTool(tool, btn);
+      });
+    });
+
+    // Tool rows on landing page also open overlay
+    document.querySelectorAll('.tool-row[data-tool]').forEach(function(row) {
+      row.addEventListener('click', function(e) {
+        e.preventDefault();
+        var tool = row.dataset.tool;
+        // Find matching nav button and activate it
+        var matchBtn = null;
+        navBtns.forEach(function(b) { if (b.dataset.tool === tool) matchBtn = b; });
+        openTool(tool, matchBtn || navBtns[0]);
+      });
+    });
+
+    // Keyboard: Escape closes the overlay
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape' && overlay.classList.contains('open')) {
+        openTool('', document.getElementById('btn-home'));
+      }
+    });
 
     // ── Sheet loader ──────────────────────────────────────────────────────────
     var input      = document.getElementById('sheet-url-input');
