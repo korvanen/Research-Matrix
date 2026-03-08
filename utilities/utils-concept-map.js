@@ -9,7 +9,7 @@
 //   • depthColor: added missing paletteIdx + theme variable (was ReferenceError)
 //   • depthColor: rewrote getLuminance without array destructuring (was SyntaxError)
 //   • Removed dead CMAP_LEVEL_THEMES constant
-console.log('[utils-concept-map.js v.yyyyyyyyyyyyyyy]');
+console.log('[utils-concept-map.js v.PANEL]');
 
 const CMAP_PARENT_CHILD_THRESHOLD = 0.50;
 const CMAP_MIN_SPLIT_LENGTH = 60;
@@ -217,60 +217,59 @@ function initConceptMapTool(paneEl, sidebarEl) {
 
   const DRAG_DELAY = 600;
 
-  paneEl.innerHTML =
-    '<div id="pp-cmap-head">' +
-      '<div id="pp-cmap-subtitle">Waiting for embeddings\u2026</div>' +
-      '<div id="pp-cmap-status" class="cmap-loading">' +
-        '<div class="pp-cmap-dot"></div><span id="pp-cmap-label">Embeddings loading\u2026</span>' +
-      '</div>' +
-      '<div id="pp-cmap-controls">' +
-        '<div class="pp-cmap-ctrl-col">' +
-          '<div class="pp-group-label">Max Depth</div>' +
+  // ── Build nav rail + side panel via global PPNavRail component ──
+  const nav = window.PPNavRail.create(paneEl, {
+    toolName: 'Concept Map',
+    panelSections: [
+      {
+        label: 'Parameters',
+        html:
           '<div class="pp-range-row">' +
-            '<span class="pp-range-label">Lvl</span>' +
+            '<span class="pp-range-label">Depth</span>' +
             '<input class="pp-range" id="pp-cmap-depth" type="range" min="1" max="8" value="5" step="1">' +
             '<span class="pp-range-val" id="pp-cmap-depth-val">5</span>' +
           '</div>' +
-        '</div>' +
-        '<div class="pp-cmap-ctrl-col">' +
-          '<div class="pp-group-label">Link Threshold</div>' +
           '<div class="pp-range-row">' +
-            '<span class="pp-range-label">Min</span>' +
+            '<span class="pp-range-label">Thresh</span>' +
             '<input class="pp-range" id="pp-cmap-thresh" type="range" min="20" max="90" value="50" step="5">' +
             '<span class="pp-range-val" id="pp-cmap-thresh-val">50%</span>' +
           '</div>' +
-        '</div>' +
-        '<div class="pp-cmap-ctrl-col">' +
-          '<div class="pp-group-label" style="color:#7c5cbf">Max Parents</div>' +
           '<div class="pp-range-row">' +
-            '<span class="pp-range-label" style="color:#7c5cbf">Par</span>' +
+            '<span class="pp-range-label" style="color:#7c5cbf">Parents</span>' +
             '<input class="pp-range pp-range--accent" id="pp-cmap-maxpar" type="range" min="1" max="6" value="1" step="1">' +
             '<span class="pp-range-val" id="pp-cmap-maxpar-val" style="color:#7c5cbf">1</span>' +
           '</div>' +
-        '</div>' +
-        '<div id="pp-cmap-layout-wrap">' +
-          '<button id="pp-cmap-layout-btn" title="Change layout">' +
-            '<svg viewBox="0 0 12 12" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="6" cy="6" r="2"/><circle cx="6" cy="6" r="5" stroke-dasharray="2 2"/></svg>' +
-            '<span id="pp-cmap-layout-label">Organic</span>' +
-          '</button>' +
-          '<div id="pp-cmap-layout-menu">' +
-            '<div class="pp-cmap-layout-group">Flow</div>' +
-            '<button class="pp-cmap-layout-opt" data-layout="hflow">Horizontal Flow</button>' +
-            '<button class="pp-cmap-layout-opt" data-layout="vflow">Vertical Flow</button>' +
-            '<div class="pp-cmap-layout-sep"></div>' +
-            '<div class="pp-cmap-layout-group">Tree</div>' +
-            '<button class="pp-cmap-layout-opt" data-layout="htree">Horizontal Tree</button>' +
-            '<button class="pp-cmap-layout-opt" data-layout="vtree">Vertical Tree</button>' +
-            '<button class="pp-cmap-layout-opt" data-layout="radial">Radial Tree</button>' +
-            '<div class="pp-cmap-layout-sep"></div>' +
-            '<div class="pp-cmap-layout-group">Other</div>' +
-            '<button class="pp-cmap-layout-opt" data-layout="circle">Circle</button>' +
-            '<button class="pp-cmap-layout-opt active" data-layout="organic">Organic</button>' +
-          '</div>' +
-        '</div>' +
-        '<button id="pp-cmap-rebuild">Rebuild</button>' +
-      '</div>' +
-    '</div>' +
+          '<button id="pp-cmap-rebuild" style="margin-top:4px">Rebuild</button>',
+      },
+      {
+        label: 'Layout',
+        html:
+          '<div id="pp-cmap-layout-wrap">' +
+            '<button id="pp-cmap-layout-btn" title="Change layout">' +
+              '<svg viewBox="0 0 12 12" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="6" cy="6" r="2"/><circle cx="6" cy="6" r="5" stroke-dasharray="2 2"/></svg>' +
+              '<span id="pp-cmap-layout-label">Organic</span>' +
+            '</button>' +
+            '<div id="pp-cmap-layout-menu">' +
+              '<div class="pp-cmap-layout-group">Flow</div>' +
+              '<button class="pp-cmap-layout-opt" data-layout="hflow">Horizontal Flow</button>' +
+              '<button class="pp-cmap-layout-opt" data-layout="vflow">Vertical Flow</button>' +
+              '<div class="pp-cmap-layout-sep"></div>' +
+              '<div class="pp-cmap-layout-group">Tree</div>' +
+              '<button class="pp-cmap-layout-opt" data-layout="htree">Horizontal Tree</button>' +
+              '<button class="pp-cmap-layout-opt" data-layout="vtree">Vertical Tree</button>' +
+              '<button class="pp-cmap-layout-opt" data-layout="radial">Radial Tree</button>' +
+              '<div class="pp-cmap-layout-sep"></div>' +
+              '<div class="pp-cmap-layout-group">Other</div>' +
+              '<button class="pp-cmap-layout-opt" data-layout="circle">Circle</button>' +
+              '<button class="pp-cmap-layout-opt active" data-layout="organic">Organic</button>' +
+            '</div>' +
+          '</div>',
+      },
+    ],
+  });
+
+  // ── Inject canvas into main area ──
+  nav.mainEl.innerHTML =
     '<div id="pp-cmap-canvas">' +
       '<div id="pp-cmap-world"></div>' +
       '<div id="pp-cmap-empty">Concept map will appear<br>once the spreadsheet loads</div>' +
@@ -287,7 +286,13 @@ function initConceptMapTool(paneEl, sidebarEl) {
     paneEl.querySelectorAll('.pp-range').forEach(upgradeSlider);
   }
 
-  const subtitleEl  = paneEl.querySelector('#pp-cmap-subtitle');
+  // Status chip lives in the panel header's status slot
+  nav.statusEl.innerHTML =
+    '<div id="pp-cmap-status" class="cmap-loading">' +
+      '<div class="pp-cmap-dot"></div><span id="pp-cmap-label">Embeddings loading\u2026</span>' +
+    '</div>';
+
+  const subtitleEl  = nav.subtitleEl;
   const statusEl    = paneEl.querySelector('#pp-cmap-status');
   const labelEl     = paneEl.querySelector('#pp-cmap-label');
   const canvas      = paneEl.querySelector('#pp-cmap-canvas');
