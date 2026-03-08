@@ -11,7 +11,7 @@
 //   • buildCard: --ppc-on now = contrastFor(col.accent) (white/#1a1a1a, same as concept-map)
 //   • buildCard: removed manual border-left accent stripe (concept-map doesn't use it)
 //   • CSS color-mix expressions in card text/cat/split now driven by --ppc-on/--ppc-bg
-console.log('[utils-clusters.js v3000000000000]');
+console.log('[utils-clusters.js vuuuuuuuu]');
 
 var CL_MIN_SPLIT_LENGTH = 60;
 
@@ -1026,23 +1026,34 @@ function initClustersTool(paneEl, sidebarEl) {
     if (bestText.length < 60) return [row];
     const segments = sentenceSplit(bestText);
     if (segments.length <= 1) return [row];
+    const catStr = cats.join(' · ') || 'Cell';
     let segVecs;
     try { segVecs = await Promise.all(segments.map(s => window.EmbeddingUtils.getCachedEmbedding(s))); }
-    catch(e) { return [row]; }
-    const valid = segments
-      .map((s, i) => ({ text: s, vec: segVecs[i] }))
-      .filter(x => x.vec && x.vec.length);
-    if (valid.length <= 1) return [row];
+    catch(e) { segVecs = null; }
 
-    // Fixed split threshold — independent of the UI link threshold slider
+    const valid = segVecs
+      ? segments.map((s, i) => ({ text: s, vec: segVecs[i] })).filter(x => x.vec && x.vec.length)
+      : [];
+
+    // Fallback: if no per-sentence embeddings, split structurally using parent vec
+    if (valid.length <= 1) {
+      if (!row.vec) return [row];
+      return segments.map((seg, ni) => ({
+        tabIdx: row.tabIdx, rowIdx: row.rowIdx,
+        headers: row.headers || [], title: row.title || '',
+        kws: row.kws || new Set(),
+        _splitFrom: catStr, _splitN: ni + 1, _splitT: segments.length,
+        vec: row.vec,
+        row: { cells: cells.map((c, ci) => ci === bestIdx ? seg : c), cats }
+      }));
+    }
+
+    // Semantic grouping with complete-linkage
     const SPLIT_THRESHOLD = 0.55;
     const n = valid.length;
     const sim = Array.from({length: n}, (_, i) =>
       Array.from({length: n}, (_, j) => i === j ? 1 : cosineSim(valid[i].vec, valid[j].vec))
     );
-
-    // Complete-linkage grouping: j only joins group g if it's similar to ALL members of g
-    // (prevents chaining where A~B and B~C wrongly merge A and C into one group)
     const groupOf = new Array(n).fill(-1); let numGroups = 0;
     for (let i = 0; i < n; i++) {
       if (groupOf[i] !== -1) continue;
@@ -1061,7 +1072,7 @@ function initClustersTool(paneEl, sidebarEl) {
       tabIdx: row.tabIdx, rowIdx: row.rowIdx,
       headers: row.headers || [], title: row.title || '',
       kws: row.kws || new Set(),
-      _splitN: ni + 1, _splitT: numGroups,
+      _splitFrom: catStr, _splitN: ni + 1, _splitT: numGroups,
       vec: avgVec(segs.map(s => s.vec)),
       row: { cells: cells.map((c, ci) => ci === bestIdx ? segs.map(s => s.text).join(' ') : c), cats }
     }));
@@ -1299,7 +1310,7 @@ function initClustersTool(paneEl, sidebarEl) {
     if (r._splitN && r._splitT && r._splitT > 1) {
       const sp = document.createElement('div');
       sp.className = 'pp-cl-card-split';
-      sp.textContent = 'Seg ' + r._splitN + '\u2009/\u2009' + r._splitT;
+      sp.textContent = r._splitN + '/' + r._splitT + ' Split';
       body.appendChild(sp);
     }
     card.appendChild(body);
