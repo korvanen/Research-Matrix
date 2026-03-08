@@ -9,6 +9,7 @@
   <style>
     html, body { height: 100%; overflow: hidden; margin: 0; }
 
+    /* ── App shell ── */
     .app-shell {
       display: flex;
       flex-direction: column;
@@ -16,68 +17,22 @@
       overflow: hidden;
     }
 
-    #topbar {
-      display: flex; align-items: stretch;
-      height: var(--topbar-height, 44px);
-      flex-shrink: 0;
-      background: var(--md-sys-color-surface);
-      border-bottom: 1px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 60%, transparent);
-      z-index: 20;
-    }
-    .topbar-back {
-      display: flex; align-items: center; gap: 6px;
-      padding: 0 14px;
-      font-size: var(--font-size-xs);
-      font-weight: var(--font-weight-bold);
-      letter-spacing: var(--letter-spacing-caps);
-      text-transform: uppercase;
-      color: var(--md-sys-color-on-surface-variant);
-      text-decoration: none;
-      border-right: 1px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 60%, transparent);
-      flex-shrink: 0;
-      transition: color var(--transition-fast), background var(--transition-fast);
-    }
-    .topbar-back:hover {
-      color: var(--md-sys-color-on-surface);
-      background: color-mix(in srgb, var(--md-sys-color-on-surface) 5%, transparent);
-    }
-    #topbar-title {
-      display: flex; align-items: center;
-      padding: 0 16px;
-      font-size: var(--font-size-xs);
-      font-weight: var(--font-weight-bold);
-      letter-spacing: var(--letter-spacing-caps);
-      text-transform: uppercase;
-      color: var(--md-sys-color-on-surface-variant);
-      border-right: 1px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 60%, transparent);
-      flex-shrink: 0;
-      white-space: nowrap;
-    }
-    #topbar-sheet-name {
-      display: flex; align-items: center;
-      padding: 0 16px;
-      font-size: var(--font-size-sm);
-      font-weight: var(--font-weight-medium);
-      color: var(--md-sys-color-on-surface);
-      flex: 1; min-width: 0;
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    /* ── Pane: PPNavRail mounts here ── */
+    #pp-ss-pane {
+      flex: 1; min-height: 0;
+      display: flex;
+      overflow: hidden;
     }
 
-    /* ── Nav rail + content wrapper ── */
-    .sheet-col {
+    /* ── Sheet column: topbar + grid + tab bar ── */
+    .pp-ss-sheet-col {
       flex: 1; min-height: 0;
       display: flex;
       flex-direction: column;
       overflow: hidden;
     }
 
-    .main-row {
-      flex: 1; min-height: 0;
-      display: flex;
-      flex-direction: row;
-      overflow: hidden;
-    }
-
+    /* ── Sheet grid ── */
     .sheet-area {
       flex: 1; min-height: 0;
       position: relative;
@@ -86,7 +41,9 @@
       grid-template-columns: auto 1fr;
       grid-template-areas: "corner header" "cats data";
       overflow: hidden;
+      background: var(--md-sys-color-background);
     }
+
     .corner {
       grid-area: corner;
       background: var(--md-sys-color-surface-container);
@@ -103,21 +60,30 @@
       border-right: 1px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 50%, transparent);
     }
     .data-scroll { grid-area: data; overflow: auto; }
-    .data-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
-    .data-scroll::-webkit-scrollbar-track { background: var(--md-sys-color-background); }
-    .data-scroll::-webkit-scrollbar-thumb { background: var(--md-sys-color-outline-variant); border-radius: var(--radius-full); }
+    .data-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+    .data-scroll::-webkit-scrollbar-track { background: transparent; }
+    .data-scroll::-webkit-scrollbar-thumb {
+      background: var(--md-sys-color-outline-variant);
+      border-radius: var(--radius-full);
+    }
 
-    .sheet-table { border-collapse: collapse; font-size: var(--font-size-sm); font-family: var(--font-family); }
+    /* ── Tables ── */
+    .sheet-table {
+      border-collapse: collapse;
+      font-size: var(--font-size-sm);
+      font-family: var(--font-family);
+    }
 
     #header-row th {
       background: var(--md-sys-color-surface-container);
-      padding: 10px 16px;
+      padding: 8px 16px;
       font-size: var(--font-size-xs);
       font-weight: var(--font-weight-bold);
       letter-spacing: var(--letter-spacing-caps);
       text-transform: uppercase;
       color: var(--md-sys-color-on-surface-variant);
-      text-align: left; white-space: nowrap;
+      text-align: left;
+      white-space: nowrap;
       border-right: 1px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 40%, transparent);
     }
     #header-row th:last-child { border-right: none; }
@@ -127,7 +93,8 @@
       padding: 10px 12px;
       font-size: var(--font-size-xs);
       font-weight: var(--font-weight-bold);
-      letter-spacing: .03em; text-transform: uppercase;
+      letter-spacing: .03em;
+      text-transform: uppercase;
       color: var(--md-sys-color-on-surface-variant);
       vertical-align: middle;
       border-bottom: 1px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 30%, transparent);
@@ -142,7 +109,9 @@
       display: inline-block;
       transform-origin: center center;
       transform: rotate(-90deg) translateX(-50%);
-      white-space: nowrap; position: absolute; left: 50%;
+      white-space: nowrap;
+      position: absolute;
+      left: 50%;
     }
 
     #data-body td {
@@ -158,6 +127,7 @@
       border-bottom: 2px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 55%, transparent);
     }
 
+    /* ── Row highlight / selection states ── */
     #data-body td.highlight-group, #cat-body td.highlight-group {
       background: color-mix(in srgb, var(--md-sys-color-primary) 6%, transparent);
     }
@@ -173,9 +143,12 @@
       outline-offset: -2px;
     }
 
-    .bottombar {
-      flex-shrink: 0; height: 36px;
-      display: flex; align-items: stretch;
+    /* ── Tab bar ── */
+    .pp-ss-bottombar {
+      flex-shrink: 0;
+      height: 34px;
+      display: flex;
+      align-items: stretch;
       background: var(--md-sys-color-surface);
       border-top: 1px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 60%, transparent);
       z-index: 10;
@@ -188,76 +161,52 @@
     .tab-bar::-webkit-scrollbar { display: none; }
     .tab {
       display: flex; align-items: center;
-      padding: 0 16px;
+      padding: 0 14px;
       font-size: var(--font-size-xs);
       font-weight: var(--font-weight-medium);
+      letter-spacing: var(--letter-spacing-caps);
       color: var(--md-sys-color-on-surface-variant);
       cursor: pointer; white-space: nowrap;
       border-radius: var(--radius-xs) var(--radius-xs) 0 0;
       transition: background var(--transition-fast), color var(--transition-fast);
     }
-    .tab:hover { background: color-mix(in srgb, var(--md-sys-color-on-surface) 6%, transparent); color: var(--md-sys-color-on-surface); }
+    .tab:hover {
+      background: color-mix(in srgb, var(--md-sys-color-on-surface) 6%, transparent);
+      color: var(--md-sys-color-on-surface);
+    }
     .tab.active {
       color: var(--md-sys-color-primary);
       font-weight: var(--font-weight-bold);
       box-shadow: inset 0 -2px 0 var(--md-sys-color-primary);
     }
 
+    /* ── Loading overlay ── */
     .loading-overlay {
       position: absolute; inset: 0;
       display: flex; align-items: center; justify-content: center;
       background: var(--md-sys-color-background);
       font-size: var(--font-size-sm);
+      font-weight: var(--font-weight-medium);
+      letter-spacing: var(--letter-spacing-caps);
       color: var(--md-sys-color-on-surface-variant);
       z-index: 30;
+    }
+
+    /* ── Override PPNavRail subtitle to show sheet name nicely ── */
+    .pp-panel-subtitle {
+      font-size: var(--font-size-sm) !important;
+      font-weight: var(--font-weight-medium) !important;
+      color: var(--md-sys-color-on-surface) !important;
+      letter-spacing: 0 !important;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
   </style>
 </head>
 <body>
   <div class="app-shell">
-
-    <div class="main-row">
-      <nav class="pp-nav-rail"></nav>
-
-      <div class="sheet-col">
-    <div id="topbar">
-      <a class="topbar-back" href="../index.html">
-        <svg viewBox="0 0 14 14" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M9 2L4 7l5 5"/>
-        </svg>
-        Back
-      </a>
-      <div id="topbar-title">Dimensional Framework</div>
-      <div id="topbar-sheet-name"></div>
-    </div>
-
-    <div class="sheet-area">
-      <div class="loading-overlay" id="loading-overlay">Loading…</div>
-      <div class="corner"        id="corner"></div>
-      <div class="header-scroll" id="header-scroll">
-        <table class="sheet-table" id="header-table">
-          <thead><tr id="header-row"></tr></thead>
-        </table>
-      </div>
-      <div class="cat-scroll" id="cat-scroll">
-        <table class="sheet-table" id="cat-table">
-          <tbody id="cat-body"></tbody>
-        </table>
-      </div>
-      <div class="data-scroll" id="data-scroll">
-        <table class="sheet-table" id="data-table">
-          <tbody id="data-body"></tbody>
-        </table>
-      </div>
-    </div>
-
-    <div class="bottombar">
-      <div class="tab-bar" id="tab-bar"></div>
-    </div>
-
-      </div><!-- end sheet-col -->
-    </div><!-- end main-row -->
-
+    <div id="pp-ss-pane"></div>
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -268,47 +217,101 @@
   <script type="module" src="../utilities/utils-embedding.js?v=1a2b3c4d"></script>
   <script>
     (function () {
-      var ICON_OPEN =
-        '<svg viewBox="0 0 18 14" width="16" height="14" fill="none" ' +
-        'stroke="currentColor" stroke-width="1.7" stroke-linecap="round">' +
-        '<line x1="1" y1="2"  x2="17" y2="2"/>' +
-        '<line x1="5" y1="7"  x2="17" y2="7"/>' +
-        '<line x1="1" y1="12" x2="17" y2="12"/>' +
-        '</svg>';
-      var ICON_CLOSED =
-        '<svg viewBox="0 0 10 14" width="10" height="14" fill="none" ' +
-        'stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">' +
-        '<polyline points="7,2 2,7 7,12"/>' +
-        '</svg>';
+      var paneEl = document.getElementById('pp-ss-pane');
+      if (!paneEl || !window.PPNavRail) return;
 
-      // Insert toggle button at the top of the rail
-      var rail = document.querySelector('.pp-nav-rail');
-      if (!rail) return;
-
-      var toggleBtn = document.createElement('button');
-      toggleBtn.className = 'pp-nav-rail-toggle';
-      toggleBtn.title = 'Toggle nav';
-      toggleBtn.innerHTML = ICON_OPEN;
-      rail.appendChild(toggleBtn);
-
-      // Inject tool nav icons (adds spacer + icons)
-      injectToolNav('spreadsheet.html');
-
-      // Wire collapse — hide tool icons, shrink rail width
-      var open = true;
-      toggleBtn.addEventListener('click', function () {
-        open = !open;
-        toggleBtn.innerHTML = open ? ICON_OPEN : ICON_CLOSED;
-        rail.querySelectorAll('.pp-nav-item').forEach(function (el) {
-          el.style.visibility = open ? '' : 'hidden';
-          el.style.pointerEvents = open ? '' : 'none';
-        });
-        // Also hide the spacer
-        rail.querySelectorAll('div[style*="flex"]').forEach(function (el) {
-          el.style.display = open ? '' : 'none';
-        });
-        rail.style.width = open ? '' : '44px';
+      // ── Build nav rail + side panel ──────────────────────────
+      var nav = window.PPNavRail.create(paneEl, {
+        toolName: 'Spreadsheet',
+        panelSections: [
+          {
+            label: 'Sheet',
+            html: '<div id="pp-ss-panel-tabs"></div>',
+          },
+        ],
       });
+
+      // Sheet name goes in the subtitle slot
+      nav.subtitleEl.id = 'topbar-sheet-name';
+      nav.subtitleEl.classList.add('pp-panel-subtitle');
+
+      // Status slot — loading indicator
+      nav.statusEl.innerHTML =
+        '<div id="pp-ss-status" style="display:inline-flex;align-items:center;gap:6px;' +
+        'padding:4px 8px;border-radius:var(--radius-full);border:1px solid var(--md-sys-color-outline-variant);' +
+        'font-size:9px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;' +
+        'background:color-mix(in srgb,var(--md-sys-color-on-surface) 5%,transparent);' +
+        'color:var(--md-sys-color-on-surface-variant);width:fit-content;">' +
+        '<span id="pp-ss-status-dot" style="width:6px;height:6px;border-radius:50%;' +
+        'background:var(--md-sys-color-outline);animation:pp-ss-pulse 1.2s ease-in-out infinite;flex-shrink:0;"></span>' +
+        '<span id="pp-ss-status-label">Loading\u2026</span>' +
+        '</div>' +
+        '<style>@keyframes pp-ss-pulse{0%,100%{opacity:.3;transform:scale(.85);}50%{opacity:1;transform:scale(1.1);}}</style>';
+
+      // ── Build sheet grid inside nav.mainEl ───────────────────
+      nav.mainEl.style.cssText = 'display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden;';
+      nav.mainEl.innerHTML =
+        '<div class="sheet-area">' +
+          '<div class="loading-overlay" id="loading-overlay">Loading\u2026</div>' +
+          '<div class="corner" id="corner"></div>' +
+          '<div class="header-scroll" id="header-scroll">' +
+            '<table class="sheet-table" id="header-table">' +
+              '<thead><tr id="header-row"></tr></thead>' +
+            '</table>' +
+          '</div>' +
+          '<div class="cat-scroll" id="cat-scroll">' +
+            '<table class="sheet-table" id="cat-table">' +
+              '<tbody id="cat-body"></tbody>' +
+            '</table>' +
+          '</div>' +
+          '<div class="data-scroll" id="data-scroll">' +
+            '<table class="sheet-table" id="data-table">' +
+              '<tbody id="data-body"></tbody>' +
+            '</table>' +
+          '</div>' +
+        '</div>' +
+        '<div class="pp-ss-bottombar">' +
+          '<div class="tab-bar" id="tab-bar"></div>' +
+        '</div>';
+
+      // ── Wire tab panel in side panel to mirror the bottom tab bar ──
+      // After utils-spreadsheet loads tabs, mirror them into the panel list
+      var panelTabs = document.getElementById('pp-ss-panel-tabs');
+      var tabBar    = document.getElementById('tab-bar');
+      if (panelTabs && tabBar) {
+        var tabObserver = new MutationObserver(function () {
+          var tabs = Array.from(tabBar.querySelectorAll('.tab'));
+          if (!tabs.length) return;
+          panelTabs.innerHTML = '';
+          tabs.forEach(function (tab) {
+            var btn = document.createElement('button');
+            btn.style.cssText =
+              'display:block;width:100%;text-align:left;border:none;background:transparent;' +
+              'padding:6px 8px;border-radius:var(--radius-sm);cursor:pointer;' +
+              'font-size:var(--font-size-xs);font-weight:var(--font-weight-medium);' +
+              'letter-spacing:var(--letter-spacing-caps);text-transform:uppercase;' +
+              'color:var(--md-sys-color-on-surface-variant);' +
+              'transition:background var(--transition-fast),color var(--transition-fast);';
+            btn.textContent = tab.textContent;
+            if (tab.classList.contains('active')) {
+              btn.style.color = 'var(--md-sys-color-primary)';
+              btn.style.background = 'color-mix(in srgb,var(--md-sys-color-primary) 10%,transparent)';
+            }
+            btn.addEventListener('mouseover', function () {
+              if (!tab.classList.contains('active')) btn.style.background = 'color-mix(in srgb,var(--md-sys-color-on-surface) 6%,transparent)';
+            });
+            btn.addEventListener('mouseout', function () {
+              if (!tab.classList.contains('active')) btn.style.background = 'transparent';
+            });
+            btn.addEventListener('click', function () { tab.click(); });
+            panelTabs.appendChild(btn);
+          });
+        });
+        tabObserver.observe(tabBar, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
+      }
+
+      // ── Inject tool nav icons ─────────────────────────────────
+      injectToolNav('spreadsheet.html');
     })();
   </script>
 </body>
