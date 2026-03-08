@@ -1874,6 +1874,10 @@ function initClustersTool(paneEl, sidebarEl) {
     let workRows = _cachedEmbedded;
     try {
       const split = await splitAllRows(_cachedEmbedded);
+
+      console.log('[clusters] split check: before='+_cachedEmbedded.length+' after='+split.length+' splits='+(split.length-_cachedEmbedded.length));
+split.filter(r => r._splitFrom).forEach(r => console.log('  split:', r._splitFrom, r._splitN+'/'+r._splitT, r.row.cells.find(c=>c.trim().length>0)?.slice(0,60)));
+      
       if (split.length > _cachedEmbedded.length) {
         workRows = split;
         setStatus('loading', 'Clustering ' + workRows.length + ' concepts\u2026');
