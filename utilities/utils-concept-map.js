@@ -9,7 +9,7 @@
 //   • depthColor: added missing paletteIdx + theme variable (was ReferenceError)
 //   • depthColor: rewrote getLuminance without array destructuring (was SyntaxError)
 //   • Removed dead CMAP_LEVEL_THEMES constant
-console.log('[utils-concept-map.js v.SPLIT!]');
+console.log('[utils-concept-map.js v.yyyyyyyyyyyyyyy]');
 
 const CMAP_PARENT_CHILD_THRESHOLD = 0.50;
 const CMAP_MIN_SPLIT_LENGTH = 60;
@@ -827,14 +827,14 @@ function initConceptMapTool(paneEl, sidebarEl) {
         te.className='pp-cmap-cell-text';
         te.textContent=parsed.body;
         body.appendChild(te);
+        var r2=rows[ri];
+        if (r2._splitFrom) {
+          var sb=document.createElement('div');
+          sb.style.cssText='font-size:9px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:'+lc+';opacity:0.7;padding:5px 0 2px;';
+          sb.textContent=r2._splitN+'/'+r2._splitT+' Split';
+          body.appendChild(sb);
+        }
       });
-      if (isSplit) {
-        var splitBadge=document.createElement('div');
-        splitBadge.style.cssText='font-size:9px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;'
-          +'color:'+lc+';opacity:0.7;padding:6px 0 2px;';
-        splitBadge.textContent=primaryRow._splitN+'/'+primaryRow._splitT+' Split';
-        body.appendChild(splitBadge);
-      }
       card.appendChild(body);
 
       var hasChildren=childrenOf[i].length>0;
