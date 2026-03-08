@@ -607,12 +607,22 @@ function initClustersTool(paneEl, sidebarEl) {
     '<line x1="7" y1="5" x2="7" y2="15"/>' +
     '</svg>';
 
+  const ICON_EXPORT =
+    '<svg viewBox="0 0 16 18" width="14" height="16" fill="none" ' +
+    'stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">' +
+    '<path d="M8 1v10M4 7l4 4 4-4"/>' +
+    '<path d="M2 13v3h12v-3"/>' +
+    '</svg>';
+
   // ── Build nav rail + side panel via global PPNavRail component ──
   const nav = window.PPNavRail.create(paneEl, {
     toolName: 'Clusters',
     railExtra:
       '<button class="pp-nav-rail-sheet-btn" id="pp-cl-sheet-btn" title="Toggle cluster table">' +
         ICON_TABLE +
+      '</button>' +
+      '<button class="pp-nav-rail-sheet-btn" id="pp-cl-export-btn" title="Export to spreadsheet">' +
+        ICON_EXPORT +
       '</button>',
     panelSections: [
       {
@@ -811,6 +821,116 @@ function initClustersTool(paneEl, sidebarEl) {
     sheetBtn.classList.toggle('pp-nav-rail-sheet-btn--active', open);
   }
   sheetBtn.addEventListener('click', () => setSheetOpen(!_sheetOpen));
+
+  // ── Export to XLSX ────────────────────────────────────────
+  const exportBtn = paneEl.querySelector('#pp-cl-export-btn');
+
+  function exportToXlsx() {
+    if (!_clusterState || !_clusterState.nonEmpty || !_clusterState.nonEmpty.length) return;
+    const { nonEmpty } = _clusterState;
+
+    // Build the same column/row structure as the sheet panel
+    const cols = nonEmpty.map((members, ci) => {
+      const outerLbl = outerLabel(ci);
+      let groups;
+      if (_depth >= 2 && members.length >= 2) {
+        const asgn   = autoCluster(members, _innerMin, _innerMax);
+        const numSub = Math.max(...asgn, 0) + 1;
+        groups = Array.from({ length: numSub }, () => []);
+        members.forEach((r, i) => groups[asgn[i]].push(r));
+      } else {
+        groups = [members.slice()];
+      }
+      return { outerLbl, groups };
+    });
+
+    const maxRows = Math.max(...cols.map(c => c.groups.length));
+
+    // Build aoa (array of arrays) for SheetJS
+    // Row 0: headers  [ '#', 'A Cluster', 'B Cluster', … ]
+    const headers = ['#', ...cols.map(c => c.outerLbl + ' Cluster')];
+    const aoa = [headers];
+
+    // Helper: flatten a group of rows into a single cell string, with sub-labels if depth>2
+    function cellText(members, rowLbl) {
+      if (_depth <= 2 || members.length < 2) {
+        return members.map(r => {
+          const cells = r.row && r.row.cells ? r.row.cells : (r.cells || []);
+          const best  = cells.reduce((b, c) => c.length > b.length ? c : b, '');
+          const parsed = typeof parseCitation === 'function' ? parseCitation(best) : { body: best };
+          return (parsed.body || best).trim();
+        }).join('\n\n');
+      }
+      // depth 3+: recurse with sub-labels
+      const asgn     = autoCluster(members, _innerMin, _innerMax);
+      const numGroups = Math.max(...asgn, 0) + 1;
+      if (numGroups <= 1) return cellText(members, rowLbl, 0);
+      const groups  = Array.from({ length: numGroups }, () => []);
+      members.forEach((r, i) => groups[asgn[i]].push(r));
+      return groups.map((grp, si) => {
+        const lbl = subLabel(rowLbl, si);
+        const body = grp.map(r => {
+          const cells = r.row && r.row.cells ? r.row.cells : (r.cells || []);
+          const best  = cells.reduce((b, c) => c.length > b.length ? c : b, '');
+          const parsed = typeof parseCitation === 'function' ? parseCitation(best) : { body: best };
+          return (parsed.body || best).trim();
+        }).join('\n');
+        return '[' + lbl + ']\n' + body;
+      }).filter(Boolean).join('\n\n');
+    }
+
+    for (let ri = 0; ri < maxRows; ri++) {
+      const row = [ri + 1];
+      cols.forEach(c => {
+        const members = c.groups[ri] || [];
+        const rowLbl  = subLabel(c.outerLbl, ri);
+        row.push(members.length ? cellText(members, rowLbl) : '');
+      });
+      aoa.push(row);
+    }
+
+    // Use SheetJS if available, otherwise fall back to CSV
+    if (window.XLSX) {
+      const wb = window.XLSX.utils.book_new();
+      const ws = window.XLSX.utils.aoa_to_sheet(aoa);
+      // Set column widths: # narrow, clusters wide
+      ws['!cols'] = [{ wch: 4 }, ...cols.map(() => ({ wch: 38 }))];
+      // Wrap text in all data cells
+      const range = window.XLSX.utils.decode_range(ws['!ref']);
+      for (let R = 0; R <= range.e.r; R++) {
+        for (let C = 0; C <= range.e.c; C++) {
+          const addr = window.XLSX.utils.encode_cell({ r: R, c: C });
+          if (!ws[addr]) continue;
+          if (!ws[addr].s) ws[addr].s = {};
+          ws[addr].s.alignment = { wrapText: true, vertical: 'top' };
+          if (R === 0) ws[addr].s.font = { bold: true };
+        }
+      }
+      window.XLSX.utils.book_append_sheet(wb, ws, 'Clusters');
+      window.XLSX.writeFile(wb, 'clusters.xlsx');
+    } else {
+      // CSV fallback
+      const csv = aoa.map(row =>
+        row.map(cell => {
+          const s = String(cell).replace(/"/g, '""');
+          return /[,"\n]/.test(s) ? '"' + s + '"' : s;
+        }).join(',')
+      ).join('\n');
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'clusters.csv';
+      a.click();
+      URL.revokeObjectURL(a.href);
+    }
+  }
+
+  exportBtn.addEventListener('click', () => {
+    if (!_clusterState) return;
+    exportBtn.style.opacity = '0.4';
+    setTimeout(() => { exportBtn.style.opacity = ''; }, 400);
+    exportToXlsx();
+  });
 
   function buildSheetCard(r, col) {
     const cells  = r.row && r.row.cells ? r.row.cells : (r.cells || []);
