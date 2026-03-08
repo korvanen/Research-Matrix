@@ -9,7 +9,7 @@
 //   • depthColor: added missing paletteIdx + theme variable (was ReferenceError)
 //   • depthColor: rewrote getLuminance without array destructuring (was SyntaxError)
 //   • Removed dead CMAP_LEVEL_THEMES constant
-console.log('[utils-concept-map.js v.pneeeel]');
+console.log('[utils-concept-map.js v.hoohaaa]');
 
 const CMAP_PARENT_CHILD_THRESHOLD = 0.50;
 const CMAP_MIN_SPLIT_LENGTH = 60;
@@ -288,6 +288,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
   const world       = paneEl.querySelector('#pp-cmap-world');
   const emptyEl     = paneEl.querySelector('#pp-cmap-empty');
   const rebuildBtn  = paneEl.querySelector('#pp-cmap-rebuild');
+  const fitBtn      = paneEl.querySelector('#pp-cmap-fit');
   const layoutOpts  = paneEl.querySelectorAll('.pp-cmap-layout-opt');
   const depthSlider = paneEl.querySelector('#pp-cmap-depth');
   const depthValEl  = paneEl.querySelector('#pp-cmap-depth-val');
