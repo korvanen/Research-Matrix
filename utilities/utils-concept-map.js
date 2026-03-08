@@ -832,8 +832,9 @@ function initConceptMapTool(paneEl, sidebarEl) {
         var splitBadge=document.createElement('div');
         splitBadge.className='pp-cmap-split-badge';
         splitBadge.textContent=primaryRow._splitN+'/'+primaryRow._splitT+' Split';
-        splitBadge.style.cssText='font-size:9px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;'
-          +'color:'+lc+';opacity:0.65;padding:4px 9px 6px;text-align:right;display:block;';
+        splitBadge.style.cssText='display:inline-block;font-size:9px;font-weight:800;letter-spacing:.06em;'
+          +'text-transform:uppercase;color:'+lc+';background:rgba(0,0,0,0.18);'
+          +'border-radius:99px;padding:2px 8px;margin:4px 9px 4px auto;float:right;clear:both;';
         card.appendChild(splitBadge);
       }
 
