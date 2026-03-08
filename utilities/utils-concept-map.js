@@ -9,7 +9,7 @@
 //   • depthColor: added missing paletteIdx + theme variable (was ReferenceError)
 //   • depthColor: rewrote getLuminance without array destructuring (was SyntaxError)
 //   • Removed dead CMAP_LEVEL_THEMES constant
-console.log('[utils-concept-map.js v.66666]');
+console.log('[utils-concept-map.js v.3]');
 
 const CMAP_PARENT_CHILD_THRESHOLD = 0.50;
 const CMAP_MIN_SPLIT_LENGTH = 60;
@@ -977,7 +977,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
         case 'organic': layoutOrganic(); break;
         default: layoutRadial(); break;
       }
-      setTimeout(fitAll,80);
+      setTimeout(fitAll, 700 + 180 + 100); // after animation + max stagger + buffer
     });
   }
 
