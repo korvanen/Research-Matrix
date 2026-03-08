@@ -10,6 +10,8 @@
     body {
       overflow-x: hidden;
       min-height: 100vh;
+      /* Room for fixed bottom nav */
+      padding-bottom: 60px;
     }
 
     /* ── Nav ── */
@@ -294,6 +296,80 @@
       color: var(--raw-black);
     }
 
+    /* ── Footer ── */
+    footer { border-top: 1px solid var(--raw-black); }
+
+    .footer-section {
+      display: flex;
+      flex-direction: column;
+      padding: 20px 24px;
+      max-width: 1280px;
+      margin: 0 auto;
+    }
+
+    .footer-bottom {
+      display: flex;
+      flex-direction: row;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 4px;
+    }
+
+    .footer-copy,
+    .footer-version {
+      font-size: 13px;
+      color: var(--color-text-muted);
+      letter-spacing: -0.01em;
+    }
+    .footer-version { letter-spacing: 0.04em; font-variant-numeric: tabular-nums; }
+
+    /* ── Dark mode toggle ── */
+    .theme-toggle {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: none;
+      border: 1px solid rgba(128,128,128,0.25);
+      border-radius: var(--radius-full);
+      padding: 5px 12px 5px 8px;
+      cursor: pointer;
+      font-family: var(--font-family);
+      font-size: 12px;
+      font-weight: var(--font-weight-medium);
+      color: var(--color-text-muted);
+      letter-spacing: -0.01em;
+      transition: border-color var(--transition-fast), color var(--transition-fast), background var(--transition-fast);
+    }
+    .theme-toggle:hover {
+      border-color: rgba(128,128,128,0.5);
+      color: var(--color-text-default);
+    }
+
+    .theme-toggle-track {
+      width: 28px;
+      height: 16px;
+      border-radius: 8px;
+      background: rgba(128,128,128,0.2);
+      position: relative;
+      flex-shrink: 0;
+      transition: background var(--transition-fast);
+    }
+    .theme-toggle-thumb {
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--color-text-muted);
+      transition: transform var(--transition-fast), background var(--transition-fast);
+    }
+
+    html.dark .theme-toggle-track  { background: rgba(255,255,255,0.25); }
+    html.dark .theme-toggle-thumb  { transform: translateX(12px); background: #fff; }
+    html.dark .theme-toggle        { color: rgba(255,255,255,0.5); border-color: rgba(255,255,255,0.15); }
+    html.dark .theme-toggle:hover  { border-color: rgba(255,255,255,0.35); color: rgba(255,255,255,0.9); }
+
     /* ── Animations ── */
     .fade-in {
       opacity: 0;
@@ -303,6 +379,65 @@
     .fade-in:nth-child(1) { animation-delay: 0.05s; }
     .fade-in:nth-child(2) { animation-delay: 0.12s; }
     .fade-in:nth-child(3) { animation-delay: 0.20s; }
+
+    /* ── Footer ── */
+    footer { border-top: 1px solid var(--raw-black); }
+    .footer-section {
+      display: flex;
+      flex-direction: column;
+      padding: 20px 24px;
+      max-width: 1280px;
+      margin: 0 auto;
+    }
+    .footer-bottom {
+      display: flex;
+      flex-direction: row;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 4px;
+    }
+    .footer-copy, .footer-version {
+      font-size: 13px;
+      color: var(--color-text-muted);
+      letter-spacing: -0.01em;
+    }
+    .footer-version { letter-spacing: 0.04em; font-variant-numeric: tabular-nums; }
+
+    .theme-toggle {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: none;
+      border: 1px solid rgba(128,128,128,0.25);
+      border-radius: var(--radius-full);
+      padding: 5px 12px 5px 8px;
+      cursor: pointer;
+      font-family: var(--font-family);
+      font-size: 12px;
+      font-weight: var(--font-weight-medium);
+      color: var(--color-text-muted);
+      letter-spacing: -0.01em;
+      transition: border-color var(--transition-fast), color var(--transition-fast);
+    }
+    .theme-toggle:hover { border-color: rgba(128,128,128,0.5); color: var(--color-text-default); }
+    .theme-toggle-track {
+      width: 28px; height: 16px;
+      border-radius: 8px;
+      background: rgba(128,128,128,0.2);
+      position: relative; flex-shrink: 0;
+      transition: background var(--transition-fast);
+    }
+    .theme-toggle-thumb {
+      position: absolute; top: 2px; left: 2px;
+      width: 12px; height: 12px;
+      border-radius: 50%;
+      background: var(--color-text-muted);
+      transition: transform var(--transition-fast), background var(--transition-fast);
+    }
+    html.dark .theme-toggle-track  { background: rgba(255,255,255,0.25); }
+    html.dark .theme-toggle-thumb  { transform: translateX(12px); background: #fff; }
+    html.dark .theme-toggle        { color: rgba(255,255,255,0.5); border-color: rgba(255,255,255,0.15); }
+    html.dark .theme-toggle:hover  { border-color: rgba(255,255,255,0.35); color: rgba(255,255,255,0.9); }
 
     /* ── Responsive ── */
     @media (max-width: 900px) {
@@ -315,6 +450,7 @@
     @media (max-width: 600px) {
       .nav-links { gap: 20px; }
       .tool-name { font-size: 22px; }
+      .footer-bottom { flex-direction: column; gap: 12px; align-items: flex-start; }
     }
   </style>
 </head>
@@ -324,6 +460,7 @@
     <div class="nav-contain">
       <span class="logo-text">Dimensional Framework</span>
       <div class="nav-links">
+        <a class="nav-link" href="tools/spreadsheet.html">Spreadsheet</a>
         <a class="nav-link" href="tools/find-matches.html">Find Matches</a>
         <a class="nav-link" href="tools/concept-map.html">Concept Map</a>
         <a class="nav-link" href="tools/clusters.html">Clusters</a>
@@ -366,9 +503,27 @@
     <span class="section-label">Tools</span>
     <div class="tools-content">
 
-      <a class="tool-row" href="tools/find-matches.html">
+      <!-- Spreadsheet row — now clickable via bottom nav too -->
+      <a class="tool-row" href="tools/spreadsheet.html">
         <div class="tool-left">
           <span class="tool-number">01</span>
+          <div class="tool-accent" style="background:var(--md-sys-color-outline);"></div>
+          <div class="tool-info">
+            <span class="tool-name">Spreadsheet</span>
+            <span class="tool-desc">Browse your raw data in a structured, tab-navigable spreadsheet view. Category columns span rows, headers sync with scroll, and highlights follow your cursor.</span>
+            <div class="tool-tags">
+              <span class="tool-tag">Browse</span>
+              <span class="tool-tag">Raw data</span>
+              <span class="tool-tag">Spreadsheet</span>
+            </div>
+          </div>
+        </div>
+        <span class="tool-arrow">↗</span>
+      </a>
+
+      <a class="tool-row" href="tools/find-matches.html">
+        <div class="tool-left">
+          <span class="tool-number">02</span>
           <div class="tool-accent" style="background:var(--raw-visions);"></div>
           <div class="tool-info">
             <span class="tool-name">Find Matches</span>
@@ -385,7 +540,7 @@
 
       <a class="tool-row" href="tools/concept-map.html">
         <div class="tool-left">
-          <span class="tool-number">02</span>
+          <span class="tool-number">03</span>
           <div class="tool-accent" style="background:var(--raw-relational);"></div>
           <div class="tool-info">
             <span class="tool-name">Concept Map</span>
@@ -402,7 +557,7 @@
 
       <a class="tool-row" href="tools/clusters.html">
         <div class="tool-left">
-          <span class="tool-number">03</span>
+          <span class="tool-number">04</span>
           <div class="tool-accent" style="background:var(--raw-org);"></div>
           <div class="tool-info">
             <span class="tool-name">Clusters</span>
@@ -420,10 +575,42 @@
     </div>
   </section>
 
+  <footer>
+    <div class="footer-section">
+      <div class="footer-bottom">
+        <span class="footer-copy">Dimensional Framework</span>
+
+        <button class="theme-toggle" id="theme-toggle" aria-label="Toggle dark mode">
+          <div class="theme-toggle-track">
+            <div class="theme-toggle-thumb"></div>
+          </div>
+          <span id="theme-toggle-label">Dark mode</span>
+        </button>
+
+        <span class="footer-version">v2.0 — 2026</span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <div class="footer-section">
+      <div class="footer-bottom">
+        <span class="footer-copy">Dimensional Framework</span>
+        <button class="theme-toggle" id="theme-toggle" aria-label="Toggle dark mode">
+          <div class="theme-toggle-track">
+            <div class="theme-toggle-thumb"></div>
+          </div>
+          <span id="theme-toggle-label">Dark mode</span>
+        </button>
+        <span class="footer-version">v2.0 — 2026</span>
+      </div>
+    </div>
+  </footer>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="utilities/embedding-bridge.js?v=4"></script>
 <script src="utilities/utils-keywords.js?v=4"></script>
-<script src="utilities/utils-shared.js?v=ad61c2d7"></script>
+<script src="utilities/utils-shared.js?v=9e3a42a4"></script>
 <script type="module" src="utilities/utils-embedding.js?v=4"></script>
 
   <script>console.log('[index.html v.10]');</script>
