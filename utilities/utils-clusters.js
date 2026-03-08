@@ -11,7 +11,7 @@
 //   • buildCard: --ppc-on now = contrastFor(col.accent) (white/#1a1a1a, same as concept-map)
 //   • buildCard: removed manual border-left accent stripe (concept-map doesn't use it)
 //   • CSS color-mix expressions in card text/cat/split now driven by --ppc-on/--ppc-bg
-console.log('[utils-clusters.js vuuuuuuuu]');
+console.log('[utils-clusters.js vhmmmm]');
 
 var CL_MIN_SPLIT_LENGTH = 60;
 
@@ -1518,12 +1518,12 @@ function initClustersTool(paneEl, sidebarEl) {
       });
     });
 
-    const splitCount   = rows.filter(r => r._splitN && r._splitN > 1).length;
+    const splitCount   = rows.filter(r => r._splitFrom).length;
     const clusterNames = nestEls.map((_, i) => outerLabel(i)).join(', ');
     subtitle.textContent =
       numTop + ' cluster' + (numTop === 1 ? '' : 's') +
       ' (' + clusterNames + ') \u00b7 ' + rows.length + ' entries' +
-      (splitCount > 0 ? ' \u00b7 ' + splitCount + ' split' : '');
+      (splitCount > 0 ? ' \u00b7 ' + splitCount + ' split segment' + (splitCount === 1 ? '' : 's') : '');
 
     _clusterState = { nonEmpty, alignedAsgns: (_depth > 1 ? alignedAsgns : null) };
     updateSheetPanel();
