@@ -9,7 +9,7 @@
 //   • depthColor: added missing paletteIdx + theme variable (was ReferenceError)
 //   • depthColor: rewrote getLuminance without array destructuring (was SyntaxError)
 //   • Removed dead CMAP_LEVEL_THEMES constant
-console.log('[utils-concept-map.js v.kkkkkkkkk]');
+console.log('[utils-concept-map.js v.ppppp]');
 
 const CMAP_PARENT_CHILD_THRESHOLD = 0.50;
 const CMAP_MIN_SPLIT_LENGTH = 60;
@@ -646,9 +646,9 @@ function initConceptMapTool(paneEl, sidebarEl) {
 
   var _connSvg=null, _connEdges=[];
 
-  function redrawConnectors(liveOverride) {
+  function redrawConnectors() {
     if (!_connSvg) return;
-    var rects = liveOverride || _liveRects;
+    var rects = _liveRects;
     var ns='http://www.w3.org/2000/svg';
     _connSvg.innerHTML='';
     _connEdges.forEach(function(edge) {
@@ -883,7 +883,6 @@ function initConceptMapTool(paneEl, sidebarEl) {
       var GAP_X=MM_PAD+10, GAP_Y=MM_PAD+20;
 
       function applyPositions(posMap) {
-        var ANIMATE_DURATION = 700;
 
         // Collision detection on target positions
         var targetRects = new Map();
@@ -910,47 +909,66 @@ function initConceptMapTool(paneEl, sidebarEl) {
 
         var ids = Array.from(targetRects.keys());
 
-        // Cards are already painted at old positions (from previous layout).
-        // Reading offsetLeft forces a style flush so the browser has committed
-        // those positions before we set the transition + new target.
-        ids.forEach(function(id) { var el=cardEls.get(id); if(el) el.offsetLeft; });
-
-        // Animate every card from its current painted position to its new target
-        ids.forEach(function(id, i) {
+        // Capture start positions from current card styles
+        var startRects = new Map();
+        ids.forEach(function(id) {
           var el = cardEls.get(id);
           if (!el) return;
-          var pos = targetRects.get(id);
-          var delay = Math.min(i * 18, 180);
-          el.style.transition =
-            'left ' + ANIMATE_DURATION + 'ms cubic-bezier(0.4,0,0.2,1) ' + delay + 'ms, ' +
-            'top '  + ANIMATE_DURATION + 'ms cubic-bezier(0.4,0,0.2,1) ' + delay + 'ms';
-          el.style.left = pos.x + 'px';
-          el.style.top  = pos.y + 'px';
-          _liveRects.set(id, { x: pos.x, y: pos.y, w: CARD_W, h: pos.h });
+          el.style.transition = 'none'; // disable CSS transitions — we drive everything in JS
+          startRects.set(id, {
+            x: parseFloat(el.style.left) || 0,
+            y: parseFloat(el.style.top)  || 0
+          });
         });
 
-        // Keep connectors tracking actual card positions each frame
-        var canvasRect = canvas.getBoundingClientRect();
-        var startTime = performance.now();
-        function animateConn(now) {
-          // Sample actual painted positions via getBoundingClientRect,
-          // convert from screen space back to world space
-          var liveRects = new Map();
-          cardEls.forEach(function(el, id) {
-            var br = el.getBoundingClientRect();
-            var wx = (br.left - canvasRect.left - _panX) / _zoom;
-            var wy = (br.top  - canvasRect.top  - _panY) / _zoom;
-            var r  = _liveRects.get(id) || { w: CARD_W, h: 80 };
-            liveRects.set(id, { x: wx, y: wy, w: r.w, h: br.height || r.h });
+        // Easing: cubic-bezier approximation of ease-out
+        function easeOut(t) { return 1 - Math.pow(1 - t, 3); }
+
+        var DURATION = 700;
+        var startTime = null;
+        var stagger = Math.min(18, 180 / Math.max(ids.length, 1));
+
+        function frame(now) {
+          if (!startTime) startTime = now;
+          var elapsed = now - startTime;
+
+          ids.forEach(function(id, i) {
+            var el = cardEls.get(id);
+            if (!el) return;
+            var delay = i * stagger;
+            var t = Math.max(0, Math.min(1, (elapsed - delay) / DURATION));
+            var et = easeOut(t);
+            var from = startRects.get(id);
+            var to   = targetRects.get(id);
+            var cx = from.x + (to.x - from.x) * et;
+            var cy = from.y + (to.y - from.y) * et;
+            el.style.left = cx + 'px';
+            el.style.top  = cy + 'px';
+            // Keep _liveRects in sync so connectors draw at real current positions
+            var r = _liveRects.get(id) || { w: CARD_W, h: 80 };
+            _liveRects.set(id, { x: cx, y: cy, w: r.w, h: r.h });
           });
-          redrawConnectors(liveRects);
-          if (now - startTime < ANIMATE_DURATION + 220) requestAnimationFrame(animateConn);
-          else {
-            cardEls.forEach(function(el) { el.style.transition = ''; });
-            redrawConnectors(); // final pass with _liveRects
+
+          redrawConnectors(); // always reads _liveRects which is current interpolated pos
+
+          var maxDelay = (ids.length - 1) * stagger;
+          if (elapsed < DURATION + maxDelay) {
+            requestAnimationFrame(frame);
+          } else {
+            // Snap to exact final positions
+            ids.forEach(function(id) {
+              var el = cardEls.get(id);
+              var to = targetRects.get(id);
+              if (!el || !to) return;
+              el.style.left = to.x + 'px';
+              el.style.top  = to.y + 'px';
+              _liveRects.set(id, { x: to.x, y: to.y, w: to.w, h: to.h });
+            });
+            redrawConnectors();
           }
         }
-        requestAnimationFrame(animateConn);
+
+        requestAnimationFrame(frame);
 
         _everRendered = true;
       }
