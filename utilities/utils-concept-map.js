@@ -9,7 +9,7 @@
 //   • depthColor: added missing paletteIdx + theme variable (was ReferenceError)
 //   • depthColor: rewrote getLuminance without array destructuring (was SyntaxError)
 //   • Removed dead CMAP_LEVEL_THEMES constant
-console.log('[utils-concept-map.js v.queres?]');
+console.log('[utils-concept-map.js v.3]');
 
 const CMAP_PARENT_CHILD_THRESHOLD = 0.50;
 const CMAP_MIN_SPLIT_LENGTH = 60;
@@ -766,6 +766,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
       card.style.setProperty('--ppc-on',     lc);
 
       var primaryRow=rows[i], isSplit=!!primaryRow._splitFrom;
+      if (isSplit) console.log('[concept-map] card',i,'isSplit=true _splitN='+primaryRow._splitN+'/'+primaryRow._splitT);
       var numParents=(parentsOf.get(i)||[]).length;
 
       var topRow=document.createElement('div');
@@ -831,6 +832,8 @@ function initConceptMapTool(paneEl, sidebarEl) {
         var splitBadge=document.createElement('div');
         splitBadge.className='pp-cmap-split-badge';
         splitBadge.textContent=primaryRow._splitN+'/'+primaryRow._splitT+' Split';
+        splitBadge.style.cssText='font-size:9px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;'
+          +'color:'+lc+';opacity:0.65;padding:4px 9px 6px;text-align:right;display:block;';
         card.appendChild(splitBadge);
       }
 
