@@ -11,7 +11,7 @@
 //   • buildCard: --ppc-on now = contrastFor(col.accent) (white/#1a1a1a, same as concept-map)
 //   • buildCard: removed manual border-left accent stripe (concept-map doesn't use it)
 //   • CSS color-mix expressions in card text/cat/split now driven by --ppc-on/--ppc-bg
-console.log('[utils-clusters.js vjhjhjhjhj]');
+console.log('[utils-clusters.js v3000000000000]');
 
 var CL_MIN_SPLIT_LENGTH = 60;
 
@@ -413,19 +413,39 @@ var CL_MIN_SPLIT_LENGTH = 60;
 }
 .pp-cl-tooltip-goto:hover { opacity: 1; }
 
-/* ── Cluster Spreadsheet Side Panel ─────────────────────── */
-#pp-cl-sheet-host {
+/* ── Cluster Spreadsheet Sheet Panel ────────────────────── */
+#pp-cl-sheet {
   position: absolute;
-  top: 0; right: 0; bottom: 0;
+  inset: 0;
+  z-index: 20;
   display: flex;
-  flex-direction: row;
-  align-items: stretch;
-  z-index: 60;
+  flex-direction: column;
+  background: var(--md-sys-color-surface);
+  transform: translateX(100%);
+  transition: transform .26s cubic-bezier(0.4, 0, 0.2, 1);
   pointer-events: none;
 }
-#pp-cl-sheet-host > .ds-panel {
+#pp-cl-sheet.pp-cl-sheet--open {
+  transform: translateX(0);
   pointer-events: all;
-  height: 100%;
+}
+
+/* rail button active state */
+.pp-nav-rail-sheet-btn {
+  width: 32px; height: 32px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: var(--radius-xs);
+  border: none; background: none; cursor: pointer;
+  color: var(--md-sys-color-on-surface-variant);
+  margin: 4px auto 0;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+.pp-nav-rail-sheet-btn:hover {
+  background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent);
+}
+.pp-nav-rail-sheet-btn.pp-nav-rail-sheet-btn--active {
+  color: var(--md-sys-color-primary);
+  background: color-mix(in srgb, var(--md-sys-color-primary) 12%, transparent);
 }
 
 #pp-cl-sheet-phead {
@@ -579,9 +599,21 @@ var CL_MIN_SPLIT_LENGTH = 60;
 // ════════════════════════════════════════════════════════════════════════════
 function initClustersTool(paneEl, sidebarEl) {
 
+  const ICON_TABLE =
+    '<svg viewBox="0 0 18 16" width="16" height="14" fill="none" ' +
+    'stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">' +
+    '<rect x="1" y="1" width="16" height="14" rx="2"/>' +
+    '<line x1="1" y1="5" x2="17" y2="5"/>' +
+    '<line x1="7" y1="5" x2="7" y2="15"/>' +
+    '</svg>';
+
   // ── Build nav rail + side panel via global PPNavRail component ──
   const nav = window.PPNavRail.create(paneEl, {
     toolName: 'Clusters',
+    railExtra:
+      '<button class="pp-nav-rail-sheet-btn" id="pp-cl-sheet-btn" title="Toggle cluster table">' +
+        ICON_TABLE +
+      '</button>',
     panelSections: [
       {
         label: 'Outer Clusters',
@@ -747,13 +779,9 @@ function initClustersTool(paneEl, sidebarEl) {
 
   reclusterBtn.addEventListener('click', () => { clearTimeout(_reclusterTimer); _rendered = false; tryRender(); });
 
-  // ── Side-panel sheet (unchanged from v37) ─────────────────
-  const sheetHost = document.createElement('div');
-  sheetHost.id = 'pp-cl-sheet-host';
-  canvas.appendChild(sheetHost);
-
-  const sheetPanelContent = document.createElement('div');
-  sheetPanelContent.style.cssText = 'display:flex;flex-direction:column;height:100%;';
+  // ── Sheet panel — absolute overlay inside nav.mainEl ─────
+  const sheetEl = document.createElement('div');
+  sheetEl.id = 'pp-cl-sheet';
 
   const sheetPHead = document.createElement('div');
   sheetPHead.id = 'pp-cl-sheet-phead';
@@ -768,18 +796,21 @@ function initClustersTool(paneEl, sidebarEl) {
   const sheetBody = document.createElement('div');
   sheetBody.id = 'pp-cl-sheet-body';
   sheetBody.innerHTML = '<div class="pp-cl-panel-empty">Clusters will appear here once embeddings finish.</div>';
-
-  sheetPanelContent.appendChild(sheetPHead);
-  sheetPanelContent.appendChild(sheetBody);
   sheetBody.addEventListener('wheel', ev => ev.stopPropagation(), { passive: true });
 
-  const sheetPanel = createSidePanel(sheetHost, {
-    side: 'right', defaultFraction: 0.40, minFraction: 0, maxFraction: 0.88,
-    snapCloseFraction: 0.10, overlapFraction: 0, fullscreenFraction: 0.88,
-    twoPosition: false, animDuration: 260,
-    onResize: () => {}, onOpen: () => {}, onClose: () => {},
-  });
-  sheetPanel.setContent(sheetPanelContent);
+  sheetEl.appendChild(sheetPHead);
+  sheetEl.appendChild(sheetBody);
+  nav.mainEl.appendChild(sheetEl);
+
+  // Wire sheet toggle button in nav rail
+  const sheetBtn = paneEl.querySelector('#pp-cl-sheet-btn');
+  let _sheetOpen = false;
+  function setSheetOpen(open) {
+    _sheetOpen = open;
+    sheetEl.classList.toggle('pp-cl-sheet--open', open);
+    sheetBtn.classList.toggle('pp-nav-rail-sheet-btn--active', open);
+  }
+  sheetBtn.addEventListener('click', () => setSheetOpen(!_sheetOpen));
 
   function buildSheetCard(r, col) {
     const cells  = r.row && r.row.cells ? r.row.cells : (r.cells || []);
