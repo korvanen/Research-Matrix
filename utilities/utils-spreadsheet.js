@@ -2,7 +2,7 @@
 // utils-spreadsheet.js — spreadsheet viewer
 // Depends on: utils-shared.js (TABS, parseCitation, processSheetData)
 // ════════════════════════════════════════════════════════════════
-console.log('[utils-spreadsheet.js v.5]');
+console.log('[utils-spreadsheet.js v.6]');
 
 // ── All DOM-dependent code is deferred until DOMContentLoaded ──
 // (PPNavRail injects the grid HTML at runtime, so getElementById
@@ -144,6 +144,10 @@ function updateLayout(numDataCols) {
     td.style.width = td.style.minWidth = CAT_COL_W + 'px';
   });
 
+  // Force the browser to recalculate the grid layout so the corner
+  // width is applied before we read elDataScroll.clientWidth.
+  void elCorner.offsetWidth;
+
   const available  = elDataScroll.clientWidth || 800;
   const natural    = Math.floor(available / numDataCols);
   const colW       = Math.max(natural, DATA_COL_MIN_W);
@@ -243,7 +247,26 @@ elDataScroll.addEventListener('scroll', () => {
   elCatScroll.scrollTop     = elDataScroll.scrollTop;
 });
 
-// ════════════════════════════════════════════════════════════════
+// ── Forward wheel on cat column / corner into data-scroll ─────
+// cat-scroll + corner are overflow:hidden — wheel events landing
+// there would be swallowed. Forward them to data-scroll instead.
+function _forwardWheelV(e) {
+  e.preventDefault();
+  elDataScroll.scrollTop  += e.deltaY;
+  elDataScroll.scrollLeft += e.deltaX;
+  elHeaderScroll.scrollLeft = elDataScroll.scrollLeft;
+  elCatScroll.scrollTop     = elDataScroll.scrollTop;
+}
+elCatScroll.addEventListener('wheel',    _forwardWheelV, { passive: false });
+elCorner.addEventListener('wheel',       _forwardWheelV, { passive: false });
+// Header scroll: forward vertical component so the whole sheet scrolls
+elHeaderScroll.addEventListener('wheel', function(e) {
+  if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+    e.preventDefault();
+    elDataScroll.scrollTop += e.deltaY;
+    elCatScroll.scrollTop   = elDataScroll.scrollTop;
+  }
+}, { passive: false });
 // HIGHLIGHT & SELECTION
 // ════════════════════════════════════════════════════════════════
 
@@ -371,6 +394,13 @@ function _waitForTabs() {
     buildTabBar();
     showTab(0);
     elLoadingOverlay.style.display = 'none';
+    // Update the status chip in the nav panel
+    const chip  = document.getElementById('pp-ss-status');
+    const dot   = chip && chip.querySelector('span:first-child');
+    const label = document.getElementById('pp-ss-status-label');
+    if (dot)   { dot.style.animation = 'none'; dot.style.background = 'var(--md-sys-color-secondary, #2e7d5e)'; }
+    if (label) { label.textContent = 'Ready'; }
+    if (chip)  { setTimeout(() => { chip.style.transition = 'opacity .6s'; chip.style.opacity = '0'; }, 2200); }
   } else {
     elLoadingOverlay.textContent = 'Fetching data…';
     setTimeout(_waitForTabs, 200);
