@@ -83,49 +83,101 @@
       text-align: right;
     }
 
-    /* ── Sheet loader ── */
-    .sheet-loader { width: 100%; display: flex; flex-direction: column; gap: 6px; }
-    .sheet-loader-row { display: flex; gap: 6px; align-items: center; }
-    .sheet-url-input {
-      flex: 1; min-width: 0; height: 30px; padding: 0 9px;
-      border: 1px solid rgba(0,0,0,0.18);
-      border-radius: var(--radius-md);
-      background: var(--color-bg-page);
-      font-family: var(--font-family); font-size: 12px;
-      color: var(--color-text-default); outline: none;
+    /* ── Sheet loader — MD3 Outlined Text Field + Buttons ── */
+    .sheet-loader { width: 100%; display: flex; flex-direction: column; gap: 8px; }
+    .sheet-loader-row { display: flex; gap: 8px; align-items: center; }
+
+    /* MD3 Outlined Text Field (compact 40px for this layout) */
+    .sheet-url-field {
+      flex: 1; min-width: 0;
+      position: relative; display: flex; align-items: center;
+      height: 40px;
+    }
+    .sheet-url-field__outline {
+      position: absolute; inset: 0;
+      border: 1px solid var(--md-sys-color-outline, rgba(0,0,0,0.38));
+      border-radius: 4px; pointer-events: none;
       transition: border-color var(--transition-fast);
     }
-    .sheet-url-input:focus { border-color: rgba(0,0,0,0.5); }
-    .sheet-url-input::placeholder { color: var(--color-text-placeholder); }
+    .sheet-url-field:focus-within .sheet-url-field__outline {
+      border: 2px solid var(--md-sys-color-primary, #6750a4);
+    }
+    .sheet-url-input {
+      flex: 1; height: 100%;
+      padding: 0 12px;
+      background: transparent; border: none; outline: none;
+      font-family: var(--font-family); font-size: 14px; font-weight: 400;
+      letter-spacing: .015em;
+      color: var(--md-sys-color-on-surface, inherit);
+      caret-color: var(--md-sys-color-primary);
+    }
+    .sheet-url-input::placeholder { color: var(--md-sys-color-on-surface-variant, #49454f); }
+
+    /* MD3 Filled Button (primary) */
+    .sheet-btn--primary {
+      height: 40px; padding: 0 24px;
+      border-radius: 20px; border: none;
+      background: var(--md-sys-color-primary, #6750a4);
+      color: var(--md-sys-color-on-primary, #fff);
+      font-family: var(--font-family); font-size: 14px; font-weight: 500;
+      letter-spacing: .00625em; cursor: pointer;
+      white-space: nowrap; flex-shrink: 0;
+      position: relative; overflow: hidden;
+      transition: box-shadow var(--transition-fast);
+    }
+    .sheet-btn--primary::before {
+      content: ''; position: absolute; inset: 0;
+      background: var(--md-sys-color-on-primary);
+      opacity: 0; transition: opacity var(--transition-fast);
+    }
+    .sheet-btn--primary:hover { box-shadow: 0 1px 2px rgba(0,0,0,.3); }
+    .sheet-btn--primary:hover::before { opacity: .08; }
+    .sheet-btn--primary:active::before { opacity: .12; }
+    .sheet-btn--primary:disabled { opacity: .38; cursor: not-allowed; pointer-events: none; }
+
+    /* MD3 Outlined Button */
     .sheet-btn {
-      height: 30px; padding: 0 11px;
-      border-radius: var(--radius-md);
-      border: 1px solid rgba(0,0,0,0.18);
+      height: 40px; padding: 0 24px;
+      border-radius: 20px;
+      border: 1px solid var(--md-sys-color-outline, rgba(0,0,0,0.38));
       background: transparent;
-      font-family: var(--font-family); font-size: 12px;
-      font-weight: var(--font-weight-medium);
-      color: var(--color-text-muted);
+      font-family: var(--font-family); font-size: 14px; font-weight: 500;
+      letter-spacing: .00625em;
+      color: var(--md-sys-color-primary, #6750a4);
       cursor: pointer; white-space: nowrap; flex-shrink: 0;
-      letter-spacing: -0.01em;
-      transition: border-color var(--transition-fast), color var(--transition-fast);
+      position: relative; overflow: hidden;
+      transition: box-shadow var(--transition-fast);
     }
-    .sheet-btn:hover:not(:disabled) { border-color: rgba(0,0,0,0.4); color: var(--raw-black); }
-    .sheet-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-    .sheet-btn--primary { background: var(--raw-black); color: #fff; border-color: var(--raw-black); }
-    .sheet-btn--primary:hover:not(:disabled) { background: #222; border-color: #222; color: #fff; }
+    .sheet-btn::before {
+      content: ''; position: absolute; inset: 0;
+      background: var(--md-sys-color-primary);
+      opacity: 0; transition: opacity var(--transition-fast);
+    }
+    .sheet-btn:hover::before { opacity: .08; }
+    .sheet-btn:active::before { opacity: .12; }
+    .sheet-btn:disabled { opacity: .38; cursor: not-allowed; pointer-events: none; }
+
     .sheet-loader-status {
-      font-size: 11px; color: var(--color-text-muted);
-      text-align: right; min-height: 14px; letter-spacing: -0.01em;
+      font-size: 12px; font-weight: 400; letter-spacing: .025em;
+      color: var(--md-sys-color-on-surface-variant);
+      min-height: 16px;
     }
-    .sheet-loader-status.error   { color: #c0392b; }
-    .sheet-loader-status.success { color: #27ae60; }
+    .sheet-loader-status.error   { color: var(--md-sys-color-error, #b3261e); }
+    .sheet-loader-status.success { color: var(--md-sys-color-secondary, #625b71); }
     .sheet-active-url {
-      font-size: 11px; color: var(--color-text-placeholder);
-      display: flex; align-items: center; justify-content: flex-end; gap: 5px;
+      font-size: 12px; letter-spacing: .025em;
+      color: var(--md-sys-color-on-surface-variant);
+      display: flex; align-items: center; justify-content: flex-end; gap: 6px;
     }
-    .sheet-active-dot { width: 6px; height: 6px; border-radius: 50%; background: #27ae60; flex-shrink: 0; }
-    .sheet-active-dot.loading { background: #f39c12; }
-    .sheet-active-dot.error   { background: #c0392b; }
+    /* MD3 Badge small (dot) */
+    .sheet-active-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--md-sys-color-secondary, #625b71);
+      flex-shrink: 0;
+    }
+    .sheet-active-dot.loading { background: var(--md-sys-color-outline, #79747e); animation: dot-pulse 1.4s ease-in-out infinite; }
+    .sheet-active-dot.error   { background: var(--md-sys-color-error, #b3261e); }
+    @keyframes dot-pulse { 0%,100%{opacity:.4;}50%{opacity:1;} }
 
     /* ── Tools section ── */
     .tools-section {
@@ -156,12 +208,17 @@
       font-size: 14px; font-weight: var(--font-weight-normal);
       color: var(--color-text-muted); letter-spacing: -0.02em; line-height: 1.5; max-width: 380px;
     }
-    .tool-tags { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+    /* ── Tool tags — MD3 Assist Chips ── */
+    .tool-tags { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
     .tool-tag {
-      font-size: 10px; font-weight: var(--font-weight-semibold);
-      letter-spacing: 0.06em; text-transform: uppercase;
-      color: var(--color-text-muted); border: 1px solid rgba(0,0,0,0.15);
-      border-radius: var(--radius-full); padding: 3px 10px;
+      display: inline-flex; align-items: center;
+      height: 32px; padding: 0 16px;
+      border-radius: 8px;
+      font-size: 14px; font-weight: 500; letter-spacing: .006em;
+      color: var(--md-sys-color-on-surface, inherit);
+      border: 1px solid var(--md-sys-color-outline, rgba(0,0,0,0.38));
+      background: transparent;
+      cursor: default;
     }
     .tool-arrow {
       font-size: 20px; color: var(--color-text-muted); align-self: center;
@@ -179,31 +236,39 @@
     .footer-copy, .footer-version { font-size: 13px; color: var(--color-text-muted); letter-spacing: -0.01em; }
     .footer-version { letter-spacing: 0.04em; font-variant-numeric: tabular-nums; }
 
-    /* ── Dark mode toggle ── */
+    /* ── MD3 Switch — theme toggle ── */
     .theme-toggle {
-      display: flex; align-items: center; gap: 8px;
-      background: none; border: 1px solid rgba(128,128,128,0.25);
-      border-radius: var(--radius-full); padding: 5px 12px 5px 8px;
-      cursor: pointer; font-family: var(--font-family); font-size: 12px;
-      font-weight: var(--font-weight-medium); color: var(--color-text-muted);
-      letter-spacing: -0.01em;
-      transition: border-color var(--transition-fast), color var(--transition-fast), background var(--transition-fast);
+      display: inline-flex; align-items: center; gap: 10px;
+      background: none; border: none; cursor: pointer;
+      font-family: var(--font-family); font-size: 14px;
+      font-weight: 500; letter-spacing: .006em;
+      color: var(--md-sys-color-on-surface-variant, #49454f);
+      padding: 0;
     }
-    .theme-toggle:hover { border-color: rgba(128,128,128,0.5); color: var(--color-text-default); }
-    .theme-toggle-track {
-      width: 28px; height: 16px; border-radius: 8px;
-      background: rgba(128,128,128,0.2); position: relative; flex-shrink: 0;
-      transition: background var(--transition-fast);
+    .theme-switch-track {
+      width: 52px; height: 32px; border-radius: 16px;
+      background: var(--md-sys-color-surface-container-highest, #e6e0e9);
+      border: 2px solid var(--md-sys-color-outline, #79747e);
+      position: relative; flex-shrink: 0;
+      transition: background var(--transition-fast), border-color var(--transition-fast);
+      pointer-events: none;
     }
-    .theme-toggle-thumb {
-      position: absolute; top: 2px; left: 2px; width: 12px; height: 12px;
-      border-radius: 50%; background: var(--color-text-muted);
-      transition: transform var(--transition-fast), background var(--transition-fast);
+    .theme-switch-handle {
+      width: 16px; height: 16px; border-radius: 50%;
+      background: var(--md-sys-color-outline, #79747e);
+      position: absolute; top: 50%; left: 4px;
+      transform: translateY(-50%);
+      transition: left var(--transition-fast), width var(--transition-fast), height var(--transition-fast), background var(--transition-fast);
     }
-    html.dark .theme-toggle-track  { background: rgba(255,255,255,0.25); }
-    html.dark .theme-toggle-thumb  { transform: translateX(12px); background: #fff; }
-    html.dark .theme-toggle        { color: rgba(255,255,255,0.5); border-color: rgba(255,255,255,0.15); }
-    html.dark .theme-toggle:hover  { border-color: rgba(255,255,255,0.35); color: rgba(255,255,255,0.9); }
+    html.dark .theme-switch-track {
+      background: var(--md-sys-color-primary, #6750a4);
+      border-color: var(--md-sys-color-primary, #6750a4);
+    }
+    html.dark .theme-switch-handle {
+      width: 24px; height: 24px; left: calc(52px - 28px - 2px);
+      background: var(--md-sys-color-on-primary, #fff);
+    }
+    html.dark .theme-toggle { color: var(--md-sys-color-on-surface-variant); }
 
     /* ── Animations ── */
     .fade-in { opacity: 0; transform: translateY(16px); animation: ds-fade-up 0.6s ease forwards; }
@@ -246,10 +311,13 @@
         <p class="hero-sub">Spreadsheet analytical tool</p>
         <div class="sheet-loader">
           <div class="sheet-loader-row">
-            <input class="sheet-url-input" id="sheet-url-input" type="text"
-              placeholder="Paste a Google Sheets link…" autocomplete="off" spellcheck="false"/>
+            <div class="sheet-url-field">
+              <div class="sheet-url-field__outline"></div>
+              <input class="sheet-url-input" id="sheet-url-input" type="text"
+                placeholder="Paste a Google Sheets link…" autocomplete="off" spellcheck="false"/>
+            </div>
             <button class="sheet-btn sheet-btn--primary" id="sheet-load-btn">Load</button>
-            <button class="sheet-btn" id="sheet-default-btn">Use default</button>
+            <button class="sheet-btn" id="sheet-default-btn">Default</button>
           </div>
           <div class="sheet-loader-status" id="sheet-status"></div>
           <div class="sheet-active-url">
@@ -341,8 +409,8 @@
       <div class="footer-bottom">
         <span class="footer-copy">Dimensional Framework</span>
         <button class="theme-toggle" id="theme-toggle" aria-label="Toggle dark mode">
-          <div class="theme-toggle-track">
-            <div class="theme-toggle-thumb"></div>
+          <div class="theme-switch-track">
+            <div class="theme-switch-handle"></div>
           </div>
           <span id="theme-toggle-label">Dark mode</span>
         </button>
@@ -354,7 +422,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="utilities/embedding-bridge.js?v=4"></script>
   <script src="utilities/utils-keywords.js?v=4"></script>
-  <script src="utilities/utils-shared.js?v=6c026b9b"></script>
+  <script src="utilities/utils-shared.js?v=9e3a42a4"></script>
   <script type="module" src="utilities/utils-embedding.js?v=4"></script>
 
   <script>console.log('[index.html v.10]');</script>
