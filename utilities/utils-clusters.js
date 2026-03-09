@@ -748,73 +748,22 @@ var CL_MIN_SPLIT_LENGTH = 60;
 .pp-cl-sim-label { white-space: nowrap; }
 
 /* ══════════════════════════════════════════════════════════
-   v38.4 Layout fixes — based on actual class names in
-   utils-shared.js / PPNavRail.create / injectToolNav
-   ══════════════════════════════════════════════════════════
+   Clusters layout — nav rail scrollable on short viewports
+   ══════════════════════════════════════════════════════════ */
 
-   FIX 1 — Left rail tool nav items get clipped
-   ─────────────────────────────────────────────────────────
-   .pp-nav-rail has overflow:hidden and injectToolNav adds a
-   flex:1 spacer that pushes 4 nav items off-screen on short
-   viewports. Allow the rail to scroll (hidden scrollbar) and
-   compact only the top buttons — leave nav items readable.
-   ────────────────────────────────────────────────────────── */
-
+/* Allow rail to scroll on very short viewports without showing scrollbar */
 .pp-nav-rail {
-  overflow-y: auto !important;
-  overflow-x: hidden !important;
-  scrollbar-width: none !important;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: none;
 }
-.pp-nav-rail::-webkit-scrollbar { display: none !important; }
+.pp-nav-rail::-webkit-scrollbar { display: none; }
 
-/* Toggle + sheet buttons: 48px → 40px saves ~24px without
-   making them feel broken */
-.pp-nav-rail-toggle,
-.pp-nav-rail-sheet-btn {
-  width: 40px !important;
-  height: 40px !important;
-}
-
-/* Nav items: shave padding from 12px → 8px each = 32px saved
-   across 4 items. Keep labels and indicators at full size. */
-.pp-nav-item {
-  padding: 8px 0 !important;
-}
-
-/* ══════════════════════════════════════════════════════════
-   FIX 2 — Controls have no horizontal padding (blue circles)
-   ─────────────────────────────────────────────────────────
-   .pp-side-panel-section has padding: 8px 0 — zero horizontal.
-   Section labels get 16px via their own rule but range rows,
-   buttons and chips get none, so they bleed to the edges.
-   ────────────────────────────────────────────────────────── */
-
-/* Panel header — slightly tighter vertically only */
-.pp-side-panel-header {
-  padding: 12px 16px 8px !important;
-}
-.pp-side-panel-tool-name {
-  font-size: 18px !important;
-  line-height: 22px !important;
-}
-
-/* Section wrappers — add horizontal padding, trim vertical */
-.pp-side-panel-section {
-  padding: 4px 16px !important;
-}
-
-/* Section labels already have 16px horizontal — just tighten top */
-.pp-side-panel-section-label {
-  padding: 8px 0 4px !important;
-  font-size: 10px !important;
-}
-
-/* Range rows — horizontal padding now comes from section,
-   just tighten vertical */
+/* Range rows — tighten vertical spacing inside cluster panel */
 .pp-range-row {
-  min-height: 24px !important;
-  padding-top: 2px !important;
-  padding-bottom: 2px !important;
+  min-height: 24px;
+  padding-top: 2px;
+  padding-bottom: 2px;
 }
 
 /* Re-cluster button — full width within padded section */
