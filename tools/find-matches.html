@@ -10,12 +10,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Find Matches — Dimensional Framework</title>
   <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="../design-system.css?v=6f75ea7c">
+  <link rel="stylesheet" href="../design-system.css?v=5f3df7d8">
   <style>
     *, *::before, *::after { box-sizing: border-box; }
     html, body { height: 100%; overflow: hidden; margin: 0; padding: 0; }
     body {
-      display: flex; flex-direction: row;
+      display: flex; flex-direction: column;
       background: var(--md-sys-color-background);
       font-family: var(--font-family);
       color: var(--md-sys-color-on-background);
@@ -225,7 +225,23 @@
 </head>
 <body>
 
-  <div id="fm-pane" style="flex:1;min-width:0;display:flex;flex-direction:row;overflow:hidden;"></div>
+  <div class="ds-topbar">
+    <a class="ds-topbar-back" href="../index.html">
+      <svg viewBox="0 0 14 14" width="12" height="12" fill="none"
+           stroke="currentColor" stroke-width="2"
+           stroke-linecap="round" stroke-linejoin="round">
+        <path d="M9 2L4 7l5 5"/>
+      </svg>
+      Back
+    </a>
+    <div class="ds-topbar-title">Find Matches</div>
+    <div class="ds-badge ds-badge--waiting" id="fm-topbar-badge">
+      <div class="ds-badge-dot"></div>
+      <span id="fm-topbar-badge-text">Connecting…</span>
+    </div>
+  </div>
+
+  <div id="fm-pane" style="flex:1;min-height:0;display:flex;flex-direction:row;overflow:hidden;"></div>
 
   <script>
     var _rows = [], _lastResults = [], _searching = false, _ready = false;
@@ -420,6 +436,11 @@
       setStatus('waiting','Model loading\u2026');
       nav.subtitleEl.textContent='Model loading\u2026';
       showEmpty('Model loading\u2026',true);
+      // Update topbar badge
+      var tb=document.getElementById('fm-topbar-badge');
+      var tt=document.getElementById('fm-topbar-badge-text');
+      if(tb){tb.className='ds-badge ds-badge--waiting';}
+      if(tt){tt.textContent=rows.length+' entries';}
       var m=new Map();
       rows.forEach(function(r){if(!r.vec)return;var cs=(r.row&&r.row.cells)?r.row.cells:(r.cells||[]);cs.forEach(function(c){if(c&&c.trim())m.set(c.trim(),r.vec);});});
       window.EmbeddingUtils=window.EmbeddingUtils||{};
@@ -427,8 +448,20 @@
       window.dispatchEvent(new CustomEvent('embedder-ready'));
       setTimeout(function(){window.dispatchEvent(new CustomEvent('embedding-complete',{detail:{total:rows.length}}));_ready=true;maybeEnable();},100);
     });
-    window.addEventListener('bridge-no-host',function(){setStatus('error','No data');noHostEl.classList.add('visible');});
-    window.addEventListener('embedding-complete',function(){_ready=true;maybeEnable();});
+    window.addEventListener('bridge-no-host',function(){
+      setStatus('error','No data');noHostEl.classList.add('visible');
+      var tb=document.getElementById('fm-topbar-badge');
+      var tt=document.getElementById('fm-topbar-badge-text');
+      if(tb){tb.className='ds-badge ds-badge--disconnected';}
+      if(tt){tt.textContent='No data';}
+    });
+    window.addEventListener('embedding-complete',function(){
+      _ready=true;maybeEnable();
+      var tb=document.getElementById('fm-topbar-badge');
+      var tt=document.getElementById('fm-topbar-badge-text');
+      if(tb){tb.className='ds-badge ds-badge--connected';}
+      if(tt){tt.textContent=_rows.length+' entries live';}
+    });
     injectToolNav('find-matches.html');
   </script>
 </body>
