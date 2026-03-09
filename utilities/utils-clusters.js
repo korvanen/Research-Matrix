@@ -1,27 +1,6 @@
 // utils-clusters.js — Clusters tool v38
-// v37 → v38 changes:
-//   • Fixed card width AND height — CARD_W × CARD_H constants, no auto-sizing
-//   • Text color mixes now use `black` (not var(--ppc-bg)) — matches concept-map exactly
-//   • Cluster drag activates on ANY card hover, not just the header strip
-//   • Cluster cannot shrink below the minimum space needed to tile all its cards
-//   • makeResizable receives per-nest minW/minH — enforced during resize drag
-//   • Drag threshold (4 px) prevents accidental drags on short card clicks
-// v38 → v38.1 changes:
-//   • buildCard: --ppc-bg now = col.accent (vivid, same as concept-map)
-//   • buildCard: --ppc-on now = contrastFor(col.accent) (white/#1a1a1a, same as concept-map)
-//   • buildCard: removed manual border-left accent stripe (concept-map doesn't use it)
-//   • CSS color-mix expressions in card text/cat/split now driven by --ppc-on/--ppc-bg
-// v38.2 fix:
-//   • maybySplitRow: removed early-exit guard on EmbeddingUtils so structural split
-//     still fires on the fast-path (pre-veced rows from sessionStorage) before
-//     EmbeddingUtils is ready. canEmbed flag now only gates per-sentence embedding attempt.
-// v38.3 fix:
-//   • _embedWithRetry: reduced retries from 10 to 3 — getCachedEmbedding only knows
-//     pre-loaded row vectors, so retrying forever for user-typed cluster names always fails
-//   • _findVecByTextSearch: new fallback — after 3 failed retries, keyword-matches the
-//     cluster label against loaded row text and averages matching vectors as a proxy,
-//     so defined clusters always resolve quickly instead of hanging indefinitely
-console.log('[utils-clusters.js v21]');
+
+console.log('[utils-clusters.js v3000000000002]');
 
 var CL_MIN_SPLIT_LENGTH = 60;
 
@@ -789,7 +768,12 @@ function initClustersTool(paneEl, sidebarEl) {
               '<line x1="9" y1="3" x2="9" y2="15"/><line x1="3" y1="9" x2="15" y2="9"/>' +
             '</svg>' +
             'Add defined cluster' +
-          '</button>',
+          '</button>' +
+          '<div class="pp-range-row" style="margin-top:6px;" title="Minimum cosine similarity for a card to be pulled into a named cluster. Cards below this threshold become orphans and fall through to auto-clusters.">' +
+            '<span class="pp-range-label">Match</span>' +
+            '<input class="pp-range pp-range--accent" id="pp-cl-defthresh" type="range" min="5" max="95" value="40" step="1">' +
+            '<span class="pp-range-val" id="pp-cl-defthresh-val">40%</span>' +
+          '</div>',
       },
       {
         label: 'Outer Clusters',
@@ -889,13 +873,33 @@ function initClustersTool(paneEl, sidebarEl) {
   // ── Defined clusters ──────────────────────────────────────
   let _definedClusters = []; // [{id, desc, vec, color, subClusters:[{id,desc,vec}]}]
   let _defNextId = 0;
-  const DEF_THRESHOLD = 0.15;
+  let _defThreshold = 0.40; // adjustable via Match slider; cards below this sim → orphan auto-clusters
   const DEF_COLORS = ['#2e7d5e','#4a56c8','#5e3d9e','#c44035','#c8991a','#3d7a6b','#7d5a1e','#4a8aa8'];
 
   const defsList    = paneEl.querySelector('#pp-cl-defs-list');
   const defAddBtn   = paneEl.querySelector('#pp-cl-def-add-btn');
   const defFieldWrap = paneEl.querySelector('#pp-cl-def-field-wrap');
   const defTa       = paneEl.querySelector('#pp-cl-def-ta');
+  const defThreshSlider = paneEl.querySelector('#pp-cl-defthresh');
+  const defThreshVal    = paneEl.querySelector('#pp-cl-defthresh-val');
+
+  if (typeof upgradeSlider === 'function' && defThreshSlider) upgradeSlider(defThreshSlider);
+
+  function syncDefThreshold() {
+    _defThreshold = +defThreshSlider.value / 100;
+    defThreshVal.textContent = defThreshSlider.value + '%';
+  }
+  defThreshSlider.addEventListener('input', () => {
+    syncDefThreshold();
+    if (!_cachedEmbedded) return;
+    clearTimeout(_reclusterTimer);
+    _reclusterTimer = setTimeout(() => { _rendered = false; tryRender(); }, DRAG_DELAY);
+  });
+  defThreshSlider.addEventListener('change', () => {
+    syncDefThreshold();
+    if (!_cachedEmbedded) return;
+    clearTimeout(_reclusterTimer); _rendered = false; tryRender();
+  });
 
   function defColorFor(idx) { return DEF_COLORS[idx % DEF_COLORS.length]; }
   function defAutoResize(ta) { ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 'px'; }
@@ -1025,43 +1029,7 @@ function initClustersTool(paneEl, sidebarEl) {
     }
   }
 
-  // ── Text-search fallback vector (v38.3) ───────────────────
-  // When the embedder can't compute a vector for user-typed text,
-  // find rows whose text contains the cluster label's keywords and
-  // average their pre-computed vectors as a semantic proxy.
-  function _findVecByTextSearch(text) {
-    const rows = (typeof buildRowIndex === 'function') ? buildRowIndex() : [];
-    const veced = rows.filter(r => r.vec && r.vec.length);
-    if (!veced.length) return null;
-
-    // Tokenize into meaningful keywords (3+ chars)
-    const keywords = text.toLowerCase()
-      .replace(/[^a-z0-9\s]/g, ' ')
-      .split(/\s+/)
-      .filter(w => w.length > 2);
-
-    if (!keywords.length) return avgVec(veced.slice(0, 20).map(r => r.vec));
-
-    // Score each row by keyword overlap against cluster label
-    const scored = veced.map(r => {
-      const cells = r.row && r.row.cells ? r.row.cells : (r.cells || []);
-      const rowText = cells.join(' ').toLowerCase();
-      const score = keywords.reduce((s, kw) => s + (rowText.includes(kw) ? 1 : 0), 0);
-      return { r, score };
-    }).filter(x => x.score > 0)
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 20);
-
-    // Fall back to global centroid if nothing keyword-matched
-    const pool = scored.length ? scored.map(x => x.r) : veced.slice(0, 20);
-    return avgVec(pool.map(r => r.vec));
-  }
-
-  // ── Robust embedding with retries (v38.3) ─────────────────
-  // getCachedEmbedding only returns pre-computed vectors for loaded rows.
-  // For user-typed cluster names it will always return null, so we cap
-  // retries at 3 (≈1.2s total) then fall back to _findVecByTextSearch
-  // so the cluster resolves immediately instead of hanging indefinitely.
+  // ── Robust embedding with retries ─────────────────────────
   async function _tryEmbed(text) {
     if (!window.EmbeddingUtils) return null;
     if (typeof window.EmbeddingUtils.getCachedEmbedding === 'function') {
@@ -1070,7 +1038,6 @@ function initClustersTool(paneEl, sidebarEl) {
         if (v && v.length) return v;
       } catch(e) { /* fall through */ }
     }
-    // Fallback: try any direct embed method the bridge may expose
     for (const m of ['embed', 'getEmbedding', 'computeEmbedding', 'embedText']) {
       if (typeof window.EmbeddingUtils[m] === 'function') {
         try {
@@ -1082,6 +1049,37 @@ function initClustersTool(paneEl, sidebarEl) {
     return null;
   }
 
+  // ── v38.3: keyword-based vector fallback ──────────────────
+  // When getCachedEmbedding can't produce a vector for user-typed text
+  // (it only knows pre-loaded row vectors), find the closest rows by
+  // keyword overlap and average their vectors as a semantic proxy.
+  function _findVecByTextSearch(text) {
+    const rows = (typeof buildRowIndex === 'function') ? buildRowIndex() : [];
+    const veced = rows.filter(r => r.vec && r.vec.length);
+    if (!veced.length) return null;
+
+    const keywords = text.toLowerCase()
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .split(/\s+/)
+      .filter(w => w.length > 2);
+
+    if (!keywords.length) return avgVec(veced.slice(0, 20).map(r => r.vec));
+
+    const scored = veced.map(r => {
+      const cells = r.row && r.row.cells ? r.row.cells : (r.cells || []);
+      const rowText = cells.join(' ').toLowerCase();
+      const score = keywords.reduce((s, kw) => s + (rowText.includes(kw) ? 1 : 0), 0);
+      return { r, score };
+    }).filter(x => x.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 20);
+
+    // If nothing matches by keyword, fall back to global centroid
+    const pool = scored.length ? scored.map(x => x.r) : veced.slice(0, 20);
+    return avgVec(pool.map(r => r.vec));
+  }
+
+  // ── v38.3: max 3 retries then keyword fallback ────────────
   function _embedWithRetry(target, attempt) {
     attempt = attempt || 0;
     if (target.vec) return;
@@ -1093,12 +1091,11 @@ function initClustersTool(paneEl, sidebarEl) {
         renderDefPanel();
         scheduleRerender();
       } else if (attempt < 3) {
-        // Cap at 3 retries (~1.2s total) — getCachedEmbedding only knows
-        // pre-loaded row vectors so retrying more never helps for typed text
+        // Only retry a few times — getCachedEmbedding only knows pre-loaded row vectors
         const delay = 400 + attempt * 400;
         setTimeout(() => _embedWithRetry(target, attempt + 1), delay);
       } else {
-        // Fallback: approximate via keyword-matched row vectors
+        // Fallback: approximate via keyword-matching rows in the loaded data
         const fallbackVec = _findVecByTextSearch(target.desc);
         if (fallbackVec) {
           target.vec = fallbackVec;
@@ -1114,7 +1111,6 @@ function initClustersTool(paneEl, sidebarEl) {
   }
 
   function scheduleRerender() {
-    // Don't require _cachedEmbedded — defined clusters may exist before first render
     _rendered = false;
     clearTimeout(_reclusterTimer);
     _reclusterTimer = setTimeout(() => { _rendered = false; tryRender(); }, 300);
@@ -1317,10 +1313,8 @@ function initClustersTool(paneEl, sidebarEl) {
     if (!_clusterState) return;
     const { nonEmpty, alignedAsgns, definedGroups } = _clusterState;
 
-    // Build column descriptors — defined clusters first, then auto
     const cols = [];
 
-    // Defined cluster columns
     (definedGroups || []).forEach(({ def, members }) => {
       if (!members.length) return;
       const col = { accent: def.color, bg: def.color + '18', label: contrastFor(def.color) };
@@ -1336,7 +1330,6 @@ function initClustersTool(paneEl, sidebarEl) {
       cols.push({ outerLbl: def.desc, col, groups, isDefined: true });
     });
 
-    // Auto cluster columns
     (nonEmpty || []).forEach((members, ci) => {
       const outerLbl = outerLabel(ci);
       const col = colForIndex(ci);
@@ -1512,7 +1505,6 @@ function initClustersTool(paneEl, sidebarEl) {
     return Array.from(sum).map(x => x / valid.length);
   }
 
-  // ── KEY FIX v38.2 ─────────────────────────────────────────
   async function maybySplitRow(row) {
     const canEmbed = window.EmbeddingUtils && typeof window.EmbeddingUtils.getCachedEmbedding === 'function';
     const cells = row.row && row.row.cells ? row.row.cells : (row.cells || []);
@@ -1843,7 +1835,7 @@ function initClustersTool(paneEl, sidebarEl) {
         const subGroups = Array.from({ length: readySubs.length + 1 }, () => []);
         members.forEach(r => {
           if (!r.vec) { subGroups[readySubs.length].push(r); return; }
-          let bestSim = DEF_THRESHOLD * 0.8, bestIdx = readySubs.length;
+          let bestSim = _defThreshold * 0.8, bestIdx = readySubs.length;
           readySubs.forEach((sub, si) => { const s = cosineSim(r.vec, sub.vec); if (s > bestSim) { bestSim = s; bestIdx = si; } });
           subGroups[bestIdx].push(r);
         });
@@ -1886,7 +1878,7 @@ function initClustersTool(paneEl, sidebarEl) {
       autoRows = [];
       rows.forEach(r => {
         if (!r.vec) { autoRows.push(r); return; }
-        let bestSim = DEF_THRESHOLD, bestIdx = -1;
+        let bestSim = _defThreshold, bestIdx = -1;
         readyDefs.forEach((def, di) => {
           const s = cosineSim(r.vec, def.vec);
           if (s > bestSim) { bestSim = s; bestIdx = di; }
@@ -1950,15 +1942,18 @@ function initClustersTool(paneEl, sidebarEl) {
       });
     });
 
-    const splitCount = rows.filter(r => r._splitFrom).length;
-    const defCount   = readyDefs.length ? readyDefs.length + ' defined \u00b7 ' : '';
-    const autoNests  = nestEls.length - readyDefs.filter((_, di) => defGroups[di].length).length;
-    const autoNames  = Array.from({ length: autoNests }, (_, i) => outerLabel(i)).join(', ');
-    const autoStr    = autoNests > 0 ? autoNests + ' auto (' + autoNames + ')' : '';
+    const splitCount  = rows.filter(r => r._splitFrom).length;
+    const defCount    = readyDefs.length ? readyDefs.length + ' defined \u00b7 ' : '';
+    const autoNests   = nestEls.length - readyDefs.filter((_, di) => defGroups[di].length).length;
+    const autoNames   = Array.from({ length: autoNests }, (_, i) => outerLabel(i)).join(', ');
+    const autoStr     = autoNests > 0 ? autoNests + ' auto (' + autoNames + ')' : '';
+    const orphanCount = readyDefs.length ? autoRows.length : 0;
+    const orphanStr   = orphanCount > 0 ? ' \u00b7 ' + orphanCount + ' orphan' + (orphanCount === 1 ? '' : 's') : '';
     subtitle.textContent =
       defCount + autoStr +
       (defCount || autoStr ? ' \u00b7 ' : '') +
       rows.length + ' entries' +
+      orphanStr +
       (splitCount > 0 ? ' \u00b7 ' + splitCount + ' split' : '');
 
     updateSheetPanel();
