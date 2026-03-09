@@ -878,6 +878,11 @@ function initClustersTool(paneEl, sidebarEl) {
             '<input class="pp-range pp-range--accent" id="pp-cl-depth" type="range" min="1" max="4" value="2" step="1">' +
             '<span class="pp-range-val" id="pp-cl-depth-val">2</span>' +
           '</div>' +
+          '<div class="pp-range-row" title="Hard-split cards longer than this. Slide to max to disable.">'+
+            '<span class="pp-range-label">Max</span>'+
+            '<input class="pp-range pp-range--muted" id="pp-cl-maxlen" type="range" min="100" max="2000" value="2000" step="50">'+
+            '<span class="pp-range-val" id="pp-cl-maxlen-val">Off</span>'+
+          '</div>' +
           '<button id="pp-cl-recluster" style="margin-top:4px">Re-cluster</button>',
       },
     ],
@@ -920,6 +925,7 @@ function initClustersTool(paneEl, sidebarEl) {
   const iMinSlider   = paneEl.querySelector('#pp-cl-imin'), iMinVal = paneEl.querySelector('#pp-cl-imin-val');
   const iMaxSlider   = paneEl.querySelector('#pp-cl-imax'), iMaxVal = paneEl.querySelector('#pp-cl-imax-val');
   const depthSlider  = paneEl.querySelector('#pp-cl-depth'), depthVal = paneEl.querySelector('#pp-cl-depth-val');
+  const maxLenSlider = paneEl.querySelector('#pp-cl-maxlen'), maxLenVal = paneEl.querySelector('#pp-cl-maxlen-val');
 
   const CARD_W         = 225;
   const CARD_GAP       = 8;
@@ -929,7 +935,7 @@ function initClustersTool(paneEl, sidebarEl) {
   const DRAG_DELAY     = 600;
   const DRAG_THRESHOLD = 4;
 
-  let _outerMin=2, _outerMax=12, _innerMin=2, _innerMax=4, _depth=2;
+  let _outerMin=2, _outerMax=12, _innerMin=2, _innerMax=4, _depth=2, _maxCardLen=0; // 0 = disabled
   let _rendered=false, _ttRow=null;
   let _cachedEmbedded=null, _cachedVectors=null;
   let _reclusterTimer=null;
@@ -1225,6 +1231,8 @@ function initClustersTool(paneEl, sidebarEl) {
     _outerMin = +oMinSlider.value; _outerMax = +oMaxSlider.value;
     _innerMin = +iMinSlider.value; _innerMax = +iMaxSlider.value;
     _depth    = +depthSlider.value;
+    _maxCardLen = +maxLenSlider.value >= 2000 ? 0 : +maxLenSlider.value;
+    maxLenVal.textContent = _maxCardLen === 0 ? 'Off' : _maxCardLen;
     smoothSliderVal(oMinSlider, oMinVal, _outerMin);
     smoothSliderVal(oMaxSlider, oMaxVal, _outerMax);
     smoothSliderVal(iMinSlider, iMinVal, _innerMin);
@@ -1248,7 +1256,7 @@ function initClustersTool(paneEl, sidebarEl) {
     state.raf = requestAnimationFrame(step);
   }
 
-  [oMinSlider, oMaxSlider, iMinSlider, iMaxSlider, depthSlider].forEach(s => {
+  [oMinSlider, oMaxSlider, iMinSlider, iMaxSlider, depthSlider, maxLenSlider].forEach(s => {
     s.addEventListener('input', () => {
       syncSliders();
       if (!_cachedEmbedded) return;
@@ -1553,18 +1561,73 @@ function initClustersTool(paneEl, sidebarEl) {
   ttGoto.addEventListener('click', () => { if (_ttRow && typeof panelGoTo === 'function') panelGoTo(_ttRow, 0); hideTooltip(); });
 
   // ── Utilities ─────────────────────────────────────────────
+
+  // Abbreviations that end with "." but are NOT sentence boundaries
+  const _ABBREV = new Set([
+    'mr','mrs','ms','dr','prof','sr','jr','vs','etc','approx','est','dept',
+    'fig','no','vol','pp','ed','eds','ibid','op','cf','al','et','e.g','i.e',
+    'jan','feb','mar','apr','jun','jul','aug','sep','oct','nov','dec',
+    'st','ave','blvd','co','corp','inc','ltd','govt','univ','assoc',
+  ]);
+
   function sentenceSplit(text) {
-    return text
-      .replace(/\r\n|\r/g, '\n')
-      // Only split on real sentence endings (. ! ?) before a capital letter.
-      // Do NOT split on ; : — – as those connect clauses within one idea.
-      .replace(/([.!?])\s+(?=[A-Z])/g, '$1\n')
-      // Blank lines are genuine paragraph breaks
-      .replace(/\n{2,}/g, '\n')
-      .split('\n')
-      .map(s => s.trim())
-      // Raise min length: short fragments are rarely independent ideas
-      .filter(s => s.length >= 60);
+    // Scan character-by-character for real sentence endings.
+    // A period/!/? is a sentence boundary only when:
+    //   1. Followed by whitespace then an uppercase letter
+    //   2. Not preceded by a known abbreviation
+    //   3. Not preceded by a single capital letter (initials: "J. Smith")
+    //   4. Not preceded by a digit (decimals / numbered lists: "3. The")
+    const sentences = [];
+    let start = 0;
+    const t = text.replace(/
+|
+/g, '
+');
+
+    for (let i = 0; i < t.length; i++) {
+      const ch = t[i];
+
+      // Blank line = definite paragraph break
+      if (ch === '
+' && t[i + 1] === '
+') {
+        const seg = t.slice(start, i).trim();
+        if (seg.length >= 60) sentences.push(seg);
+        // skip all consecutive newlines
+        while (i + 1 < t.length && t[i + 1] === '
+') i++;
+        start = i + 1;
+        continue;
+      }
+
+      if (ch !== '.' && ch !== '!' && ch !== '?') continue;
+
+      // Must be followed by whitespace then an uppercase letter
+      const after = t.slice(i + 1).match(/^(\s+)([A-Z])/);
+      if (!after) continue;
+
+      // Word before the punctuation
+      const wordBefore = t.slice(0, i).match(/(\b\w+)$/);
+      if (wordBefore) {
+        const w = wordBefore[1];
+        // Skip abbreviations
+        if (_ABBREV.has(w.toLowerCase())) continue;
+        // Skip single capital letter (initials)
+        if (w.length === 1 && w === w.toUpperCase()) continue;
+      }
+
+      // Skip digit before period (decimals, numbered items)
+      if (/\d$/.test(t.slice(0, i))) continue;
+
+      const seg = t.slice(start, i + 1).trim();
+      if (seg.length >= 60) sentences.push(seg);
+      start = i + 1 + after[1].length; // advance past the whitespace
+    }
+
+    const last = t.slice(start).trim();
+    if (last.length >= 60) sentences.push(last);
+
+    return sentences;
   }
 
   function avgVec(vecs) {
@@ -1575,44 +1638,41 @@ function initClustersTool(paneEl, sidebarEl) {
   }
 
   async function maybySplitRow(row) {
-    const canEmbed = window.EmbeddingUtils && typeof window.EmbeddingUtils.getCachedEmbedding === 'function';
+    // Without embeddings we cannot judge semantic distance — never split blindly
+    if (!window.EmbeddingUtils || typeof window.EmbeddingUtils.getCachedEmbedding !== 'function') return [row];
+
     const cells = row.row && row.row.cells ? row.row.cells : (row.cells || []);
     const cats  = row.row && row.row.cats  ? row.row.cats.filter(c => c.trim()) : [];
     let bestText = '', bestIdx = 0;
     cells.forEach((c, i) => { if (c.trim().length > bestText.length) { bestText = c.trim(); bestIdx = i; } });
-    if (bestText.length < 150) return [row];  // only consider very long cells
+    if (bestText.length < 150) return [row];
+
     const segments = sentenceSplit(bestText);
-    if (segments.length <= 1) return [row];
+    // Require at least 3 distinct sentences — two sentences in a cell almost
+    // always share a topic and should stay together
+    if (segments.length < 3) return [row];
+
     const catStr = cats.join(' · ') || 'Cell';
 
     let segVecs;
-    if (canEmbed) {
-      try { segVecs = await Promise.all(segments.map(s => window.EmbeddingUtils.getCachedEmbedding(s))); }
-      catch(e) { segVecs = null; }
-    }
+    try { segVecs = await Promise.all(segments.map(s => window.EmbeddingUtils.getCachedEmbedding(s))); }
+    catch(e) { return [row]; }
 
-    const valid = segVecs
-      ? segments.map((s, i) => ({ text: s, vec: segVecs[i] })).filter(x => x.vec && x.vec.length)
-      : [];
+    const valid = segments
+      .map((s, i) => ({ text: s, vec: segVecs[i] }))
+      .filter(x => x.vec && x.vec.length);
 
-    if (valid.length <= 1) {
-      if (!row.vec) { console.log('[clusters] split skipped - no row.vec'); return [row]; }
-      console.log('[clusters] structural split into', segments.length, 'segments');
-      return segments.map((seg, ni) => ({
-        tabIdx: row.tabIdx, rowIdx: row.rowIdx,
-        headers: row.headers || [], title: row.title || '',
-        kws: row.kws || new Set(),
-        _splitFrom: catStr, _splitN: ni + 1, _splitT: segments.length,
-        vec: row.vec,
-        row: { cells: cells.map((c, ci) => ci === bestIdx ? seg : c), cats }
-      }));
-    }
+    // Still need at least 3 embedded segments
+    if (valid.length < 3) return [row];
 
-    // Lower threshold = more permissive grouping = harder to split.
-    // Sentences must be clearly about different topics (sim < 0.45) to land in separate groups.
+    // Group sentences by semantic proximity.
+    // SPLIT_THRESHOLD 0.45: segments in the same group must have cos-sim >= 0.45.
+    // Lower = harder to split (more gets merged into one group).
     const SPLIT_THRESHOLD = 0.45;
     const n = valid.length;
-    const sim = Array.from({length: n}, (_, i) => Array.from({length: n}, (_, j) => i === j ? 1 : cosineSim(valid[i].vec, valid[j].vec)));
+    const sim = Array.from({length: n}, (_, i) =>
+      Array.from({length: n}, (_, j) => i === j ? 1 : cosineSim(valid[i].vec, valid[j].vec)));
+
     const groupOf = new Array(n).fill(-1); let numGroups = 0;
     for (let i = 0; i < n; i++) {
       if (groupOf[i] !== -1) continue;
@@ -1620,17 +1680,17 @@ function initClustersTool(paneEl, sidebarEl) {
       for (let j = i + 1; j < n; j++) {
         if (groupOf[j] !== -1) continue;
         const membersOfG = valid.map((_, k) => k).filter(k => groupOf[k] === g);
-        const allSimilar = membersOfG.every(k => sim[k][j] >= SPLIT_THRESHOLD);
-        if (allSimilar) groupOf[j] = g;
+        if (membersOfG.every(k => sim[k][j] >= SPLIT_THRESHOLD)) groupOf[j] = g;
       }
     }
     if (numGroups <= 1) return [row];
+
     const groups = Array.from({length: numGroups}, () => []);
-    valid.forEach((seg, i) => groups[groupOf[i]].push(seg));
-    // Don't split if any resulting group is too thin to stand alone
-    const minGroupTextLen = 60;
-    if (groups.some(g => g.reduce((sum, s) => sum + s.text.length, 0) < minGroupTextLen)) return [row];
-    valid.forEach((seg, i) => groups[groupOf[i]].push(seg));
+    valid.forEach((seg, i) => groups[groupOf[i]].push(seg)); // pushed exactly once
+
+    // Abort split if any group would be too thin to be meaningful
+    if (groups.some(g => g.reduce((sum, s) => sum + s.text.length, 0) < 60)) return [row];
+
     return groups.map((segs, ni) => ({
       tabIdx: row.tabIdx, rowIdx: row.rowIdx,
       headers: row.headers || [], title: row.title || '',
@@ -1644,6 +1704,56 @@ function initClustersTool(paneEl, sidebarEl) {
   async function splitAllRows(rows) {
     const result = [];
     for (const row of rows) { const parts = await maybySplitRow(row); parts.forEach(r => result.push(r)); }
+    return result;
+  }
+
+  // Hard-split any row whose best-cell text exceeds _maxCardLen chars.
+  // Splits at sentence boundaries (. ! ?) preferring not to break mid-sentence;
+  // falls back to word boundaries if no sentence break fits.
+  function hardSplitByLength(rows) {
+    if (!_maxCardLen) return rows; // disabled
+    const result = [];
+    rows.forEach(row => {
+      const cells = row.row && row.row.cells ? row.row.cells : (row.cells || []);
+      const cats  = row.row && row.row.cats  ? row.row.cats  : [];
+      let bestIdx = 0;
+      cells.forEach((c, i) => { if (c.trim().length > cells[bestIdx].trim().length) bestIdx = i; });
+      const text = cells[bestIdx].trim();
+      if (text.length <= _maxCardLen) { result.push(row); return; }
+
+      // Chunk the text respecting sentence boundaries
+      const chunks = [];
+      let remaining = text;
+      while (remaining.length > _maxCardLen) {
+        // Find the last sentence-ending punctuation within the limit
+        const window = remaining.slice(0, _maxCardLen);
+        const sentEnd = Math.max(
+          window.lastIndexOf('. '), window.lastIndexOf('! '), window.lastIndexOf('? ')
+        );
+        let cutAt = sentEnd > _maxCardLen * 0.4 ? sentEnd + 1 : -1;
+        if (cutAt < 0) {
+          // No good sentence break — fall back to last space
+          const spaceAt = window.lastIndexOf(' ');
+          cutAt = spaceAt > 0 ? spaceAt : _maxCardLen;
+        }
+        chunks.push(remaining.slice(0, cutAt).trim());
+        remaining = remaining.slice(cutAt).trim();
+      }
+      if (remaining.length) chunks.push(remaining);
+      if (chunks.length <= 1) { result.push(row); return; }
+
+      const catStr = cats.filter(c => c.trim()).join(' · ') || 'Cell';
+      chunks.forEach((chunk, ni) => {
+        result.push({
+          tabIdx: row.tabIdx, rowIdx: row.rowIdx,
+          headers: row.headers || [], title: row.title || '',
+          kws: row.kws || new Set(),
+          _splitFrom: catStr, _splitN: ni + 1, _splitT: chunks.length,
+          vec: row.vec, // reuse original vec; will be close enough for clustering
+          row: { cells: cells.map((c, ci) => ci === bestIdx ? chunk : c), cats }
+        });
+      });
+    });
     return result;
   }
 
@@ -1711,14 +1821,18 @@ function initClustersTool(paneEl, sidebarEl) {
   }
   function autoCluster(rows, minK, maxK) {
     const n = rows.length; if (n === 0) return []; if (n <= 2) return rows.map((_, i) => i);
-    minK = Math.max(2, minK); maxK = Math.min(maxK, Math.floor(Math.sqrt(n) * 2), n - 1);
-    if (maxK < minK) return new Array(n).fill(0);
-    if (minK === maxK) return bestKMeans(rows, minK).asgn;
+    const hardMin = Math.max(2, minK);
+    const hardMax = Math.min(maxK, Math.floor(Math.sqrt(n) * 2), n - 1);
+    if (hardMax < hardMin) return new Array(n).fill(0);
+    if (hardMin === hardMax) return bestKMeans(rows, hardMin).asgn;
     const results = [];
-    for (let k = minK; k <= maxK; k++) results.push({ k, ...bestKMeans(rows, k) });
+    for (let k = hardMin; k <= hardMax; k++) results.push({ k, ...bestKMeans(rows, k) });
     const inertias = results.map(r => r.inertia); const totalDrop = (inertias[0] - inertias[inertias.length - 1]) || 1;
+    // Elbow: find where marginal gain drops below 10% of total
     let chosenK = results[0].k;
     for (let i = 1; i < results.length; i++) { if ((inertias[i-1] - inertias[i]) / totalDrop < 0.10) { chosenK = results[i-1].k; break; } chosenK = results[i].k; }
+    // Clamp: elbow can never go below hardMin (respects the user's Min slider)
+    chosenK = Math.max(hardMin, Math.min(hardMax, chosenK));
     return (results.find(r => r.k === chosenK) || results[results.length-1]).asgn;
   }
 
@@ -1727,7 +1841,9 @@ function initClustersTool(paneEl, sidebarEl) {
     if (numGroups < 2) return numGroups === 0 ? [] : [autoCluster(topGroups[0], minK, maxK)];
     const perGroupK = topGroups.map(members => { if (members.length < 2) return 1; const asgn = autoCluster(members, minK, maxK); return Math.max(...asgn) + 1; });
     const kCounts = {}; perGroupK.forEach(k => { kCounts[k] = (kCounts[k] || 0) + 1; });
-    const canonicalK = parseInt(Object.entries(kCounts).sort((a, b) => b[1] - a[1])[0][0]);
+    let canonicalK = parseInt(Object.entries(kCounts).sort((a, b) => b[1] - a[1])[0][0]);
+    // Respect slider bounds: canonicalK must be within [minK, maxK]
+    canonicalK = Math.max(minK, Math.min(maxK, canonicalK));
     if (canonicalK < 2) return topGroups.map(g => new Array(g.length).fill(0));
     const allRows = topGroups.flat(); const globalAsgn = bestKMeans(allRows, canonicalK, 5).asgn;
     const globalBuckets = Array.from({ length: canonicalK }, () => []); allRows.forEach((r, i) => globalBuckets[globalAsgn[i]].push(r));
@@ -2081,6 +2197,16 @@ function initClustersTool(paneEl, sidebarEl) {
         setStatus('loading', 'Clustering ' + workRows.length + ' concepts\u2026');
       }
     } catch(e) { console.warn('[clusters] split error:', e); }
+
+    // Second pass: hard-split by max card length (if enabled)
+    if (_maxCardLen) {
+      const hardSplit = hardSplitByLength(workRows);
+      if (hardSplit.length > workRows.length) {
+        console.log('[clusters] hard-split by length: before=' + workRows.length + ' after=' + hardSplit.length);
+        workRows = hardSplit;
+        setStatus('loading', 'Clustering ' + workRows.length + ' concepts\u2026');
+      }
+    }
 
     setTimeout(() => {
       try {
