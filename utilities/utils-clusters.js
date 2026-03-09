@@ -15,7 +15,13 @@
 //   • maybySplitRow: removed early-exit guard on EmbeddingUtils so structural split
 //     still fires on the fast-path (pre-veced rows from sessionStorage) before
 //     EmbeddingUtils is ready. canEmbed flag now only gates per-sentence embedding attempt.
-console.log('[utils-clusters.js v3000000000000]');
+// v38.3 fix:
+//   • _embedWithRetry: reduced retries from 10 to 3 — getCachedEmbedding only knows
+//     pre-loaded row vectors, so retrying forever for user-typed cluster names always fails
+//   • _findVecByTextSearch: new fallback — after 3 failed retries, keyword-matches the
+//     cluster label against loaded row text and averages matching vectors as a proxy,
+//     so defined clusters always resolve quickly instead of hanging indefinitely
+console.log('[utils-clusters.js v21]');
 
 var CL_MIN_SPLIT_LENGTH = 60;
 
@@ -1019,13 +1025,45 @@ function initClustersTool(paneEl, sidebarEl) {
     }
   }
 
-  // ── Robust embedding with retries ─────────────────────────
-  // getCachedEmbedding only returns pre-computed vectors.
-  // For user-typed text we may need to wait until the model is
-  // warm, then it will compute and cache on first call.
+  // ── Text-search fallback vector (v38.3) ───────────────────
+  // When the embedder can't compute a vector for user-typed text,
+  // find rows whose text contains the cluster label's keywords and
+  // average their pre-computed vectors as a semantic proxy.
+  function _findVecByTextSearch(text) {
+    const rows = (typeof buildRowIndex === 'function') ? buildRowIndex() : [];
+    const veced = rows.filter(r => r.vec && r.vec.length);
+    if (!veced.length) return null;
+
+    // Tokenize into meaningful keywords (3+ chars)
+    const keywords = text.toLowerCase()
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .split(/\s+/)
+      .filter(w => w.length > 2);
+
+    if (!keywords.length) return avgVec(veced.slice(0, 20).map(r => r.vec));
+
+    // Score each row by keyword overlap against cluster label
+    const scored = veced.map(r => {
+      const cells = r.row && r.row.cells ? r.row.cells : (r.cells || []);
+      const rowText = cells.join(' ').toLowerCase();
+      const score = keywords.reduce((s, kw) => s + (rowText.includes(kw) ? 1 : 0), 0);
+      return { r, score };
+    }).filter(x => x.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 20);
+
+    // Fall back to global centroid if nothing keyword-matched
+    const pool = scored.length ? scored.map(x => x.r) : veced.slice(0, 20);
+    return avgVec(pool.map(r => r.vec));
+  }
+
+  // ── Robust embedding with retries (v38.3) ─────────────────
+  // getCachedEmbedding only returns pre-computed vectors for loaded rows.
+  // For user-typed cluster names it will always return null, so we cap
+  // retries at 3 (≈1.2s total) then fall back to _findVecByTextSearch
+  // so the cluster resolves immediately instead of hanging indefinitely.
   async function _tryEmbed(text) {
     if (!window.EmbeddingUtils) return null;
-    // Try getCachedEmbedding — on warm model it computes new text too
     if (typeof window.EmbeddingUtils.getCachedEmbedding === 'function') {
       try {
         const v = await window.EmbeddingUtils.getCachedEmbedding(text);
@@ -1046,19 +1084,31 @@ function initClustersTool(paneEl, sidebarEl) {
 
   function _embedWithRetry(target, attempt) {
     attempt = attempt || 0;
-    if (target.vec) return; // already done
+    if (target.vec) return;
+
     _tryEmbed(target.desc).then(vec => {
       if (vec) {
         target.vec = vec;
-        console.log('[clusters] embedded "' + target.desc.slice(0, 40) + '" on attempt ' + attempt);
+        console.log('[clusters] embedded "' + target.desc.slice(0, 40) + '" via embedder on attempt ' + attempt);
         renderDefPanel();
         scheduleRerender();
-      } else if (attempt < 10) {
-        // Retry with back-off: 400ms, 800ms, 1.2s … up to 4s
-        const delay = Math.min(400 + attempt * 400, 4000);
+      } else if (attempt < 3) {
+        // Cap at 3 retries (~1.2s total) — getCachedEmbedding only knows
+        // pre-loaded row vectors so retrying more never helps for typed text
+        const delay = 400 + attempt * 400;
         setTimeout(() => _embedWithRetry(target, attempt + 1), delay);
       } else {
-        console.warn('[clusters] embedding failed after 10 attempts for: ' + target.desc);
+        // Fallback: approximate via keyword-matched row vectors
+        const fallbackVec = _findVecByTextSearch(target.desc);
+        if (fallbackVec) {
+          target.vec = fallbackVec;
+          target._vecApproximate = true;
+          console.log('[clusters] using text-search fallback vec for "' + target.desc.slice(0, 40) + '"');
+          renderDefPanel();
+          scheduleRerender();
+        } else {
+          console.warn('[clusters] no vector found for defined cluster: ' + target.desc);
+        }
       }
     });
   }
@@ -1274,7 +1324,6 @@ function initClustersTool(paneEl, sidebarEl) {
     (definedGroups || []).forEach(({ def, members }) => {
       if (!members.length) return;
       const col = { accent: def.color, bg: def.color + '18', label: contrastFor(def.color) };
-      // Sub-group by sub-clusters if they exist, else treat as single group
       let groups;
       if (_depth >= 2 && members.length >= 2) {
         const asgn = autoCluster(members, _innerMin, _innerMax);
@@ -1315,7 +1364,6 @@ function initClustersTool(paneEl, sidebarEl) {
       th.style.color = c.col.accent;
       th.style.borderTop = '3px solid ' + c.col.accent;
       if (c.isDefined) {
-        // Show description as the header, with a small "defined" badge
         th.innerHTML =
           '<span style="font-size:8px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;' +
             'background:' + c.col.accent + '22;color:' + c.col.accent + ';border-radius:3px;padding:1px 4px;margin-right:4px;">' +
@@ -1465,10 +1513,6 @@ function initClustersTool(paneEl, sidebarEl) {
   }
 
   // ── KEY FIX v38.2 ─────────────────────────────────────────
-  // Removed the early-exit guard on EmbeddingUtils. canEmbed now only gates
-  // the per-sentence embedding attempt — structural split (using parent vec)
-  // fires regardless, so rows are split even on the fast pre-veced path
-  // before EmbeddingUtils is initialized.
   async function maybySplitRow(row) {
     const canEmbed = window.EmbeddingUtils && typeof window.EmbeddingUtils.getCachedEmbedding === 'function';
     const cells = row.row && row.row.cells ? row.row.cells : (row.cells || []);
@@ -1680,7 +1724,6 @@ function initClustersTool(paneEl, sidebarEl) {
     if (cats.length) { const ce = document.createElement('div'); ce.className = 'pp-cl-card-cat'; ce.textContent = cats.join(' \u00b7 '); body.appendChild(ce); }
     const te = document.createElement('div'); te.className = 'pp-cl-card-text'; te.textContent = parsed.body; body.appendChild(te);
     if (r._splitN && r._splitT && r._splitT > 1) { const sp = document.createElement('div'); sp.className = 'pp-cl-card-split'; sp.textContent = r._splitN + '/' + r._splitT + ' Split'; body.appendChild(sp); }
-    // ── Similarity badge (defined clusters only) ──
     if (typeof similarity === 'number') {
       const pct = Math.round(similarity * 100);
       const sim = document.createElement('div'); sim.className = 'pp-cl-sim-row';
@@ -1774,13 +1817,12 @@ function initClustersTool(paneEl, sidebarEl) {
     return nest;
   }
 
-  // Build a nest for a user-defined cluster
   function buildDefinedNest(def, members, defIdx, simMap) {
     const color = def.color;
     const col = { accent: color, bg: color + '18', label: contrastFor(color) };
     const shortDesc = def.desc.length > 22 ? def.desc.slice(0, 20) + '\u2026' : def.desc;
-    const lbl = shortDesc; // shown on cards as clusterLabel
-    const nestNum = '\u2605' + (defIdx + 1); // ★1 for nest header only
+    const lbl = shortDesc;
+    const nestNum = '\u2605' + (defIdx + 1);
     const nest = document.createElement('div'); nest.className = 'pp-cl-nest';
     const head = document.createElement('div'); head.className = 'pp-cl-nest-head'; head.style.background = color + '18';
     const nestLblEl = document.createElement('span'); nestLblEl.className = 'pp-cl-nest-label'; nestLblEl.textContent = nestNum; nestLblEl.style.color = color;
@@ -1794,7 +1836,6 @@ function initClustersTool(paneEl, sidebarEl) {
     nest.appendChild(head);
     const body = document.createElement('div'); body.className = 'pp-cl-nest-body'; nest.appendChild(body);
 
-    // Sub-cluster within defined: if sub-cluster descriptions exist, try to assign
     let innerFrag;
     if (def.subClusters && def.subClusters.length && members.some(r => r.vec)) {
       const readySubs = def.subClusters.filter(s => s.vec);
@@ -1836,10 +1877,9 @@ function initClustersTool(paneEl, sidebarEl) {
     emptyEl.style.display = 'none';
     _panX = 0; _panY = 0; _zoom = 1; applyWorldTransform(); _topZ = 10;
 
-    // ── 1. Assign rows to defined clusters ──────────────────
     const readyDefs = _definedClusters.filter(d => d.vec);
-    const defGroups = readyDefs.map(() => []); // members per defined cluster
-    const defSimMaps = readyDefs.map(() => new Map()); // row → similarity
+    const defGroups = readyDefs.map(() => []);
+    const defSimMaps = readyDefs.map(() => new Map());
     let autoRows = rows;
 
     if (readyDefs.length) {
@@ -1862,7 +1902,6 @@ function initClustersTool(paneEl, sidebarEl) {
 
     const nestEls = [];
 
-    // ── 2. Build defined cluster nests ──────────────────────
     readyDefs.forEach((def, di) => {
       if (!defGroups[di].length) return;
       const nest = buildDefinedNest(def, defGroups[di], di, defSimMaps[di]);
@@ -1870,7 +1909,6 @@ function initClustersTool(paneEl, sidebarEl) {
       world.appendChild(nest); nestEls.push(nest);
     });
 
-    // ── 3. Auto-cluster remaining rows ──────────────────────
     const definedOffset = nestEls.length;
     let autoNonEmpty = [];
     let autoAlignedAsgns = null;
@@ -1894,14 +1932,12 @@ function initClustersTool(paneEl, sidebarEl) {
       autoNonEmpty = [autoRows];
     }
 
-    // Save full cluster state — both defined and auto groups
     _clusterState = {
       nonEmpty: autoNonEmpty,
       alignedAsgns: (_depth > 1 ? autoAlignedAsgns : null),
       definedGroups: readyDefs.map((def, di) => ({ def, members: defGroups[di] })).filter(g => g.members.length),
     };
 
-    // ── 4. Layout ────────────────────────────────────────────
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         nestEls.forEach(nest => { const { contentH } = doMasonry(nest, false); if (nest._setMasonryMinH) nest._setMasonryMinH(contentH); const realH = HEAD_H + contentH + BODY_PAD * 2; nest.style.height = realH + 'px'; nest._estH = realH; });
@@ -1914,7 +1950,6 @@ function initClustersTool(paneEl, sidebarEl) {
       });
     });
 
-    // ── 5. Subtitle ──────────────────────────────────────────
     const splitCount = rows.filter(r => r._splitFrom).length;
     const defCount   = readyDefs.length ? readyDefs.length + ' defined \u00b7 ' : '';
     const autoNests  = nestEls.length - readyDefs.filter((_, di) => defGroups[di].length).length;
@@ -1932,7 +1967,8 @@ function initClustersTool(paneEl, sidebarEl) {
   function tryRender() {
     if (_rendered) return;
     if (typeof buildRowIndex !== 'function') return;
-    if (_cachedEmbedded && _cachedVectors) { doRender(); return; }    const rows = buildRowIndex(); if (!rows.length) return;
+    if (_cachedEmbedded && _cachedVectors) { doRender(); return; }
+    const rows = buildRowIndex(); if (!rows.length) return;
     const preVeced = rows.filter(r => r.vec && r.vec.length);
     if (preVeced.length >= 2) {
       const vectors = new Map(); preVeced.forEach(r => vectors.set(r.tabIdx+':'+r.rowIdx, r.vec));
@@ -1989,9 +2025,7 @@ function initClustersTool(paneEl, sidebarEl) {
   window.addEventListener('embedding-complete', ev => { if (!_rendered) { subtitle.textContent = 'Indexed ' + ev.detail.total + ' entries \u2014 building clusters\u2026'; tryRender(); } });
   window.addEventListener('df-theme-change', () => { _rendered = false; tryRender(); });
 
-  // Also re-embed any defined clusters that are waiting when embedder comes online
   window.addEventListener('embedder-ready', () => {
-    // Kick off embedding retries for any defs/subs still waiting
     _definedClusters.forEach(def => {
       if (!def.vec) _embedWithRetry(def);
       def.subClusters.forEach(sub => { if (!sub.vec) _embedWithRetry(sub); });
