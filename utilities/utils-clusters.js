@@ -27,7 +27,7 @@
 //   • Cards that fall below the threshold become orphans and flow into the auto-cluster pool
 //     so they always appear in unnamed clusters rather than being forced into a poor fit
 //   • Sub-cluster matching inside buildDefinedNest uses the same _defThreshold * 0.8 ratio
-console.log('[utils-clusters.js v5000]');
+console.log('[utils-clusters.js vFINALLY]');
 
 var CL_MIN_SPLIT_LENGTH = 60;
 
@@ -1376,10 +1376,9 @@ function initClustersTool(paneEl, sidebarEl) {
     if (numGroups <= 1) { rows.forEach(r => container.appendChild(buildSheetCard(r, col))); return; }
     const groups = Array.from({ length: numGroups }, () => []);
     rows.forEach((r, i) => groups[asgn[i]].push(r));
-    let colorIdx = 0;
     groups.forEach((members, si) => {
       if (!members.length) return;
-      const lbl = subLabel(prefixLbl, si); const subCol = colForIndex(colorIdx++);
+      const lbl = subLabel(prefixLbl, si); const subCol = colForIndex(si);
       const hdr = document.createElement('div'); hdr.className = 'pp-cl-scard-group-label'; hdr.textContent = lbl; hdr.style.color = subCol.accent; container.appendChild(hdr);
       renderSheetGroup(container, members, lbl, remainingDepth - 1, subCol);
     });
@@ -1698,54 +1697,135 @@ function initClustersTool(paneEl, sidebarEl) {
     return result;
   }
 
-  // Hard-split any row whose best-cell text exceeds _maxCardLen chars.
-  // Splits at sentence boundaries (. ! ?) preferring not to break mid-sentence;
-  // falls back to word boundaries if no sentence break fits.
-  function hardSplitByLength(rows) {
-    if (!_maxCardLen) return rows; // disabled
+  // Semantic length-cap split: if a card exceeds _maxCardLen, split it using
+  // proper sentence boundaries + embeddings. Sentences are grouped greedily by
+  // cosine similarity; any group that still exceeds the cap is further divided
+  // at sentence boundaries (never mid-sentence, never mid-word).
+  async function hardSplitByLength(rows) {
+    if (!_maxCardLen) return rows; // slider at max = disabled
+
+    const canEmbed = window.EmbeddingUtils &&
+      typeof window.EmbeddingUtils.getCachedEmbedding === 'function';
+
     const result = [];
-    rows.forEach(row => {
+    for (const row of rows) {
       const cells = row.row && row.row.cells ? row.row.cells : (row.cells || []);
       const cats  = row.row && row.row.cats  ? row.row.cats  : [];
       let bestIdx = 0;
-      cells.forEach((c, i) => { if (c.trim().length > cells[bestIdx].trim().length) bestIdx = i; });
+      cells.forEach((c, i) => {
+        if (c.trim().length > cells[bestIdx].trim().length) bestIdx = i;
+      });
       const text = cells[bestIdx].trim();
-      if (text.length <= _maxCardLen) { result.push(row); return; }
 
-      // Chunk the text respecting sentence boundaries
-      const chunks = [];
-      let remaining = text;
-      while (remaining.length > _maxCardLen) {
-        // Find the last sentence-ending punctuation within the limit
-        const window = remaining.slice(0, _maxCardLen);
-        const sentEnd = Math.max(
-          window.lastIndexOf('. '), window.lastIndexOf('! '), window.lastIndexOf('? ')
-        );
-        let cutAt = sentEnd > _maxCardLen * 0.4 ? sentEnd + 1 : -1;
-        if (cutAt < 0) {
-          // No good sentence break — fall back to last space
-          const spaceAt = window.lastIndexOf(' ');
-          cutAt = spaceAt > 0 ? spaceAt : _maxCardLen;
-        }
-        chunks.push(remaining.slice(0, cutAt).trim());
-        remaining = remaining.slice(cutAt).trim();
+      if (text.length <= _maxCardLen) { result.push(row); continue; }
+
+      // Split into proper sentences
+      const sentences = sentenceSplit(text);
+
+      // If sentenceSplit produced nothing useful (e.g. one giant run-on),
+      // fall back to word-boundary chunks as a last resort
+      if (sentences.length <= 1) {
+        const chunks = wordBoundaryChunk(text, _maxCardLen);
+        if (chunks.length <= 1) { result.push(row); continue; }
+        const catStr = cats.filter(c => c.trim()).join(' · ') || 'Cell';
+        chunks.forEach((chunk, ni) => {
+          result.push(makeRow(row, cells, cats, bestIdx, chunk, catStr, ni, chunks.length, row.vec));
+        });
+        continue;
       }
-      if (remaining.length) chunks.push(remaining);
-      if (chunks.length <= 1) { result.push(row); return; }
+
+      // Embed each sentence if possible
+      let segs;
+      if (canEmbed) {
+        try {
+          const vecs = await Promise.all(
+            sentences.map(s => window.EmbeddingUtils.getCachedEmbedding(s))
+          );
+          segs = sentences.map((s, i) => ({ text: s, vec: vecs[i] }));
+        } catch(e) { segs = sentences.map(s => ({ text: s, vec: null })); }
+      } else {
+        segs = sentences.map(s => ({ text: s, vec: null }));
+      }
+
+      // Greedy grouping: merge adjacent sentences that are semantically close
+      // AND where adding the next sentence keeps the group under the cap.
+      const SIM_MERGE = 0.50; // similarity above which we prefer to merge
+      const groups = []; // each group = array of segs
+      let current = [segs[0]];
+
+      for (let i = 1; i < segs.length; i++) {
+        const next = segs[i];
+        const currentText = current.map(s => s.text).join(' ');
+        const wouldFit = (currentText.length + 1 + next.text.length) <= _maxCardLen;
+
+        // Compute average similarity of next to all sentences in current group
+        let sim = 0;
+        if (next.vec) {
+          const sims = current.filter(s => s.vec).map(s => cosineSim(s.vec, next.vec));
+          sim = sims.length ? sims.reduce((a, b) => a + b, 0) / sims.length : 0;
+        }
+
+        if (wouldFit && (sim >= SIM_MERGE || !next.vec)) {
+          // Semantically close and still fits — merge into current group
+          current.push(next);
+        } else if (!wouldFit && current.length === 0) {
+          // Single sentence already exceeds cap — emit it alone
+          groups.push([next]);
+        } else {
+          // Start a new group
+          groups.push(current);
+          current = [next];
+        }
+      }
+      if (current.length) groups.push(current);
+
+      // Safety pass: any group that still exceeds the cap gets word-boundary split
+      const finalChunks = [];
+      for (const grp of groups) {
+        const joined = grp.map(s => s.text).join(' ');
+        if (joined.length <= _maxCardLen) {
+          finalChunks.push({ text: joined, vec: avgVec(grp.map(s => s.vec)) });
+        } else {
+          // Rare: a single sentence > cap, or tight merge — word-boundary split
+          const sub = wordBoundaryChunk(joined, _maxCardLen);
+          sub.forEach(t => finalChunks.push({ text: t, vec: grp[0].vec || row.vec }));
+        }
+      }
+
+      if (finalChunks.length <= 1) { result.push(row); continue; }
 
       const catStr = cats.filter(c => c.trim()).join(' · ') || 'Cell';
-      chunks.forEach((chunk, ni) => {
-        result.push({
-          tabIdx: row.tabIdx, rowIdx: row.rowIdx,
-          headers: row.headers || [], title: row.title || '',
-          kws: row.kws || new Set(),
-          _splitFrom: catStr, _splitN: ni + 1, _splitT: chunks.length,
-          vec: row.vec, // reuse original vec; will be close enough for clustering
-          row: { cells: cells.map((c, ci) => ci === bestIdx ? chunk : c), cats }
-        });
+      finalChunks.forEach((chunk, ni) => {
+        result.push(makeRow(row, cells, cats, bestIdx, chunk.text, catStr, ni, finalChunks.length, chunk.vec || row.vec));
       });
-    });
+    }
     return result;
+  }
+
+  // Splits text at word boundaries, each chunk <= maxLen chars
+  function wordBoundaryChunk(text, maxLen) {
+    const chunks = [];
+    let remaining = text;
+    while (remaining.length > maxLen) {
+      const win = remaining.slice(0, maxLen);
+      const cut = Math.max(win.lastIndexOf(' '), win.lastIndexOf('\n'));
+      const at = cut > maxLen * 0.3 ? cut : maxLen;
+      chunks.push(remaining.slice(0, at).trim());
+      remaining = remaining.slice(at).trim();
+    }
+    if (remaining.length) chunks.push(remaining);
+    return chunks.filter(c => c.length > 0);
+  }
+
+  function makeRow(row, cells, cats, bestIdx, text, catStr, ni, total, vec) {
+    return {
+      tabIdx: row.tabIdx, rowIdx: row.rowIdx,
+      headers: row.headers || [], title: row.title || '',
+      kws: row.kws || new Set(),
+      _splitFrom: catStr, _splitN: ni + 1, _splitT: total,
+      vec: vec || row.vec,
+      row: { cells: cells.map((c, ci) => ci === bestIdx ? text : c), cats }
+    };
   }
 
   function resolveCollisions(rects, gap, maxPasses) {
@@ -1924,8 +2004,8 @@ function initClustersTool(paneEl, sidebarEl) {
     const asgn = autoCluster(rows, _innerMin, _innerMax); const numGroups = Math.max(...asgn, 0) + 1;
     if (numGroups <= 1) { rows.forEach((r, ri) => frag.appendChild(buildCard(r, col, (delayOffset + ri) * 10, prefixLbl, simMap && simMap.get(r)))); return; }
     const groups = Array.from({ length: numGroups }, () => []); rows.forEach((r, i) => groups[asgn[i]].push(r));
-    let delay = delayOffset, colorIdx = 0;
-    groups.forEach((members, si) => { if (!members.length) return; const lbl = subLabel(prefixLbl, si); const subCol = colForIndex(colorIdx++); buildTilesRecursive(members, lbl, remainingDepth - 1, subCol, frag, delay, simMap); delay += members.length; });
+    let delay = delayOffset;
+    groups.forEach((members, si) => { if (!members.length) return; const lbl = subLabel(prefixLbl, si); const subCol = colForIndex(si); buildTilesRecursive(members, lbl, remainingDepth - 1, subCol, frag, delay, simMap); delay += members.length; });
   }
 
   function buildInnerTiles(rows, subAsgn, col, outerLbl, simMap) {
@@ -1933,12 +2013,8 @@ function initClustersTool(paneEl, sidebarEl) {
     if (_depth <= 1) { rows.forEach((r, ri) => frag.appendChild(buildCard(r, col, ri * 10, outerLbl, simMap && simMap.get(r)))); return frag; }
     if (_depth === 2 && subAsgn) {
       const numSub = Math.max(...subAsgn, 0) + 1; const groups = Array.from({ length: numSub }, () => []); rows.forEach((r, i) => groups[subAsgn[i]].push(r));
-      let delay = 0, colorIdx = 0;
-      // Use a local colorIdx counter so that the first visible sub-group in every
-      // outer cluster always gets color 0, the second gets color 1, etc.
-      // (si is the global-aligned slot index and may have gaps, so it must not
-      //  drive the color — only the label.)
-      groups.forEach((members, si) => { if (!members.length) return; const lbl = subLabel(outerLbl, si); const subCol = colForIndex(colorIdx++); members.forEach((r, ri) => frag.appendChild(buildCard(r, subCol, (delay + ri) * 10, lbl, simMap && simMap.get(r)))); delay += members.length; });
+      let delay = 0;
+      groups.forEach((members, si) => { if (!members.length) return; const lbl = subLabel(outerLbl, si); const subCol = colForIndex(si); members.forEach((r, ri) => frag.appendChild(buildCard(r, subCol, (delay + ri) * 10, lbl, simMap && simMap.get(r)))); delay += members.length; });
     } else { buildTilesRecursive(rows, outerLbl, _depth - 1, col, frag, 0, simMap); }
     return frag;
   }
@@ -2191,7 +2267,7 @@ function initClustersTool(paneEl, sidebarEl) {
 
     // Second pass: hard-split by max card length (if enabled)
     if (_maxCardLen) {
-      const hardSplit = hardSplitByLength(workRows);
+      const hardSplit = await hardSplitByLength(workRows);
       if (hardSplit.length > workRows.length) {
         console.log('[clusters] hard-split by length: before=' + workRows.length + ' after=' + hardSplit.length);
         workRows = hardSplit;
