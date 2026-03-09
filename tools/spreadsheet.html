@@ -9,7 +9,6 @@
   <style>
     html, body { height: 100%; overflow: hidden; margin: 0; }
 
-    /* ── App shell ── */
     .app-shell {
       display: flex;
       flex-direction: column;
@@ -17,22 +16,12 @@
       overflow: hidden;
     }
 
-    /* ── Pane: PPNavRail mounts here ── */
     #pp-ss-pane {
       flex: 1; min-height: 0;
       display: flex;
       overflow: hidden;
     }
 
-    /* ── Sheet column: topbar + grid + tab bar ── */
-    .pp-ss-sheet-col {
-      flex: 1; min-height: 0;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-    }
-
-    /* ── Sheet grid ── */
     .sheet-area {
       flex: 1; min-height: 0;
       position: relative;
@@ -67,14 +56,14 @@
       border-radius: var(--radius-full);
     }
 
-    /* ── Tables ── */
     .sheet-table {
       border-collapse: collapse;
       font-size: var(--font-size-sm);
       font-family: var(--font-family);
     }
 
-    #header-row th {
+    .corner table { border-collapse: collapse; width: 100%; height: 100%; }
+    .corner th {
       background: var(--md-sys-color-surface-container);
       padding: 8px 16px;
       font-size: var(--font-size-xs);
@@ -82,8 +71,19 @@
       letter-spacing: var(--letter-spacing-caps);
       text-transform: uppercase;
       color: var(--md-sys-color-on-surface-variant);
-      text-align: left;
-      white-space: nowrap;
+      text-align: left; white-space: nowrap;
+      border-right: 1px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 40%, transparent);
+      height: 100%; vertical-align: middle;
+    }
+    .corner th:last-child { border-right: none; }
+      background: var(--md-sys-color-surface-container);
+      padding: 8px 16px;
+      font-size: var(--font-size-xs);
+      font-weight: var(--font-weight-bold);
+      letter-spacing: var(--letter-spacing-caps);
+      text-transform: uppercase;
+      color: var(--md-sys-color-on-surface-variant);
+      text-align: left; white-space: nowrap;
       border-right: 1px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 40%, transparent);
     }
     #header-row th:last-child { border-right: none; }
@@ -93,8 +93,7 @@
       padding: 10px 12px;
       font-size: var(--font-size-xs);
       font-weight: var(--font-weight-bold);
-      letter-spacing: .03em;
-      text-transform: uppercase;
+      letter-spacing: .03em; text-transform: uppercase;
       color: var(--md-sys-color-on-surface-variant);
       vertical-align: middle;
       border-bottom: 1px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 30%, transparent);
@@ -109,9 +108,7 @@
       display: inline-block;
       transform-origin: center center;
       transform: rotate(-90deg) translateX(-50%);
-      white-space: nowrap;
-      position: absolute;
-      left: 50%;
+      white-space: nowrap; position: absolute; left: 50%;
     }
 
     #data-body td {
@@ -127,7 +124,6 @@
       border-bottom: 2px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 55%, transparent);
     }
 
-    /* ── Row highlight / selection states ── */
     #data-body td.highlight-group, #cat-body td.highlight-group {
       background: color-mix(in srgb, var(--md-sys-color-primary) 6%, transparent);
     }
@@ -143,12 +139,9 @@
       outline-offset: -2px;
     }
 
-    /* ── Tab bar ── */
     .pp-ss-bottombar {
-      flex-shrink: 0;
-      height: 34px;
-      display: flex;
-      align-items: stretch;
+      flex-shrink: 0; height: 34px;
+      display: flex; align-items: stretch;
       background: var(--md-sys-color-surface);
       border-top: 1px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 60%, transparent);
       z-index: 10;
@@ -180,7 +173,6 @@
       box-shadow: inset 0 -2px 0 var(--md-sys-color-primary);
     }
 
-    /* ── Loading overlay ── */
     .loading-overlay {
       position: absolute; inset: 0;
       display: flex; align-items: center; justify-content: center;
@@ -192,15 +184,32 @@
       z-index: 30;
     }
 
-    /* ── Override PPNavRail subtitle to show sheet name nicely ── */
-    .pp-panel-subtitle {
-      font-size: var(--font-size-sm) !important;
-      font-weight: var(--font-weight-medium) !important;
-      color: var(--md-sys-color-on-surface) !important;
-      letter-spacing: 0 !important;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+    /* Panel tab list */
+    .pp-ss-panel-tab-btn {
+      display: block; width: 100%; text-align: left;
+      border: none; background: transparent;
+      padding: 6px 8px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      font-size: var(--font-size-xs);
+      font-weight: var(--font-weight-medium);
+      letter-spacing: var(--letter-spacing-caps);
+      text-transform: uppercase;
+      color: var(--md-sys-color-on-surface-variant);
+      transition: background var(--transition-fast), color var(--transition-fast);
+    }
+    .pp-ss-panel-tab-btn:hover {
+      background: color-mix(in srgb, var(--md-sys-color-on-surface) 6%, transparent);
+      color: var(--md-sys-color-on-surface);
+    }
+    .pp-ss-panel-tab-btn.active {
+      color: var(--md-sys-color-primary);
+      background: color-mix(in srgb, var(--md-sys-color-primary) 10%, transparent);
+    }
+
+    @keyframes pp-ss-pulse {
+      0%, 100% { opacity: .3; transform: scale(.85); }
+      50%       { opacity: 1; transform: scale(1.1); }
     }
   </style>
 </head>
@@ -209,110 +218,91 @@
     <div id="pp-ss-pane"></div>
   </div>
 
+  <!-- Load shared utils first so PPNavRail is available -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  <script src="../utilities/utils-shared.js?v=eb01ebc2"></script>
+  <script src="../utilities/utils-shared.js?v=f448e658"></script>
   <script src="../utilities/utils-keywords.js?v=1a2b3c4d"></script>
   <script src="../utilities/embedding-bridge.js?v=1a2b3c4d"></script>
-  <script src="../utilities/utils-spreadsheet.js?v=af7c7a04"></script>
-  <script type="module" src="../utilities/utils-embedding.js?v=1a2b3c4d"></script>
+
+  <!-- Build the PPNavRail DOM BEFORE utils-spreadsheet.js runs so all
+       elements (#data-scroll, #header-row, etc.) exist when it queries them -->
   <script>
     (function () {
       var paneEl = document.getElementById('pp-ss-pane');
       if (!paneEl || !window.PPNavRail) return;
 
-      // ── Build nav rail + side panel ──────────────────────────
       var nav = window.PPNavRail.create(paneEl, {
         toolName: 'Spreadsheet',
         panelSections: [
           {
-            label: 'Sheet',
-            html: '<div id="pp-ss-panel-tabs"></div>',
+            label: 'Sheets',
+            html: '<div id="pp-ss-panel-tabs" style="display:flex;flex-direction:column;gap:2px;"></div>',
           },
         ],
       });
 
-      // Sheet name goes in the subtitle slot
+      // Subtitle = sheet name (utils-spreadsheet writes here)
       nav.subtitleEl.id = 'topbar-sheet-name';
-      nav.subtitleEl.classList.add('pp-panel-subtitle');
+      nav.subtitleEl.style.cssText += ';font-size:var(--font-size-sm);font-weight:var(--font-weight-medium);color:var(--md-sys-color-on-surface);letter-spacing:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
 
-      // Status slot — loading indicator
+      // Status chip
       nav.statusEl.innerHTML =
         '<div id="pp-ss-status" style="display:inline-flex;align-items:center;gap:6px;' +
-        'padding:4px 8px;border-radius:var(--radius-full);border:1px solid var(--md-sys-color-outline-variant);' +
-        'font-size:9px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;' +
-        'background:color-mix(in srgb,var(--md-sys-color-on-surface) 5%,transparent);' +
-        'color:var(--md-sys-color-on-surface-variant);width:fit-content;">' +
-        '<span id="pp-ss-status-dot" style="width:6px;height:6px;border-radius:50%;' +
-        'background:var(--md-sys-color-outline);animation:pp-ss-pulse 1.2s ease-in-out infinite;flex-shrink:0;"></span>' +
-        '<span id="pp-ss-status-label">Loading\u2026</span>' +
-        '</div>' +
-        '<style>@keyframes pp-ss-pulse{0%,100%{opacity:.3;transform:scale(.85);}50%{opacity:1;transform:scale(1.1);}}</style>';
+          'padding:4px 8px;border-radius:var(--radius-full);width:fit-content;' +
+          'border:1px solid var(--md-sys-color-outline-variant);' +
+          'font-size:9px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;' +
+          'background:color-mix(in srgb,var(--md-sys-color-on-surface) 5%,transparent);' +
+          'color:var(--md-sys-color-on-surface-variant);">' +
+          '<span style="width:6px;height:6px;border-radius:50%;flex-shrink:0;' +
+            'background:var(--md-sys-color-outline);animation:pp-ss-pulse 1.2s ease-in-out infinite;"></span>' +
+          '<span id="pp-ss-status-label">Loading\u2026</span>' +
+        '</div>';
 
-      // ── Build sheet grid inside nav.mainEl ───────────────────
+      // Build sheet grid + bottombar inside mainEl
       nav.mainEl.style.cssText = 'display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden;';
       nav.mainEl.innerHTML =
         '<div class="sheet-area">' +
           '<div class="loading-overlay" id="loading-overlay">Loading\u2026</div>' +
           '<div class="corner" id="corner"></div>' +
           '<div class="header-scroll" id="header-scroll">' +
-            '<table class="sheet-table" id="header-table">' +
-              '<thead><tr id="header-row"></tr></thead>' +
-            '</table>' +
+            '<table class="sheet-table" id="header-table"><thead><tr id="header-row"></tr></thead></table>' +
           '</div>' +
           '<div class="cat-scroll" id="cat-scroll">' +
-            '<table class="sheet-table" id="cat-table">' +
-              '<tbody id="cat-body"></tbody>' +
-            '</table>' +
+            '<table class="sheet-table" id="cat-table"><tbody id="cat-body"></tbody></table>' +
           '</div>' +
           '<div class="data-scroll" id="data-scroll">' +
-            '<table class="sheet-table" id="data-table">' +
-              '<tbody id="data-body"></tbody>' +
-            '</table>' +
+            '<table class="sheet-table" id="data-table"><tbody id="data-body"></tbody></table>' +
           '</div>' +
         '</div>' +
-        '<div class="pp-ss-bottombar">' +
-          '<div class="tab-bar" id="tab-bar"></div>' +
-        '</div>';
+        '<div class="pp-ss-bottombar"><div class="tab-bar" id="tab-bar"></div></div>';
 
-      // ── Wire tab panel in side panel to mirror the bottom tab bar ──
-      // After utils-spreadsheet loads tabs, mirror them into the panel list
+      // Mirror bottom tabs into side panel via MutationObserver
       var panelTabs = document.getElementById('pp-ss-panel-tabs');
       var tabBar    = document.getElementById('tab-bar');
       if (panelTabs && tabBar) {
-        var tabObserver = new MutationObserver(function () {
+        function syncPanelTabs() {
           var tabs = Array.from(tabBar.querySelectorAll('.tab'));
           if (!tabs.length) return;
           panelTabs.innerHTML = '';
           tabs.forEach(function (tab) {
             var btn = document.createElement('button');
-            btn.style.cssText =
-              'display:block;width:100%;text-align:left;border:none;background:transparent;' +
-              'padding:6px 8px;border-radius:var(--radius-sm);cursor:pointer;' +
-              'font-size:var(--font-size-xs);font-weight:var(--font-weight-medium);' +
-              'letter-spacing:var(--letter-spacing-caps);text-transform:uppercase;' +
-              'color:var(--md-sys-color-on-surface-variant);' +
-              'transition:background var(--transition-fast),color var(--transition-fast);';
+            btn.className = 'pp-ss-panel-tab-btn' + (tab.classList.contains('active') ? ' active' : '');
             btn.textContent = tab.textContent;
-            if (tab.classList.contains('active')) {
-              btn.style.color = 'var(--md-sys-color-primary)';
-              btn.style.background = 'color-mix(in srgb,var(--md-sys-color-primary) 10%,transparent)';
-            }
-            btn.addEventListener('mouseover', function () {
-              if (!tab.classList.contains('active')) btn.style.background = 'color-mix(in srgb,var(--md-sys-color-on-surface) 6%,transparent)';
-            });
-            btn.addEventListener('mouseout', function () {
-              if (!tab.classList.contains('active')) btn.style.background = 'transparent';
-            });
             btn.addEventListener('click', function () { tab.click(); });
             panelTabs.appendChild(btn);
           });
-        });
-        tabObserver.observe(tabBar, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
+        }
+        new MutationObserver(syncPanelTabs)
+          .observe(tabBar, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
       }
 
-      // ── Inject tool nav icons ─────────────────────────────────
+      // Inject tool nav icons into the rail
       injectToolNav('spreadsheet.html');
     })();
   </script>
+
+  <!-- Now safe to load utils-spreadsheet — all DOM elements exist -->
+  <script src="../utilities/utils-spreadsheet.js?v=1a2b3c4d"></script>
+  <script type="module" src="../utilities/utils-embedding.js?v=1a2b3c4d"></script>
 </body>
 </html>
