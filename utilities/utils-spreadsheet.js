@@ -418,6 +418,13 @@ function _waitForTabs() {
     if (dot)   { dot.style.animation = 'none'; dot.style.background = 'var(--md-sys-color-secondary, #2e7d5e)'; }
     if (label) { label.textContent = 'Ready'; }
     if (chip)  { setTimeout(() => { chip.style.transition = 'opacity .6s'; chip.style.opacity = '0'; }, 2200); }
+    // Update topbar badge
+    const tbBadge = document.getElementById('ss-topbar-badge');
+    const tbText  = document.getElementById('ss-topbar-badge-text');
+    if (tbBadge) { tbBadge.className = 'ds-badge ds-badge--connected'; }
+    if (tbText)  { tbText.textContent = window.TABS.length + ' sheets'; }
+    const sheetNameEl = document.getElementById('topbar-sheet-name');
+    if (sheetNameEl) { document.getElementById('topbar-title').textContent = sheetNameEl.textContent || 'Spreadsheet'; }
   } else {
     elLoadingOverlay.textContent = 'Fetching data…';
     setTimeout(_waitForTabs, 200);
