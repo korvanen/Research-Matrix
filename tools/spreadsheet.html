@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Spreadsheet — Dimensional Framework</title>
   <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="../design-system.css?v=6f75ea7c">
+  <link rel="stylesheet" href="../design-system.css?v=5f3df7d8">
   <style>
     html, body { height: 100%; overflow: hidden; margin: 0; }
 
@@ -228,6 +228,21 @@
 </head>
 <body>
   <div class="app-shell">
+    <div class="ds-topbar">
+      <a class="ds-topbar-back" href="../index.html">
+        <svg viewBox="0 0 14 14" width="12" height="12" fill="none"
+             stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 2L4 7l5 5"/>
+        </svg>
+        Back
+      </a>
+      <div class="ds-topbar-title" id="topbar-title">Spreadsheet</div>
+      <div class="ds-badge ds-badge--waiting" id="ss-topbar-badge">
+        <div class="ds-badge-dot"></div>
+        <span id="ss-topbar-badge-text">Loading…</span>
+      </div>
+    </div>
     <div id="pp-ss-pane"></div>
   </div>
 
