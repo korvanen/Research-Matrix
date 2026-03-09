@@ -2,7 +2,7 @@
 // utils-spreadsheet.js — spreadsheet viewer
 // Depends on: utils-shared.js (TABS, parseCitation, processSheetData)
 // ════════════════════════════════════════════════════════════════
-console.log('[utils-spreadsheet.js v.6]');
+console.log('[utils-spreadsheet.js v.5]');
 
 // ── All DOM-dependent code is deferred until DOMContentLoaded ──
 // (PPNavRail injects the grid HTML at runtime, so getElementById
@@ -86,7 +86,24 @@ function renderSheet(data) {
   });
   const groupEnds = new Set(spans[0]?.map(s => s.start + s.count - 1) || []);
 
-  // Header
+  // Corner — category column headers
+  const cornerTable = document.createElement('table');
+  cornerTable.className = 'sheet-table';
+  cornerTable.style.cssText = 'width:100%;height:100%;';
+  const cornerThead = document.createElement('thead');
+  const cornerTr = document.createElement('tr');
+  const catHdrs = data.catHeaders && data.catHeaders.length ? data.catHeaders : data.catIndices.map(() => 'Category');
+  catHdrs.forEach(h => {
+    const th = document.createElement('th');
+    th.textContent = h;
+    cornerTr.appendChild(th);
+  });
+  cornerThead.appendChild(cornerTr);
+  cornerTable.appendChild(cornerThead);
+  elCorner.innerHTML = '';
+  elCorner.appendChild(cornerTable);
+
+  // Header — data column headers
   elHeaderRow.innerHTML = '';
   data.headers.forEach(h => {
     const th = document.createElement('th');
