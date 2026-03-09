@@ -1368,9 +1368,10 @@ function initClustersTool(paneEl, sidebarEl) {
     if (numGroups <= 1) { rows.forEach(r => container.appendChild(buildSheetCard(r, col))); return; }
     const groups = Array.from({ length: numGroups }, () => []);
     rows.forEach((r, i) => groups[asgn[i]].push(r));
+    let colorIdx = 0;
     groups.forEach((members, si) => {
       if (!members.length) return;
-      const lbl = subLabel(prefixLbl, si); const subCol = colForIndex(si);
+      const lbl = subLabel(prefixLbl, si); const subCol = colForIndex(colorIdx++);
       const hdr = document.createElement('div'); hdr.className = 'pp-cl-scard-group-label'; hdr.textContent = lbl; hdr.style.color = subCol.accent; container.appendChild(hdr);
       renderSheetGroup(container, members, lbl, remainingDepth - 1, subCol);
     });
@@ -1555,14 +1556,15 @@ function initClustersTool(paneEl, sidebarEl) {
   function sentenceSplit(text) {
     return text
       .replace(/\r\n|\r/g, '\n')
+      // Only split on real sentence endings (. ! ?) before a capital letter.
+      // Do NOT split on ; : — – as those connect clauses within one idea.
       .replace(/([.!?])\s+(?=[A-Z])/g, '$1\n')
-      .replace(/([;])\s+/g, '$1\n')
+      // Blank lines are genuine paragraph breaks
       .replace(/\n{2,}/g, '\n')
-      .replace(/:\s{1,3}(?=\S)/g, ':\n')
-      .replace(/\s+[—–]\s+/g, '\n')
       .split('\n')
       .map(s => s.trim())
-      .filter(s => s.length >= 30);
+      // Raise min length: short fragments are rarely independent ideas
+      .filter(s => s.length >= 60);
   }
 
   function avgVec(vecs) {
@@ -1578,7 +1580,7 @@ function initClustersTool(paneEl, sidebarEl) {
     const cats  = row.row && row.row.cats  ? row.row.cats.filter(c => c.trim()) : [];
     let bestText = '', bestIdx = 0;
     cells.forEach((c, i) => { if (c.trim().length > bestText.length) { bestText = c.trim(); bestIdx = i; } });
-    if (bestText.length < 60) return [row];
+    if (bestText.length < 150) return [row];  // only consider very long cells
     const segments = sentenceSplit(bestText);
     if (segments.length <= 1) return [row];
     const catStr = cats.join(' · ') || 'Cell';
@@ -1606,7 +1608,9 @@ function initClustersTool(paneEl, sidebarEl) {
       }));
     }
 
-    const SPLIT_THRESHOLD = 0.55;
+    // Lower threshold = more permissive grouping = harder to split.
+    // Sentences must be clearly about different topics (sim < 0.45) to land in separate groups.
+    const SPLIT_THRESHOLD = 0.45;
     const n = valid.length;
     const sim = Array.from({length: n}, (_, i) => Array.from({length: n}, (_, j) => i === j ? 1 : cosineSim(valid[i].vec, valid[j].vec)));
     const groupOf = new Array(n).fill(-1); let numGroups = 0;
@@ -1622,6 +1626,10 @@ function initClustersTool(paneEl, sidebarEl) {
     }
     if (numGroups <= 1) return [row];
     const groups = Array.from({length: numGroups}, () => []);
+    valid.forEach((seg, i) => groups[groupOf[i]].push(seg));
+    // Don't split if any resulting group is too thin to stand alone
+    const minGroupTextLen = 60;
+    if (groups.some(g => g.reduce((sum, s) => sum + s.text.length, 0) < minGroupTextLen)) return [row];
     valid.forEach((seg, i) => groups[groupOf[i]].push(seg));
     return groups.map((segs, ni) => ({
       tabIdx: row.tabIdx, rowIdx: row.rowIdx,
@@ -1809,8 +1817,8 @@ function initClustersTool(paneEl, sidebarEl) {
     const asgn = autoCluster(rows, _innerMin, _innerMax); const numGroups = Math.max(...asgn, 0) + 1;
     if (numGroups <= 1) { rows.forEach((r, ri) => frag.appendChild(buildCard(r, col, (delayOffset + ri) * 10, prefixLbl, simMap && simMap.get(r)))); return; }
     const groups = Array.from({ length: numGroups }, () => []); rows.forEach((r, i) => groups[asgn[i]].push(r));
-    let delay = delayOffset;
-    groups.forEach((members, si) => { if (!members.length) return; const lbl = subLabel(prefixLbl, si); const subCol = colForIndex(si); buildTilesRecursive(members, lbl, remainingDepth - 1, subCol, frag, delay, simMap); delay += members.length; });
+    let delay = delayOffset, colorIdx = 0;
+    groups.forEach((members, si) => { if (!members.length) return; const lbl = subLabel(prefixLbl, si); const subCol = colForIndex(colorIdx++); buildTilesRecursive(members, lbl, remainingDepth - 1, subCol, frag, delay, simMap); delay += members.length; });
   }
 
   function buildInnerTiles(rows, subAsgn, col, outerLbl, simMap) {
@@ -1818,8 +1826,12 @@ function initClustersTool(paneEl, sidebarEl) {
     if (_depth <= 1) { rows.forEach((r, ri) => frag.appendChild(buildCard(r, col, ri * 10, outerLbl, simMap && simMap.get(r)))); return frag; }
     if (_depth === 2 && subAsgn) {
       const numSub = Math.max(...subAsgn, 0) + 1; const groups = Array.from({ length: numSub }, () => []); rows.forEach((r, i) => groups[subAsgn[i]].push(r));
-      let delay = 0;
-      groups.forEach((members, si) => { if (!members.length) return; const lbl = subLabel(outerLbl, si); const subCol = colForIndex(si); members.forEach((r, ri) => frag.appendChild(buildCard(r, subCol, (delay + ri) * 10, lbl, simMap && simMap.get(r)))); delay += members.length; });
+      let delay = 0, colorIdx = 0;
+      // Use a local colorIdx counter so that the first visible sub-group in every
+      // outer cluster always gets color 0, the second gets color 1, etc.
+      // (si is the global-aligned slot index and may have gaps, so it must not
+      //  drive the color — only the label.)
+      groups.forEach((members, si) => { if (!members.length) return; const lbl = subLabel(outerLbl, si); const subCol = colForIndex(colorIdx++); members.forEach((r, ri) => frag.appendChild(buildCard(r, subCol, (delay + ri) * 10, lbl, simMap && simMap.get(r)))); delay += members.length; });
     } else { buildTilesRecursive(rows, outerLbl, _depth - 1, col, frag, 0, simMap); }
     return frag;
   }
