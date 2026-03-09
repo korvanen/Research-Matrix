@@ -4,6 +4,12 @@
 // ════════════════════════════════════════════════════════════════
 console.log('[utils-spreadsheet.js v.5]');
 
+// ── All DOM-dependent code is deferred until DOMContentLoaded ──
+// (PPNavRail injects the grid HTML at runtime, so getElementById
+//  calls at parse-time would all return null.)
+
+document.addEventListener('DOMContentLoaded', function () {
+
 // ── DOM refs ──────────────────────────────────────────────────
 const elTopbarSheetName = document.getElementById('topbar-sheet-name');
 const elCorner          = document.getElementById('corner');
@@ -15,6 +21,11 @@ const elDataScroll      = document.getElementById('data-scroll');
 const elDataBody        = document.getElementById('data-body');
 const elTabBar          = document.getElementById('tab-bar');
 const elLoadingOverlay  = document.getElementById('loading-overlay');
+
+if (!elDataScroll) {
+  console.error('[utils-spreadsheet] Required DOM elements not found — PPNavRail may not have initialised yet.');
+  return;
+}
 
 // ── State ─────────────────────────────────────────────────────
 let activeTab   = 0;
@@ -226,7 +237,7 @@ if (window.ResizeObserver) {
 
 window.addEventListener('resize', () => { updateLayout(); });
 
-// ── Scroll sync — cat-scroll is overflow:hidden, driven entirely by JS ───
+// ── Scroll sync ───────────────────────────────────────────────
 elDataScroll.addEventListener('scroll', () => {
   elHeaderScroll.scrollLeft = elDataScroll.scrollLeft;
   elCatScroll.scrollTop     = elDataScroll.scrollTop;
@@ -366,3 +377,5 @@ function _waitForTabs() {
   }
 }
 _waitForTabs();
+
+}); // end DOMContentLoaded
