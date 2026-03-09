@@ -1235,12 +1235,12 @@ input[type=range].pp-range {
 .pp-side-panel-body::-webkit-scrollbar-track { background: transparent; }
 .pp-side-panel-body::-webkit-scrollbar-thumb { background: var(--md-sys-color-outline-variant); border-radius: 2px; }
 .pp-side-panel-section {
-  padding: 8px 0;
+  padding: 8px 16px;
   border-bottom: 1px solid var(--md-sys-color-outline-variant);
 }
 .pp-side-panel-section:last-child { border-bottom: none; }
 .pp-side-panel-section-label {
-  padding: 12px 16px 6px;
+  padding: 10px 0 6px;
   font-size: 11px; font-weight: 600;
   letter-spacing: 0.08em; text-transform: uppercase;
   color: var(--md-sys-color-on-surface-variant);
