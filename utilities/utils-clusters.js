@@ -15,7 +15,7 @@
 //   • maybySplitRow: removed early-exit guard on EmbeddingUtils so structural split
 //     still fires on the fast-path (pre-veced rows from sessionStorage) before
 //     EmbeddingUtils is ready. canEmbed flag now only gates per-sentence embedding attempt.
-console.log('[utils-clusters.js vr]');
+console.log('[utils-clusters.js v3000000000000]');
 
 var CL_MIN_SPLIT_LENGTH = 60;
 
@@ -584,71 +584,136 @@ var CL_MIN_SPLIT_LENGTH = 60;
   padding: 0 10px 6px !important;
 }
 
-/* ── Defined cluster panel items ──────────────────────────── */
-.pp-cl-def-item { position: relative; margin-bottom: 1px; }
-.pp-cl-def-row {
-  display: flex; align-items: flex-start; gap: 6px;
-  padding: 5px 8px; border-radius: 7px; cursor: default;
-  transition: background .15s;
+/* ── MD3 Input Chips — confirmed defined clusters ─────────── */
+.pp-cl-def-chip {
+  display: flex; align-items: center; gap: 0;
+  height: 32px; border-radius: 8px;
+  border: 1px solid var(--md-sys-color-outline);
+  background: var(--md-sys-color-surface-container-low);
+  margin-bottom: 4px; overflow: hidden;
+  position: relative; cursor: default;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
 }
-.pp-cl-def-row:hover { background: color-mix(in srgb, var(--md-sys-color-on-surface) 6%, transparent); }
-.pp-cl-def-row:hover .pp-cl-def-actions { opacity: 1; }
-.pp-cl-def-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; }
-.pp-cl-def-text { font-size: 11.5px; line-height: 1.45; color: var(--md-sys-color-on-surface); flex: 1; word-break: break-word; }
-.pp-cl-def-lbl {
-  display: block; font-style: normal; font-size: 9px; font-weight: 600;
-  letter-spacing: .07em; text-transform: uppercase;
-  color: var(--md-sys-color-on-surface-variant); margin-bottom: 1px;
+.pp-cl-def-chip::before {
+  content: ''; position: absolute; inset: 0;
+  background: var(--md-sys-color-on-surface);
+  opacity: 0; transition: opacity var(--transition-fast);
+  pointer-events: none;
 }
-.pp-cl-def-actions {
-  opacity: 0; display: flex; gap: 1px;
-  transition: opacity .15s; flex-shrink: 0; margin-top: 1px;
+.pp-cl-def-chip:hover::before { opacity: .06; }
+.pp-cl-def-chip-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  flex-shrink: 0; margin-left: 8px;
 }
-.pp-cl-def-action {
-  width: 20px; height: 20px; border: none; background: none;
+.pp-cl-def-chip-label {
+  flex: 1; min-width: 0;
+  padding: 0 4px 0 8px;
+  font-size: var(--font-size-sm); line-height: 1;
+  color: var(--md-sys-color-on-surface);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.pp-cl-def-chip-embedding {
+  font-size: 9px; padding-right: 4px; opacity: .5;
+  animation: pp-cl-pulse 1.2s ease-in-out infinite;
+}
+.pp-cl-def-chip-close {
+  width: 32px; height: 32px; flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
-  border-radius: 5px; cursor: pointer; color: var(--md-sys-color-on-surface-variant);
-  transition: background .12s, color .12s;
+  border: none; background: none; cursor: pointer;
+  color: var(--md-sys-color-on-surface-variant);
+  border-radius: 0 8px 8px 0;
+  transition: background var(--transition-fast), color var(--transition-fast);
 }
-.pp-cl-def-action:hover { background: color-mix(in srgb, var(--md-sys-color-on-surface) 12%, transparent); color: var(--md-sys-color-on-surface); }
-.pp-cl-def-action svg { width: 11px; height: 11px; }
-.pp-cl-def-children { padding-left: 16px; margin-top: 1px; }
+.pp-cl-def-chip-close:hover {
+  background: color-mix(in srgb, var(--md-sys-color-on-surface) 12%, transparent);
+  color: var(--md-sys-color-error);
+}
+.pp-cl-def-chip-close svg { width: 14px; height: 14px; pointer-events: none; }
 
-/* Add-cluster button row */
-.pp-cl-add-row {
-  display: flex; align-items: center; gap: 6px;
-  padding: 3px 8px; border-radius: 7px; cursor: pointer; margin-top: 2px;
+/* Sub-chips indent */
+.pp-cl-def-sub-row { padding-left: 16px; }
+.pp-cl-def-sub-row .pp-cl-def-chip { height: 28px; border-style: dashed; opacity: .85; }
+
+/* Add sub-cluster text button inside chip row */
+.pp-cl-def-chip-sub-btn {
+  display: inline-flex; align-items: center; gap: 4px;
+  height: 24px; margin-left: 16px; margin-bottom: 4px;
+  padding: 0 8px 0 4px; border-radius: 12px;
+  border: none; background: none; cursor: pointer;
+  font-size: 10.5px; font-weight: var(--font-weight-medium);
+  letter-spacing: .03em;
+  color: var(--md-sys-color-primary);
+  transition: background var(--transition-fast);
 }
-.pp-cl-add-row:hover .pp-cl-add-btn {
-  border-color: var(--md-sys-color-primary); color: var(--md-sys-color-primary);
+.pp-cl-def-chip-sub-btn:hover {
   background: color-mix(in srgb, var(--md-sys-color-primary) 8%, transparent);
 }
-.pp-cl-add-btn {
-  width: 18px; height: 18px; flex-shrink: 0;
-  border: 1.5px dashed var(--md-sys-color-outline-variant);
-  border-radius: 5px; background: none;
-  display: flex; align-items: center; justify-content: center;
-  cursor: pointer; color: var(--md-sys-color-on-surface-variant);
-  transition: border-color .15s, color .15s, background .15s; pointer-events: none;
-}
-.pp-cl-add-btn svg { width: 10px; height: 10px; }
-.pp-cl-add-hint { font-size: 10.5px; color: var(--md-sys-color-outline); font-style: italic; }
+.pp-cl-def-chip-sub-btn svg { width: 12px; height: 12px; }
 
-/* Inline textarea input */
-.pp-cl-new-wrap { padding: 2px 8px 4px; }
-.pp-cl-new-row {
-  display: flex; align-items: flex-start; gap: 6px;
-  padding: 5px 8px; border-radius: 7px;
-  background: color-mix(in srgb, var(--md-sys-color-on-surface) 5%, transparent);
-  border: 1px solid var(--md-sys-color-outline-variant);
+/* ── MD3 Outlined Text Field — new cluster input ────────────── */
+.pp-cl-field-wrap {
+  position: relative; margin: 4px 0 6px;
 }
-.pp-cl-new-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--md-sys-color-outline); margin-top: 5px; flex-shrink: 0; }
-.pp-cl-new-ta {
+.pp-cl-field-outline {
+  display: flex; align-items: center; gap: 8px;
+  padding: 0 12px; height: 40px; border-radius: 4px;
+  border: 1px solid var(--md-sys-color-outline);
+  background: transparent;
+  transition: border-color var(--transition-fast), border-width .1s;
+}
+.pp-cl-field-wrap:focus-within .pp-cl-field-outline {
+  border: 2px solid var(--md-sys-color-primary);
+}
+.pp-cl-field-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--md-sys-color-outline); flex-shrink: 0;
+}
+.pp-cl-field-wrap:focus-within .pp-cl-field-dot { background: var(--md-sys-color-primary); }
+.pp-cl-field-ta {
   flex: 1; border: none; outline: none; background: transparent;
-  font-family: var(--font-family); font-size: 11.5px; line-height: 1.45;
-  color: var(--md-sys-color-on-surface); resize: none; min-height: 18px; overflow: hidden;
+  font-family: var(--font-family); font-size: var(--font-size-sm); line-height: 1.4;
+  color: var(--md-sys-color-on-surface);
+  resize: none; overflow: hidden; min-height: 20px;
+  padding: 10px 0;
 }
-.pp-cl-new-ta::placeholder { color: var(--md-sys-color-outline); font-style: italic; }
+.pp-cl-field-ta::placeholder { color: var(--md-sys-color-outline); }
+.pp-cl-field-label {
+  position: absolute; top: 50%; left: 12px; transform: translateY(-50%);
+  font-size: var(--font-size-sm); color: var(--md-sys-color-outline);
+  pointer-events: none; transition: all .15s;
+  background: var(--md-sys-color-surface-container);
+  padding: 0 4px; margin-left: -4px; line-height: 1;
+}
+.pp-cl-field-wrap:focus-within .pp-cl-field-label,
+.pp-cl-field-wrap.pp-cl-field-has-val .pp-cl-field-label {
+  top: 0; font-size: 10px; color: var(--md-sys-color-primary);
+}
+.pp-cl-field-hint {
+  font-size: 10px; color: var(--md-sys-color-outline);
+  padding: 2px 12px 0; letter-spacing: .01em;
+}
+
+/* ── MD3 Text Button — "Add defined cluster" ────────────────── */
+.pp-cl-add-text-btn {
+  display: flex; align-items: center; gap: 6px;
+  height: 40px; padding: 0 12px 0 8px;
+  border: none; background: none; cursor: pointer;
+  border-radius: var(--radius-full);
+  color: var(--md-sys-color-primary);
+  font-family: var(--font-family);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: .01em;
+  position: relative; overflow: hidden;
+  transition: box-shadow var(--transition-fast);
+}
+.pp-cl-add-text-btn::before {
+  content: ''; position: absolute; inset: 0;
+  background: var(--md-sys-color-primary); opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+.pp-cl-add-text-btn:hover::before { opacity: .08; }
+.pp-cl-add-text-btn svg { width: 18px; height: 18px; flex-shrink: 0; }
 
 /* Defined nest badge */
 .pp-cl-nest-defined-badge {
@@ -705,21 +770,20 @@ function initClustersTool(paneEl, sidebarEl) {
         label: 'Defined Clusters',
         html:
           '<div id="pp-cl-defs-list"></div>' +
-          '<div id="pp-cl-def-new-wrap" style="display:none;" class="pp-cl-new-wrap">' +
-            '<div class="pp-cl-new-row">' +
-              '<div class="pp-cl-new-dot"></div>' +
-              '<textarea class="pp-cl-new-ta" id="pp-cl-def-ta" rows="1" ' +
-                'placeholder="Describe this cluster\u2026 (Enter to confirm)"></textarea>' +
+          '<div id="pp-cl-def-field-wrap" class="pp-cl-field-wrap" style="display:none;">' +
+            '<div class="pp-cl-field-outline">' +
+              '<div class="pp-cl-field-dot" id="pp-cl-field-dot"></div>' +
+              '<textarea class="pp-cl-field-ta" id="pp-cl-def-ta" rows="1" ' +
+                'placeholder="e.g. Community & governance"></textarea>' +
             '</div>' +
+            '<div class="pp-cl-field-hint">Enter \u2192 confirm \u00b7 Esc \u2192 cancel</div>' +
           '</div>' +
-          '<div id="pp-cl-def-add-row" class="pp-cl-add-row">' +
-            '<button class="pp-cl-add-btn">' +
-              '<svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">' +
-                '<line x1="5" y1="1" x2="5" y2="9"/><line x1="1" y1="5" x2="9" y2="5"/>' +
-              '</svg>' +
-            '</button>' +
-            '<span class="pp-cl-add-hint">Define a cluster\u2026</span>' +
-          '</div>',
+          '<button id="pp-cl-def-add-btn" class="pp-cl-add-text-btn">' +
+            '<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">' +
+              '<line x1="9" y1="3" x2="9" y2="15"/><line x1="3" y1="9" x2="15" y2="9"/>' +
+            '</svg>' +
+            'Add defined cluster' +
+          '</button>',
       },
       {
         label: 'Outer Clusters',
@@ -822,219 +886,205 @@ function initClustersTool(paneEl, sidebarEl) {
   const DEF_THRESHOLD = 0.15;
   const DEF_COLORS = ['#2e7d5e','#4a56c8','#5e3d9e','#c44035','#c8991a','#3d7a6b','#7d5a1e','#4a8aa8'];
 
-  const defsList   = paneEl.querySelector('#pp-cl-defs-list');
-  const defAddRow  = paneEl.querySelector('#pp-cl-def-add-row');
-  const defNewWrap = paneEl.querySelector('#pp-cl-def-new-wrap');
-  const defTa      = paneEl.querySelector('#pp-cl-def-ta');
+  const defsList    = paneEl.querySelector('#pp-cl-defs-list');
+  const defAddBtn   = paneEl.querySelector('#pp-cl-def-add-btn');
+  const defFieldWrap = paneEl.querySelector('#pp-cl-def-field-wrap');
+  const defTa       = paneEl.querySelector('#pp-cl-def-ta');
 
   function defColorFor(idx) { return DEF_COLORS[idx % DEF_COLORS.length]; }
-
-  // Auto-resize textarea height
   function defAutoResize(ta) { ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 'px'; }
+  function escDefHtml(t) { return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
-  // Render the defined-clusters panel list
+  // ── MD3 Input Chip rendering ──────────────────────────────
+  function makeChip(label, dotColor, isEmbedding, onClose) {
+    const chip = document.createElement('div');
+    chip.className = 'pp-cl-def-chip';
+    const dot = document.createElement('div');
+    dot.className = 'pp-cl-def-chip-dot';
+    dot.style.background = dotColor;
+    const lbl = document.createElement('span');
+    lbl.className = 'pp-cl-def-chip-label';
+    lbl.textContent = label;
+    chip.appendChild(dot);
+    chip.appendChild(lbl);
+    if (isEmbedding) {
+      const spin = document.createElement('span');
+      spin.className = 'pp-cl-def-chip-embedding';
+      spin.title = 'Computing embedding\u2026';
+      spin.textContent = '\u23f3';
+      chip.appendChild(spin);
+    }
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'pp-cl-def-chip-close';
+    closeBtn.title = 'Remove';
+    closeBtn.innerHTML = '<svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="3" x2="11" y2="11"/><line x1="11" y1="3" x2="3" y2="11"/></svg>';
+    closeBtn.addEventListener('click', onClose);
+    chip.appendChild(closeBtn);
+    return chip;
+  }
+
   function renderDefPanel() {
     defsList.innerHTML = '';
     _definedClusters.forEach((def, di) => {
       const item = document.createElement('div');
-      item.className = 'pp-cl-def-item';
-      item.dataset.defId = def.id;
 
-      const row = document.createElement('div');
-      row.className = 'pp-cl-def-row';
-      row.innerHTML =
-        '<div class="pp-cl-def-dot" style="background:' + def.color + ';"></div>' +
-        '<div class="pp-cl-def-text">' +
-          '<em class="pp-cl-def-lbl">Cluster ' + (di + 1) + (def.vec ? '' : ' \u23f3') + '</em>' +
-          escDefHtml(def.desc) +
-        '</div>' +
-        '<div class="pp-cl-def-actions">' +
-          '<button class="pp-cl-def-action pp-cl-def-action-sub" title="Add sub-cluster">' +
-            '<svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">' +
-              '<line x1="6" y1="2" x2="6" y2="10"/><line x1="2" y1="6" x2="10" y2="6"/></svg>' +
-          '</button>' +
-          '<button class="pp-cl-def-action pp-cl-def-action-del" title="Remove">' +
-            '<svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">' +
-              '<line x1="2" y1="2" x2="10" y2="10"/><line x1="10" y1="2" x2="2" y2="10"/></svg>' +
-          '</button>' +
-        '</div>';
-
-      row.querySelector('.pp-cl-def-action-del').addEventListener('click', (e) => {
-        e.stopPropagation();
-        _definedClusters = _definedClusters.filter(d => d.id !== def.id);
-        renderDefPanel(); scheduleRerender();
-      });
-      row.querySelector('.pp-cl-def-action-sub').addEventListener('click', (e) => {
-        e.stopPropagation();
-        startAddSub(def.id, item);
-      });
-
-      item.appendChild(row);
+      // Parent chip
+      const chip = makeChip(
+        def.desc,
+        def.color,
+        !def.vec,
+        (e) => { e.stopPropagation(); _definedClusters = _definedClusters.filter(d => d.id !== def.id); renderDefPanel(); scheduleRerender(); }
+      );
+      item.appendChild(chip);
 
       // Sub-clusters
       if (def.subClusters && def.subClusters.length) {
-        const children = document.createElement('div');
-        children.className = 'pp-cl-def-children';
         def.subClusters.forEach((sub, si) => {
-          const subItem = document.createElement('div');
-          subItem.className = 'pp-cl-def-item';
-          const subRow = document.createElement('div');
-          subRow.className = 'pp-cl-def-row';
-          subRow.innerHTML =
-            '<div class="pp-cl-def-dot" style="background:' + def.color + ';opacity:.55;"></div>' +
-            '<div class="pp-cl-def-text">' +
-              '<em class="pp-cl-def-lbl">' + (di+1) + '.' + (si+1) + (sub.vec ? '' : ' \u23f3') + '</em>' +
-              escDefHtml(sub.desc) +
-            '</div>' +
-            '<div class="pp-cl-def-actions">' +
-              '<button class="pp-cl-def-action pp-cl-def-action-subdel" title="Remove">' +
-                '<svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">' +
-                  '<line x1="2" y1="2" x2="10" y2="10"/><line x1="10" y1="2" x2="2" y2="10"/></svg>' +
-              '</button>' +
-            '</div>';
-          subRow.querySelector('.pp-cl-def-action-subdel').addEventListener('click', (e) => {
-            e.stopPropagation();
-            def.subClusters = def.subClusters.filter(s => s.id !== sub.id);
-            renderDefPanel(); scheduleRerender();
-          });
-          subItem.appendChild(subRow);
-          children.appendChild(subItem);
+          const subWrap = document.createElement('div');
+          subWrap.className = 'pp-cl-def-sub-row';
+          const subChip = makeChip(
+            sub.desc,
+            def.color,
+            !sub.vec,
+            (e) => { e.stopPropagation(); def.subClusters = def.subClusters.filter(s => s.id !== sub.id); renderDefPanel(); scheduleRerender(); }
+          );
+          subWrap.appendChild(subChip);
+          item.appendChild(subWrap);
         });
-        // Sub-add row
-        const subAddRow = document.createElement('div');
-        subAddRow.className = 'pp-cl-add-row';
-        subAddRow.innerHTML =
-          '<button class="pp-cl-add-btn"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="5" y1="1" x2="5" y2="9"/><line x1="1" y1="5" x2="9" y2="5"/></svg></button>' +
-          '<span class="pp-cl-add-hint">Add sub-cluster ' + (di+1) + '.' + (def.subClusters.length+1) + '\u2026</span>';
-        subAddRow.addEventListener('click', () => startAddSub(def.id, item));
-        // Sub-input
-        const subInputWrap = document.createElement('div');
-        subInputWrap.className = 'pp-cl-new-wrap';
-        subInputWrap.style.display = 'none';
-        subInputWrap.dataset.subFor = def.id;
-        subInputWrap.innerHTML =
-          '<div class="pp-cl-new-row">' +
-            '<div class="pp-cl-new-dot" style="background:' + def.color + ';opacity:.55;"></div>' +
-            '<textarea class="pp-cl-new-ta" rows="1" placeholder="Describe sub-cluster\u2026 (Enter to confirm)"></textarea>' +
-          '</div>';
-        const subTa = subInputWrap.querySelector('textarea');
-        subTa.addEventListener('input', () => defAutoResize(subTa));
-        subTa.addEventListener('keydown', (e) => {
-          if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); commitSub(def.id, subTa.value.trim(), subInputWrap); }
-          if (e.key === 'Escape') { subInputWrap.style.display = 'none'; }
-        });
-        children.appendChild(subInputWrap);
-        children.appendChild(subAddRow);
-        item.appendChild(children);
-      } else {
-        // No sub-clusters yet — just add row hidden in children
-        const children = document.createElement('div');
-        children.className = 'pp-cl-def-children';
-        const subInputWrap = document.createElement('div');
-        subInputWrap.className = 'pp-cl-new-wrap';
-        subInputWrap.style.display = 'none';
-        subInputWrap.dataset.subFor = def.id;
-        subInputWrap.innerHTML =
-          '<div class="pp-cl-new-row">' +
-            '<div class="pp-cl-new-dot" style="background:' + def.color + ';opacity:.55;"></div>' +
-            '<textarea class="pp-cl-new-ta" rows="1" placeholder="Describe sub-cluster\u2026 (Enter to confirm)"></textarea>' +
-          '</div>';
-        const subTa = subInputWrap.querySelector('textarea');
-        subTa.addEventListener('input', () => defAutoResize(subTa));
-        subTa.addEventListener('keydown', (e) => {
-          if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); commitSub(def.id, subTa.value.trim(), subInputWrap); }
-          if (e.key === 'Escape') { subInputWrap.style.display = 'none'; }
-        });
-        const subAddRow = document.createElement('div');
-        subAddRow.className = 'pp-cl-add-row';
-        subAddRow.innerHTML =
-          '<button class="pp-cl-add-btn"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="5" y1="1" x2="5" y2="9"/><line x1="1" y1="5" x2="9" y2="5"/></svg></button>' +
-          '<span class="pp-cl-add-hint">Add sub-cluster ' + (di+1) + '.1\u2026</span>';
-        subAddRow.addEventListener('click', () => startAddSub(def.id, item));
-        children.appendChild(subInputWrap);
-        children.appendChild(subAddRow);
-        item.appendChild(children);
       }
+
+      // Add sub-cluster text button (small, below chips)
+      const subBtn = document.createElement('button');
+      subBtn.className = 'pp-cl-def-chip-sub-btn';
+      subBtn.innerHTML =
+        '<svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="6" y1="2" x2="6" y2="10"/><line x1="2" y1="6" x2="10" y2="6"/></svg>' +
+        'Add sub-cluster';
+      subBtn.addEventListener('click', () => startAddSub(def.id));
+      item.appendChild(subBtn);
 
       defsList.appendChild(item);
     });
   }
 
-  function startAddSub(defId, itemEl) {
-    const wrap = itemEl.querySelector('[data-sub-for="' + defId + '"]');
-    if (!wrap) return;
-    wrap.style.display = 'block';
-    const ta = wrap.querySelector('textarea');
-    ta.value = ''; ta.style.height = ''; ta.focus();
-  }
-
-  function commitSub(defId, desc, wrap) {
-    wrap.style.display = 'none';
-    if (!desc) return;
-    const def = _definedClusters.find(d => d.id === defId);
-    if (!def) return;
-    const sub = { id: _defNextId++, desc, vec: null };
-    def.subClusters.push(sub);
-    renderDefPanel();
-    // Get embedding async
-    getDefEmbedding(desc).then(vec => {
-      if (vec) { sub.vec = vec; renderDefPanel(); scheduleRerender(); }
-    });
-  }
+  // ── Inline sub-cluster input (reuses the same field) ─────
+  let _activeSub = null; // {defId}
 
   function startAddDef() {
-    defNewWrap.style.display = 'block';
-    defAddRow.style.display = 'none';
-    defTa.value = ''; defTa.style.height = ''; defTa.focus();
+    _activeSub = null;
+    defFieldWrap.style.display = 'block';
+    defAddBtn.style.display = 'none';
+    defTa.value = '';
+    defTa.style.height = '';
+    // Update dot color to next def color
+    const dot = defFieldWrap.querySelector('.pp-cl-field-dot');
+    if (dot) dot.style.background = defColorFor(_definedClusters.length);
+    setTimeout(() => defTa.focus(), 0);
   }
 
-  function cancelAddDef() {
-    defNewWrap.style.display = 'none';
-    defAddRow.style.display = '';
+  function startAddSub(defId) {
+    _activeSub = { defId };
+    defFieldWrap.style.display = 'block';
+    defAddBtn.style.display = 'none';
+    defTa.value = '';
+    defTa.style.height = '';
+    const def = _definedClusters.find(d => d.id === defId);
+    const dot = defFieldWrap.querySelector('.pp-cl-field-dot');
+    if (dot && def) dot.style.background = def.color;
+    setTimeout(() => defTa.focus(), 0);
   }
 
-  function commitDef() {
+  function cancelAddField() {
+    defFieldWrap.style.display = 'none';
+    defAddBtn.style.display = '';
+    _activeSub = null;
+  }
+
+  function commitField() {
     const desc = defTa.value.trim();
-    cancelAddDef();
+    cancelAddField();
     if (!desc) return;
-    const color = defColorFor(_definedClusters.length);
-    const def = { id: _defNextId++, desc, vec: null, color, subClusters: [] };
-    _definedClusters.push(def);
-    renderDefPanel();
-    getDefEmbedding(desc).then(vec => {
-      if (vec) { def.vec = vec; renderDefPanel(); scheduleRerender(); }
-    });
+    if (_activeSub) {
+      const def = _definedClusters.find(d => d.id === _activeSub.defId);
+      if (!def) return;
+      const sub = { id: _defNextId++, desc, vec: null };
+      def.subClusters.push(sub);
+      renderDefPanel();
+      _embedWithRetry(sub);
+    } else {
+      const color = defColorFor(_definedClusters.length);
+      const def = { id: _defNextId++, desc, vec: null, color, subClusters: [] };
+      _definedClusters.push(def);
+      renderDefPanel();
+      _embedWithRetry(def);
+    }
   }
 
-  async function getDefEmbedding(text) {
-    if (!window.EmbeddingUtils || !window.EmbeddingUtils.isReady()) return null;
-    try { return await window.EmbeddingUtils.getCachedEmbedding(text); }
-    catch(e) { return null; }
+  // ── Robust embedding with retries ─────────────────────────
+  // getCachedEmbedding only returns pre-computed vectors.
+  // For user-typed text we may need to wait until the model is
+  // warm, then it will compute and cache on first call.
+  async function _tryEmbed(text) {
+    if (!window.EmbeddingUtils) return null;
+    // Try getCachedEmbedding — on warm model it computes new text too
+    if (typeof window.EmbeddingUtils.getCachedEmbedding === 'function') {
+      try {
+        const v = await window.EmbeddingUtils.getCachedEmbedding(text);
+        if (v && v.length) return v;
+      } catch(e) { /* fall through */ }
+    }
+    // Fallback: try any direct embed method the bridge may expose
+    for (const m of ['embed', 'getEmbedding', 'computeEmbedding', 'embedText']) {
+      if (typeof window.EmbeddingUtils[m] === 'function') {
+        try {
+          const v = await window.EmbeddingUtils[m](text);
+          if (v && v.length) return v;
+        } catch(e) { /* fall through */ }
+      }
+    }
+    return null;
+  }
+
+  function _embedWithRetry(target, attempt) {
+    attempt = attempt || 0;
+    if (target.vec) return; // already done
+    _tryEmbed(target.desc).then(vec => {
+      if (vec) {
+        target.vec = vec;
+        console.log('[clusters] embedded "' + target.desc.slice(0, 40) + '" on attempt ' + attempt);
+        renderDefPanel();
+        scheduleRerender();
+      } else if (attempt < 10) {
+        // Retry with back-off: 400ms, 800ms, 1.2s … up to 4s
+        const delay = Math.min(400 + attempt * 400, 4000);
+        setTimeout(() => _embedWithRetry(target, attempt + 1), delay);
+      } else {
+        console.warn('[clusters] embedding failed after 10 attempts for: ' + target.desc);
+      }
+    });
   }
 
   function scheduleRerender() {
-    if (!_cachedEmbedded) return;
+    // Don't require _cachedEmbedded — defined clusters may exist before first render
     _rendered = false;
     clearTimeout(_reclusterTimer);
     _reclusterTimer = setTimeout(() => { _rendered = false; tryRender(); }, 300);
   }
 
-  function escDefHtml(t) {
-    return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  }
-
-  // Wire add-row click (with same-click protection)
-  defAddRow.addEventListener('click', startAddDef);
-  defTa.addEventListener('input', () => defAutoResize(defTa));
-  defTa.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); commitDef(); }
-    if (e.key === 'Escape') { cancelAddDef(); }
+  // Wire up text field events
+  defAddBtn.addEventListener('click', startAddDef);
+  defTa.addEventListener('input', () => {
+    defAutoResize(defTa);
+    const wrap = defFieldWrap;
+    if (wrap) wrap.classList.toggle('pp-cl-field-has-val', defTa.value.trim().length > 0);
   });
-  // Outside-click dismiss (deferred to avoid same-click cancel)
+  defTa.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); commitField(); }
+    if (e.key === 'Escape') { cancelAddField(); }
+  });
   document.addEventListener('click', (e) => {
-    if (defNewWrap.style.display === 'none') return;
-    if (defNewWrap.contains(e.target) || defAddRow.contains(e.target)) return;
-    setTimeout(commitDef, 0);
+    if (defFieldWrap.style.display === 'none') return;
+    if (defFieldWrap.contains(e.target) || defAddBtn.contains(e.target)) return;
+    setTimeout(commitField, 0);
   });
 
   (function setCSSCardDims() {
@@ -1882,8 +1932,7 @@ function initClustersTool(paneEl, sidebarEl) {
   function tryRender() {
     if (_rendered) return;
     if (typeof buildRowIndex !== 'function') return;
-    if (_cachedEmbedded && _cachedVectors) { doRender(); return; }
-    const rows = buildRowIndex(); if (!rows.length) return;
+    if (_cachedEmbedded && _cachedVectors) { doRender(); return; }    const rows = buildRowIndex(); if (!rows.length) return;
     const preVeced = rows.filter(r => r.vec && r.vec.length);
     if (preVeced.length >= 2) {
       const vectors = new Map(); preVeced.forEach(r => vectors.set(r.tabIdx+':'+r.rowIdx, r.vec));
@@ -1941,15 +1990,12 @@ function initClustersTool(paneEl, sidebarEl) {
   window.addEventListener('df-theme-change', () => { _rendered = false; tryRender(); });
 
   // Also re-embed any defined clusters that are waiting when embedder comes online
-  window.addEventListener('embedder-ready', async () => {
-    let needRerender = false;
-    for (const def of _definedClusters) {
-      if (!def.vec) { def.vec = await getDefEmbedding(def.desc); if (def.vec) needRerender = true; }
-      for (const sub of def.subClusters) {
-        if (!sub.vec) { sub.vec = await getDefEmbedding(sub.desc); if (sub.vec) needRerender = true; }
-      }
-    }
-    if (needRerender) renderDefPanel();
+  window.addEventListener('embedder-ready', () => {
+    // Kick off embedding retries for any defs/subs still waiting
+    _definedClusters.forEach(def => {
+      if (!def.vec) _embedWithRetry(def);
+      def.subClusters.forEach(sub => { if (!sub.vec) _embedWithRetry(sub); });
+    });
     setTimeout(tryRender, 120);
   });
 
