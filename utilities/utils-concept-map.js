@@ -9,7 +9,7 @@
 //   • depthColor: added missing paletteIdx + theme variable (was ReferenceError)
 //   • depthColor: rewrote getLuminance without array destructuring (was SyntaxError)
 //   • Removed dead CMAP_LEVEL_THEMES constant
-console.log('[utils-concept-map.js v.hoohaaa]');
+console.log('[utils-concept-map.js v.hahaa]');
 
 const CMAP_PARENT_CHILD_THRESHOLD = 0.50;
 const CMAP_MIN_SPLIT_LENGTH = 60;
@@ -239,6 +239,11 @@ function initConceptMapTool(paneEl, sidebarEl) {
             '<input class="pp-range pp-range--accent" id="pp-cmap-maxpar" type="range" min="1" max="6" value="1" step="1">' +
             '<span class="pp-range-val" id="pp-cmap-maxpar-val" style="color:#7c5cbf">1</span>' +
           '</div>' +
+          '<div class="pp-range-row" title="Hard-split cards longer than this character count. Slide to max to disable.">' +
+            '<span class="pp-range-label">Max</span>' +
+            '<input class="pp-range pp-range--muted" id="pp-cmap-maxlen" type="range" min="100" max="2000" value="2000" step="50">' +
+            '<span class="pp-range-val" id="pp-cmap-maxlen-val">Off</span>' +
+          '</div>' +
           '<button id="pp-cmap-rebuild" style="margin-top:4px">Rebuild</button>',
       },
       {
@@ -296,6 +301,8 @@ function initConceptMapTool(paneEl, sidebarEl) {
   const threshValEl = paneEl.querySelector('#pp-cmap-thresh-val');
   const maxParSlider= paneEl.querySelector('#pp-cmap-maxpar');
   const maxParValEl = paneEl.querySelector('#pp-cmap-maxpar-val');
+  const maxLenSlider= paneEl.querySelector('#pp-cmap-maxlen');
+  const maxLenValEl = paneEl.querySelector('#pp-cmap-maxlen-val');
 
   const CARD_W = 225;
   const MM_PAD = 16;
@@ -303,6 +310,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
   let _depth      = 5;
   let _threshold  = CMAP_PARENT_CHILD_THRESHOLD;
   let _maxParents = 1;
+  let _cmapMaxLen = 0; // 0 = disabled
   let _layout     = 'organic';
   let _rows       = null;
   let _rendered   = false;
@@ -327,6 +335,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
     { el: depthSlider,  valEl: depthValEl,  read: function() { _depth = +depthSlider.value; depthValEl.textContent = _depth; } },
     { el: threshSlider, valEl: threshValEl, read: function() { _threshold = +threshSlider.value / 100; threshValEl.textContent = threshSlider.value + '%'; } },
     { el: maxParSlider, valEl: maxParValEl, read: function() { _maxParents = +maxParSlider.value; maxParValEl.textContent = _maxParents; } },
+    { el: maxLenSlider, valEl: maxLenValEl, read: function() { _cmapMaxLen = +maxLenSlider.value >= 2000 ? 0 : +maxLenSlider.value; maxLenValEl.textContent = _cmapMaxLen === 0 ? 'Off' : _cmapMaxLen; } },
   ].forEach(function(item) {
     item.el.addEventListener('input', function() {
       item.read();
@@ -575,6 +584,95 @@ function initConceptMapTool(paneEl, sidebarEl) {
   async function splitAllRows(rows) {
     var result=[];
     for (var i=0; i<rows.length; i++) { var parts=await maybySplitRow(rows[i]); parts.forEach(function(r){ result.push(r); }); }
+    return result;
+  }
+
+  function wordBoundaryChunk(text, maxLen) {
+    var chunks = [], remaining = text;
+    while (remaining.length > maxLen) {
+      var win = remaining.slice(0, maxLen);
+      var cut = Math.max(win.lastIndexOf(' '), win.lastIndexOf('\n'));
+      var at = cut > maxLen * 0.3 ? cut : maxLen;
+      chunks.push(remaining.slice(0, at).trim());
+      remaining = remaining.slice(at).trim();
+    }
+    if (remaining.length) chunks.push(remaining);
+    return chunks.filter(function(c){ return c.length > 0; });
+  }
+
+  async function hardSplitByLength(rows, maxLen) {
+    if (!maxLen) return rows;
+    var canEmbed = window.EmbeddingUtils &&
+      typeof window.EmbeddingUtils.getCachedEmbedding === 'function';
+    var result = [];
+    for (var ri = 0; ri < rows.length; ri++) {
+      var row = rows[ri];
+      var cells = row.row && row.row.cells ? row.row.cells : (row.cells || []);
+      var cats  = row.row && row.row.cats  ? row.row.cats  : [];
+      var bestIdx = 0;
+      cells.forEach(function(c, i) { if (c.trim().length > cells[bestIdx].trim().length) bestIdx = i; });
+      var text = cells[bestIdx].trim();
+      if (text.length <= maxLen) { result.push(row); continue; }
+
+      var sentences = sentenceSplit(text);
+      if (sentences.length <= 1) {
+        var chunks = wordBoundaryChunk(text, maxLen);
+        if (chunks.length <= 1) { result.push(row); continue; }
+        var catStr = cats.filter(function(c){ return c.trim(); }).join(' · ') || 'Cell';
+        chunks.forEach(function(chunk, ni) {
+          result.push({ tabIdx:row.tabIdx, rowIdx:row.rowIdx, headers:row.headers||[], title:row.title||'', kws:row.kws||new Set(),
+            _splitFrom:catStr, _splitN:ni+1, _splitT:chunks.length, vec:row.vec,
+            row:{ cells:cells.map(function(c,ci){ return ci===bestIdx?chunk:c; }), cats:cats } });
+        });
+        continue;
+      }
+
+      var segs;
+      if (canEmbed) {
+        try {
+          var vecs = await Promise.all(sentences.map(function(s){ return window.EmbeddingUtils.getCachedEmbedding(s); }));
+          segs = sentences.map(function(s,i){ return { text:s, vec:vecs[i] }; });
+        } catch(e) { segs = sentences.map(function(s){ return { text:s, vec:null }; }); }
+      } else {
+        segs = sentences.map(function(s){ return { text:s, vec:null }; });
+      }
+
+      var SIM_MERGE = 0.50;
+      var groups = [], current = [segs[0]];
+      for (var si = 1; si < segs.length; si++) {
+        var next = segs[si];
+        var currentText = current.map(function(s){ return s.text; }).join(' ');
+        var wouldFit = (currentText.length + 1 + next.text.length) <= maxLen;
+        var sim = 0;
+        if (next.vec) {
+          var sims = current.filter(function(s){ return s.vec; }).map(function(s){ return cosineSim(s.vec, next.vec); });
+          sim = sims.length ? sims.reduce(function(a,b){ return a+b; }, 0) / sims.length : 0;
+        }
+        if (wouldFit && (sim >= SIM_MERGE || !next.vec)) { current.push(next); }
+        else { groups.push(current); current = [next]; }
+      }
+      if (current.length) groups.push(current);
+
+      var finalChunks = [];
+      groups.forEach(function(grp) {
+        var joined = grp.map(function(s){ return s.text; }).join(' ');
+        if (joined.length <= maxLen) {
+          finalChunks.push({ text:joined, vec:avgVec(grp.map(function(s){ return s.vec; })) });
+        } else {
+          wordBoundaryChunk(joined, maxLen).forEach(function(t){
+            finalChunks.push({ text:t, vec:grp[0].vec||row.vec });
+          });
+        }
+      });
+
+      if (finalChunks.length <= 1) { result.push(row); continue; }
+      var catStr2 = cats.filter(function(c){ return c.trim(); }).join(' · ') || 'Cell';
+      finalChunks.forEach(function(chunk, ni) {
+        result.push({ tabIdx:row.tabIdx, rowIdx:row.rowIdx, headers:row.headers||[], title:row.title||'', kws:row.kws||new Set(),
+          _splitFrom:catStr2, _splitN:ni+1, _splitT:finalChunks.length, vec:chunk.vec||row.vec,
+          row:{ cells:cells.map(function(c,ci){ return ci===bestIdx?chunk.text:c; }), cats:cats } });
+      });
+    }
     return result;
   }
 
@@ -1157,6 +1255,13 @@ function initConceptMapTool(paneEl, sidebarEl) {
     setStatus('loading','Splitting cells\u2026');
     var workRows;
     try { workRows=await splitAllRows(_rows); } catch(e){ console.warn('[concept-map] split error:',e); workRows=_rows; }
+    // Length cap pass
+    if (_cmapMaxLen) {
+      try {
+        var lenSplit = await hardSplitByLength(workRows, _cmapMaxLen);
+        if (lenSplit.length > workRows.length) workRows = lenSplit;
+      } catch(e) { console.warn('[concept-map] length split error:', e); }
+    }
     var splitCount=workRows.length-_rows.length;
     setStatus('loading','Building hierarchy for '+workRows.length+' concepts\u2026');
     setTimeout(function(){
