@@ -27,7 +27,7 @@
 //   • Cards that fall below the threshold become orphans and flow into the auto-cluster pool
 //     so they always appear in unnamed clusters rather than being forced into a poor fit
 //   • Sub-cluster matching inside buildDefinedNest uses the same _defThreshold * 0.8 ratio
-console.log('[utils-clusters.js v56]');
+console.log('[utils-clusters.js v5000]');
 
 var CL_MIN_SPLIT_LENGTH = 60;
 
@@ -1579,23 +1579,16 @@ function initClustersTool(paneEl, sidebarEl) {
     //   4. Not preceded by a digit (decimals / numbered lists: "3. The")
     const sentences = [];
     let start = 0;
-    const t = text.replace(/
-|
-/g, '
-');
+    const t = text.replace(/\r\n|\r/g, '\n');
 
     for (let i = 0; i < t.length; i++) {
       const ch = t[i];
 
       // Blank line = definite paragraph break
-      if (ch === '
-' && t[i + 1] === '
-') {
+      if (ch === '\n' && t[i + 1] === '\n') {
         const seg = t.slice(start, i).trim();
         if (seg.length >= 60) sentences.push(seg);
-        // skip all consecutive newlines
-        while (i + 1 < t.length && t[i + 1] === '
-') i++;
+        while (i + 1 < t.length && t[i + 1] === '\n') i++;
         start = i + 1;
         continue;
       }
@@ -1610,9 +1603,7 @@ function initClustersTool(paneEl, sidebarEl) {
       const wordBefore = t.slice(0, i).match(/(\b\w+)$/);
       if (wordBefore) {
         const w = wordBefore[1];
-        // Skip abbreviations
         if (_ABBREV.has(w.toLowerCase())) continue;
-        // Skip single capital letter (initials)
         if (w.length === 1 && w === w.toUpperCase()) continue;
       }
 
@@ -1621,7 +1612,7 @@ function initClustersTool(paneEl, sidebarEl) {
 
       const seg = t.slice(start, i + 1).trim();
       if (seg.length >= 60) sentences.push(seg);
-      start = i + 1 + after[1].length; // advance past the whitespace
+      start = i + 1 + after[1].length;
     }
 
     const last = t.slice(start).trim();
@@ -1630,7 +1621,7 @@ function initClustersTool(paneEl, sidebarEl) {
     return sentences;
   }
 
-  function avgVec(vecs) {
+    function avgVec(vecs) {
     const valid = vecs.filter(Boolean); if (!valid.length) return null;
     const dim = valid[0].length, sum = new Float32Array(dim);
     valid.forEach(v => v.forEach((x, i) => { sum[i] += x; }));
