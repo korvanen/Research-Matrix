@@ -27,7 +27,7 @@
 //   • Cards that fall below the threshold become orphans and flow into the auto-cluster pool
 //     so they always appear in unnamed clusters rather than being forced into a poor fit
 //   • Sub-cluster matching inside buildDefinedNest uses the same _defThreshold * 0.8 ratio
-console.log('[utils-clusters.js v1]');
+console.log('[utils-clusters.js v56]');
 
 var CL_MIN_SPLIT_LENGTH = 60;
 
@@ -754,19 +754,12 @@ var CL_MIN_SPLIT_LENGTH = 60;
 
    FIX 1 — Left rail tool nav items get clipped
    ─────────────────────────────────────────────────────────
-   .pp-nav-rail has overflow:hidden. injectToolNav appends a
-   flex:1 spacer then 4 .pp-nav-item anchors. On short screens
-   the spacer consumes all remaining space and the nav items
-   overflow below the clipped edge.
-
-   Solution A: allow the rail to scroll (hidden scrollbar)
-   Solution B: compact the nav items and sheet buttons so
-               everything fits without scrolling
-   We do both so it degrades gracefully.
+   .pp-nav-rail has overflow:hidden and injectToolNav adds a
+   flex:1 spacer that pushes 4 nav items off-screen on short
+   viewports. Allow the rail to scroll (hidden scrollbar) and
+   compact only the top buttons — leave nav items readable.
    ────────────────────────────────────────────────────────── */
 
-/* Allow rail to scroll past its own overflow so bottom nav
-   items are never permanently hidden */
 .pp-nav-rail {
   overflow-y: auto !important;
   overflow-x: hidden !important;
@@ -774,38 +767,29 @@ var CL_MIN_SPLIT_LENGTH = 60;
 }
 .pp-nav-rail::-webkit-scrollbar { display: none !important; }
 
-/* Reduce the toggle + sheet button sizes so they take less
-   vertical space — from 48px to 36px each */
+/* Toggle + sheet buttons: 48px → 40px saves ~24px without
+   making them feel broken */
 .pp-nav-rail-toggle,
 .pp-nav-rail-sheet-btn {
-  width: 36px !important;
-  height: 36px !important;
+  width: 40px !important;
+  height: 40px !important;
 }
 
-/* Compact nav items: trim top/bottom padding from 12px → 6px
-   and reduce indicator height so labels always stay visible */
+/* Nav items: shave padding from 12px → 8px each = 32px saved
+   across 4 items. Keep labels and indicators at full size. */
 .pp-nav-item {
-  padding: 6px 0 !important;
-  gap: 2px !important;
-}
-.pp-nav-item-indicator {
-  height: 26px !important;
-  width: 48px !important;
-}
-.pp-nav-item-label {
-  font-size: 10px !important;
-  line-height: 13px !important;
+  padding: 8px 0 !important;
 }
 
 /* ══════════════════════════════════════════════════════════
-   FIX 2 — Side panel sections don't quite fit the viewport
+   FIX 2 — Controls have no horizontal padding (blue circles)
    ─────────────────────────────────────────────────────────
-   The .pp-side-panel-body already has overflow-y:auto so it
-   scrolls, but we compact sections so controls fit without
-   needing to scroll on most screen heights.
+   .pp-side-panel-section has padding: 8px 0 — zero horizontal.
+   Section labels get 16px via their own rule but range rows,
+   buttons and chips get none, so they bleed to the edges.
    ────────────────────────────────────────────────────────── */
 
-/* Panel header — tighter */
+/* Panel header — slightly tighter vertically only */
 .pp-side-panel-header {
   padding: 12px 16px 8px !important;
 }
@@ -814,35 +798,45 @@ var CL_MIN_SPLIT_LENGTH = 60;
   line-height: 22px !important;
 }
 
-/* Section wrappers — tighter vertical breathing room */
+/* Section wrappers — add horizontal padding, trim vertical */
 .pp-side-panel-section {
-  padding: 4px 0 !important;
+  padding: 4px 16px !important;
 }
 
-/* Section heading labels — tighter top spacing */
+/* Section labels already have 16px horizontal — just tighten top */
 .pp-side-panel-section-label {
-  padding: 8px 16px 4px !important;
+  padding: 8px 0 4px !important;
   font-size: 10px !important;
 }
 
-/* Range rows — tighter (these are defined in utils-clusters
-   itself as .pp-range-row) */
+/* Range rows — horizontal padding now comes from section,
+   just tighten vertical */
 .pp-range-row {
-  min-height: 22px !important;
-  padding-top: 1px !important;
-  padding-bottom: 1px !important;
+  min-height: 24px !important;
+  padding-top: 2px !important;
+  padding-bottom: 2px !important;
 }
 
-/* Re-cluster button — less top margin */
-#pp-cl-recluster { margin-top: 2px !important; }
+/* Re-cluster button — full width within padded section */
+#pp-cl-recluster {
+  margin-top: 4px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
 
-/* Add defined cluster button — more compact */
-.pp-cl-add-text-btn { height: 32px !important; }
+/* Add defined cluster button — flush with section padding */
+.pp-cl-add-text-btn {
+  height: 32px !important;
+  padding-left: 0 !important;
+}
 
-/* Defined cluster chips — slightly tighter */
+/* Defined cluster chips and sub items */
 .pp-cl-def-chip        { height: 28px !important; margin-bottom: 3px !important; }
 .pp-cl-def-sub-row .pp-cl-def-chip { height: 24px !important; }
 .pp-cl-def-chip-sub-btn { height: 20px !important; }
+
+/* Field wrap (new cluster input) — no extra horizontal margin */
+.pp-cl-field-wrap { margin-left: 0 !important; margin-right: 0 !important; }
 `;
   document.head.appendChild(s);
 })();
