@@ -15,7 +15,7 @@
 //   • maybySplitRow: removed early-exit guard on EmbeddingUtils so structural split
 //     still fires on the fast-path (pre-veced rows from sessionStorage) before
 //     EmbeddingUtils is ready. canEmbed flag now only gates per-sentence embedding attempt.
-console.log('[utils-clusters.js v1]');
+console.log('[utils-clusters.js vr]');
 
 var CL_MIN_SPLIT_LENGTH = 60;
 
@@ -819,7 +819,7 @@ function initClustersTool(paneEl, sidebarEl) {
   // ── Defined clusters ──────────────────────────────────────
   let _definedClusters = []; // [{id, desc, vec, color, subClusters:[{id,desc,vec}]}]
   let _defNextId = 0;
-  const DEF_THRESHOLD = 0.20;
+  const DEF_THRESHOLD = 0.15;
   const DEF_COLORS = ['#2e7d5e','#4a56c8','#5e3d9e','#c44035','#c8991a','#3d7a6b','#7d5a1e','#4a8aa8'];
 
   const defsList   = paneEl.querySelector('#pp-cl-defs-list');
@@ -1215,23 +1215,66 @@ function initClustersTool(paneEl, sidebarEl) {
 
   function updateSheetPanel() {
     if (!_clusterState) return;
-    const { nonEmpty } = _clusterState;
-    if (!nonEmpty || !nonEmpty.length) { sheetBody.innerHTML = '<div class="pp-cl-panel-empty">No clusters yet.</div>'; return; }
-    const cols = nonEmpty.map((members, ci) => {
-      const outerLbl = outerLabel(ci); const col = colForIndex(ci);
+    const { nonEmpty, alignedAsgns, definedGroups } = _clusterState;
+
+    // Build column descriptors — defined clusters first, then auto
+    const cols = [];
+
+    // Defined cluster columns
+    (definedGroups || []).forEach(({ def, members }) => {
+      if (!members.length) return;
+      const col = { accent: def.color, bg: def.color + '18', label: contrastFor(def.color) };
+      // Sub-group by sub-clusters if they exist, else treat as single group
       let groups;
       if (_depth >= 2 && members.length >= 2) {
-        const asgn = autoCluster(members, _innerMin, _innerMax); const numSub = Math.max(...asgn, 0) + 1;
-        groups = Array.from({ length: numSub }, () => []); members.forEach((r, i) => groups[asgn[i]].push(r));
-      } else { groups = [members.slice()]; }
-      return { outerLbl, col, groups };
+        const asgn = autoCluster(members, _innerMin, _innerMax);
+        const numSub = Math.max(...asgn, 0) + 1;
+        groups = Array.from({ length: numSub }, () => []);
+        members.forEach((r, i) => groups[asgn[i]].push(r));
+      } else {
+        groups = [members.slice()];
+      }
+      cols.push({ outerLbl: def.desc, col, groups, isDefined: true });
     });
+
+    // Auto cluster columns
+    (nonEmpty || []).forEach((members, ci) => {
+      const outerLbl = outerLabel(ci);
+      const col = colForIndex(ci);
+      let groups;
+      if (_depth >= 2 && members.length >= 2) {
+        const asgn = autoCluster(members, _innerMin, _innerMax);
+        const numSub = Math.max(...asgn, 0) + 1;
+        groups = Array.from({ length: numSub }, () => []);
+        members.forEach((r, i) => groups[asgn[i]].push(r));
+      } else {
+        groups = [members.slice()];
+      }
+      cols.push({ outerLbl, col, groups, isDefined: false });
+    });
+
+    if (!cols.length) { sheetBody.innerHTML = '<div class="pp-cl-panel-empty">No clusters yet.</div>'; return; }
+
     const maxRows = Math.max(...cols.map(c => c.groups.length));
     sheetDesc.textContent = cols.length + ' col · ' + maxRows + ' row' + (maxRows === 1 ? '' : 's');
     const table = document.createElement('table'); table.className = 'pp-cl-table';
     const thead = document.createElement('thead'); const hrow = document.createElement('tr');
     const thC = document.createElement('th'); thC.className = 'pp-cl-th-corner'; thC.textContent = '#'; hrow.appendChild(thC);
-    cols.forEach(c => { const th = document.createElement('th'); th.textContent = c.outerLbl + ' cluster'; th.style.color = c.col.accent; th.style.borderTop = '3px solid ' + c.col.accent; hrow.appendChild(th); });
+    cols.forEach(c => {
+      const th = document.createElement('th');
+      th.style.color = c.col.accent;
+      th.style.borderTop = '3px solid ' + c.col.accent;
+      if (c.isDefined) {
+        // Show description as the header, with a small "defined" badge
+        th.innerHTML =
+          '<span style="font-size:8px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;' +
+            'background:' + c.col.accent + '22;color:' + c.col.accent + ';border-radius:3px;padding:1px 4px;margin-right:4px;">' +
+            'defined</span>' + escDefHtml(c.outerLbl);
+      } else {
+        th.textContent = c.outerLbl + ' cluster';
+      }
+      hrow.appendChild(th);
+    });
     thead.appendChild(hrow); table.appendChild(thead);
     const tbody = document.createElement('tbody');
     for (let ri = 0; ri < maxRows; ri++) {
@@ -1240,7 +1283,7 @@ function initClustersTool(paneEl, sidebarEl) {
       cols.forEach(c => {
         const td = document.createElement('td'); const members = c.groups[ri] || [];
         if (!members.length) { td.className = 'pp-cl-td-empty'; td.textContent = '—'; }
-        else { const rowLbl = subLabel(c.outerLbl, ri); renderSheetGroup(td, members, rowLbl, _depth - 2, c.col); }
+        else { const rowLbl = c.isDefined ? c.outerLbl : subLabel(c.outerLbl, ri); renderSheetGroup(td, members, rowLbl, _depth - 2, c.col); }
         tr.appendChild(td);
       });
       tbody.appendChild(tr);
@@ -1685,10 +1728,12 @@ function initClustersTool(paneEl, sidebarEl) {
   function buildDefinedNest(def, members, defIdx, simMap) {
     const color = def.color;
     const col = { accent: color, bg: color + '18', label: contrastFor(color) };
-    const lbl = '\u2605' + (defIdx + 1); // ★1, ★2 …
+    const shortDesc = def.desc.length > 22 ? def.desc.slice(0, 20) + '\u2026' : def.desc;
+    const lbl = shortDesc; // shown on cards as clusterLabel
+    const nestNum = '\u2605' + (defIdx + 1); // ★1 for nest header only
     const nest = document.createElement('div'); nest.className = 'pp-cl-nest';
     const head = document.createElement('div'); head.className = 'pp-cl-nest-head'; head.style.background = color + '18';
-    const nestLblEl = document.createElement('span'); nestLblEl.className = 'pp-cl-nest-label'; nestLblEl.textContent = lbl; nestLblEl.style.color = color;
+    const nestLblEl = document.createElement('span'); nestLblEl.className = 'pp-cl-nest-label'; nestLblEl.textContent = nestNum; nestLblEl.style.color = color;
     const dot = document.createElement('span'); dot.className = 'pp-cl-nest-dot'; dot.style.background = color;
     const badge = document.createElement('span'); badge.className = 'pp-cl-nest-defined-badge'; badge.textContent = 'defined';
     const cnt = document.createElement('span'); cnt.className = 'pp-cl-nest-count'; cnt.textContent = members.length + ' entr' + (members.length === 1 ? 'y' : 'ies');
@@ -1704,7 +1749,6 @@ function initClustersTool(paneEl, sidebarEl) {
     if (def.subClusters && def.subClusters.length && members.some(r => r.vec)) {
       const readySubs = def.subClusters.filter(s => s.vec);
       if (readySubs.length >= 2) {
-        // Assign each member to best sub-cluster description
         const subGroups = Array.from({ length: readySubs.length + 1 }, () => []);
         members.forEach(r => {
           if (!r.vec) { subGroups[readySubs.length].push(r); return; }
@@ -1715,8 +1759,9 @@ function initClustersTool(paneEl, sidebarEl) {
         innerFrag = document.createDocumentFragment();
         readySubs.forEach((sub, si) => {
           if (!subGroups[si].length) return;
+          const subLbl = shortDesc + ' \u00b7 ' + (sub.desc.length > 14 ? sub.desc.slice(0,12)+'\u2026' : sub.desc);
           const subCol = { accent: color, bg: color + '18', label: contrastFor(color) };
-          subGroups[si].forEach((r, ri) => innerFrag.appendChild(buildCard(r, subCol, ri * 10, lbl + '.' + (si+1), simMap && simMap.get(r))));
+          subGroups[si].forEach((r, ri) => innerFrag.appendChild(buildCard(r, subCol, ri * 10, subLbl, simMap && simMap.get(r))));
         });
         if (subGroups[readySubs.length].length) {
           subGroups[readySubs.length].forEach((r, ri) => innerFrag.appendChild(buildCard(r, col, ri * 10, lbl, simMap && simMap.get(r))));
@@ -1777,29 +1822,34 @@ function initClustersTool(paneEl, sidebarEl) {
 
     // ── 3. Auto-cluster remaining rows ──────────────────────
     const definedOffset = nestEls.length;
+    let autoNonEmpty = [];
+    let autoAlignedAsgns = null;
     if (autoRows.length >= 2) {
       const topAsgn = autoCluster(autoRows, _outerMin, _outerMax);
       const numTop = Math.max(...topAsgn, 0) + 1;
       const topGroups = Array.from({ length: numTop }, () => []); autoRows.forEach((r, i) => topGroups[topAsgn[i]].push(r));
-      let alignedAsgns = null; const nonEmpty = topGroups.filter(g => g.length > 0);
-      if (_depth > 1 && nonEmpty.length > 1) alignedAsgns = alignedSubCluster(nonEmpty, _innerMin, _innerMax);
+      autoNonEmpty = topGroups.filter(g => g.length > 0);
+      if (_depth > 1 && autoNonEmpty.length > 1) autoAlignedAsgns = alignedSubCluster(autoNonEmpty, _innerMin, _innerMax);
       let alignIdx = 0;
       topGroups.forEach((members, oi) => {
         if (!members.length) return;
-        const subAsgn = (alignedAsgns && _depth > 1) ? alignedAsgns[alignIdx++] : null;
+        const subAsgn = (autoAlignedAsgns && _depth > 1) ? autoAlignedAsgns[alignIdx++] : null;
         const nest = buildOuterNest(members, oi, subAsgn, null);
         nest.style.animationDelay = ((definedOffset + oi) * 55) + 'ms';
         world.appendChild(nest); nestEls.push(nest);
       });
-      _clusterState = { nonEmpty, alignedAsgns: (_depth > 1 ? alignedAsgns : null) };
     } else if (autoRows.length === 1) {
-      // Single unmatched row — tack into a solo nest
       const nest = buildOuterNest(autoRows, 0, null, null);
       world.appendChild(nest); nestEls.push(nest);
-      _clusterState = { nonEmpty: [autoRows], alignedAsgns: null };
-    } else {
-      _clusterState = { nonEmpty: [], alignedAsgns: null };
+      autoNonEmpty = [autoRows];
     }
+
+    // Save full cluster state — both defined and auto groups
+    _clusterState = {
+      nonEmpty: autoNonEmpty,
+      alignedAsgns: (_depth > 1 ? autoAlignedAsgns : null),
+      definedGroups: readyDefs.map((def, di) => ({ def, members: defGroups[di] })).filter(g => g.members.length),
+    };
 
     // ── 4. Layout ────────────────────────────────────────────
     requestAnimationFrame(() => {
