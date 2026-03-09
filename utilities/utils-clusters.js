@@ -1,6 +1,33 @@
 // utils-clusters.js — Clusters tool v38
-
-console.log('[utils-clusters.js v3000000000002]');
+// v37 → v38 changes:
+//   • Fixed card width AND height — CARD_W × CARD_H constants, no auto-sizing
+//   • Text color mixes now use `black` (not var(--ppc-bg)) — matches concept-map exactly
+//   • Cluster drag activates on ANY card hover, not just the header strip
+//   • Cluster cannot shrink below the minimum space needed to tile all its cards
+//   • makeResizable receives per-nest minW/minH — enforced during resize drag
+//   • Drag threshold (4 px) prevents accidental drags on short card clicks
+// v38 → v38.1 changes:
+//   • buildCard: --ppc-bg now = col.accent (vivid, same as concept-map)
+//   • buildCard: --ppc-on now = contrastFor(col.accent) (white/#1a1a1a, same as concept-map)
+//   • buildCard: removed manual border-left accent stripe (concept-map doesn't use it)
+//   • CSS color-mix expressions in card text/cat/split now driven by --ppc-on/--ppc-bg
+// v38.2 fix:
+//   • maybySplitRow: removed early-exit guard on EmbeddingUtils so structural split
+//     still fires on the fast-path (pre-veced rows from sessionStorage) before
+//     EmbeddingUtils is ready. canEmbed flag now only gates per-sentence embedding attempt.
+// v38.3 fix:
+//   • _embedWithRetry: reduced retries from 10 to 3 (getCachedEmbedding only knows pre-loaded
+//     row vectors, not arbitrary user-typed text — endless spinning is now impossible)
+//   • _findVecByTextSearch: new fallback that keyword-matches loaded rows and averages their
+//     vectors as a proxy, so defined cluster names resolve immediately without a live embedder
+// v38.4 fix:
+//   • DEF_THRESHOLD replaced by _defThreshold (default 0.40) — a live "Match" slider in the
+//     Defined Clusters panel lets the user dial the minimum cosine similarity required for a
+//     card to be pulled into a named cluster (0–100 %, shown as a percentage)
+//   • Cards that fall below the threshold become orphans and flow into the auto-cluster pool
+//     so they always appear in unnamed clusters rather than being forced into a poor fit
+//   • Sub-cluster matching inside buildDefinedNest uses the same _defThreshold * 0.8 ratio
+console.log('[utils-clusters.js v1]');
 
 var CL_MIN_SPLIT_LENGTH = 60;
 
@@ -719,6 +746,103 @@ var CL_MIN_SPLIT_LENGTH = 60;
 .pp-cl-sim-bar { flex: 1; height: 2px; background: color-mix(in srgb, var(--ppc-on, #fff) 18%, var(--ppc-bg, transparent)); border-radius: 2px; overflow: hidden; min-width: 20px; }
 .pp-cl-sim-fill { height: 100%; background: color-mix(in srgb, var(--ppc-on, #fff) 65%, var(--ppc-bg, transparent)); border-radius: 2px; transition: width .4s ease; }
 .pp-cl-sim-label { white-space: nowrap; }
+
+/* ══════════════════════════════════════════════════════════
+   v38.4 Layout fixes — based on actual class names in
+   utils-shared.js / PPNavRail.create / injectToolNav
+   ══════════════════════════════════════════════════════════
+
+   FIX 1 — Left rail tool nav items get clipped
+   ─────────────────────────────────────────────────────────
+   .pp-nav-rail has overflow:hidden. injectToolNav appends a
+   flex:1 spacer then 4 .pp-nav-item anchors. On short screens
+   the spacer consumes all remaining space and the nav items
+   overflow below the clipped edge.
+
+   Solution A: allow the rail to scroll (hidden scrollbar)
+   Solution B: compact the nav items and sheet buttons so
+               everything fits without scrolling
+   We do both so it degrades gracefully.
+   ────────────────────────────────────────────────────────── */
+
+/* Allow rail to scroll past its own overflow so bottom nav
+   items are never permanently hidden */
+.pp-nav-rail {
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  scrollbar-width: none !important;
+}
+.pp-nav-rail::-webkit-scrollbar { display: none !important; }
+
+/* Reduce the toggle + sheet button sizes so they take less
+   vertical space — from 48px to 36px each */
+.pp-nav-rail-toggle,
+.pp-nav-rail-sheet-btn {
+  width: 36px !important;
+  height: 36px !important;
+}
+
+/* Compact nav items: trim top/bottom padding from 12px → 6px
+   and reduce indicator height so labels always stay visible */
+.pp-nav-item {
+  padding: 6px 0 !important;
+  gap: 2px !important;
+}
+.pp-nav-item-indicator {
+  height: 26px !important;
+  width: 48px !important;
+}
+.pp-nav-item-label {
+  font-size: 10px !important;
+  line-height: 13px !important;
+}
+
+/* ══════════════════════════════════════════════════════════
+   FIX 2 — Side panel sections don't quite fit the viewport
+   ─────────────────────────────────────────────────────────
+   The .pp-side-panel-body already has overflow-y:auto so it
+   scrolls, but we compact sections so controls fit without
+   needing to scroll on most screen heights.
+   ────────────────────────────────────────────────────────── */
+
+/* Panel header — tighter */
+.pp-side-panel-header {
+  padding: 12px 16px 8px !important;
+}
+.pp-side-panel-tool-name {
+  font-size: 18px !important;
+  line-height: 22px !important;
+}
+
+/* Section wrappers — tighter vertical breathing room */
+.pp-side-panel-section {
+  padding: 4px 0 !important;
+}
+
+/* Section heading labels — tighter top spacing */
+.pp-side-panel-section-label {
+  padding: 8px 16px 4px !important;
+  font-size: 10px !important;
+}
+
+/* Range rows — tighter (these are defined in utils-clusters
+   itself as .pp-range-row) */
+.pp-range-row {
+  min-height: 22px !important;
+  padding-top: 1px !important;
+  padding-bottom: 1px !important;
+}
+
+/* Re-cluster button — less top margin */
+#pp-cl-recluster { margin-top: 2px !important; }
+
+/* Add defined cluster button — more compact */
+.pp-cl-add-text-btn { height: 32px !important; }
+
+/* Defined cluster chips — slightly tighter */
+.pp-cl-def-chip        { height: 28px !important; margin-bottom: 3px !important; }
+.pp-cl-def-sub-row .pp-cl-def-chip { height: 24px !important; }
+.pp-cl-def-chip-sub-btn { height: 20px !important; }
 `;
   document.head.appendChild(s);
 })();
@@ -769,7 +893,7 @@ function initClustersTool(paneEl, sidebarEl) {
             '</svg>' +
             'Add defined cluster' +
           '</button>' +
-          '<div class="pp-range-row" style="margin-top:6px;" title="Minimum cosine similarity for a card to be pulled into a named cluster. Cards below this threshold become orphans and fall through to auto-clusters.">' +
+          '<div class="pp-range-row" title="Minimum cosine similarity for a card to be pulled into a named cluster. Cards below this threshold become orphans and fall through to auto-clusters.">' +
             '<span class="pp-range-label">Match</span>' +
             '<input class="pp-range pp-range--accent" id="pp-cl-defthresh" type="range" min="5" max="95" value="40" step="1">' +
             '<span class="pp-range-val" id="pp-cl-defthresh-val">40%</span>' +
