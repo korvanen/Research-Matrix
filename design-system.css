@@ -1693,17 +1693,43 @@ html.light {
   flex-shrink: 0;
   width: 80px;
   background: var(--md-sys-color-surface-container-low);
-  border-right: 1px solid var(--md-sys-color-outline-variant);
+  border-right: 1px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 35%, transparent);
   display: flex;
   flex-direction: column;
   align-items: center;
   padding: 8px 6px 12px;
   gap: 4px;
   z-index: 10;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: none;
 }
+.pp-nav-rail::-webkit-scrollbar { display: none; }
+
+/* Extra icon buttons injected into the rail (e.g. table view, export) */
+.pp-nav-rail-sheet-btn {
+  width: 40px; height: 40px;
+  flex-shrink: 0;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: none;
+  color: var(--md-sys-color-on-surface-variant);
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+.pp-nav-rail-sheet-btn:hover {
+  background: var(--md-sys-color-surface-container);
+  color: var(--md-sys-color-on-surface);
+}
+.pp-nav-rail-sheet-btn.pp-nav-rail-sheet-btn--active {
+  color: var(--md-sys-color-primary);
+  background: color-mix(in srgb, var(--md-sys-color-primary) 12%, transparent);
+}
+.pp-nav-rail-sheet-btn svg { display: block; pointer-events: none; }
 
 .pp-nav-rail-toggle {
-  width: 32px; height: 32px;
+  width: 40px; height: 40px;
   flex-shrink: 0;
   border-radius: var(--radius-sm);
   border: none;
@@ -1816,7 +1842,7 @@ html.light {
 /* Header: tool name + live subtitle + status chip */
 .pp-side-panel-header {
   flex-shrink: 0;
-  padding: 14px 14px 10px;
+  padding: 14px 16px 10px;
   border-bottom: 1px solid var(--md-sys-color-outline-variant);
   display: flex;
   flex-direction: column;
@@ -1852,7 +1878,7 @@ html.light {
 
 /* Individual section inside panel body */
 .pp-side-panel-section {
-  padding: 12px 14px 10px;
+  padding: 10px 16px;
   border-bottom: 1px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 35%, transparent);
   flex-shrink: 0;
 }
@@ -1862,10 +1888,7 @@ html.light {
 .pp-side-panel-header {
   border-bottom-color: color-mix(in srgb, var(--md-sys-color-outline-variant) 35%, transparent) !important;
 }
-/* Nav rail border faint */
-.pp-nav-rail {
-  border-right-color: color-mix(in srgb, var(--md-sys-color-outline-variant) 35%, transparent) !important;
-}
+/* faint borders — already set in base rule above */
 .pp-side-panel {
   border-right-color: color-mix(in srgb, var(--md-sys-color-outline-variant) 35%, transparent) !important;
 }
