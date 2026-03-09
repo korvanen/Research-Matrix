@@ -9,7 +9,7 @@
 //   • depthColor: added missing paletteIdx + theme variable (was ReferenceError)
 //   • depthColor: rewrote getLuminance without array destructuring (was SyntaxError)
 //   • Removed dead CMAP_LEVEL_THEMES constant
-console.log('[utils-concept-map.js v.hahaa]');
+console.log('[utils-concept-map.js v.hoohaaa]');
 
 const CMAP_PARENT_CHILD_THRESHOLD = 0.50;
 const CMAP_MIN_SPLIT_LENGTH = 60;
@@ -509,76 +509,130 @@ function initConceptMapTool(paneEl, sidebarEl) {
     return Array.from(sum).map(function(x){ return x/valid.length; });
   }
 
+  // Abbreviations that end with "." but are NOT sentence boundaries
+  var _ABBREV = new Set([
+    'mr','mrs','ms','dr','prof','sr','jr','vs','etc','approx','est','dept',
+    'fig','no','vol','pp','ed','eds','ibid','op','cf','al','et','e.g','i.e',
+    'jan','feb','mar','apr','jun','jul','aug','sep','oct','nov','dec',
+    'st','ave','blvd','co','corp','inc','ltd','govt','univ','assoc',
+  ]);
+
   function sentenceSplit(text) {
-    return text
-      .replace(/\r\n|\r/g, '\n')
-      .replace(/([.!?])\s+(?=[A-Z])/g, '$1\n')
-      .replace(/([;])\s+/g, '$1\n')
-      .replace(/\n{2,}/g, '\n')
-      .replace(/:\s{1,3}(?=\S)/g, ':\n')
-      .replace(/\s+[—–]\s+/g, '\n')
-      .split('\n')
-      .map(function(s){ return s.trim(); })
-      .filter(function(s){ return s.length >= 30; });
+    // Scan character-by-character for real sentence endings.
+    // A period/!/? is a sentence boundary only when:
+    //   1. Followed by whitespace then an uppercase letter
+    //   2. Not preceded by a known abbreviation
+    //   3. Not preceded by a single capital letter (initials: "J. Smith")
+    //   4. Not preceded by a digit (decimals / numbered lists: "3. The")
+    var sentences = [];
+    var start = 0;
+    var t = text.replace(/\r\n|\r/g, '\n');
+
+    for (var i = 0; i < t.length; i++) {
+      var ch = t[i];
+
+      // Blank line = definite paragraph break
+      if (ch === '\n' && t[i + 1] === '\n') {
+        var seg = t.slice(start, i).trim();
+        if (seg.length >= 60) sentences.push(seg);
+        while (i + 1 < t.length && t[i + 1] === '\n') i++;
+        start = i + 1;
+        continue;
+      }
+
+      if (ch !== '.' && ch !== '!' && ch !== '?') continue;
+
+      // Must be followed by whitespace then an uppercase letter
+      var after = t.slice(i + 1).match(/^(\s+)([A-Z])/);
+      if (!after) continue;
+
+      // Word before the punctuation
+      var wordBefore = t.slice(0, i).match(/(\b\w+)$/);
+      if (wordBefore) {
+        var w = wordBefore[1];
+        if (_ABBREV.has(w.toLowerCase())) continue;
+        if (w.length === 1 && w === w.toUpperCase()) continue;
+      }
+
+      // Skip digit before period (decimals, numbered items)
+      if (/\d$/.test(t.slice(0, i))) continue;
+
+      var seg2 = t.slice(start, i + 1).trim();
+      if (seg2.length >= 60) sentences.push(seg2);
+      start = i + 1 + after[1].length;
+    }
+
+    var last = t.slice(start).trim();
+    if (last.length >= 60) sentences.push(last);
+
+    return sentences;
   }
 
   async function maybySplitRow(row) {
-    var cells=row.row&&row.row.cells?row.row.cells:(row.cells||[]);
-    var cats=row.row&&row.row.cats?row.row.cats.filter(function(c){ return c.trim(); }):[];
-    var catStr=cats.join(' \u00b7 ')||'Cell';
-    var bestText='', bestIdx=0;
-    cells.forEach(function(c,i){ if(c.trim().length>bestText.length){ bestText=c.trim(); bestIdx=i; } });
-    if (bestText.length < 60) return [row];
-    var segments=sentenceSplit(bestText);
-    if (segments.length<=1) return [row];
+    // Without embeddings we cannot judge semantic distance — never split blindly
+    if (!window.EmbeddingUtils || typeof window.EmbeddingUtils.getCachedEmbedding !== 'function') return [row];
 
-    // Try to get per-sentence embeddings first
+    var cells = row.row && row.row.cells ? row.row.cells : (row.cells || []);
+    var cats  = row.row && row.row.cats  ? row.row.cats.filter(function(c){ return c.trim(); }) : [];
+    var catStr = cats.join(' \u00b7 ') || 'Cell';
+    var bestText = '', bestIdx = 0;
+    cells.forEach(function(c, i) { if (c.trim().length > bestText.length) { bestText = c.trim(); bestIdx = i; } });
+    if (bestText.length < 150) return [row];
+
+    var segments = sentenceSplit(bestText);
+    // Require at least 3 distinct sentences — two sentences in a cell almost
+    // always share a topic and should stay together
+    if (segments.length < 3) return [row];
+
     var segVecs;
-    try { segVecs=await Promise.all(segments.map(function(s){ return window.EmbeddingUtils.getCachedEmbedding(s); })); }
-    catch(e){ segVecs=null; }
+    try { segVecs = await Promise.all(segments.map(function(s){ return window.EmbeddingUtils.getCachedEmbedding(s); })); }
+    catch(e) { return [row]; }
 
-    var valid=segVecs
-      ? segments.map(function(s,i){ return {text:s,vec:segVecs[i]}; }).filter(function(x){ return x.vec&&x.vec.length; })
-      : [];
+    var valid = segments
+      .map(function(s, i) { return { text: s, vec: segVecs[i] }; })
+      .filter(function(x) { return x.vec && x.vec.length; });
 
-    // If embeddings unavailable for sentences (common — bridge only stores full-cell vectors),
-    // fall back to structural split: use the parent row's vector for all segments.
-    // This still produces multiple cards with x/n labels, grouped by topic proximity.
-    if (valid.length <= 1) {
-      var parentVec = row.vec;
-      if (!parentVec) return [row];
-      // Each segment gets the parent's vector — they'll cluster together, which is correct
-      // since they came from the same source cell. The split is purely structural/display.
-      return segments.map(function(seg, ni) {
-        return {
-          tabIdx: row.tabIdx, rowIdx: row.rowIdx,
-          headers: row.headers||[], title: row.title||'',
-          kws: row.kws||new Set(),
-          _splitFrom: catStr, _splitN: ni+1, _splitT: segments.length,
-          vec: parentVec,
-          row: { cells: cells.map(function(c,ci){ return ci===bestIdx ? seg : c; }), cats: cats }
-        };
+    // Still need at least 3 embedded segments
+    if (valid.length < 3) return [row];
+
+    // Group sentences by semantic proximity.
+    // SPLIT_THRESHOLD 0.45: segments in the same group must have cos-sim >= 0.45.
+    var SPLIT_THRESHOLD = 0.45;
+    var n = valid.length;
+    var sim = Array.from({length: n}, function(_, i) {
+      return Array.from({length: n}, function(_, j) {
+        return i === j ? 1 : cosineSim(valid[i].vec, valid[j].vec);
       });
-    }
+    });
 
-    // We have real per-sentence embeddings — do semantic grouping
-    var SPLIT_THRESHOLD = 0.55;
-    var n=valid.length;
-    var sim=Array.from({length:n},function(_,i){ return Array.from({length:n},function(_,j){ return i===j?1:cosineSim(valid[i].vec,valid[j].vec); }); });
-    var groupOf=new Array(n).fill(-1); var numGroups=0;
-    for (var i=0;i<n;i++) {
-      if (groupOf[i]!==-1) continue; var g=numGroups++; groupOf[i]=g;
-      for (var j=i+1;j<n;j++) {
-        if (groupOf[j]!==-1) continue;
-        var membersOfG=valid.map(function(_,k){ return k; }).filter(function(k){ return groupOf[k]===g; });
-        var allSimilar=membersOfG.every(function(k){ return sim[k][j]>=SPLIT_THRESHOLD; });
-        if (allSimilar) groupOf[j]=g;
+    var groupOf = new Array(n).fill(-1); var numGroups = 0;
+    for (var i = 0; i < n; i++) {
+      if (groupOf[i] !== -1) continue;
+      var g = numGroups++; groupOf[i] = g;
+      for (var j = i + 1; j < n; j++) {
+        if (groupOf[j] !== -1) continue;
+        var membersOfG = valid.map(function(_, k) { return k; }).filter(function(k) { return groupOf[k] === g; });
+        if (membersOfG.every(function(k) { return sim[k][j] >= SPLIT_THRESHOLD; })) groupOf[j] = g;
       }
     }
-    if (numGroups<=1) return [row];
-    var t=numGroups, groups=Array.from({length:t},function(){ return []; });
-    valid.forEach(function(seg,i){ groups[groupOf[i]].push(seg); });
-    return groups.map(function(segs,ni){ return { tabIdx:row.tabIdx, rowIdx:row.rowIdx, headers:row.headers||[], title:row.title||'', kws:row.kws||new Set(), _splitFrom:catStr, _splitN:ni+1, _splitT:t, vec:avgVec(segs.map(function(s){ return s.vec; })), row:{cells:cells.map(function(c,ci){ return ci===bestIdx?segs.map(function(s){ return s.text; }).join(' '):''; }), cats:cats} }; });
+    if (numGroups <= 1) return [row];
+
+    var groups = Array.from({length: numGroups}, function() { return []; });
+    valid.forEach(function(seg, i) { groups[groupOf[i]].push(seg); }); // pushed exactly once
+
+    // Abort split if any group would be too thin to be meaningful
+    if (groups.some(function(grp) { return grp.reduce(function(sum, s) { return sum + s.text.length; }, 0) < 60; })) return [row];
+
+    return groups.map(function(segs, ni) {
+      return {
+        tabIdx: row.tabIdx, rowIdx: row.rowIdx,
+        headers: row.headers || [], title: row.title || '',
+        kws: row.kws || new Set(),
+        _splitFrom: catStr, _splitN: ni + 1, _splitT: numGroups,
+        vec: avgVec(segs.map(function(s) { return s.vec; })),
+        row: { cells: cells.map(function(c, ci) { return ci === bestIdx ? segs.map(function(s) { return s.text; }).join(' ') : c; }), cats: cats }
+      };
+    });
   }
 
   async function splitAllRows(rows) {
