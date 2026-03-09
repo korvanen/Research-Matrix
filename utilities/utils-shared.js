@@ -2,7 +2,7 @@
 // utils-shared.js — shared data, theme, and UI utilities
 // Loaded by: index.html, tools/spreadsheet.html, tools/*.html
 // ════════════════════════════════════════════════════════════════
-console.log('[utils-shared.js v.1]');
+console.log('[utils-shared.js v.11]');
 
 // ════════════════════════════════════════════════════════════════
 // DARK / LIGHT MODE
@@ -426,6 +426,7 @@ function processSheetData(grid) {
     return a;
   }, []);
   const headers = colIndices.map(i => grid[headerRowIdx][i] || '');
+  const catHeaders = catIndices.map(i => grid[headerRowIdx][i] || '');
   let title = '';
   for (let r = 0; r < grid.length; r++) {
     if ((grid[r][0] || '').trim() === 'TITLE') {
@@ -440,7 +441,7 @@ function processSheetData(grid) {
     if (!cats[0].trim()) continue;
     rows.push({ cats, cells: colIndices.map(i => g[i] || '') });
   }
-  return { catIndices, headers, rows, title };
+  return { catIndices, catHeaders, headers, rows, title };
 }
 
 function buildRowIndex() {
