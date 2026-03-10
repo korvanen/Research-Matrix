@@ -27,7 +27,7 @@
 //   • Cards that fall below the threshold become orphans and flow into the auto-cluster pool
 //     so they always appear in unnamed clusters rather than being forced into a poor fit
 //   • Sub-cluster matching inside buildDefinedNest uses the same _defThreshold * 0.8 ratio
-console.log('[utils-clusters.js vFINALLY]');
+console.log('[utils-clusters.js vUNCERTAIN]');
 
 var CL_MIN_SPLIT_LENGTH = 60;
 
@@ -746,6 +746,50 @@ var CL_MIN_SPLIT_LENGTH = 60;
 .pp-cl-sim-bar { flex: 1; height: 2px; background: color-mix(in srgb, var(--ppc-on, #fff) 18%, var(--ppc-bg, transparent)); border-radius: 2px; overflow: hidden; min-width: 20px; }
 .pp-cl-sim-fill { height: 100%; background: color-mix(in srgb, var(--ppc-on, #fff) 65%, var(--ppc-bg, transparent)); border-radius: 2px; transition: width .4s ease; }
 .pp-cl-sim-label { white-space: nowrap; }
+
+/* ── Cluster coherence meter (in nest header) ─────────────── */
+.pp-cl-coherence {
+  margin-left: auto;
+  display: flex; align-items: center; gap: 5px;
+  font-size: 9px; font-weight: 700; letter-spacing: .04em;
+  opacity: 0.85; flex-shrink: 0;
+  cursor: default;
+}
+.pp-cl-coherence-bar {
+  width: 36px; height: 3px; border-radius: 2px;
+  background: var(--md-sys-color-outline-variant); overflow: hidden;
+}
+.pp-cl-coherence-fill {
+  height: 100%; border-radius: 2px;
+  transition: width .4s ease, background .4s ease;
+}
+.pp-cl-coherence--tight  .pp-cl-coherence-fill { background: #2e7d5e; }
+.pp-cl-coherence--medium .pp-cl-coherence-fill { background: #c8991a; }
+.pp-cl-coherence--loose  .pp-cl-coherence-fill { background: #c44035; }
+.pp-cl-coherence--tight  .pp-cl-coherence-pct  { color: #2e7d5e; }
+.pp-cl-coherence--medium .pp-cl-coherence-pct  { color: #c8991a; }
+.pp-cl-coherence--loose  .pp-cl-coherence-pct  { color: #c44035; }
+.pp-cl-coherence-pct { font-variant-numeric: tabular-nums; }
+
+/* ── Card uncertainty badges ──────────────────────────────── */
+.pp-cl-card-badges {
+  display: flex; gap: 4px; flex-wrap: wrap; margin-top: 6px;
+}
+.pp-cl-badge {
+  font-size: 8px; font-weight: 800; letter-spacing: .06em;
+  text-transform: uppercase; border-radius: 3px;
+  padding: 2px 5px; opacity: 0.9; flex-shrink: 0;
+}
+.pp-cl-badge--boundary {
+  background: color-mix(in srgb, #c8991a 18%, transparent);
+  color: color-mix(in srgb, #c8991a 90%, var(--ppc-on, #fff));
+  border: 1px solid color-mix(in srgb, #c8991a 35%, transparent);
+}
+.pp-cl-badge--outlier {
+  background: color-mix(in srgb, #c44035 15%, transparent);
+  color: color-mix(in srgb, #c44035 90%, var(--ppc-on, #fff));
+  border: 1px solid color-mix(in srgb, #c44035 30%, transparent);
+}
 
 /* ══════════════════════════════════════════════════════════
    Clusters layout — nav rail scrollable on short viewports
@@ -1934,6 +1978,65 @@ function initClustersTool(paneEl, sidebarEl) {
     });
   }
 
+  // ── Transparency utilities ───────────────────────────────
+
+  // Average pairwise cosine similarity of all rows that have vectors.
+  // Returns 0..1. Used to score cluster coherence.
+  function clusterCoherence(members) {
+    const vecs = members.map(r => r.vec).filter(Boolean);
+    if (vecs.length < 2) return null;
+    let sum = 0, count = 0;
+    for (let i = 0; i < vecs.length; i++)
+      for (let j = i + 1; j < vecs.length; j++) { sum += cosineSim(vecs[i], vecs[j]); count++; }
+    return sum / count;
+  }
+
+  // Run k-means TRIALS more times and measure how consistently each card
+  // stays with its original cluster-mates. Returns a stability score per
+  // card: 1.0 = always in the same group, 0.0 = completely random.
+  function computeCardStability(rows, originalAsgn, k, trials) {
+    trials = trials || 6;
+    const n = rows.length;
+    if (n < 3 || k < 2) return new Array(n).fill(1);
+    // Build original groups (index sets)
+    const origGroups = Array.from({ length: k }, () => []);
+    rows.forEach((r, i) => origGroups[originalAsgn[i]].push(i));
+    const stableCount = new Array(n).fill(0);
+    for (let t = 0; t < trials; t++) {
+      const trialAsgn = kMeansCosine(rows, k);
+      rows.forEach((r, i) => {
+        const groupMembers = origGroups[originalAsgn[i]];
+        if (groupMembers.length <= 1) { stableCount[i]++; return; }
+        // Count how many original group-mates ended up in the same trial cluster
+        const together = groupMembers.filter(j => j !== i && trialAsgn[j] === trialAsgn[i]).length;
+        if (together >= (groupMembers.length - 1) * 0.5) stableCount[i]++;
+      });
+    }
+    return stableCount.map(s => s / trials);
+  }
+
+  // Mark the outlier card(s) in a group: those whose avg sim to all others
+  // is more than 1.5 std-devs below the group mean. At most 1 card flagged.
+  function markGroupOutliers(members) {
+    const vecs = members.map(r => r.vec);
+    if (members.length < 4) return; // too few to be meaningful
+    const avgSims = members.map((r, i) => {
+      if (!r.vec) return null;
+      let s = 0, cnt = 0;
+      members.forEach((r2, j) => { if (i !== j && r2.vec) { s += cosineSim(r.vec, r2.vec); cnt++; } });
+      return cnt ? s / cnt : null;
+    });
+    const valid = avgSims.filter(s => s !== null);
+    if (valid.length < 3) return;
+    const mean = valid.reduce((a, b) => a + b, 0) / valid.length;
+    const std  = Math.sqrt(valid.reduce((a, b) => a + (b - mean) ** 2, 0) / valid.length);
+    if (std < 0.01) return; // no meaningful spread
+    members.forEach((r, i) => {
+      if (avgSims[i] !== null && avgSims[i] < mean - 1.5 * std) r._outlier = true;
+      else delete r._outlier;
+    });
+  }
+
   const FALLBACK_PALETTE = [
     { accent: '#2e7d5e', bg: '#f4faf7', label: '#fff' },
     { accent: '#4a56c8', bg: '#f4f5fd', label: '#fff' },
@@ -1959,6 +2062,27 @@ function initClustersTool(paneEl, sidebarEl) {
     return pal[i % pal.length];
   }
 
+  // Build the coherence pill DOM element for a cluster header.
+  function buildCoherencePill(members) {
+    const score = clusterCoherence(members);
+    if (score === null) return null;
+    const pct = Math.round(score * 100);
+    const tier = score >= 0.65 ? 'tight' : score >= 0.45 ? 'medium' : 'loose';
+    const label = tier === 'tight' ? 'tight' : tier === 'medium' ? 'moderate' : 'loose';
+    const tooltip = tier === 'tight'
+      ? 'Cards are highly similar — this cluster is semantically coherent (' + pct + '%)'
+      : tier === 'medium'
+      ? 'Cards share moderate similarity — some thematic spread (' + pct + '%)'
+      : 'Cards are weakly similar — this grouping has low confidence (' + pct + '%). Consider re-clustering or splitting manually.';
+    const pill = document.createElement('div');
+    pill.className = 'pp-cl-coherence pp-cl-coherence--' + tier;
+    pill.title = tooltip;
+    pill.innerHTML =
+      '<div class="pp-cl-coherence-bar"><div class="pp-cl-coherence-fill" style="width:' + pct + '%"></div></div>' +
+      '<span class="pp-cl-coherence-pct">' + pct + '%</span>';
+    return pill;
+  }
+
   function buildCard(r, col, delay, clusterLabel, similarity) {
     const cells  = r.row && r.row.cells ? r.row.cells : (r.cells || []);
     const cats   = r.row && r.row.cats  ? r.row.cats.filter(c => c.trim()) : [];
@@ -1978,6 +2102,22 @@ function initClustersTool(paneEl, sidebarEl) {
     if (cats.length) { const ce = document.createElement('div'); ce.className = 'pp-cl-card-cat'; ce.textContent = cats.join(' \u00b7 '); body.appendChild(ce); }
     const te = document.createElement('div'); te.className = 'pp-cl-card-text'; te.textContent = parsed.body; body.appendChild(te);
     if (r._splitN && r._splitT && r._splitT > 1) { const sp = document.createElement('div'); sp.className = 'pp-cl-card-split'; sp.textContent = r._splitN + '/' + r._splitT + ' Split'; body.appendChild(sp); }
+    if (r._borderline || r._outlier) {
+      const badges = document.createElement('div'); badges.className = 'pp-cl-card-badges';
+      if (r._borderline) {
+        const b = document.createElement('span'); b.className = 'pp-cl-badge pp-cl-badge--boundary';
+        b.textContent = '~ boundary';
+        b.title = 'This card\u2019s cluster assignment is unstable \u2014 it could plausibly belong to another group. Treat its placement with lower confidence.';
+        badges.appendChild(b);
+      }
+      if (r._outlier) {
+        const o = document.createElement('span'); o.className = 'pp-cl-badge pp-cl-badge--outlier';
+        o.textContent = '\u2197 outlier';
+        o.title = 'This card is the least similar to the other cards in its cluster. It may belong elsewhere or represent an under-explored theme.';
+        badges.appendChild(o);
+      }
+      body.appendChild(badges);
+    }
     if (typeof similarity === 'number') {
       const pct = Math.round(similarity * 100);
       const sim = document.createElement('div'); sim.className = 'pp-cl-sim-row';
@@ -1990,6 +2130,7 @@ function initClustersTool(paneEl, sidebarEl) {
         '<span class="pp-cl-sim-label">to cluster</span>';
       body.appendChild(sim);
     }
+
     card.appendChild(body);
     card.addEventListener('mouseenter', ev => { if (_nestDrag && _nestDrag.moved) return; showTooltip(ev, r, col.accent, clusterLabel || ''); });
     card.addEventListener('mousemove',  ev => { if (_nestDrag && _nestDrag.moved) { hideTooltip(); return; } moveTooltip(ev); });
@@ -2062,7 +2203,12 @@ function initClustersTool(paneEl, sidebarEl) {
     const nestLblEl = document.createElement('span'); nestLblEl.className = 'pp-cl-nest-label'; nestLblEl.textContent = lbl; nestLblEl.style.color = col.accent;
     const dot = document.createElement('span'); dot.className = 'pp-cl-nest-dot'; dot.style.background = col.accent;
     const cnt = document.createElement('span'); cnt.className = 'pp-cl-nest-count'; cnt.textContent = members.length + ' entr' + (members.length === 1 ? 'y' : 'ies') + subLabelStr;
-    head.appendChild(nestLblEl); head.appendChild(dot); head.appendChild(cnt); nest.appendChild(head);
+    head.appendChild(nestLblEl); head.appendChild(dot); head.appendChild(cnt);
+    const pill = buildCoherencePill(members);
+    if (pill) head.appendChild(pill);
+    nest.appendChild(head);
+    // Mark outliers within this cluster before building cards
+    markGroupOutliers(members);
     const body = document.createElement('div'); body.className = 'pp-cl-nest-body'; nest.appendChild(body);
     body.appendChild(buildInnerTiles(members, subAsgn, col, lbl, simMap));
     const { nestW, estH } = calcNestDims(members.length);
@@ -2087,6 +2233,8 @@ function initClustersTool(paneEl, sidebarEl) {
     descEl.style.cssText = 'font-size:9px;color:var(--md-sys-color-on-surface-variant);font-style:italic;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-left:4px;';
     descEl.textContent = def.desc;
     head.appendChild(nestLblEl); head.appendChild(dot); head.appendChild(badge); head.appendChild(cnt); head.appendChild(descEl);
+    const defPill = buildCoherencePill(members);
+    if (defPill) head.appendChild(defPill);
     nest.appendChild(head);
     const body = document.createElement('div'); body.className = 'pp-cl-nest-body'; nest.appendChild(body);
 
@@ -2170,6 +2318,12 @@ function initClustersTool(paneEl, sidebarEl) {
       const topAsgn = autoCluster(autoRows, _outerMin, _outerMax);
       const numTop = Math.max(...topAsgn, 0) + 1;
       const topGroups = Array.from({ length: numTop }, () => []); autoRows.forEach((r, i) => topGroups[topAsgn[i]].push(r));
+      // Compute card stability: run k-means 6 more times and check consistency
+      const stability = computeCardStability(autoRows, topAsgn, numTop);
+      autoRows.forEach((r, i) => {
+        r._borderline = stability[i] < 0.5;
+        if (!r._borderline) delete r._borderline;
+      });
       autoNonEmpty = topGroups.filter(g => g.length > 0);
       if (_depth > 1 && autoNonEmpty.length > 1) autoAlignedAsgns = alignedSubCluster(autoNonEmpty, _innerMin, _innerMax);
       let alignIdx = 0;
