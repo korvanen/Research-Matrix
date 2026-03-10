@@ -1441,7 +1441,7 @@ window.TABS = window.TABS || [];
     const urlToLoad = getSavedSheetUrl();
     console.log('[utils-shared] Loading sheet:', urlToLoad);
     const all = await fetchODS(urlToLoad);
-    window.TABS = all.filter(s => s.name.includes('MX'));
+    window.TABS = all.filter(s => s.name.includes('TAB'));
     console.log('[utils-shared] Loaded', window.TABS.length, 'tabs');
     if (typeof EmbeddingBridge !== 'undefined') EmbeddingBridge.host();
     if (typeof initEmbeddings  === 'function')  initEmbeddings();
