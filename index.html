@@ -103,11 +103,11 @@
       border: 2px solid var(--md-sys-color-primary, #6750a4);
     }
     .sheet-url-input {
-      flex: 1; height: 100%;
+      flex: 1; min-width: 0; width: 0; height: 100%;
       padding: 0 12px;
       background: transparent; border: none; outline: none;
       font-family: var(--font-family); font-size: 14px; font-weight: 400;
-      letter-spacing: .015em;
+      letter-spacing: .015em; overflow: hidden; text-overflow: ellipsis;
       color: var(--md-sys-color-on-surface, inherit);
       caret-color: var(--md-sys-color-primary);
     }
@@ -422,8 +422,8 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="utilities/embedding-bridge.js?v=4"></script>
   <script src="utilities/utils-keywords.js?v=4"></script>
-  <script src="utilities/utils-shared.js?v=2c656b35"></script>
-  <script src="utilities/utils-academic.js?v=66257bc0"></script>
+  <script src="utilities/utils-shared.js?v=425998b6"></script>
+  <script src="utilities/utils-academic.js?v=1"></script>
   <script type="module" src="utilities/utils-embedding.js?v=4"></script>
 
   <script>console.log('[index.html v.10]');</script>
@@ -468,8 +468,8 @@
       loadBtn.disabled = true;
       fetchODS(val)
         .then(function(all) {
-          var tabs = all.filter(function(s) { return s.name.includes('TAB'); });
-          if (!tabs.length) { loadBtn.disabled = false; return setStatus('No tabs containing TAB found — check the tab names.', 'error'); }
+          var tabs = all.filter(function(s) { return s.name.includes('MX'); });
+          if (!tabs.length) { loadBtn.disabled = false; return setStatus('No MX tabs found — check the tab names.', 'error'); }
           saveSheetUrl(val);
           setStatus('Loaded ' + tabs.length + ' tab' + (tabs.length === 1 ? '' : 's') + '. Reloading…', 'success');
           setTimeout(function() { location.reload(); }, 700);
