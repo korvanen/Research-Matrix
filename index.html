@@ -468,7 +468,7 @@
       loadBtn.disabled = true;
       fetchODS(val)
         .then(function(all) {
-          var tabs = all.filter(function(s) { return s.name.includes('MX'); });
+          var tabs = all.filter(function(s) { return s.name.includes('TAB'); });
           if (!tabs.length) { loadBtn.disabled = false; return setStatus('No MX tabs found — check the tab names.', 'error'); }
           saveSheetUrl(val);
           setStatus('Loaded ' + tabs.length + ' tab' + (tabs.length === 1 ? '' : 's') + '. Reloading…', 'success');
