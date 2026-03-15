@@ -9,7 +9,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="../utilities/utils-keywords.js?v=7"></script>
   <script src="../utilities/utils-shared.js?v=425998b6"></script>
-  <script src="../utilities/utils-synthesis.js?v=8678ae4f"></script>
+  <script src="../utilities/utils-synthesis.js?v=3"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; }
     html, body { height: 100%; overflow: hidden; margin: 0; padding: 0; }
@@ -124,6 +124,41 @@
     .fw-panel-btn-ghost   { background: transparent; color: var(--md-sys-color-on-surface-variant); border: 1px solid var(--md-sys-color-outline-variant); }
     .fw-panel-status { font-size: 11px; color: var(--md-sys-color-on-surface-variant); padding: 2px 0 4px; }
 
+    /* ── Schema editor ── */
+    .fw-schema-item {
+      display: flex; align-items: center; gap: 6px;
+      padding: 5px 0; border-bottom: 1px solid var(--md-sys-color-outline-variant);
+    }
+    .fw-schema-item:last-of-type { border-bottom: none; }
+    .fw-schema-label {
+      flex: 1; font-size: 12px; font-weight: 500;
+      color: var(--md-sys-color-on-surface);
+    }
+    .fw-schema-key {
+      font-size: 10px; font-weight: 600; letter-spacing: .05em;
+      color: var(--md-sys-color-on-surface-variant); min-width: 36px;
+    }
+    .fw-schema-btn {
+      height: 22px; padding: 0 8px; border-radius: 11px; border: none;
+      background: transparent; font-size: 11px; font-weight: 500; cursor: pointer;
+      color: var(--md-sys-color-on-surface-variant);
+    }
+    .fw-schema-btn:hover { background: var(--md-sys-color-surface-container-high); }
+    .fw-schema-btn.del:hover { color: var(--md-sys-color-error); }
+    .fw-schema-add {
+      width: 100%; height: 28px; margin-top: 6px; border-radius: 14px;
+      border: 1px dashed var(--md-sys-color-outline-variant);
+      background: transparent; font-size: 11px; font-weight: 500; cursor: pointer;
+      color: var(--md-sys-color-primary);
+    }
+    .fw-schema-add:hover { background: color-mix(in srgb,var(--md-sys-color-primary) 6%,transparent); }
+    .fw-schema-input {
+      flex: 1; height: 26px; padding: 0 8px;
+      border: 1px solid var(--md-sys-color-primary); border-radius: 4px;
+      background: transparent; font-size: 12px; color: inherit; outline: none;
+    }
+    .fw-reg-color { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
     /* ── Diff modal ── */
     .fw-modal-bg { position: fixed; inset: 0; z-index: 8000; background: rgba(0,0,0,.45); display: none; align-items: center; justify-content: center; }
     .fw-modal-bg.open { display: flex; }
@@ -181,6 +216,8 @@
         '<span class="pp-range-val" id="fw-maxwords-val">'+SY.getSettings().maxWords+'</span>' +
       '</div>';
 
+    var _schemaHtml = '<div id="fw-schema-body"></div>';
+
     var _syncHtml =
       '<div class="fw-panel-label">Apps Script URL</div>' +
       '<input class="fw-panel-input" id="fw-script-url" type="url" placeholder="https://script.google.com/...">' +
@@ -198,6 +235,7 @@
       defaultOpen: true,
       panelSections: [
         { label: 'Global', html: _globalHtml },
+        { label: 'Schema', html: _schemaHtml },
         { label: 'Sync',   html: _syncHtml },
       ],
     });
@@ -395,8 +433,10 @@
       var byP = {};
       as.forEach(function(a){ if (!byP[a.principleId]) byP[a.principleId]=[]; byP[a.principleId].push(a); });
 
-      var REGS      = ['what','why','who','how'];
-      var REG_LABEL = { what:'WHAT?', why:'WHY?', who:'WHO?', how:'HOW?' };
+      var _regs     = SY.getRegisters();
+      var REGS      = _regs.map(function(r){ return r.key; });
+      var REG_LABEL = {};
+      _regs.forEach(function(r){ REG_LABEL[r.key] = r.label; });
       var html = '';
 
       dimOrder2.forEach(function(dim){
@@ -410,14 +450,16 @@
         dps.forEach(function(p){
           var pId  = p.sheetId || ('P-'+String(p.seq).padStart(2,'0'));
           var pAs  = byP[p.id] || [];
-          var byReg = { what:[], why:[], who:[], how:[] };
+          var byReg = {};
+          REGS.forEach(function(k){ byReg[k] = []; });
           pAs.forEach(function(a){ if (byReg[a.register]) byReg[a.register].push(a); });
 
           html += '<tr class="fw-sep"><td colspan="5"></td></tr>';
           html += '<tr class="fw-p-name"><td class="fw-id">'+_h(pId)+'</td><td colspan="4" style="font-weight:600">'+_h(p.name)+'</td></tr>';
 
-          var mbr = p.moveByReg   || { what:'', why:'', who:'', how:'' };
-          var tbr = p.metricByReg || { what:'', why:'', who:'', how:'' };
+          var _mbrDef = {}; REGS.forEach(function(k){ _mbrDef[k]=''; });
+          var mbr = Object.assign({}, _mbrDef, p.moveByReg   || {});
+          var tbr = Object.assign({}, _mbrDef, p.metricByReg || {});
 
           REGS.forEach(function(reg){
             var regAs     = byReg[reg];
@@ -497,14 +539,142 @@
     // ── Events ────────────────────────────────────────────────────────────────
     window.addEventListener('sheet-loaded', function(){
       render();
+      renderSchema();
       _loadFromSheet();
       var ps = SY.getPrinciples().filter(function(p){ return p.named&&!p.archived; });
       if (_nav && _nav.subtitleEl) _nav.subtitleEl.textContent = ps.length + ' principles';
     });
 
+    // ── Schema editor ────────────────────────────────────────────────────────
+    var REG_COLORS = { what:'#1565c0', why:'#e65100', who:'#2e7d32', how:'#6a1b9a' };
+
+    function renderSchema() {
+      var el = document.getElementById('fw-schema-body');
+      if (!el) return;
+      var regs = SY.getRegisters();
+      var dims = SY.getDimensions();
+
+      var html = '<div class="fw-panel-label">Questions (registers)</div>';
+      regs.forEach(function(r){
+        var col = REG_COLORS[r.key] || 'var(--md-sys-color-primary)';
+        html += '<div class="fw-schema-item" data-rkey="'+_h(r.key)+'">';
+        html += '<span class="fw-reg-color" style="background:'+col+'"></span>';
+        html += '<span class="fw-schema-key">'+_h(r.key)+'</span>';
+        html += '<span class="fw-schema-label">'+_h(r.label)+'</span>';
+        html += '<button class="fw-schema-btn" data-action="edit-reg" data-key="'+_h(r.key)+'">Edit</button>';
+        html += '<button class="fw-schema-btn del" data-action="del-reg" data-key="'+_h(r.key)+'">Delete</button>';
+        html += '</div>';
+      });
+      html += '<button class="fw-schema-add" data-action="add-reg">+ Add question</button>';
+
+      html += '<div class="fw-panel-label" style="margin-top:10px">Dimensions</div>';
+      dims.forEach(function(d){
+        html += '<div class="fw-schema-item" data-dim="'+_h(d)+'">';
+        html += '<span class="fw-schema-label">'+_h(d)+'</span>';
+        html += '<button class="fw-schema-btn" data-action="edit-dim" data-dim="'+_h(d)+'">Edit</button>';
+        html += '<button class="fw-schema-btn del" data-action="del-dim" data-dim="'+_h(d)+'">Delete</button>';
+        html += '</div>';
+      });
+      html += '<button class="fw-schema-add" data-action="add-dim">+ Add dimension</button>';
+
+      el.innerHTML = html;
+
+      // Wire events
+      el.querySelectorAll('[data-action=edit-reg]').forEach(function(btn){
+        btn.addEventListener('click', function(){
+          var key = btn.dataset.key;
+          var reg = SY.getRegisters().find(function(r){ return r.key===key; });
+          if (!reg) return;
+          var item = btn.closest('.fw-schema-item');
+          _inlineEdit(item, reg.label, function(newLabel){
+            var newKey = newLabel.toLowerCase().replace(/[^a-z0-9]/g,'').slice(0,12) || key;
+            var affectedCount = SY.getAssignments().filter(function(a){ return a.register===key; }).length;
+            var msg = newKey !== key
+              ? affectedCount + ' assigned entr'+(affectedCount===1?'y':'ies')+' will be re-registered as "'+newKey+'". Continue?'
+              : null;
+            if (!msg || confirm(msg)) {
+              SY.updateRegister(key, newKey, newLabel);
+              render(); renderSchema();
+            } else { renderSchema(); }
+          });
+        });
+      });
+
+      el.querySelectorAll('[data-action=del-reg]').forEach(function(btn){
+        btn.addEventListener('click', function(){
+          var key = btn.dataset.key;
+          var count = SY.getAssignments().filter(function(a){ return a.register===key; }).length;
+          if (confirm('Delete register "'+key+'"? '+count+' assigned entr'+(count===1?'y':'ies')+' will become unassigned.')) {
+            SY.deleteRegister(key);
+            render(); renderSchema();
+          }
+        });
+      });
+
+      el.querySelectorAll('[data-action=add-reg]').forEach(function(btn){
+        btn.addEventListener('click', function(){
+          var label = prompt('New question label (e.g. WHEN?):');
+          if (!label || !label.trim()) return;
+          var key = label.trim().toLowerCase().replace(/[^a-z0-9]/g,'').replace(/\?+$/,'').slice(0,12);
+          if (!key) return;
+          SY.addRegister(key, label.trim());
+          render(); renderSchema();
+        });
+      });
+
+      el.querySelectorAll('[data-action=edit-dim]').forEach(function(btn){
+        btn.addEventListener('click', function(){
+          var dim = btn.dataset.dim;
+          var item = btn.closest('.fw-schema-item');
+          _inlineEdit(item, dim, function(newName){
+            if (!newName.trim()) { renderSchema(); return; }
+            SY.updateDimension(dim, newName.trim());
+            render(); renderSchema();
+          });
+        });
+      });
+
+      el.querySelectorAll('[data-action=del-dim]').forEach(function(btn){
+        btn.addEventListener('click', function(){
+          var dim = btn.dataset.dim;
+          var affected = SY.getPrinciples().filter(function(p){ return p.dimensionHint===dim; }).length;
+          var msg = 'Delete dimension "'+dim+'"?';
+          if (affected) msg += ' '+affected+' principle'+(affected===1?'':'s')+" will lose their dimension and their entries will be unassigned.";
+          if (confirm(msg)) { SY.deleteDimension(dim); render(); renderSchema(); }
+        });
+      });
+
+      el.querySelectorAll('[data-action=add-dim]').forEach(function(btn){
+        btn.addEventListener('click', function(){
+          var name = prompt('New dimension name (e.g. Ecological):');
+          if (!name || !name.trim()) return;
+          SY.addDimension(name.trim());
+          renderSchema();
+        });
+      });
+    }
+
+    function _inlineEdit(itemEl, currentVal, onConfirm) {
+      var labelEl = itemEl.querySelector('.fw-schema-label');
+      if (!labelEl) return;
+      var inp = document.createElement('input');
+      inp.className = 'fw-schema-input';
+      inp.value = currentVal;
+      itemEl.insertBefore(inp, labelEl);
+      labelEl.style.display = 'none';
+      inp.focus(); inp.select();
+      function finish(){ onConfirm(inp.value.trim()); }
+      inp.addEventListener('keydown', function(e){
+        if (e.key==='Enter') { e.preventDefault(); finish(); }
+        if (e.key==='Escape') { renderSchema(); }
+      });
+      inp.addEventListener('blur', finish);
+    }
+
     document.addEventListener('DOMContentLoaded', function(){
       _loadScriptUrl();
       render();
+      renderSchema();
       var ps = SY.getPrinciples().filter(function(p){ return p.named&&!p.archived; });
       if (_nav && _nav.subtitleEl) _nav.subtitleEl.textContent = ps.length + ' principles';
     });
