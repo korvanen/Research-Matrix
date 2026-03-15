@@ -356,7 +356,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="../utilities/utils-keywords.js?v=7"></script>
   <script src="../utilities/utils-shared.js?v=425998b6"></script>
-  <script src="../utilities/utils-synthesis.js?v=ccd63721"></script>
+  <script src="../utilities/utils-synthesis.js?v=2"></script>
   <script type="module" src="../utilities/utils-embedding.js?v=4"></script>
 
   <script>
@@ -1157,7 +1157,7 @@
       if(ls) document.getElementById('sy-sync-status').textContent='Last sync: '+new Date(ls).toLocaleString();
     }
 
-    function _writeToSheet(){
+    async function _writeToSheet(){
       var scriptUrl=SY.getScriptUrl();
       if(!scriptUrl){alert('Paste your Apps Script URL in the panel at the bottom of this view, then save it.');return;}
       var sheetUrl=typeof getSavedSheetUrl==='function'?getSavedSheetUrl():'';
@@ -1166,17 +1166,34 @@
       var grid=SY.buildFrameworkGrid();
       _pendingWrite={scriptUrl:scriptUrl,sheetUrl:sheetUrl,tabName:'FRAMEWORK',grid:grid};
 
-      // Get existing FRAMEWORK tab grid for diff
-      var existing=SY.getFrameworkTabs().length?SY.getFrameworkTabs()[0].grid:null;
+      // Fetch existing FRAMEWORK tab from sheet for an accurate diff
+      var body=document.getElementById('sy-diff-body');
+      body.innerHTML='<p style="color:var(--md-sys-color-on-surface-variant)">Reading current sheet...</p>';
+      document.getElementById('sy-diff-modal').classList.add('open');
+
+      var existing=null;
+      try {
+        var tabs = await SY.readFramework(scriptUrl, sheetUrl);
+        // Find the FRAMEWORK tab — match by name containing FRAMEWORK
+        var fwTab = tabs.find(function(t){ return t.name.indexOf('FRAMEWORK')!==-1; });
+        if (fwTab) {
+          existing = fwTab.rows;
+          SY.setFrameworkTabs([{name:fwTab.name, grid:fwTab.rows}]);
+          // Also load state from it
+          SY.loadFromFrameworkTab(fwTab.rows);
+        }
+      } catch(e) {
+        // Can't read existing — diff will show everything as new, which is fine
+        console.warn('[synthesis] Could not read existing FRAMEWORK tab:', e.message);
+      }
+
       var diff=SY.diffFramework(existing,grid);
 
-      var body=document.getElementById('sy-diff-body');
       var html='<p><strong>'+diff.unchanged+'</strong> rows unchanged</p>';
       if(diff.added.length){html+='<p><strong>'+diff.added.length+'</strong> rows added:</p>';diff.added.slice(0,20).forEach(function(r){html+='<div class="sy-diff-line added">+ '+_h(r)+'</div>';});if(diff.added.length>20)html+='<div style="color:var(--md-sys-color-on-surface-variant);font-style:italic">...and '+(diff.added.length-20)+' more</div>';}
       if(diff.removed.length){html+='<p><strong>'+diff.removed.length+'</strong> rows removed:</p>';diff.removed.slice(0,20).forEach(function(r){html+='<div class="sy-diff-line removed">- '+_h(r)+'</div>';});}
-      if(!diff.added.length&&!diff.removed.length) html+='<p style="color:var(--md-sys-color-on-surface-variant)">No structural changes. Move/Metric edits may still have been updated.</p>';
+      if(!diff.added.length&&!diff.removed.length) html+='<p style="color:var(--md-sys-color-on-surface-variant)">No structural changes — only timestamps or Move/Metric values may differ.</p>';
       body.innerHTML=html;
-      document.getElementById('sy-diff-modal').classList.add('open');
     }
 
     document.getElementById('sy-diff-cancel').addEventListener('click',function(){document.getElementById('sy-diff-modal').classList.remove('open');_pendingWrite=null;});
