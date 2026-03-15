@@ -131,7 +131,7 @@ window.SynthesisData = (function () {
       id: _id('p'), sheetId: _sheetId(), name: String(data.name||'').trim(), named: !!(data.name&&data.name.trim()),
       dimensionHint: String(data.dimensionHint||'').trim(),
       color: data.color || COLORS[(seq-1) % COLORS.length],
-      move:'', metric:'', archived:false, seq:seq, ts:Date.now(),
+      move:'', metric:'', moveByReg:{what:'',why:'',who:'',how:''}, metricByReg:{what:'',why:'',who:'',how:''}, archived:false, seq:seq, ts:Date.now(),
     };
     ps.push(p); _save(SK.PRINCIPLES, ps); return p;
   }
@@ -376,13 +376,15 @@ window.SynthesisData = (function () {
         var byReg={what:[],why:[],who:[],how:[]};
         pAs.forEach(function(a){if(byReg[a.register]) byReg[a.register].push(a);});
         rows.push([pId, p.name, '', '', '']);
-        REGS.forEach(function(reg,ri){
+        var mbr = p.moveByReg   || {what:'',why:'',who:'',how:''};
+        var tbr = p.metricByReg || {what:'',why:'',who:'',how:''};
+        REGS.forEach(function(reg){
           var regAs=byReg[reg], ruleCell='';
           if(regAs.length){
             var resolved=resolveNoteKey(regAs[0].noteKey);
             ruleCell = resolved ? cellRef(resolved.tabName,resolved.gridRow,resolved.gridCol) : '[source missing]';
           }
-          rows.push(['', REG_LABEL[reg], ruleCell, ri===0?(p.move||'N/A'):'', ri===0?(p.metric||'N/A'):'']);
+          rows.push(['', REG_LABEL[reg], ruleCell, mbr[reg]||'N/A', tbr[reg]||'N/A']);
         });
       });
     });
