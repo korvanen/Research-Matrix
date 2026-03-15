@@ -389,42 +389,57 @@
       updateCounts();
     });
 
-    document.addEventListener('embedder-ready', _onEmbedReady);
-    window.addEventListener('embedding-complete', _onEmbedReady);
-    window.addEventListener('sheet-loaded', function(){
-      _tryLoadFramework(); _checkChangedSources(); renderAll();
-      // If model was already ready before the sheet loaded, embed now
-      if (_embReady && _emb.size === 0) {
-        _embedAll().then(function(){
-          document.getElementById('sy-emb-dot').className = 'sy-emb-dot ready';
-          document.getElementById('sy-emb-label').textContent = _emb.size + ' embedded';
-          _clusters = null;
-          _runAutoAssignment();
-          if (_view === 'principles') renderPrinciples();
-          if (_view === 'notes') renderNotes();
-        });
-      }
-    });
+    // ── Embedding ────────────────────────────────────────────────────────────
+    // getCachedEmbedding handles model loading internally, so no isReady() guard
+    // needed. We trigger after both sheet-loaded AND embedder-ready; a running
+    // flag prevents concurrent runs.
+    var _embedding = false;
 
-    function _onEmbedReady(){
-      if (_embReady) return; _embReady = true;
+    function _triggerEmbed() {
+      if (_embedding) return;
+      var keys = SY.getRowNoteKeys();
+      if (!keys.length) return;              // TABS not populated yet
+      if (!window.EmbeddingUtils) return;    // module not loaded yet
+      _embedding = true;
+      _embReady  = false;
       document.getElementById('sy-emb-dot').className = 'sy-emb-dot loading';
-      document.getElementById('sy-emb-label').textContent = 'Embedding notes...';
-      _embedAll().then(function(){
+      document.getElementById('sy-emb-label').textContent = 'Embedding ' + keys.length + ' notes...';
+      _embedAll(keys).then(function(){
+        _embedding = false;
+        _embReady  = true;
         document.getElementById('sy-emb-dot').className = 'sy-emb-dot ready';
         document.getElementById('sy-emb-label').textContent = _emb.size + ' embedded';
+        console.log('[synthesis] embedded', _emb.size, 'of', keys.length, 'notes');
         _clusters = null;
-        // Run auto-assignment on any newly-embedded unassigned notes
         _runAutoAssignment();
-        if (_view === 'principles') renderPrinciples();
-        if (_view === 'notes') renderNotes();
+        renderAll();
+      }).catch(function(e){
+        _embedding = false;
+        console.error('[synthesis] _embedAll failed:', e);
       });
     }
 
-    async function _embedAll(){
-      if (!window.EmbeddingUtils || !window.EmbeddingUtils.isReady()) return;
-      var keys = SY.getRowNoteKeys();
-      for (var i=0; i<keys.length; i++){
+    // Fire on both events — whichever arrives last (after both sheet + model ready)
+    document.addEventListener('embedder-ready', function(){
+      console.log('[synthesis] embedder-ready, TABS length:', (window.TABS||[]).length);
+      _triggerEmbed();
+    });
+    window.addEventListener('embedding-complete', function(){
+      // utils-keywords fires this after it finishes; re-try in case
+      // sheet arrived before model and _triggerEmbed found no keys
+      if (!_embReady) _triggerEmbed();
+    });
+    window.addEventListener('sheet-loaded', function(){
+      console.log('[synthesis] sheet-loaded, TABS length:', (window.TABS||[]).length);
+      _tryLoadFramework(); _checkChangedSources(); renderAll();
+      _triggerEmbed();
+    });
+
+    function _onEmbedReady(){ _triggerEmbed(); } // kept for any legacy callers
+
+    async function _embedAll(keys){
+      keys = keys || SY.getRowNoteKeys();
+      for (var i = 0; i < keys.length; i++){
         var key = keys[i];
         if (_emb.has(key)) continue;
         var r = SY.resolveNoteKey(key);
@@ -432,7 +447,7 @@
         try {
           var vec = await window.EmbeddingUtils.getCachedEmbedding(r.text);
           if (vec) _emb.set(key, new Float32Array(vec));
-        } catch(e){ console.warn('[synthesis] embed failed:', e.message); }
+        } catch(e){ console.warn('[synthesis] embed key failed:', key, e.message); }
       }
     }
 
