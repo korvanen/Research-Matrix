@@ -9,7 +9,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="../utilities/utils-keywords.js?v=7"></script>
   <script src="../utilities/utils-shared.js?v=425998b6"></script>
-  <script src="../utilities/utils-synthesis.js?v=69ae51cf"></script>
+  <script src="../utilities/utils-synthesis.js?v=3"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; }
     html, body { height: 100%; overflow: hidden; margin: 0; padding: 0; }
@@ -21,14 +21,6 @@
     }
 
     /* ── Topbar ── */
-    .fw-topbar {
-      flex-shrink: 0; display: flex; align-items: center; gap: 8px;
-      height: 48px; padding: 0 12px;
-      background: var(--md-sys-color-surface-container);
-      border-bottom: 1px solid var(--md-sys-color-outline-variant);
-    }
-    .fw-topbar-title { font-size: 16px; font-weight: 500; flex: 1; }
-    .fw-sync-text { font-size: 11px; color: var(--md-sys-color-on-surface-variant); }
 
     /* ── Body / nav rail area ── */
     .fw-body { flex: 1; min-height: 0; display: flex; overflow: hidden; }
@@ -152,11 +144,6 @@
   </style>
 </head>
 <body>
-
-  <div class="fw-topbar">
-    <div class="fw-topbar-title">Framework</div>
-    <span class="fw-sync-text" id="fw-sync-text"></span>
-  </div>
 
   <div class="fw-body" id="fw-body"></div>
 
