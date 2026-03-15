@@ -740,9 +740,11 @@
         create: function(paneEl, opts) {
           window.PPNavRail = _realPPNavRail; // restore immediately
 
-          // Build combined HTML: tool's panel sections as a hidden lookup target
-          // inside paneEl (so paneEl.querySelector works), PLUS a visible copy
-          // in the outer panel. The inner copy is display:none — purely for JS lookup.
+          // ── Strategy: inject full PPNavRail structure into paneEl so the tool's
+          // querySelector calls work and its event listeners bind to real elements.
+          // After init, we MOVE those live elements into the outer visible panel.
+          // DOM moves preserve event listeners — no proxy/copy needed.
+
           var sectionsHTML = '';
           if (opts && opts.panelSections) {
             opts.panelSections.forEach(function(sec){
@@ -754,25 +756,20 @@
             });
           }
 
-          // paneEl gets the full PPNavRail structure so all querySelector('#...') calls
-          // inside the tool find their elements. We hide the inner panel visually.
-          paneEl.style.cssText = 'flex:1;min-height:0;display:flex;flex-direction:row;overflow:hidden;position:relative;';
-          // railExtra buttons (sheet-btn, export-btn) must be inside paneEl so
-          // paneEl.querySelector('#pp-cl-sheet-btn') finds them. They're hidden.
           var railExtraHTML = opts && opts.railExtra ? opts.railExtra : '';
+
+          paneEl.style.cssText = 'flex:1;min-height:0;display:flex;flex-direction:row;overflow:hidden;position:relative;';
           paneEl.innerHTML =
             '<div class="pp-nav-rail" style="display:none">' + railExtraHTML + '</div>' +
             '<div class="pp-side-panel pp-side-panel--collapsed" style="display:none">' +
               '<div class="pp-side-panel-header"><div class="pp-side-panel-tool-name"></div>' +
               '<div class="pp-side-panel-subtitle" id="cl-visual-subtitle">Loading…</div>' +
               '<div class="pp-side-panel-status"></div></div>' +
-              '<div class="pp-side-panel-body">' + sectionsHTML + '</div>' +
+              '<div class="pp-side-panel-body" id="cl-hidden-panel-body">' + sectionsHTML + '</div>' +
             '</div>' +
             '<div class="pp-tool-main" style="flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden;position:relative;"></div>';
 
-          var mainEl = paneEl.querySelector('.pp-tool-main');
-
-          // Wrap outer sections in a hide-able div (for principles tab)
+          // Wrap existing outer sections for toggling
           if (_outerPanelBody && !document.getElementById('cl-outer-sections')) {
             var wrap = document.createElement('div');
             wrap.id = 'cl-outer-sections';
@@ -780,36 +777,10 @@
             _outerPanelBody.appendChild(wrap);
           }
 
-          // Copy visible sections into outer panel (for display when visual tab is active)
-          if (_outerPanelBody) {
-            var innerWrap = document.createElement('div');
-            innerWrap.id = 'cl-inner-sections';
-            innerWrap.style.display = 'none';
-            innerWrap.innerHTML = sectionsHTML;
-            _outerPanelBody.appendChild(innerWrap);
-          }
-
-          // Put railExtra buttons in a section at the bottom of the outer panel
-          if (_outerPanelBody && opts && opts.railExtra) {
-            var btnSection = document.createElement('div');
-            btnSection.className = 'pp-side-panel-section';
-            btnSection.id = 'cl-visual-actions';
-            btnSection.dataset.clVisualBtn = '1';
-            btnSection.style.cssText = 'display:none;flex-direction:row;gap:6px;padding:8px 12px;';
-            var tmp = document.createElement('div');
-            tmp.innerHTML = opts.railExtra;
-            // Re-style as inline panel buttons
-            Array.from(tmp.children).forEach(function(btn){
-              btn.style.cssText = 'flex:1;height:34px;border-radius:6px;border:1px solid var(--md-sys-color-outline-variant);background:transparent;cursor:pointer;color:var(--md-sys-color-on-surface-variant);display:inline-flex;align-items:center;justify-content:center;';
-              btnSection.appendChild(btn);
-            });
-            _outerPanelBody.appendChild(btnSection);
-          }
-
           return {
             railEl:     paneEl.querySelector('.pp-nav-rail'),
             panelEl:    paneEl.querySelector('.pp-side-panel'),
-            mainEl:     mainEl,
+            mainEl:     paneEl.querySelector('.pp-tool-main'),
             subtitleEl: paneEl.querySelector('#cl-visual-subtitle') || document.createElement('span'),
             statusEl:   paneEl.querySelector('.pp-side-panel-status') || document.createElement('div'),
           };
@@ -821,10 +792,35 @@
       s.onload = function(){
         if (typeof initClustersTool !== 'function') return;
         _clusterTool = initClustersTool(visualPane, null);
+
+        // MOVE live panel sections from hidden pane into outer visible panel.
+        // Event listeners bound by the tool survive DOM moves — no proxy needed.
+        var hiddenBody = document.getElementById('cl-hidden-panel-body');
+        if (hiddenBody && _outerPanelBody) {
+          var innerWrap = document.createElement('div');
+          innerWrap.id = 'cl-inner-sections';
+          innerWrap.style.display = 'none';
+          // Move each pp-side-panel-section (not the hidden panel header) into outer
+          var sections = Array.from(hiddenBody.querySelectorAll('.pp-side-panel-section'));
+          sections.forEach(function(sec){ innerWrap.appendChild(sec); });
+          _outerPanelBody.appendChild(innerWrap);
+
+          // Move railExtra buttons (sheet/export) into a panel button section
+          var railButtons = Array.from(visualPane.querySelectorAll('.pp-nav-rail-sheet-btn'));
+          if (railButtons.length) {
+            var btnSection = document.createElement('div');
+            btnSection.className = 'pp-side-panel-section';
+            btnSection.id = 'cl-visual-actions';
+            btnSection.style.cssText = 'display:none;flex-direction:row;gap:6px;padding:8px 12px;';
+            railButtons.forEach(function(btn){
+              btn.style.cssText = 'flex:1;height:34px;border-radius:6px;border:1px solid var(--md-sys-color-outline-variant);background:transparent;cursor:pointer;color:var(--md-sys-color-on-surface-variant);display:inline-flex;align-items:center;justify-content:center;';
+              btnSection.appendChild(btn);
+            });
+            _outerPanelBody.appendChild(btnSection);
+          }
+        }
+
         _showPanelSections('visual');
-        // Proxy all input/change/click events from the visible outer panel
-        // to the hidden pane copies where the tool bound its listeners
-        setTimeout(function(){ _proxyVisualControls(visualPane); }, 80);
         // Inject named principles as defined clusters with their colours
         setTimeout(function(){ _injectPrinciplesAsClusters(); }, 350);
         if (_embReady) {
@@ -848,72 +844,6 @@
         inner.style.pointerEvents  = tab === 'visual' ? '' : 'none';
       }
       if (actions) { actions.style.display = tab === 'visual' ? 'flex' : 'none'; }
-    }
-
-    function _proxyVisualControls(pane) {
-      // The tool bound event listeners to elements inside `pane` (hidden).
-      // The visible outer panel has duplicate IDs (from cl-inner-sections innerHTML copy).
-      // We find each visible outer control and forward its events to the hidden pane copy.
-      var innerSecs = document.getElementById('cl-inner-sections');
-      if (!innerSecs) return;
-
-      var SLIDER_IDS = [
-        'pp-cl-defthresh',
-        'pp-cl-omin','pp-cl-omax',
-        'pp-cl-imin','pp-cl-imax',
-        'pp-cl-depth','pp-cl-maxlen',
-      ];
-      var BTN_IDS = ['pp-cl-def-add-btn','pp-cl-recluster'];
-
-      SLIDER_IDS.forEach(function(id) {
-        var visible = innerSecs.querySelector('#'+id);
-        var hidden  = pane.querySelector('#'+id);
-        if (!visible || !hidden) return;
-        ['input','change'].forEach(function(evt) {
-          visible.addEventListener(evt, function() {
-            hidden.value = visible.value;
-            hidden.dispatchEvent(new Event(evt, { bubbles: true }));
-          });
-        });
-      });
-
-      BTN_IDS.forEach(function(id) {
-        var visible = innerSecs.querySelector('#'+id);
-        var hidden  = pane.querySelector('#'+id);
-        if (!visible || !hidden) return;
-        visible.addEventListener('click', function(e) {
-          e.stopPropagation();
-          hidden.click();
-        });
-      });
-
-      // "Add defined cluster" textarea — proxy keydown (Enter) and input
-      var visTa = innerSecs.querySelector('#pp-cl-def-ta');
-      var hidTa = pane.querySelector('#pp-cl-def-ta');
-      if (visTa && hidTa) {
-        ['input','keydown','keyup'].forEach(function(evt) {
-          visTa.addEventListener(evt, function(e) {
-            hidTa.value = visTa.value;
-            hidTa.dispatchEvent(new KeyboardEvent(evt, { key:e.key, bubbles:true, cancelable:true }));
-          });
-        });
-      }
-
-      // Sync val display spans from hidden back to visible after tool updates them
-      var VAL_IDS = [
-        'pp-cl-defthresh-val',
-        'pp-cl-omin-val','pp-cl-omax-val',
-        'pp-cl-imin-val','pp-cl-imax-val',
-        'pp-cl-depth-val','pp-cl-maxlen-val',
-      ];
-      VAL_IDS.forEach(function(id) {
-        var visVal = innerSecs.querySelector('#'+id);
-        var hidVal = pane.querySelector('#'+id);
-        if (!visVal || !hidVal) return;
-        new MutationObserver(function() {
-          visVal.textContent = hidVal.textContent;
-        }).observe(hidVal, { childList: true, characterData: true, subtree: true });
-      });
     }
 
     function _injectPrinciplesAsClusters() {
