@@ -9,7 +9,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="../utilities/utils-keywords.js?v=7"></script>
   <script src="../utilities/utils-shared.js?v=425998b6"></script>
-  <script src="../utilities/utils-synthesis.js?v=8fe72eda"></script>
+  <script src="../utilities/utils-synthesis.js?v=3"></script>
   <script src="../utilities/utils-academic.js?v=66257bc0"></script>
   <script type="module" src="../utilities/utils-embedding.js?v=4"></script>
   <style>
@@ -349,10 +349,6 @@
       color: var(--md-sys-color-on-surface-variant); white-space: nowrap;
     }
     .en-panel-chip.active { background: var(--md-sys-color-secondary-container); color: var(--md-sys-color-on-secondary-container); border-color: transparent; }
-    .en-panel-range-row { display: flex; align-items: center; gap: 8px; padding: 4px 0; }
-    .en-panel-range-label { font-size: 12px; color: var(--md-sys-color-on-surface-variant); min-width: 60px; }
-    .en-panel-range { flex: 1; accent-color: var(--md-sys-color-primary); cursor: pointer; }
-    .en-panel-range-val { font-size: 12px; font-weight: 600; color: var(--md-sys-color-on-surface); min-width: 36px; text-align: right; }
     .en-saved-item { display: flex; align-items: center; gap: 4px; }
     .en-saved-btn {
       flex: 1; display: flex; align-items: center; gap: 6px; padding: 5px 6px;
@@ -436,14 +432,14 @@
       '<div class="en-panel-label">Sheet</div>' +
       '<div id="en-global-status" style="font-size:11px;color:var(--md-sys-color-on-surface-variant);padding:2px 0 6px"></div>' +
       '<div class="en-panel-label">Cluster threshold</div>' +
-      '<div class="en-panel-range-row">' +
-        '<input type="range" class="en-panel-range" id="en-thresh-slider" min="20" max="70" value="'+Math.round(SY.getSettings().threshold*100)+'" step="1">' +
-        '<span class="en-panel-range-val" id="en-thresh-val">'+Math.round(SY.getSettings().threshold*100)+'%</span>' +
+      '<div class="pp-range-row">' +
+        '<input type="range" class="pp-range" id="en-thresh-slider" min="20" max="70" value="'+Math.round(SY.getSettings().threshold*100)+'" step="1">' +
+        '<span class="pp-range-val" id="en-thresh-val">'+Math.round(SY.getSettings().threshold*100)+'%</span>' +
       '</div>' +
       '<div class="en-panel-label">Max words (split)</div>' +
-      '<div class="en-panel-range-row">' +
-        '<input type="range" class="en-panel-range" id="en-maxwords-slider" min="20" max="300" value="'+SY.getSettings().maxWords+'" step="10">' +
-        '<span class="en-panel-range-val" id="en-maxwords-val">'+SY.getSettings().maxWords+'</span>' +
+      '<div class="pp-range-row">' +
+        '<input type="range" class="pp-range" id="en-maxwords-slider" min="20" max="300" value="'+SY.getSettings().maxWords+'" step="10">' +
+        '<span class="pp-range-val" id="en-maxwords-val">'+SY.getSettings().maxWords+'</span>' +
       '</div>' +
       '<div class="en-panel-label">Screening</div>' +
       '<div id="en-screening-progress" style="font-size:11px;color:var(--md-sys-color-on-surface-variant);padding:2px 0 4px">–</div>' +
@@ -550,6 +546,14 @@
       '</div>';
 
     injectToolNav('entries.html');
+    // Upgrade panel sliders to MD3 pp-range style
+    (function(){
+      var panelBody = document.querySelector('.pp-side-panel-body');
+      if (panelBody && typeof upgradeSlider === 'function') {
+        panelBody.querySelectorAll('input[type=range].pp-range').forEach(upgradeSlider);
+      }
+    })();
+
 
     // ── Global settings wiring ───────────────────────────────────────────────
     var _threshSlider   = document.getElementById('en-thresh-slider');
