@@ -9,7 +9,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="../utilities/utils-keywords.js?v=7"></script>
   <script src="../utilities/utils-shared.js?v=425998b6"></script>
-  <script src="../utilities/utils-synthesis.js?v=69ae51cf"></script>
+  <script src="../utilities/utils-synthesis.js?v=3"></script>
   <script src="../utilities/utils-panel.js?v=7"></script>
   <script type="module" src="../utilities/utils-embedding.js?v=4"></script>
   <style>
@@ -386,13 +386,15 @@
       });
     }
 
-    window.addEventListener('sy-settings-changed', function(){
-      var s = SY.getSettings();
+    window.addEventListener('sy-settings-changed', function(ev){
+      var s = ev.detail || SY.getSettings();
       if (_threshSlider)   { _threshSlider.value = Math.round(s.threshold*100); _threshVal.textContent = Math.round(s.threshold*100)+'%'; }
       if (_maxWordsSlider) { _maxWordsSlider.value = s.maxWords; _maxWordsVal.textContent = s.maxWords; }
       _thresh = s.threshold;
       _clusters = null;
-      // Forward threshold to utils-clusters.js visual canvas if loaded
+      // Re-split long unassigned entries, embed new fragments
+      if (SY.autoSplitAll()) { _embedNewSplits(); }
+      // Forward threshold to utils-clusters.js visual canvas
       if (_clusterTool) {
         var visualPane = document.getElementById('cl-visual-pane');
         var defSlider  = visualPane && visualPane.querySelector('#pp-cl-defthresh');
@@ -402,6 +404,25 @@
         }
       }
     });
+
+    function _embedNewSplits() {
+      if (!window.EmbeddingUtils || !_embReady) return;
+      var keys = SY.getEffectiveNoteKeys();
+      keys.forEach(function(key) {
+        if (_emb.has(key)) return;
+        var r = SY.resolveNoteKey(key); if (!r || !r.text.trim()) return;
+        window.EmbeddingUtils.getCachedEmbedding(r.text).then(function(vec){
+          if (vec) {
+            _emb.set(key, new Float32Array(vec));
+            // If visual tab is active, signal re-cluster
+            if (_clusterTool && _view === 'visual') {
+              _clusterTool.reset();
+              window.dispatchEvent(new CustomEvent('embedding-complete', { detail:{ total: _emb.size } }));
+            }
+          }
+        }).catch(function(){});
+      });
+    }
 
     // ── Sub-tab switching (pp-panel-tab buttons live in panel) ──────────────
     document.addEventListener('click', function(e){
@@ -430,6 +451,8 @@
       document.getElementById('cl-emb-text').textContent = 'Embedding ' + keys.length + ' entries...';
       _embedAll(keys).then(function(){
         _embedding = false; _embReady = true;
+        SY.autoSplitAll();
+        _embedNewSplits();
         document.getElementById('cl-dot').className = 'pp-panel-dot ready';
         var _clMsg = _emb.size + ' indexed';
         document.getElementById('cl-emb-text').textContent = _clMsg;
