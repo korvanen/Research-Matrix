@@ -443,12 +443,19 @@ window.SynthesisData = (function () {
         var mbr = p.moveByReg   || {what:'',why:'',who:'',how:''};
         var tbr = p.metricByReg || {what:'',why:'',who:'',how:''};
         REGS.forEach(function(reg){
-          var regAs=byReg[reg], ruleCell='';
-          if(regAs.length){
-            var resolved=resolveNoteKey(regAs[0].noteKey);
-            ruleCell = resolved ? cellRef(resolved.tabName,resolved.gridRow,resolved.gridCol) : '[source missing]';
+          var regAs=byReg[reg];
+          var mv = mbr[reg]||'N/A', mt = tbr[reg]||'N/A';
+          if (!regAs.length) {
+            // No notes: single empty row
+            rows.push(['', REG_LABEL[reg], '', mv, mt]);
+          } else {
+            // One row per note; Move/Metric only on first row (subsequent rows blank)
+            regAs.forEach(function(a, ai){
+              var resolved = resolveNoteKey(a.noteKey);
+              var ruleCell = resolved ? cellRef(resolved.tabName,resolved.gridRow,resolved.gridCol) : '[source missing]';
+              rows.push(['', ai===0 ? REG_LABEL[reg] : '', ruleCell, ai===0 ? mv : '', ai===0 ? mt : '']);
+            });
           }
-          rows.push(['', REG_LABEL[reg], ruleCell, mbr[reg]||'N/A', tbr[reg]||'N/A']);
         });
       });
     });
