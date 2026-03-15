@@ -255,7 +255,7 @@ window.SynthesisData = (function () {
   function splitNote(parentKey) {
     if (isSplitKey(parentKey)) return [];
     var existing = getAssignment(parentKey);
-    if (existing && existing.status === 'confirmed') return []; // Option D: no split for assigned
+    if (existing && existing.status === 'confirmed') return []; // Option D: never split assigned
     var resolved = resolveNoteKey(parentKey);
     if (!resolved || !resolved.text.trim()) return [];
 
@@ -264,49 +264,59 @@ window.SynthesisData = (function () {
     var wordCount = rawText.split(/\s+/).length;
     if (wordCount <= settings.maxWords) return [];
 
-    // Strip trailing citation — e.g. "(Author, 2019)" — before splitting.
-    // Each fragment will have it re-appended so it's identifiable.
-    var citation = null;
-    var bodyText = rawText;
-    var _cRe = /\s*\(([^)]+)\)\s*\.?\s*$/;
-    var _cm = _cRe.exec(rawText);
-    if (_cm) { bodyText = rawText.slice(0, _cm.index).trimEnd(); citation = _cm[1]; }
+    // Strip the trailing citation "(Author, Year)" before splitting.
+    // The regex matches only the LAST parenthetical at end-of-string.
+    var citation  = null;
+    var bodyText  = rawText;
+    var _cRe      = /\s*\(([^()]+)\)\s*\.?\s*$/;
+    var _cMatch   = _cRe.exec(rawText);
+    if (_cMatch) {
+      bodyText = rawText.slice(0, _cMatch.index).trimEnd();
+      citation = _cMatch[1];
+    }
 
-    // Get sentence-boundary segments from body (no citation)
+    // Get proper sentence-boundary segments
     var sentences = _sentenceSplit(bodyText);
 
-    // Group sentences into chunks ≤ maxWords.
-    // Flexibility rule: if a single sentence already exceeds maxWords, keep it whole
-    // (don't break mid-sentence). This naturally allows fragments longer than maxWords
-    // when there's no sentence boundary to split at.
+    // Group consecutive sentences into chunks that stay ≤ maxWords.
+    // Sentence-integrity rule: a single sentence that exceeds maxWords is kept
+    // whole — we never break mid-sentence. Such a fragment may exceed maxWords.
     var chunks = [], current = [], currentLen = 0;
     sentences.forEach(function(s) {
       var wc = s.split(/\s+/).length;
       if (currentLen > 0 && currentLen + wc > settings.maxWords) {
-        // flush current group
-        chunks.push(current.join(' ')); current = [s]; currentLen = wc;
+        chunks.push(current.join(' '));
+        current = [s]; currentLen = wc;
       } else {
         current.push(s); currentLen += wc;
       }
     });
     if (current.length) chunks.push(current.join(' '));
 
-    // Fallback hard-split only when sentence detection produced ≤1 segment
+    // Fallback: if sentence detection couldn't find any boundaries (e.g. one
+    // massive run-on), hard-split at maxWords word boundary
     if (chunks.length <= 1 && wordCount > settings.maxWords) {
       var words = bodyText.split(/\s+/);
       chunks = [];
-      while (words.length) { chunks.push(words.splice(0, settings.maxWords).join(' ')); }
+      while (words.length) {
+        chunks.push(words.splice(0, settings.maxWords).join(' '));
+      }
     }
 
     if (chunks.length <= 1) return [];
 
-    // Re-append citation to every fragment so tools can display it
+    // Re-append the citation to each fragment ONLY if the fragment does not
+    // already end with its own parenthetical (to avoid double-citation on
+    // entries where the citation was mid-sentence before the split point).
+    var _trailParen = /\([^()]+\)\s*\.?\s*$/;
     if (citation) {
-      chunks = chunks.map(function(ch){ return ch + ' (' + citation + ')'; });
+      chunks = chunks.map(function(ch) {
+        return _trailParen.test(ch) ? ch : ch + ' (' + citation + ')';
+      });
     }
 
     storeSplit(parentKey, chunks);
-    return chunks.map(function(_, i){ return makeSplitKey(parentKey, i); });
+    return chunks.map(function(_, i) { return makeSplitKey(parentKey, i); });
   }
 
   // Auto-split all unassigned notes that exceed maxWords. Called when settings change.
@@ -322,12 +332,10 @@ window.SynthesisData = (function () {
       var wordCount = r.text.trim().split(/\s+/).length;
 
       if (wordCount > settings.maxWords) {
-        // Only re-split if not already split (or if split is stale/single-fragment)
-        var frags = existing[key];
-        if (!frags || frags.length <= 1) {
-          splitNote(key);
-          changed = true;
-        }
+        // Always re-split — the stored split may have been made at a different
+        // maxWords threshold. splitNote overwrites the stored fragments.
+        splitNote(key);
+        changed = true;
       } else if (existing[key]) {
         // Entry now fits under threshold — remove stale split
         removeSplit(key);
