@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="../design-system.css?v=9fa06a28">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="../utilities/utils-keywords.js?v=7"></script>
-  <script src="../utilities/utils-shared.js?v=68bda731"></script>
+  <script src="../utilities/utils-shared.js?v=425998b6"></script>
   <script src="../utilities/utils-synthesis.js?v=3"></script>
   <script src="../utilities/utils-academic.js?v=66257bc0"></script>
   <script type="module" src="../utilities/utils-embedding.js?v=4"></script>
@@ -428,32 +428,21 @@
     // ── Nav rail build ──────────────────────────────────────────────────────
     var _paneEl = document.getElementById('en-body');
 
-    var _globalPanelHtml =
-      '<div class="en-panel-label">Sheet</div>' +
-      '<div id="en-global-status" style="font-size:11px;color:var(--md-sys-color-on-surface-variant);padding:2px 0 6px"></div>' +
-      '<div class="en-panel-label">Cluster threshold</div>' +
-      '<div class="pp-range-row">' +
-        '<input type="range" class="pp-range" id="en-thresh-slider" min="20" max="70" value="'+Math.round(SY.getSettings().threshold*100)+'" step="1">' +
-        '<span class="pp-range-val" id="en-thresh-val">'+Math.round(SY.getSettings().threshold*100)+'%</span>' +
-      '</div>' +
-      '<div class="en-panel-label">Max words (split)</div>' +
-      '<div class="pp-range-row">' +
-        '<input type="range" class="pp-range" id="en-maxwords-slider" min="20" max="300" value="'+SY.getSettings().maxWords+'" step="10">' +
-        '<span class="pp-range-val" id="en-maxwords-val">'+SY.getSettings().maxWords+'</span>' +
-      '</div>' +
-      '<div class="en-panel-label">Screening</div>' +
+    var _globalHtml = window.GlobalPanel.html(
+      '<div class="pp-side-panel-section-label" style="padding:8px 0 2px">Screening</div>' +
       '<div id="en-screening-progress" style="font-size:11px;color:var(--md-sys-color-on-surface-variant);padding:2px 0 4px">–</div>' +
-      '<div class="en-panel-label">Import references</div>' +
+      '<div class="pp-side-panel-section-label" style="padding:8px 0 2px">Import references</div>' +
       '<div style="display:flex;flex-direction:column;gap:4px;padding:2px 0 6px">' +
         '<button class="en-panel-chip" id="en-import-bib-btn" style="text-align:left;height:28px;border-radius:6px">BibTeX file…</button>' +
         '<button class="en-panel-chip" id="en-import-csv-btn" style="text-align:left;height:28px;border-radius:6px">CSV file…</button>' +
       '</div>' +
       '<input type="file" id="en-file-input" accept=".bib,.csv,.txt" style="display:none">' +
-      '<div class="en-panel-label">Methods blurb</div>' +
+      '<div class="pp-side-panel-section-label" style="padding:8px 0 2px">Methods blurb</div>' +
       '<button class="en-panel-chip" id="en-methods-btn" style="text-align:left;height:28px;border-radius:6px;width:100%">Generate…</button>' +
-      '<div id="en-methods-blurb" style="display:none;font-size:11px;line-height:1.5;color:var(--md-sys-color-on-surface-variant);padding:6px 0;white-space:pre-wrap"></div>';
+      '<div id="en-methods-blurb" style="display:none;font-size:11px;line-height:1.5;color:var(--md-sys-color-on-surface-variant);padding:6px 0;white-space:pre-wrap"></div>'
+    );
 
-    var _browsePanelHtml =
+var _browsePanelHtml =
       '<div class="en-panel-label">Show</div>' +
       '<div class="en-panel-chips" id="en-filter-chips">' +
         '<button class="en-panel-chip active" data-f="all">All</button>' +
@@ -546,6 +535,11 @@
       '</div>';
 
     injectToolNav('entries.html');
+    window.GlobalPanel.init({
+      onSettingsChanged: function(s) {
+        if (SY.autoSplitAll()) { _embedNewSplits(); renderBrowse(); }
+      },
+    });
     // Upgrade panel sliders to MD3 pp-range style
     (function(){
       var panelBody = document.querySelector('.pp-side-panel-body');
@@ -553,13 +547,6 @@
         panelBody.querySelectorAll('input[type=range].pp-range').forEach(upgradeSlider);
       }
     })();
-
-
-    // ── Global settings wiring ───────────────────────────────────────────────
-    var _threshSlider   = document.getElementById('en-thresh-slider');
-    var _threshVal      = document.getElementById('en-thresh-val');
-    var _maxWordsSlider = document.getElementById('en-maxwords-slider');
-    var _maxWordsVal    = document.getElementById('en-maxwords-val');
 
     if (_threshSlider) {
       _threshSlider.addEventListener('input', function(){
@@ -586,9 +573,7 @@
     _updateGlobalStatus();
     window.addEventListener('sy-settings-changed', function(ev){
       var s = ev.detail || SY.getSettings();
-      if (_threshSlider)   { _threshSlider.value   = Math.round(s.threshold*100); _threshVal.textContent   = Math.round(s.threshold*100)+'%'; }
-      if (_maxWordsSlider) { _maxWordsSlider.value  = s.maxWords;                 _maxWordsVal.textContent = s.maxWords; }
-      if (SY.autoSplitAll()) { _embedNewSplits(); renderBrowse(); }
+                  if (SY.autoSplitAll()) { _embedNewSplits(); renderBrowse(); }
     });
 
     function _embedNewSplits() {
@@ -1365,20 +1350,6 @@
     });
 
     // ── Init ─────────────────────────────────────────────────────────────────
-
-    // ── Cross-tab settings sync ───────────────────────────────────────────────
-    // When another tab updates sy2_settings via SY.updateSettings(), the storage
-    // event fires here so our sliders and state stay in sync.
-    window.addEventListener('storage', function(e) {
-      if (e.key !== 'sy2_settings') return;
-      var s = SY.getSettings();
-      var tsl = document.getElementById('en-thresh-slider');
-      var msl = document.getElementById('en-maxwords-slider');
-      if (tsl) { tsl.value = Math.round(s.threshold*100); }
-      if (msl) { msl.value = s.maxWords; }
-      // Fire sy-settings-changed locally so this tab's state also updates
-      window.dispatchEvent(new CustomEvent('sy-settings-changed', { detail: s }));
-    });
     document.addEventListener('DOMContentLoaded', function(){
       updateCounts();
       _updateScreeningProgress();
