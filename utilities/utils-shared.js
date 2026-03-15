@@ -1546,9 +1546,6 @@ window.PPNavRail = (function () {
 // Creates MD3 Navigation Rail items with icon + label
 window.injectToolNav = function(currentTool) {
   var tools = [
-    // Home link
-    { href: '../index.html', label: 'Home', isHome: true,
-      d: '<path d="M2 9L9 2l7 7"/><path d="M4 7v8a1 1 0 001 1h3v-4h2v4h3a1 1 0 001-1V7"/>' },
     { href: 'entries.html',     label: 'Entries',
       d: '<rect x="2" y="3" width="14" height="13" rx="2"/><line x1="5" y1="7" x2="13" y2="7"/><line x1="5" y1="10" x2="13" y2="10"/><line x1="5" y1="13" x2="9" y2="13"/>' },
     { href: 'clusters.html',    label: 'Clusters',
@@ -1557,16 +1554,20 @@ window.injectToolNav = function(currentTool) {
       d: '<rect x="1.5" y="1.5" width="15" height="15" rx="2"/><line x1="1.5" y1="6.5" x2="16.5" y2="6.5"/><line x1="1.5" y1="11.5" x2="16.5" y2="11.5"/><line x1="7" y1="6.5" x2="7" y2="16.5"/>' },
     { href: 'concept-map.html', label: 'Map',
       d: '<circle cx="9" cy="4" r="2"/><circle cx="3.5" cy="14" r="2"/><circle cx="9" cy="14" r="2"/><circle cx="14.5" cy="14" r="2"/><line x1="9" y1="6" x2="3.5" y2="12"/><line x1="9" y1="6" x2="9" y2="12"/><line x1="9" y1="6" x2="14.5" y2="12"/>' },
+    // Home always last — spacer above it pushes it to the bottom
+    { href: '../index.html', label: 'Home', isHome: true,
+      d: '<path d="M2 9L9 2l7 7"/><path d="M4 7v8a1 1 0 001 1h3v-4h2v4h3a1 1 0 001-1V7"/>' },
   ];
   var rail = document.querySelector('.pp-nav-rail');
   if (!rail) return;
 
-  // Spacer pushes nav items to bottom
-  var spacer = document.createElement('div');
-  spacer.style.cssText = 'flex:1;';
-  rail.appendChild(spacer);
-
   tools.forEach(function(t) {
+    // Insert spacer before Home to push it to the bottom
+    if (t.isHome) {
+      var spacer = document.createElement('div');
+      spacer.style.cssText = 'flex:1;';
+      rail.appendChild(spacer);
+    }
     var a = document.createElement('a');
     // Home link: active only if we're on index.html (no currentTool match)
     var isActive = t.isHome ? false : (t.href === currentTool);
