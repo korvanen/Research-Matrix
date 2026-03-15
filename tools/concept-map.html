@@ -8,8 +8,8 @@
   <link rel="stylesheet" href="../design-system.css?v=9fa06a28">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="../utilities/utils-keywords.js?v=7"></script>
-  <script src="../utilities/utils-shared.js?v=4d9ff672"></script>
-  <script src="../utilities/utils-synthesis.js?v=b4058e56"></script>
+  <script src="../utilities/utils-shared.js?v=425998b6"></script>
+  <script src="../utilities/utils-synthesis.js?v=3"></script>
   <script src="../utilities/utils-panel.js?v=7"></script>
   <script type="module" src="../utilities/utils-embedding.js?v=4"></script>
   <style>
@@ -153,7 +153,18 @@
     injectToolNav('concept-map.html');
     window.GlobalPanel.init({
       onSettingsChanged: function(s) {
-        _mirrorSliders();
+        // Update maxLen in the hidden tool panel directly (don't call _mirrorSliders
+        // here — that would trigger tryRender via input events AND we call reset/start below)
+        var pane = document.getElementById('cm-pane');
+        if (pane) {
+          var ml = pane.querySelector('#pp-cmap-maxlen');
+          if (ml) {
+            var mw = s.maxWords;
+            ml.value = mw >= 200 ? 2000 : Math.max(100, mw * 6);
+            ml.dispatchEvent(new Event('input'));
+          }
+        }
+        // Re-split and re-embed new fragments, then rebuild map once
         SY.autoSplitAll();
         var pending = SY.getEffectiveNoteKeys().filter(function(k){ return !_emb.has(k); });
         if (pending.length && _embReady) {
