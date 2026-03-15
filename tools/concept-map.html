@@ -251,9 +251,13 @@
     _syncSlider(_maxParSlider, _maxParVal, '');
 
     function _mirrorSliders() {
-      var d = document.getElementById('pp-cmap-depth');
-      var t = document.getElementById('pp-cmap-thresh');
-      var m = document.getElementById('pp-cmap-maxpar');
+      // Always query from the pane element so we target the hidden copy that
+      // the tool bound its 'input' listeners to, not any outer visible copy.
+      var pane = document.getElementById('cm-pane');
+      if (!pane) return;
+      var d = pane.querySelector('#pp-cmap-depth');
+      var t = pane.querySelector('#pp-cmap-thresh');
+      var m = pane.querySelector('#pp-cmap-maxpar');
       if (d && _depthSlider)  { d.value = _depthSlider.value;  d.dispatchEvent(new Event('input')); }
       if (t && _edgeSlider)   { t.value = _edgeSlider.value;   t.dispatchEvent(new Event('input')); }
       if (m && _maxParSlider) { m.value = _maxParSlider.value; m.dispatchEvent(new Event('input')); }
@@ -267,7 +271,8 @@
         _layoutGrid.querySelectorAll('.cm-layout-btn').forEach(function(b){ b.classList.remove('active'); });
         btn.classList.add('active');
         // Mirror to utils-concept-map.js layout opts
-        var opt = document.querySelector('.pp-cmap-layout-opt[data-layout="'+btn.dataset.layout+'"]');
+        var pane = document.getElementById('cm-pane');
+        var opt  = pane ? pane.querySelector('.pp-cmap-layout-opt[data-layout="'+btn.dataset.layout+'"]') : null;
         if (opt) { opt.click(); }
       });
     }
@@ -278,9 +283,10 @@
       _rebuildBtn.addEventListener('click', function(){
         if (!_cmTool) return;
         _mirrorSliders();
-        var rb = document.getElementById('pp-cmap-rebuild');
+        var pane = document.getElementById('cm-pane');
+        var rb = pane ? pane.querySelector('#pp-cmap-rebuild') : null;
         if (rb) rb.click();
-        else { _cmTool.reset(); _cmTool.start(); }
+        else if (_cmTool) { _cmTool.reset(); _cmTool.start(); }
       });
     }
 
@@ -560,39 +566,74 @@
     }
 
     function _stylePrincipleCard(card, nameMap) {
-      // Read text from the first .pp-cmap-cell-text inside
       var textEl = card.querySelector('.pp-cmap-cell-text');
       if (!textEl) return;
       var rawText = textEl.textContent || '';
       var key     = rawText.toLowerCase().trim();
       var p       = nameMap[key];
       if (!p) {
-        // Try without [PRINCIPLE] prefix
         var stripped = key.replace(/^\[principle\]\s*/, '');
         p = nameMap[stripped];
       }
       if (!p) return;
 
-      // Mark the card
+      // Mark with colour
       card.dataset.principleColor = p.color;
       card.style.setProperty('--pnc', p.color);
 
-      // Replace raw text with clean name (strip [PRINCIPLE] prefix)
-      textEl.textContent = p.name;
-
-      // Add principle badge to the top row
-      if (!card.querySelector('.cm-principle-badge')) {
-        var badge = document.createElement('span');
-        badge.className = 'cm-principle-badge';
-        badge.textContent = p.dimensionHint ? p.dimensionHint : 'Principle';
-        badge.style.cssText = 'background:rgba(255,255,255,.25);color:#fff;font-size:9px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:10px;margin-top:5px;display:block;width:fit-content;';
-        var body = card.querySelector('.pp-cmap-card-body');
-        if (body) body.insertBefore(badge, body.firstChild);
+      // ── Header: cat-num = "P-{sheetId}", level block stays ──
+      var catEl = card.querySelector('.pp-cmap-card-cat-num');
+      if (catEl) {
+        catEl.textContent = 'P-' + (p.sheetId || String(p.seq || '?').padStart(2,'0'));
+        catEl.style.cssText = 'font-size:11px;font-weight:800;letter-spacing:.04em;color:#fff;';
       }
 
-      // Update the cat-num element to show the principle number
-      var catEl = card.querySelector('.pp-cmap-card-cat-num');
-      if (catEl) catEl.textContent = p.dimensionHint || 'P';
+      // ── Body: replace with register sections ──
+      var body = card.querySelector('.pp-cmap-card-body');
+      if (!body) return;
+
+      var assignments = SY.getAssignments().filter(function(a){
+        return a.principleId === p.id && a.status === 'confirmed';
+      });
+      var byReg = { what:[], why:[], who:[], how:[] };
+      assignments.forEach(function(a){
+        var r = SY.resolveNoteKey(a.noteKey);
+        if (r && byReg[a.register]) byReg[a.register].push(r);
+      });
+
+      var regColors = { what:'#6ab0f5', why:'#f5a66a', who:'#7dd87d', how:'#c9a4f5' };
+      var regLabels = { what:'WHAT', why:'WHY', who:'WHO', how:'HOW' };
+      var html = '';
+
+      // Principle name as bold title
+      html += '<div style="font-size:12px;font-weight:700;margin-bottom:6px;color:#fff">' +
+              _h(p.name) + '</div>';
+
+      Object.keys(byReg).forEach(function(reg){
+        var items = byReg[reg];
+        if (!items.length) return;
+        html += '<div style="margin-bottom:5px">';
+        html += '<div style="font-size:9px;font-weight:800;letter-spacing:.07em;color:' +
+                regColors[reg] + ';margin-bottom:2px">' + regLabels[reg] + '</div>';
+        items.forEach(function(r){
+          var parsed = typeof parseCitation === 'function' ? parseCitation(r.text) : {body:r.text};
+          var cats   = (r.cats||[]).filter(Boolean);
+          html += '<div style="font-size:11px;line-height:1.4;margin-bottom:3px;opacity:.9">';
+          html += _h(parsed.body.slice(0, 120)) + (parsed.body.length > 120 ? '…' : '');
+          if (cats.length) {
+            html += '<span style="font-size:9px;opacity:.65;margin-left:4px">' +
+                    _h(cats.join(' · ')) + '</span>';
+          }
+          html += '</div>';
+        });
+        html += '</div>';
+      });
+
+      if (!assignments.length) {
+        html += '<div style="font-size:11px;opacity:.6;font-style:italic">No notes assigned</div>';
+      }
+
+      body.innerHTML = html;
     }
 
     // ── Legend with principle colours ─────────────────────────────────────────
