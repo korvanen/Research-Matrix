@@ -1646,3 +1646,137 @@ window.injectToolNav = function(currentTool) {
     rail.appendChild(a);
   });
 };
+
+// ════════════════════════════════════════════════════════════════
+// GLOBAL PANEL — shared nav panel section for all tools
+//
+// Usage in any tool:
+//   panelSections: [
+//     { label: 'Global', html: window.GlobalPanel.html() },
+//     ...
+//   ]
+//   // after PPNavRail.create + injectToolNav:
+//   window.GlobalPanel.init({
+//     onThresholdChange: function(v) { /* tool-specific */ },
+//     onMaxWordsChange:  function(v) { /* tool-specific */ },
+//   });
+// ════════════════════════════════════════════════════════════════
+
+window.GlobalPanel = (function() {
+  'use strict';
+
+  var SY = null; // resolved on first call to html() or init()
+
+  function _getSY() {
+    if (!SY) SY = window.SynthesisData;
+    return SY;
+  }
+
+  // ── Fixed IDs — same in every tool ──────────────────────────────────────
+  var IDS = {
+    STATUS:    'gp-status',
+    THRESH:    'gp-thresh-slider',
+    THRESH_V:  'gp-thresh-val',
+    MAXWORDS:  'gp-maxwords-slider',
+    MAXWORDS_V:'gp-maxwords-val',
+  };
+
+  // ── Generate panel section HTML ──────────────────────────────────────────
+  function html(extraHtml) {
+    var sy = _getSY();
+    var s  = sy ? sy.getSettings() : { threshold: 0.42, maxWords: 80 };
+    var tv = Math.round(s.threshold * 100);
+    return (
+      '<div class="pp-side-panel-section-label" style="padding:8px 0 2px">Status</div>' +
+      '<div id="' + IDS.STATUS + '" style="font-size:11px;color:var(--md-sys-color-on-surface-variant);padding:2px 0 6px">—</div>' +
+      '<div class="pp-side-panel-section-label" style="padding:8px 0 2px">Cluster threshold</div>' +
+      '<div class="pp-range-row">' +
+        '<input class="pp-range" type="range" id="' + IDS.THRESH + '" min="20" max="70" step="1" value="' + tv + '">' +
+        '<span class="pp-range-val" id="' + IDS.THRESH_V + '">' + tv + '%</span>' +
+      '</div>' +
+      '<div class="pp-side-panel-section-label" style="padding:8px 0 2px">Max words (split)</div>' +
+      '<div class="pp-range-row">' +
+        '<input class="pp-range" type="range" id="' + IDS.MAXWORDS + '" min="20" max="300" step="10" value="' + s.maxWords + '">' +
+        '<span class="pp-range-val" id="' + IDS.MAXWORDS_V + '">' + s.maxWords + '</span>' +
+      '</div>' +
+      (extraHtml || '')
+    );
+  }
+
+  // ── Set slider value + text + fire input (updates upgradeSlider fill) ────
+  function _set(slId, valId, rawVal) {
+    var sl  = document.getElementById(slId);
+    var vel = document.getElementById(valId);
+    if (!sl) return;
+    sl.value = rawVal;
+    if (vel) vel.textContent = sl.value; // .value clamps to min/max
+    sl.dispatchEvent(new Event('input'));
+  }
+
+  function _syncFromSettings(s) {
+    _set(IDS.THRESH,   IDS.THRESH_V,   Math.round(s.threshold * 100));
+    _set(IDS.MAXWORDS, IDS.MAXWORDS_V, s.maxWords);
+  }
+
+  // ── Set status text ──────────────────────────────────────────────────────
+  function setStatus(text) {
+    var el = document.getElementById(IDS.STATUS);
+    if (el) el.textContent = text || '—';
+  }
+
+  // ── Wire everything — call once after PPNavRail.create ───────────────────
+  function init(opts) {
+    opts = opts || {};
+    var sy = _getSY();
+    if (!sy) { console.warn('[GlobalPanel] SynthesisData not loaded'); return; }
+
+    // Upgrade sliders to MD3 style
+    [IDS.THRESH, IDS.MAXWORDS].forEach(function(id) {
+      var el = document.getElementById(id);
+      if (el && typeof upgradeSlider === 'function') upgradeSlider(el);
+    });
+
+    // Sync initial values (upgradeSlider sets fill based on current value)
+    _syncFromSettings(sy.getSettings());
+
+    // Wire threshold slider
+    var tsl = document.getElementById(IDS.THRESH);
+    if (tsl) {
+      tsl.addEventListener('input', function() {
+        var v = parseInt(tsl.value);
+        document.getElementById(IDS.THRESH_V).textContent = v + '%';
+        sy.updateSettings({ threshold: v / 100 });
+        if (opts.onThresholdChange) opts.onThresholdChange(v / 100);
+      });
+    }
+
+    // Wire max-words slider
+    var msl = document.getElementById(IDS.MAXWORDS);
+    if (msl) {
+      msl.addEventListener('input', function() {
+        var v = parseInt(msl.value);
+        document.getElementById(IDS.MAXWORDS_V).textContent = v;
+        sy.updateSettings({ maxWords: v });
+        if (opts.onMaxWordsChange) opts.onMaxWordsChange(v);
+      });
+    }
+
+    // sy-settings-changed — fired by SY.updateSettings() in this tab
+    window.addEventListener('sy-settings-changed', function(ev) {
+      var s = (ev && ev.detail) || sy.getSettings();
+      _syncFromSettings(s);
+      if (opts.onSettingsChanged) opts.onSettingsChanged(s);
+    });
+
+    // storage — cross-tab sync (fires in all OTHER open tabs)
+    window.addEventListener('storage', function(e) {
+      if (e.key !== 'sy2_settings') return;
+      var s = sy.getSettings();
+      _syncFromSettings(s);
+      // Re-dispatch so the tool's own sy-settings-changed handler runs
+      window.dispatchEvent(new CustomEvent('sy-settings-changed', { detail: s }));
+    });
+  }
+
+  return { html: html, init: init, setStatus: setStatus, IDS: IDS };
+})();
