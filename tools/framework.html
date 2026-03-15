@@ -9,7 +9,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="../utilities/utils-keywords.js?v=7"></script>
   <script src="../utilities/utils-shared.js?v=425998b6"></script>
-  <script src="../utilities/utils-synthesis.js?v=8fe72eda"></script>
+  <script src="../utilities/utils-synthesis.js?v=3"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; }
     html, body { height: 100%; overflow: hidden; margin: 0; padding: 0; }
@@ -108,10 +108,6 @@
 
     /* ── Panel controls ── */
     .fw-panel-label { font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--md-sys-color-on-surface-variant); padding: 8px 0 4px; }
-    .fw-range-row { display: flex; align-items: center; gap: 8px; padding: 4px 0; }
-    .fw-range-label { font-size: 12px; color: var(--md-sys-color-on-surface-variant); min-width: 60px; }
-    .fw-range { flex: 1; accent-color: var(--md-sys-color-primary); cursor: pointer; }
-    .fw-range-val { font-size: 12px; font-weight: 600; min-width: 36px; text-align: right; }
     .fw-panel-input {
       width: 100%; height: 32px; padding: 0 10px; margin: 3px 0 8px;
       border: 1px solid var(--md-sys-color-outline-variant); border-radius: 4px;
@@ -175,14 +171,14 @@
       '<div class="fw-panel-label">Sheet status</div>' +
       '<div class="fw-panel-status" id="fw-panel-status">Not synced yet</div>' +
       '<div class="fw-panel-label">Cluster threshold</div>' +
-      '<div class="fw-range-row">' +
-        '<input type="range" class="fw-range" id="fw-thresh-slider" min="20" max="70" value="'+Math.round(SY.getSettings().threshold*100)+'" step="1">' +
-        '<span class="fw-range-val" id="fw-thresh-val">'+Math.round(SY.getSettings().threshold*100)+'%</span>' +
+      '<div class="pp-range-row">' +
+        '<input type="range" class="pp-range" id="fw-thresh-slider" min="20" max="70" value="'+Math.round(SY.getSettings().threshold*100)+'" step="1">' +
+        '<span class="pp-range-val" id="fw-thresh-val">'+Math.round(SY.getSettings().threshold*100)+'%</span>' +
       '</div>' +
       '<div class="fw-panel-label">Max words (split)</div>' +
-      '<div class="fw-range-row">' +
-        '<input type="range" class="fw-range" id="fw-maxwords-slider" min="20" max="300" value="'+SY.getSettings().maxWords+'" step="10">' +
-        '<span class="fw-range-val" id="fw-maxwords-val">'+SY.getSettings().maxWords+'</span>' +
+      '<div class="pp-range-row">' +
+        '<input type="range" class="pp-range" id="fw-maxwords-slider" min="20" max="300" value="'+SY.getSettings().maxWords+'" step="10">' +
+        '<span class="pp-range-val" id="fw-maxwords-val">'+SY.getSettings().maxWords+'</span>' +
       '</div>';
 
     var _syncHtml =
@@ -213,6 +209,14 @@
       '<div class="fw-scroll" id="fw-scroll"></div>';
 
     injectToolNav('framework.html');
+    // Upgrade panel sliders to MD3 pp-range style
+    (function(){
+      var panelBody = document.querySelector('.pp-side-panel-body');
+      if (panelBody && typeof upgradeSlider === 'function') {
+        panelBody.querySelectorAll('input[type=range].pp-range').forEach(upgradeSlider);
+      }
+    })();
+
 
     // ── Global settings ───────────────────────────────────────────────────────
     var _threshSlider   = document.getElementById('fw-thresh-slider');
