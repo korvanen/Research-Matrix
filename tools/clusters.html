@@ -1,101 +1,815 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Clusters — Dimensional Framework</title>
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="../design-system.css?v=9fa06a28">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="../utilities/utils-keywords.js?v=7"></script>
+  <script src="../utilities/utils-shared.js?v=425998b6"></script>
+  <script src="../utilities/utils-synthesis.js?v=3"></script>
+  <script src="../utilities/utils-panel.js?v=7"></script>
+  <script type="module" src="../utilities/utils-embedding.js?v=4"></script>
   <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body { height: 100%; overflow: hidden; margin: 0; padding: 0; }
     body {
-      height: 100vh; height: 100dvh;
-      overflow: hidden;
-      display: flex;
-      flex-direction: column;
+      display: flex; flex-direction: column;
       background: var(--md-sys-color-background);
       font-family: var(--font-family);
-      font-size: var(--font-size-base);
       color: var(--md-sys-color-on-background);
     }
-    #cl-pane {
-      flex: 1;
-      min-height: 0;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-      position: relative;
+
+    /* ── Topbar ── */
+    .cl-topbar {
+      flex-shrink: 0; display: flex; align-items: center; gap: 8px;
+      height: 48px; padding: 0 12px;
+      background: var(--md-sys-color-surface-container);
+      border-bottom: 1px solid var(--md-sys-color-outline-variant);
     }
+    .cl-topbar-title { font-size: 16px; font-weight: 500; flex: 1; }
+    .cl-emb-dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--md-sys-color-outline); transition: background .3s; flex-shrink: 0;
+    }
+    .cl-emb-dot.ready   { background: #2e7d32; }
+    .cl-emb-dot.loading { background: var(--md-sys-color-primary); animation: cl-pulse 1.2s infinite; }
+    @keyframes cl-pulse { 0%,100%{opacity:.3;} 50%{opacity:1;} }
+    .cl-emb-text { font-size: 11px; color: var(--md-sys-color-on-surface-variant); }
+
+    /* ── Sub-tabs ── */
+    .cl-subtabs {
+      flex-shrink: 0; display: flex; align-items: stretch;
+      border-bottom: 1px solid var(--md-sys-color-outline-variant);
+      background: var(--md-sys-color-surface-container-low); padding: 0 4px;
+    }
+    .cl-subtab {
+      display: flex; align-items: center; gap: 6px;
+      height: 40px; padding: 0 16px; border: none; background: transparent;
+      font-family: var(--font-family); font-size: 13px; font-weight: 500;
+      color: var(--md-sys-color-on-surface-variant); cursor: pointer;
+      position: relative; overflow: hidden; white-space: nowrap;
+    }
+    .cl-subtab::after { content:''; position:absolute; bottom:0; left:0; right:0; height:2px; }
+    .cl-subtab.active { color: var(--md-sys-color-primary); }
+    .cl-subtab.active::after { background: var(--md-sys-color-primary); }
+    .cl-subtab-n {
+      height: 16px; min-width: 16px; padding: 0 4px; border-radius: 8px;
+      background: var(--md-sys-color-surface-container-highest);
+      color: var(--md-sys-color-on-surface-variant);
+      font-size: 10px; font-weight: 600;
+      display: inline-flex; align-items: center; justify-content: center;
+    }
+    .cl-subtab.active .cl-subtab-n {
+      background: var(--md-sys-color-primary-container);
+      color: var(--md-sys-color-on-primary-container);
+    }
+
+    /* ── Body ── */
+    .cl-body { flex: 1; min-height: 0; display: flex; overflow: hidden; }
+
+    /* ── Views ── */
+    .cl-view { flex: 1; min-height: 0; display: flex; overflow: hidden; }
+    .cl-view[hidden] { display: none; }
+
+    /* ── Visual view: just holds the canvas injected by utils-clusters.js ── */
+    #cl-visual-pane { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; position: relative; }
+
+    /* ════ PRINCIPLES VIEW ════ */
+    .cl-pr-layout { flex: 1; min-height: 0; display: flex; overflow: hidden; }
+    .cl-named-col {
+      flex: 0 0 50%; display: flex; flex-direction: column; overflow: hidden;
+      border-right: 1px solid var(--md-sys-color-outline-variant);
+    }
+    .cl-pool-col { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; }
+    .cl-col-hdr {
+      flex-shrink: 0; padding: 10px 14px 8px;
+      font-size: 10px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase;
+      color: var(--md-sys-color-on-surface-variant);
+      border-bottom: 1px solid var(--md-sys-color-outline-variant);
+      display: flex; align-items: center; gap: 8px;
+      background: var(--md-sys-color-surface-container-low); position: sticky; top: 0; z-index: 2;
+    }
+    .cl-col-hdr-btn {
+      margin-left: auto; height: 26px; padding: 0 10px; border-radius: 13px;
+      border: 1px solid var(--md-sys-color-outline-variant); background: transparent;
+      font-family: var(--font-family); font-size: 11px; font-weight: 500; cursor: pointer;
+      color: var(--md-sys-color-on-surface-variant);
+    }
+    .cl-col-hdr-btn:hover { background: var(--md-sys-color-surface-container-high); }
+    .cl-scroll { flex: 1; overflow-y: auto; scrollbar-width: thin; }
+    .cl-scroll::-webkit-scrollbar { width: 4px; }
+    .cl-scroll::-webkit-scrollbar-thumb { background: var(--md-sys-color-outline-variant); border-radius: 2px; }
+
+    /* Principle card */
+    .cl-pr-card { margin: 10px 12px 4px; border-radius: 8px; border: 1px solid var(--md-sys-color-outline-variant); overflow: hidden; }
+    .cl-pr-head {
+      display: flex; align-items: center; gap: 8px; padding: 10px 12px; cursor: pointer; user-select: none;
+    }
+    .cl-pr-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .cl-pr-name { flex: 1; font-size: 14px; font-weight: 500; }
+    .cl-pr-meta { font-size: 11px; color: var(--md-sys-color-on-surface-variant); }
+    .cl-chevron { font-size: 10px; color: var(--md-sys-color-on-surface-variant); transition: transform .15s; }
+    .cl-chevron.open { transform: rotate(90deg); }
+    .cl-pr-body { display: none; border-top: 1px solid var(--md-sys-color-outline-variant); }
+    .cl-pr-body.open { display: block; }
+    .cl-pr-note { display: flex; align-items: flex-start; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--md-sys-color-outline-variant); }
+    .cl-pr-note:last-of-type { border-bottom: none; }
+    .cl-pr-note.changed { background: rgba(255,193,7,.08); }
+    .cl-pr-note-content { flex: 1; min-width: 0; }
+    .cl-pr-note-text { font-size: 12px; line-height: 1.45; }
+    .cl-pr-note-src { font-size: 10px; color: var(--md-sys-color-on-surface-variant); margin-top: 2px; }
+    .cl-pr-note-changed { font-size: 10px; color: #f57f17; margin-top: 2px; }
+    .cl-reg-tiny {
+      height: 20px; padding: 0 6px; border-radius: 10px; border: none;
+      font-size: 9px; font-weight: 700; letter-spacing: .04em; cursor: pointer; opacity: .4;
+    }
+    .cl-reg-tiny.active { opacity: 1; }
+    .cl-reg-tiny.what { background: rgba(21,101,192,.15); color: #1565c0; }
+    .cl-reg-tiny.why  { background: rgba(230,81,0,.15);   color: #e65100; }
+    .cl-reg-tiny.who  { background: rgba(46,125,50,.15);  color: #2e7d32; }
+    .cl-reg-tiny.how  { background: rgba(106,27,154,.15); color: #6a1b9a; }
+    .cl-pr-foot {
+      display: flex; gap: 6px; padding: 8px 12px;
+      border-top: 1px solid var(--md-sys-color-outline-variant);
+      background: var(--md-sys-color-surface-container-lowest); flex-wrap: wrap;
+    }
+    .cl-pending-banner {
+      background: rgba(21,101,192,.07); border-bottom: 1px solid rgba(21,101,192,.15);
+      padding: 7px 12px; font-size: 11px; color: #1565c0;
+      display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap;
+    }
+
+    /* Pool clusters */
+    .cl-pool-card { margin: 10px 12px 4px; border-radius: 8px; border: 1px dashed var(--md-sys-color-outline-variant); overflow: hidden; }
+    .cl-pool-head { display: flex; align-items: center; gap: 8px; padding: 9px 12px; cursor: pointer; }
+    .cl-pool-label { flex: 1; font-size: 13px; font-weight: 500; color: var(--md-sys-color-on-surface-variant); font-style: italic; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .cl-pool-body { display: none; }
+    .cl-pool-body.open { display: block; }
+    .cl-pool-note { display: flex; align-items: flex-start; gap: 7px; padding: 7px 12px; border-top: 1px solid var(--md-sys-color-outline-variant); }
+    .cl-pool-note-inner { flex: 1; min-width: 0; }
+    .cl-pool-note-text { font-size: 12px; line-height: 1.45; }
+    .cl-pool-note-src { font-size: 10px; color: var(--md-sys-color-on-surface-variant); margin-top: 2px; }
+    .cl-assign-btn {
+      height: 22px; padding: 0 8px; border-radius: 11px; border: none;
+      background: var(--md-sys-color-surface-container-highest); color: var(--md-sys-color-on-surface-variant);
+      font-size: 10px; font-weight: 500; cursor: pointer; flex-shrink: 0;
+    }
+    .cl-assign-btn:hover { background: var(--md-sys-color-secondary-container); color: var(--md-sys-color-on-secondary-container); }
+    .cl-pool-foot {
+      display: flex; gap: 6px; padding: 8px 12px;
+      border-top: 1px solid var(--md-sys-color-outline-variant);
+      background: var(--md-sys-color-surface-container-lowest); flex-wrap: wrap;
+    }
+    .cl-singleton-section { padding: 10px 14px; }
+    .cl-singleton-label { font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--md-sys-color-on-surface-variant); margin-bottom: 7px; }
+    .cl-singleton-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+    .cl-singleton {
+      display: flex; align-items: center; gap: 4px; height: 26px; max-width: 200px; padding: 0 10px;
+      border-radius: 13px; background: var(--md-sys-color-surface-container-highest);
+      font-size: 11px; color: var(--md-sys-color-on-surface-variant); cursor: pointer; overflow: hidden;
+    }
+    .cl-singleton span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .cl-singleton:hover { background: var(--md-sys-color-surface-container-high); color: var(--md-sys-color-on-surface); }
+    .cl-empty { flex: none; padding: 24px 16px; font-size: 13px; color: var(--md-sys-color-on-surface-variant); text-align: center; }
+
+    /* Buttons */
+    .cl-btn {
+      display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px;
+      border-radius: 15px; border: none; cursor: pointer;
+      font-family: var(--font-family); font-size: 12px; font-weight: 500; white-space: nowrap;
+    }
+    .cl-btn-primary { background: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary); }
+    .cl-btn-tonal   { background: var(--md-sys-color-secondary-container); color: var(--md-sys-color-on-secondary-container); }
+    .cl-btn-ghost   { background: transparent; color: var(--md-sys-color-on-surface-variant); border: 1px solid var(--md-sys-color-outline-variant); }
+    .cl-btn-ghost:hover { background: color-mix(in srgb,var(--md-sys-color-on-surface) 6%,transparent); }
+    .cl-btn-danger  { background: transparent; color: var(--md-sys-color-error); border: 1px solid color-mix(in srgb,var(--md-sys-color-error) 40%,transparent); }
+
+    /* Badges */
+    .cl-badge { display: inline-flex; align-items: center; height: 18px; padding: 0 6px; border-radius: 9px; font-size: 10px; font-weight: 600; }
+    .cl-badge-auto     { background: rgba(21,101,192,.12); color: #1565c0; }
+    .cl-badge-conf     { background: rgba(46,125,50,.1);   color: #2e7d32; }
+    .cl-badge-changed  { background: rgba(255,193,7,.18);  color: #f57f17; }
+    .cl-sugg { font-size: 10px; font-weight: 500; padding: 2px 7px; border-radius: 10px; background: color-mix(in srgb,var(--md-sys-color-primary) 10%,transparent); color: var(--md-sys-color-primary); white-space: nowrap; }
+
+    /* Cite pill */
+    .cl-cite-pill { display: inline-flex; align-items: center; height: 16px; padding: 0 6px; border-radius: 8px; font-size: 10px; font-weight: 600; color: #fff; white-space: nowrap; vertical-align: middle; }
+
+    /* Assign popover */
+    .cl-pop {
+      position: fixed; z-index: 9999; min-width: 180px;
+      background: var(--md-sys-color-surface-container); border: 1px solid var(--md-sys-color-outline-variant);
+      border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,.18); overflow: hidden; display: none;
+    }
+    .cl-pop.open { display: block; }
+    .cl-pop-label { padding: 8px 12px 4px; font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--md-sys-color-on-surface-variant); }
+    .cl-pop-item { display: flex; align-items: center; gap: 8px; padding: 8px 12px; cursor: pointer; font-size: 13px; transition: background .1s; }
+    .cl-pop-item:hover { background: color-mix(in srgb,var(--md-sys-color-on-surface) 6%,transparent); }
+    .cl-pop-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .cl-pop-new { color: var(--md-sys-color-primary); font-weight: 500; }
+
+    /* Principle modal */
+    .cl-modal-bg { position: fixed; inset: 0; z-index: 8100; background: rgba(0,0,0,.4); display: none; align-items: center; justify-content: center; }
+    .cl-modal-bg.open { display: flex; }
+    .cl-modal { background: var(--md-sys-color-surface); border-radius: 12px; padding: 24px; width: 360px; box-shadow: 0 8px 32px rgba(0,0,0,.22); }
+    .cl-modal-title { font-size: 15px; font-weight: 600; margin-bottom: 16px; }
+    .cl-modal-foot { display: flex; gap: 8px; justify-content: flex-end; margin-top: 18px; }
+    .cl-field { margin-bottom: 14px; }
+    .cl-fl { font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--md-sys-color-on-surface-variant); margin-bottom: 5px; display: block; }
+    .cl-input { width: 100%; height: 36px; padding: 0 12px; border: 1px solid var(--md-sys-color-outline); border-radius: 4px; background: transparent; font-family: var(--font-family); font-size: 14px; color: inherit; outline: none; }
+    .cl-input:focus { border: 2px solid var(--md-sys-color-primary); padding: 0 11px; }
+    .cl-dim-chips { display: flex; gap: 5px; flex-wrap: wrap; }
+    .cl-dim-chip { height: 28px; padding: 0 12px; border-radius: 14px; border: 1px solid var(--md-sys-color-outline-variant); background: transparent; font-size: 12px; font-weight: 500; cursor: pointer; color: var(--md-sys-color-on-surface-variant); }
+    .cl-dim-chip.active { background: var(--md-sys-color-secondary-container); color: var(--md-sys-color-on-secondary-container); border-color: transparent; }
+
+    /* Panel controls */
+    .cl-panel-label { font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--md-sys-color-on-surface-variant); padding: 8px 0 4px; }
+    .cl-range-row { display: flex; align-items: center; gap: 8px; padding: 4px 0; }
+    .cl-range-label { font-size: 12px; color: var(--md-sys-color-on-surface-variant); min-width: 60px; }
+    .cl-range { flex: 1; accent-color: var(--md-sys-color-primary); cursor: pointer; }
+    .cl-range-val { font-size: 12px; font-weight: 600; min-width: 36px; text-align: right; }
   </style>
 </head>
 <body>
-  <div class="ds-topbar">
-    <a class="ds-topbar-back" href="../index.html">
-      <svg viewBox="0 0 14 14" width="12" height="12" fill="none"
-           stroke="currentColor" stroke-width="2"
-           stroke-linecap="round" stroke-linejoin="round">
-        <path d="M9 2L4 7l5 5"/>
-      </svg>
-      Back
-    </a>
-    <div class="ds-topbar-title">Cluster Map</div>
-    <div class="ds-badge ds-badge--waiting" id="cl-connection-badge">
-      <div class="ds-badge-dot"></div>
-      <span id="cl-badge-text">Connecting…</span>
+
+  <div class="cl-topbar">
+    <div class="cl-topbar-title">Clusters</div>
+    <div class="cl-emb-dot loading" id="cl-dot"></div>
+    <span class="cl-emb-text" id="cl-emb-text">Loading...</span>
+  </div>
+
+  <div class="cl-subtabs">
+    <button class="cl-subtab active" data-view="principles">
+      Principles <span class="cl-subtab-n" id="cl-n-named">0</span>
+    </button>
+    <button class="cl-subtab" data-view="visual">
+      Visual clusters <span class="cl-subtab-n" id="cl-n-pool">0</span>
+    </button>
+  </div>
+
+  <div class="cl-body" id="cl-body">
+    <!-- PPNavRail injected here -->
+  </div>
+
+  <!-- Assign popover -->
+  <div class="cl-pop" id="cl-pop">
+    <div class="cl-pop-label">Assign to principle</div>
+    <div id="cl-pop-list"></div>
+    <div class="cl-pop-item cl-pop-new" id="cl-pop-new">+ New principle</div>
+  </div>
+
+  <!-- Principle modal -->
+  <div class="cl-modal-bg" id="cl-modal-bg">
+    <div class="cl-modal">
+      <div class="cl-modal-title" id="cl-modal-title">New principle</div>
+      <div class="cl-field">
+        <label class="cl-fl">Name</label>
+        <input class="cl-input" id="cl-modal-name" placeholder="e.g. Threshold Gradient" autocomplete="off">
+      </div>
+      <div class="cl-field">
+        <label class="cl-fl">Dimension</label>
+        <div class="cl-dim-chips" id="cl-modal-dims">
+          <button class="cl-dim-chip" data-dim="Physical">Physical</button>
+          <button class="cl-dim-chip" data-dim="Social">Social</button>
+          <button class="cl-dim-chip" data-dim="Organisational">Organisational</button>
+          <button class="cl-dim-chip" data-dim="Temporal">Temporal</button>
+          <button class="cl-dim-chip" data-dim="Economic">Economic</button>
+        </div>
+      </div>
+      <div class="cl-modal-foot">
+        <button class="cl-btn cl-btn-ghost" id="cl-modal-cancel">Cancel</button>
+        <button class="cl-btn cl-btn-primary" id="cl-modal-confirm">Create</button>
+      </div>
     </div>
   </div>
-  <div id="cl-pane">
-    <div class="ds-no-host" id="cl-no-host">
-      <h2>Data not available</h2>
-      <p>Return to the <a href="../index.html">home page</a> to load data first.</p>
-    </div>
-  </div>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  <script src="../utilities/utils-keywords.js?v=7"></script>
-  <script src="../utilities/utils-shared.js?v=2c656b35"></script>
-  <script src="../utilities/utils-academic.js?v=66257bc0"></script>
-  <script src="../utilities/utils-panel.js?v=7"></script>
-  <script src="../utilities/embedding-bridge.js?v=7"></script>
-  <script src="../utilities/utils-clusters.js?v=96702bbb"></script>
+
   <script>
-    var _bridgeRows = null;
-    function buildRowIndex() { return _bridgeRows || []; }
-    function panelGoTo(match, colIdx) {
-      window.location.href = '../tools/spreadsheet.html#goto='
-        + match.tabIdx + ':' + match.rowIdx + ':' + (colIdx || 0);
-    }
-    if (typeof parseCitation === 'undefined') {
-      window.parseCitation = function(text) {
-        return { body: String(text || ''), citation: null };
-      };
-    }
-    window.EmbeddingUtils = { isReady: function() { return !!_bridgeRows; } };
-    var badgeEl   = document.getElementById('cl-connection-badge');
-    var badgeText = document.getElementById('cl-badge-text');
-    var noHost    = document.getElementById('cl-no-host');
-    function setBadge(state, text) {
-      badgeEl.className = 'ds-badge ds-badge--' + state;
-      badgeText.textContent = text;
-    }
-    var paneEl      = document.getElementById('cl-pane');
-    var clusterTool = initClustersTool(paneEl, null);
+  (function(){
+    var SY = window.SynthesisData;
+    if (!SY) { document.body.innerHTML = '<p style="padding:24px">utils-synthesis.js not loaded.</p>'; return; }
+
+    // ── State ────────────────────────────────────────────────────────────────
+    var _emb       = new Map();   // noteKey → Float32Array
+    var _embReady  = false;
+    var _embedding = false;
+    var _view      = 'principles';
+    var _openP     = new Set();
+    var _openCl    = new Set();
+    var _clusters  = null;
+    var _thresh    = SY.getSettings().threshold;
+    var _assignCtx = null;
+    var _pModalCb  = null;
+    var _clusterTool = null;   // handle returned by initClustersTool
+
+    function _h(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+    // ── Panel HTML ───────────────────────────────────────────────────────────
+    var _globalHtml =
+      '<div class="cl-panel-label">Sheet</div>' +
+      '<div id="cl-sync-status" style="font-size:11px;color:var(--md-sys-color-on-surface-variant);padding:2px 0 6px"></div>' +
+      '<div class="cl-panel-label">Cluster threshold</div>' +
+      '<div class="cl-range-row">' +
+        '<input type="range" class="cl-range" id="cl-thresh-slider" min="20" max="70" value="'+Math.round(_thresh*100)+'" step="1">' +
+        '<span class="cl-range-val" id="cl-thresh-val">'+Math.round(_thresh*100)+'%</span>' +
+      '</div>' +
+      '<div class="cl-panel-label">Max words (split)</div>' +
+      '<div class="cl-range-row">' +
+        '<input type="range" class="cl-range" id="cl-maxwords-slider" min="20" max="300" value="'+SY.getSettings().maxWords+'" step="10">' +
+        '<span class="cl-range-val" id="cl-maxwords-val">'+SY.getSettings().maxWords+'</span>' +
+      '</div>';
+
+    var _principlesHtml =
+      '<div class="cl-panel-label">Actions</div>' +
+      '<button class="cl-btn cl-btn-ghost" id="cl-new-p-btn" style="width:100%;justify-content:center;margin-bottom:6px">+ Named principle</button>' +
+      '<button class="cl-btn cl-btn-ghost" id="cl-bulk-confirm-btn" style="width:100%;justify-content:center;display:none">Confirm all auto</button>';
+
+    // Nav rail
+    var _paneEl = document.getElementById('cl-body');
+    var _nav = window.PPNavRail.create(_paneEl, {
+      toolName: 'Clusters',
+      defaultOpen: true,
+      panelSections: [
+        { label: 'Global',     html: _globalHtml },
+        { label: 'Principles', html: _principlesHtml },
+      ],
+    });
+
+    // Build main area with two views
+    _nav.mainEl.style.cssText = 'display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden;';
+    _nav.mainEl.innerHTML =
+      // Principles view
+      '<div class="cl-view" id="cl-view-principles">' +
+        '<div class="cl-pr-layout">' +
+          '<div class="cl-named-col">' +
+            '<div class="cl-col-hdr">Named principles <span class="cl-subtab-n" id="cl-named-count">0</span></div>' +
+            '<div class="cl-scroll" id="cl-named-list"></div>' +
+          '</div>' +
+          '<div class="cl-pool-col">' +
+            '<div class="cl-col-hdr">Holding pool <span class="cl-subtab-n" id="cl-pool-count">0</span>' +
+              '<button class="cl-col-hdr-btn" id="cl-pool-recluster">Re-cluster</button>' +
+            '</div>' +
+            '<div class="cl-scroll" id="cl-pool-list"></div>' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+      // Visual view (utils-clusters.js renders into #cl-visual-pane)
+      '<div class="cl-view" id="cl-view-visual" hidden>' +
+        '<div id="cl-visual-pane" style="flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden;position:relative;">' +
+        '</div>' +
+      '</div>';
 
     injectToolNav('clusters.html');
-    EmbeddingBridge.guest(function(rows) {
-      noHost.classList.remove('visible');
-      setBadge('connected', rows.length + ' entries live');
-      _bridgeRows = rows;
-      clusterTool.reset();
-      window.dispatchEvent(new CustomEvent('embedder-ready'));
-      setTimeout(function() {
-        window.dispatchEvent(new CustomEvent('embedding-complete', {
-          detail: { total: rows.length }
-        }));
-      }, 100);
+
+    // ── Global settings wiring ───────────────────────────────────────────────
+    var _threshSlider   = document.getElementById('cl-thresh-slider');
+    var _threshVal      = document.getElementById('cl-thresh-val');
+    var _maxWordsSlider = document.getElementById('cl-maxwords-slider');
+    var _maxWordsVal    = document.getElementById('cl-maxwords-val');
+
+    if (_threshSlider) {
+      _threshSlider.addEventListener('input', function(){
+        var v = parseInt(_threshSlider.value);
+        _threshVal.textContent = v + '%';
+        _thresh = v / 100;
+        SY.updateSettings({ threshold: v/100 });
+        _clusters = null;
+        if (_view === 'principles') renderPrinciples();
+      });
+    }
+    if (_maxWordsSlider) {
+      _maxWordsSlider.addEventListener('input', function(){
+        var v = parseInt(_maxWordsSlider.value);
+        _maxWordsVal.textContent = v;
+        SY.updateSettings({ maxWords: v });
+      });
+    }
+
+    window.addEventListener('sy-settings-changed', function(){
+      var s = SY.getSettings();
+      if (_threshSlider)   { _threshSlider.value = Math.round(s.threshold*100); _threshVal.textContent = Math.round(s.threshold*100)+'%'; }
+      if (_maxWordsSlider) { _maxWordsSlider.value = s.maxWords; _maxWordsVal.textContent = s.maxWords; }
+      _thresh = s.threshold;
+      _clusters = null;
     });
-    window.addEventListener('bridge-no-host', function() {
-      setBadge('disconnected', 'No data — visit home page first');
-      noHost.classList.add('visible');
+
+    // ── Sub-tab switching ────────────────────────────────────────────────────
+    document.querySelectorAll('.cl-subtab').forEach(function(tab){
+      tab.addEventListener('click', function(){
+        _view = tab.dataset.view;
+        document.querySelectorAll('.cl-subtab').forEach(function(t){ t.classList.toggle('active', t.dataset.view === _view); });
+        document.getElementById('cl-view-principles').hidden = _view !== 'principles';
+        document.getElementById('cl-view-visual').hidden     = _view !== 'visual';
+        if (_view === 'visual' && !_clusterTool) _initVisual();
+      });
     });
+
+    // ── Embedding ────────────────────────────────────────────────────────────
+    function _triggerEmbed() {
+      if (_embedding) return;
+      var keys = SY.getRowNoteKeys();
+      if (!keys.length || !window.EmbeddingUtils) return;
+      _embedding = true;
+      document.getElementById('cl-dot').className = 'cl-emb-dot loading';
+      document.getElementById('cl-emb-text').textContent = 'Embedding ' + keys.length + ' entries...';
+      _embedAll(keys).then(function(){
+        _embedding = false; _embReady = true;
+        document.getElementById('cl-dot').className = 'cl-emb-dot ready';
+        document.getElementById('cl-emb-text').textContent = _emb.size + ' indexed';
+        _clusters = null;
+        renderPrinciples();
+        // Signal utils-clusters.js if visual tab is initialised
+        if (_clusterTool) {
+          _clusterTool.reset();
+          window.dispatchEvent(new CustomEvent('embedding-complete', { detail: { total: _emb.size } }));
+        }
+      }).catch(function(e){
+        _embedding = false;
+        document.getElementById('cl-dot').className = 'cl-emb-dot';
+        console.error('[clusters] embed error:', e);
+      });
+    }
+
+    async function _embedAll(keys) {
+      for (var i = 0; i < keys.length; i++) {
+        var key = keys[i]; if (_emb.has(key)) continue;
+        var r   = SY.resolveNoteKey(key); if (!r || !r.text.trim()) continue;
+        try {
+          var vec = await window.EmbeddingUtils.getCachedEmbedding(r.text);
+          if (vec) _emb.set(key, new Float32Array(vec));
+        } catch(e){}
+      }
+    }
+
+    document.addEventListener('embedder-ready', _triggerEmbed);
+    window.addEventListener('embedding-complete', function(){ if (!_embReady) _triggerEmbed(); });
+    window.addEventListener('sheet-loaded', function(){
+      updateCounts(); renderPrinciples();
+      _triggerEmbed();
+      _loadFramework();
+    });
+
+    function _loadFramework() {
+      var scriptUrl = SY.getScriptUrl();
+      var sheetUrl  = typeof getSavedSheetUrl === 'function' ? getSavedSheetUrl() : '';
+      if (!scriptUrl || !sheetUrl) return;
+      SY.readFramework(scriptUrl, sheetUrl).then(function(tabs){
+        var fw = tabs.find(function(t){ return t.name && t.name.indexOf('FRAMEWORK') !== -1; });
+        if (!fw) return;
+        SY.setFrameworkTabs([{ name: fw.name, grid: fw.rows }]);
+        SY.loadFromFrameworkTab(fw.rows);
+        updateCounts(); renderPrinciples();
+      }).catch(function(){});
+    }
+
+    // ── Count badges ─────────────────────────────────────────────────────────
+    function updateCounts() {
+      var named    = SY.getPrinciples().filter(function(p){ return p.named && !p.archived; }).length;
+      var assigned = new Set(SY.getAssignments().map(function(a){ return a.noteKey; }));
+      var unassigned = SY.getRowNoteKeys().filter(function(k){ return !assigned.has(k); }).length;
+      var pending  = SY.getAssignments().filter(function(a){ return a.status==='auto'; }).length;
+      document.getElementById('cl-n-named').textContent = named + (pending?' ('+pending+')':'');
+      document.getElementById('cl-n-pool').textContent  = unassigned;
+      document.getElementById('cl-named-count').textContent = named;
+      document.getElementById('cl-pool-count').textContent  = unassigned;
+      var bulk = document.getElementById('cl-bulk-confirm-btn');
+      if (bulk) { bulk.style.display = pending > 0 ? '' : 'none'; bulk.textContent = 'Confirm all auto ('+pending+')'; }
+    }
+
+    // ── Clustering (unassigned pool) ─────────────────────────────────────────
+    function _getClusters() {
+      if (_clusters !== null) return _clusters;
+      var assigned = new Set(SY.getAssignments().map(function(a){ return a.noteKey; }));
+      var items    = SY.getRowNoteKeys()
+        .filter(function(k){ return !assigned.has(k) && _emb.has(k); })
+        .map(function(k){ return { id:k, vec:_emb.get(k) }; });
+      var raw    = SY.cluster(items, _thresh);
+      var pvecs  = SY.buildPrincipleVectors(_emb);
+      _clusters  = raw.map(function(c){
+        var texts = c.noteKeys.map(function(k){ var r=SY.resolveNoteKey(k); return r?r.text:''; });
+        c.label   = SY.autoLabel(texts);
+        c.sugg    = null; var bestSim = 0.50;
+        pvecs.forEach(function(pv){
+          var sim = SY.cosine(c.centroid, pv.centroid);
+          if (sim > bestSim){ bestSim=sim; c.sugg=pv.principle; }
+        });
+        return c;
+      });
+      return _clusters;
+    }
+
+    // ══ PRINCIPLES RENDER ════════════════════════════════════════════════════
+
+    function renderPrinciples() {
+      updateCounts();
+      _renderNamed();
+      _renderPool();
+    }
+
+    // ── Named list ───────────────────────────────────────────────────────────
+    function _renderNamed() {
+      var named       = SY.getPrinciples().filter(function(p){ return p.named && !p.archived; });
+      var assignments = SY.getAssignments();
+      var changed     = new Set(SY.getChangedSources().map(function(c){ return c.noteKey; }));
+      var pNotes      = {};
+      assignments.forEach(function(a){ if(!pNotes[a.principleId]) pNotes[a.principleId]=[]; pNotes[a.principleId].push(a); });
+
+      var listEl = document.getElementById('cl-named-list');
+      if (!named.length) { listEl.innerHTML = '<div class="cl-empty">No named principles yet.<br>Name a cluster to get started.</div>'; return; }
+
+      var html = '';
+      named.forEach(function(p){
+        var as   = pNotes[p.id] || [];
+        var auto = as.filter(function(a){ return a.status==='auto'; });
+        var open = _openP.has(p.id);
+        html += '<div class="cl-pr-card">';
+        html += '<div class="cl-pr-head" data-toggle="'+_h(p.id)+'">';
+        html += '<div class="cl-pr-dot" style="background:'+_h(p.color)+'"></div>';
+        html += '<div class="cl-pr-name">'+_h(p.name)+'</div>';
+        html += '<div class="cl-pr-meta">'+_h(p.dimensionHint||'—')+' · '+as.length+' note'+(as.length!==1?'s':'');
+        if (auto.length) html += ' · <span style="color:#1565c0;font-weight:600">'+auto.length+' pending</span>';
+        html += '</div>';
+        html += '<span class="cl-chevron'+(open?' open':'')+'">&#9658;</span>';
+        html += '</div>';
+        if (auto.length) html += '<div class="cl-pending-banner">'+auto.length+' auto-assigned · <button class="cl-btn cl-btn-ghost" data-action="bulk-confirm-p" data-pid="'+_h(p.id)+'" style="height:22px;font-size:11px;padding:0 10px">Confirm all</button></div>';
+        html += '<div class="cl-pr-body'+(open?' open':'')+'">';
+        as.forEach(function(a){
+          var r = SY.resolveNoteKey(a.noteKey); if (!r) return;
+          var isChanged = changed.has(a.noteKey);
+          var reg = a.register || SY.suggestRegister(r.text);
+          var parsed = typeof parseCitation==='function' ? parseCitation(r.text) : {body:r.text,citation:null};
+          html += '<div class="cl-pr-note'+(isChanged?' changed':'')+'">';
+          html += '<div style="display:flex;flex-direction:column;gap:2px;flex-shrink:0">';
+          ['what','why','who','how'].forEach(function(rr){
+            html += '<button class="cl-reg-tiny '+rr+(reg===rr?' active':'')+'" data-nk="'+_h(a.noteKey)+'" data-r="'+rr+'">'+rr.toUpperCase()+'</button>';
+          });
+          html += '</div>';
+          html += '<div class="cl-pr-note-content">';
+          html += '<div class="cl-pr-note-text">'+_h(parsed.body)+(parsed.citation?' <span class="cl-cite-pill" style="background:'+_h(p.color)+'">'+_h(parsed.citation)+'</span>':'')+'</div>';
+          html += '<div class="cl-pr-note-src">'+_h(r.tabName)+'</div>';
+          if (a.status==='auto') html += '<div style="display:flex;gap:4px;margin-top:3px"><span class="cl-badge cl-badge-auto">auto '+(a.similarity?a.similarity.toFixed(2):'')+' </span><button class="cl-btn cl-btn-ghost" data-action="confirm-a" data-nk="'+_h(a.noteKey)+'" style="height:20px;font-size:10px;padding:0 8px">Confirm</button><button class="cl-btn cl-btn-ghost" data-action="reject-a" data-nk="'+_h(a.noteKey)+'" style="height:20px;font-size:10px;padding:0 8px;color:var(--md-sys-color-error)">Reject</button></div>';
+          if (isChanged) html += '<div class="cl-pr-note-changed">Source changed — <button class="cl-btn cl-btn-ghost" data-action="ack-change" data-nk="'+_h(a.noteKey)+'" style="height:18px;padding:0 6px;font-size:10px">Acknowledge</button></div>';
+          html += '</div>';
+          html += '<button class="cl-btn cl-btn-ghost" data-action="remove-from-p" data-nk="'+_h(a.noteKey)+'" style="height:22px;font-size:10px;padding:0 8px;margin-left:auto;flex-shrink:0;align-self:flex-start;margin-top:8px">Remove</button>';
+          html += '</div>';
+        });
+        html += '<div class="cl-pr-foot">';
+        html += '<button class="cl-btn cl-btn-ghost" data-action="rename-p"  data-pid="'+_h(p.id)+'" style="height:26px;font-size:11px">Rename</button>';
+        html += '<button class="cl-btn cl-btn-ghost" data-action="archive-p" data-pid="'+_h(p.id)+'" style="height:26px;font-size:11px">Archive</button>';
+        html += '<button class="cl-btn cl-btn-danger" data-action="del-p"    data-pid="'+_h(p.id)+'" style="height:26px;font-size:11px">Delete</button>';
+        html += '</div>';
+        html += '</div></div>';
+      });
+
+      listEl.innerHTML = html;
+      _bindNamedEvents(listEl);
+    }
+
+    function _bindNamedEvents(listEl) {
+      listEl.querySelectorAll('[data-toggle]').forEach(function(el){
+        el.addEventListener('click', function(){ var id=el.dataset.toggle; if(_openP.has(id)) _openP.delete(id); else _openP.add(id); renderPrinciples(); });
+      });
+      listEl.querySelectorAll('.cl-reg-tiny').forEach(function(btn){
+        btn.addEventListener('click', function(e){ e.stopPropagation(); SY.updateAssignmentRegister(btn.dataset.nk, btn.dataset.r); renderPrinciples(); });
+      });
+      listEl.querySelectorAll('[data-action=confirm-a]').forEach(function(btn){
+        btn.addEventListener('click', function(e){ e.stopPropagation(); SY.confirmAssignment(btn.dataset.nk); _clusters=null; renderPrinciples(); });
+      });
+      listEl.querySelectorAll('[data-action=reject-a]').forEach(function(btn){
+        btn.addEventListener('click', function(e){ e.stopPropagation(); SY.rejectAssignment(btn.dataset.nk); _clusters=null; renderPrinciples(); });
+      });
+      listEl.querySelectorAll('[data-action=ack-change]').forEach(function(btn){
+        btn.addEventListener('click', function(e){ e.stopPropagation(); SY.acknowledgeChangedSource(btn.dataset.nk); renderPrinciples(); });
+      });
+      listEl.querySelectorAll('[data-action=remove-from-p]').forEach(function(btn){
+        btn.addEventListener('click', function(e){ e.stopPropagation(); SY.rejectAssignment(btn.dataset.nk); _clusters=null; renderPrinciples(); });
+      });
+      listEl.querySelectorAll('[data-action=bulk-confirm-p]').forEach(function(btn){
+        btn.addEventListener('click', function(e){ e.stopPropagation(); SY.getAssignments().filter(function(a){ return a.principleId===btn.dataset.pid&&a.status==='auto'; }).forEach(function(a){ SY.confirmAssignment(a.noteKey); }); _clusters=null; renderPrinciples(); });
+      });
+      listEl.querySelectorAll('[data-action=rename-p]').forEach(function(btn){
+        btn.addEventListener('click', function(e){ e.stopPropagation(); var p=SY.getPrinciples().find(function(x){return x.id===btn.dataset.pid;}); if(!p) return; _openModal('Rename principle', p.name, p.dimensionHint, function(name,dim){ SY.updatePrinciple(p.id,{name:name,dimensionHint:dim}); renderPrinciples(); }); });
+      });
+      listEl.querySelectorAll('[data-action=archive-p]').forEach(function(btn){
+        btn.addEventListener('click', function(e){ e.stopPropagation(); SY.updatePrinciple(btn.dataset.pid,{archived:true,named:false}); SY.getAssignments().filter(function(a){return a.principleId===btn.dataset.pid;}).forEach(function(a){SY.rejectAssignment(a.noteKey);}); _clusters=null; renderPrinciples(); });
+      });
+      listEl.querySelectorAll('[data-action=del-p]').forEach(function(btn){
+        btn.addEventListener('click', function(e){ e.stopPropagation(); if(confirm('Delete this principle?')){ SY.deletePrinciple(btn.dataset.pid); _clusters=null; renderPrinciples(); } });
+      });
+    }
+
+    // ── Pool ─────────────────────────────────────────────────────────────────
+    function _renderPool() {
+      var poolEl   = document.getElementById('cl-pool-list');
+      var clusters = _getClusters();
+      var clusteredKeys = new Set();
+      clusters.forEach(function(c){ c.noteKeys.forEach(function(k){ clusteredKeys.add(k); }); });
+      var assigned    = new Set(SY.getAssignments().map(function(a){ return a.noteKey; }));
+      var unassigned  = SY.getRowNoteKeys().filter(function(k){ return !assigned.has(k); });
+      var singletons  = unassigned.filter(function(k){ return _emb.has(k) && !clusteredKeys.has(k); });
+      var notEmbedded = unassigned.filter(function(k){ return !_emb.has(k); });
+
+      var html = '';
+      if (!_embReady && unassigned.length) html += '<div style="padding:14px;font-size:12px;color:var(--md-sys-color-on-surface-variant);font-style:italic">Model loading — clusters will appear shortly.</div>';
+
+      clusters.forEach(function(cl, ci){
+        var open = _openCl.has(String(ci));
+        var byReg = {what:[],why:[],who:[],how:[]};
+        cl.noteKeys.forEach(function(k){
+          var r = SY.resolveNoteKey(k); if (!r) return;
+          var reg = SY.suggestRegister(r.text);
+          if (byReg[reg]) byReg[reg].push({key:k,r:r}); else byReg.what.push({key:k,r:r});
+        });
+        html += '<div class="cl-pool-card">';
+        html += '<div class="cl-pool-head" data-ci="'+ci+'">';
+        html += '<span class="cl-pool-label">'+_h(cl.label)+'</span>';
+        html += '<span class="cl-subtab-n" style="flex-shrink:0">'+cl.noteKeys.length+'</span>';
+        if (cl.sugg) html += '<span class="cl-sugg">→ '+_h(cl.sugg.name.slice(0,16))+'</span>';
+        html += '<span class="cl-chevron'+(open?' open':'')+'">&#9658;</span>';
+        html += '</div>';
+        html += '<div class="cl-pool-body'+(open?' open':'')+'">';
+        ['what','why','who','how'].forEach(function(reg){
+          var items = byReg[reg]; if (!items.length) return;
+          var regColors = {what:'#1565c0',why:'#e65100',who:'#2e7d32',how:'#6a1b9a'};
+          html += '<div style="padding:4px 12px 2px;font-size:9px;font-weight:700;letter-spacing:.06em;color:'+regColors[reg]+'">'+reg.toUpperCase()+'?</div>';
+          items.forEach(function(item){
+            var parsed = typeof parseCitation==='function' ? parseCitation(item.r.text) : {body:item.r.text,citation:null};
+            html += '<div class="cl-pool-note">';
+            html += '<div class="cl-pool-note-inner"><div class="cl-pool-note-text">'+_h(parsed.body)+(parsed.citation?' <span class="cl-cite-pill" style="background:var(--md-sys-color-surface-container-high);color:var(--md-sys-color-on-surface-variant)">'+_h(parsed.citation)+'</span>':'')+'</div>';
+            html += '<div class="cl-pool-note-src">'+_h(item.r.tabName)+'</div></div>';
+            html += '<button class="cl-assign-btn" data-key="'+_h(item.key)+'">Assign</button>';
+            html += '</div>';
+          });
+        });
+        html += '<div class="cl-pool-foot">';
+        html += '<button class="cl-btn cl-btn-tonal" data-action="name-cl" data-ci="'+ci+'" style="height:26px;font-size:11px">Name this cluster</button>';
+        if (cl.sugg) html += '<button class="cl-btn cl-btn-ghost" data-action="merge-cl" data-ci="'+ci+'" data-pid="'+_h(cl.sugg.id)+'" style="height:26px;font-size:11px">Merge into '+_h(cl.sugg.name.slice(0,14))+'</button>';
+        html += '</div>';
+        html += '</div></div>';
+      });
+
+      if (singletons.length) {
+        html += '<div class="cl-singleton-section"><div class="cl-singleton-label">Singletons ('+singletons.length+')</div><div class="cl-singleton-chips">';
+        singletons.forEach(function(k){
+          var r = SY.resolveNoteKey(k); if (!r) return;
+          html += '<div class="cl-singleton" data-key="'+_h(k)+'" title="'+_h(r.text)+'"><span>'+_h(r.text.slice(0,38))+(r.text.length>38?'…':'')+'</span></div>';
+        });
+        html += '</div></div>';
+      }
+      if (notEmbedded.length) html += '<div style="padding:10px 14px;font-size:11px;color:var(--md-sys-color-on-surface-variant);font-style:italic">'+notEmbedded.length+' entries not yet embedded.</div>';
+      if (!clusters.length && !singletons.length && !notEmbedded.length) html += '<div class="cl-empty">All entries are assigned.</div>';
+
+      poolEl.innerHTML = html;
+      _bindPoolEvents(poolEl, clusters);
+    }
+
+    function _bindPoolEvents(poolEl, clusters) {
+      poolEl.querySelectorAll('[data-ci]:not([data-action])').forEach(function(el){
+        el.addEventListener('click', function(){ var k=String(el.dataset.ci); if(_openCl.has(k)) _openCl.delete(k); else _openCl.add(k); renderPrinciples(); });
+      });
+      poolEl.querySelectorAll('.cl-assign-btn').forEach(function(btn){
+        btn.addEventListener('click', function(e){ e.stopPropagation(); var rect=btn.getBoundingClientRect(); _openPop(btn.dataset.key, rect.left, rect.bottom+4); });
+      });
+      poolEl.querySelectorAll('.cl-singleton').forEach(function(chip){
+        chip.addEventListener('click', function(){ var rect=chip.getBoundingClientRect(); _openPop(chip.dataset.key, rect.left, rect.bottom+4); });
+      });
+      poolEl.querySelectorAll('[data-action=name-cl]').forEach(function(btn){
+        btn.addEventListener('click', function(e){
+          e.stopPropagation();
+          var ci = parseInt(btn.dataset.ci), cl = clusters[ci];
+          _openModal('Name this cluster', '', '', function(name, dim){
+            var p = SY.addPrinciple({ name:name, dimensionHint:dim });
+            if (cl) cl.noteKeys.forEach(function(k){ SY.setAssignment(k, p.id, SY.suggestRegister((SY.resolveNoteKey(k)||{text:''}).text), 'confirmed', null); });
+            _clusters=null; _openP.add(p.id); renderPrinciples();
+          });
+        });
+      });
+      poolEl.querySelectorAll('[data-action=merge-cl]').forEach(function(btn){
+        btn.addEventListener('click', function(e){
+          e.stopPropagation();
+          var cl = clusters[parseInt(btn.dataset.ci)]; if (!cl) return;
+          cl.noteKeys.forEach(function(k){ SY.setAssignment(k, btn.dataset.pid, SY.suggestRegister((SY.resolveNoteKey(k)||{text:''}).text), 'confirmed', null); });
+          _clusters=null; _openP.add(btn.dataset.pid); renderPrinciples();
+        });
+      });
+    }
+
+    // Re-cluster button
+    var poolReCluster = document.getElementById('cl-pool-recluster');
+    if (poolReCluster) poolReCluster.addEventListener('click', function(){ _clusters=null; renderPrinciples(); });
+
+    // New principle button
+    var newPBtn = document.getElementById('cl-new-p-btn');
+    if (newPBtn) newPBtn.addEventListener('click', function(){ _openModal('New principle','','',function(name,dim){ var p=SY.addPrinciple({name:name,dimensionHint:dim}); _openP.add(p.id); renderPrinciples(); }); });
+    var bulkBtn = document.getElementById('cl-bulk-confirm-btn');
+    if (bulkBtn) bulkBtn.addEventListener('click', function(){ SY.getAssignments().filter(function(a){return a.status==='auto';}).forEach(function(a){SY.confirmAssignment(a.noteKey);}); _clusters=null; renderPrinciples(); });
+
+    // ══ VISUAL TAB ═══════════════════════════════════════════════════════════
+    // utils-clusters.js is NOT loaded here — it's heavyweight. We lazy-load it
+    // via a <script> tag on first switch to the visual tab.
+
+    function _initVisual() {
+      var paneEl = document.getElementById('cl-visual-pane');
+      if (!paneEl) return;
+
+      // utils-clusters.js expects EmbeddingUtils.isReady() and buildRowIndex()
+      // buildRowIndex() is already defined by utils-keywords.js
+      // We override EmbeddingUtils.isReady to reflect our embedding state
+      if (window.EmbeddingUtils) {
+        var origIsReady = window.EmbeddingUtils.isReady;
+        window.EmbeddingUtils.isReady = function(){ return _embReady; };
+      }
+
+      // Load utils-clusters.js dynamically
+      var s = document.createElement('script');
+      s.src = '../utilities/utils-clusters.js?v=96702bbb';
+      s.onload = function(){
+        if (typeof initClustersTool === 'function') {
+          _clusterTool = initClustersTool(paneEl, null);
+          if (_embReady) {
+            window.dispatchEvent(new CustomEvent('embedder-ready'));
+            setTimeout(function(){
+              window.dispatchEvent(new CustomEvent('embedding-complete', { detail: { total: _emb.size } }));
+            }, 120);
+          }
+        }
+      };
+      document.head.appendChild(s);
+    }
+
+    // ── Assign popover ───────────────────────────────────────────────────────
+    function _openPop(noteKey, x, y) {
+      _assignCtx = noteKey;
+      var ps     = SY.getPrinciples().filter(function(p){ return p.named && !p.archived; });
+      var listEl = document.getElementById('cl-pop-list');
+      listEl.innerHTML = '';
+      if (!ps.length) {
+        var it = document.createElement('div'); it.className = 'cl-pop-item';
+        it.style.color = 'var(--md-sys-color-on-surface-variant)'; it.textContent = 'No named principles'; listEl.appendChild(it);
+      }
+      ps.forEach(function(p){
+        var it = document.createElement('div'); it.className = 'cl-pop-item';
+        it.innerHTML = '<span class="cl-pop-dot" style="background:'+_h(p.color)+'"></span>'+_h(p.name);
+        it.addEventListener('click', function(){
+          var r = SY.resolveNoteKey(_assignCtx);
+          SY.setAssignment(_assignCtx, p.id, r ? SY.suggestRegister(r.text) : 'what', 'confirmed', null);
+          _clusters=null; _openP.add(p.id); _closePop(); renderPrinciples();
+        });
+        listEl.appendChild(it);
+      });
+      var pop = document.getElementById('cl-pop');
+      pop.style.left = Math.min(x, window.innerWidth-200)+'px';
+      pop.style.top  = Math.min(y, window.innerHeight-260)+'px';
+      pop.classList.add('open');
+    }
+    function _closePop(){ document.getElementById('cl-pop').classList.remove('open'); _assignCtx=null; }
+    document.addEventListener('click', function(e){ if(!document.getElementById('cl-pop').contains(e.target)) _closePop(); });
+
+    document.getElementById('cl-pop-new').addEventListener('click', function(){
+      if (!_assignCtx) return;
+      var savedCtx = _assignCtx; _closePop();
+      _openModal('New principle', '', '', function(name, dim){
+        var p = SY.addPrinciple({ name:name, dimensionHint:dim });
+        var r = SY.resolveNoteKey(savedCtx);
+        SY.setAssignment(savedCtx, p.id, r ? SY.suggestRegister(r.text) : 'what', 'confirmed', null);
+        _clusters=null; _openP.add(p.id); renderPrinciples();
+      });
+    });
+
+    // ── Principle modal ──────────────────────────────────────────────────────
+    function _openModal(title, defaultName, defaultDim, cb) {
+      _pModalCb = cb;
+      document.getElementById('cl-modal-title').textContent = title || 'New principle';
+      document.getElementById('cl-modal-name').value = defaultName || '';
+      document.getElementById('cl-modal-confirm').textContent = title && title.startsWith('Rename') ? 'Rename' : 'Create';
+      document.querySelectorAll('.cl-dim-chip').forEach(function(c){ c.classList.toggle('active', c.dataset.dim === (defaultDim||'')); });
+      document.getElementById('cl-modal-bg').classList.add('open');
+      setTimeout(function(){ var i=document.getElementById('cl-modal-name'); i.focus(); i.select(); }, 60);
+    }
+    function _closeModal(){ document.getElementById('cl-modal-bg').classList.remove('open'); _pModalCb=null; }
+
+    document.getElementById('cl-modal-cancel').addEventListener('click', _closeModal);
+    document.getElementById('cl-modal-bg').addEventListener('click', function(e){ if(e.target===e.currentTarget) _closeModal(); });
+    document.querySelectorAll('.cl-dim-chip').forEach(function(c){
+      c.addEventListener('click', function(){ document.querySelectorAll('.cl-dim-chip').forEach(function(x){ x.classList.remove('active'); }); c.classList.add('active'); });
+    });
+    document.getElementById('cl-modal-confirm').addEventListener('click', function(){
+      var name = document.getElementById('cl-modal-name').value.trim();
+      if (!name) { document.getElementById('cl-modal-name').focus(); return; }
+      var dim  = (document.querySelector('.cl-dim-chip.active')||{}).dataset && document.querySelector('.cl-dim-chip.active').dataset.dim || '';
+      _closeModal();
+      if (_pModalCb) _pModalCb(name, dim);
+    });
+    document.getElementById('cl-modal-name').addEventListener('keydown', function(e){
+      if (e.key==='Enter') document.getElementById('cl-modal-confirm').click();
+      if (e.key==='Escape') _closeModal();
+    });
+
+    // ── Init ─────────────────────────────────────────────────────────────────
+    document.addEventListener('DOMContentLoaded', function(){ updateCounts(); });
+
+  })();
   </script>
 </body>
 </html>
