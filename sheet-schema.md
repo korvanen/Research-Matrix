@@ -6,22 +6,22 @@ A reference for structuring your Google Sheet so all tools work correctly, and t
 
 ## Tab naming
 
-Every tab you want the app to load **must contain `MX` in its name**. The app ignores all other tabs.
+Every tab you want the app to load **must contain `TAB` in its name**. The app ignores all other tabs.
 
 | Tab name | Loaded? 
 |---|---|
-| `MX1 — Epistemology` | ✓ |
-| `MX2 — Methodology` | ✓ |
-| `Overview` | ✗ (no `MX`) |
+| `TAB — Epistemology` | ✓ |
+| `TAB — Methodology` | ✓ |
+| `Overview` | ✗ (no `TAB`) |
 | `Raw import` | ✗ |
 
-You can have as many `MX` tabs as you like — each becomes a separate dataset tab in the Spreadsheet tool.
+You can have as many `TAB` tabs as you like — each becomes a separate dataset tab in the Spreadsheet tool.
 
 ---
 
 ## Grid layout (the internal format)
 
-Each `MX` tab follows this fixed row/column structure. **Do not change the position of Row 0 or the "HEADER ROW" / "TITLE" sentinel cells.**
+Each `TAB` tab follows this fixed row/column structure. **Do not change the position of Row 0 or the "HEADER ROW" / "TITLE" sentinel cells.**
 
 ```
 Row 0:   CATEGORY   COLUMN    COLUMN   COLUMN   COLUMN   COLUMN   COLUMN  …
@@ -73,7 +73,7 @@ These columns unlock the most academic features. They don't need to match exactl
 
 ## Minimal example (copy-pasteable)
 
-Here is the smallest valid `MX` tab for a literature review. Columns: A = CATEGORY, B–F = COLUMN.
+Here is the smallest valid `TAB` tab for a literature review. Columns: A = CATEGORY, B–F = COLUMN.
 
 ```
 Row 0:  CATEGORY   COLUMN       COLUMN    COLUMN  COLUMN  COLUMN
