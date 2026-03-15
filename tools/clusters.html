@@ -8,8 +8,8 @@
   <link rel="stylesheet" href="../design-system.css?v=9fa06a28">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="../utilities/utils-keywords.js?v=7"></script>
-  <script src="../utilities/utils-shared.js?v=02230b0b"></script>
-  <script src="../utilities/utils-synthesis.js?v=215b0400"></script>
+  <script src="../utilities/utils-shared.js?v=425998b6"></script>
+  <script src="../utilities/utils-synthesis.js?v=3"></script>
   <script src="../utilities/utils-panel.js?v=7"></script>
   <script type="module" src="../utilities/utils-embedding.js?v=4"></script>
   <style>
@@ -817,8 +817,11 @@
         if (typeof initClustersTool !== 'function') return;
         _clusterTool = initClustersTool(visualPane, null);
         _showPanelSections('visual');
+        // Proxy all input/change/click events from the visible outer panel
+        // to the hidden pane copies where the tool bound its listeners
+        setTimeout(function(){ _proxyVisualControls(visualPane); }, 80);
         // Inject named principles as defined clusters with their colours
-        setTimeout(function(){ _injectPrinciplesAsClusters(); }, 300);
+        setTimeout(function(){ _injectPrinciplesAsClusters(); }, 350);
         if (_embReady) {
           window.dispatchEvent(new CustomEvent('embedder-ready'));
           setTimeout(function(){
@@ -836,6 +839,72 @@
       if (outer) outer.style.display = tab === 'principles' ? '' : 'none';
       if (inner) inner.style.display = tab === 'visual'     ? '' : 'none';
       visualBtns.forEach(function(b){ b.style.display = tab === 'visual' ? '' : 'none'; });
+    }
+
+    function _proxyVisualControls(pane) {
+      // The tool bound event listeners to elements inside `pane` (hidden).
+      // The visible outer panel has duplicate IDs (from cl-inner-sections innerHTML copy).
+      // We find each visible outer control and forward its events to the hidden pane copy.
+      var innerSecs = document.getElementById('cl-inner-sections');
+      if (!innerSecs) return;
+
+      var SLIDER_IDS = [
+        'pp-cl-defthresh',
+        'pp-cl-omin','pp-cl-omax',
+        'pp-cl-imin','pp-cl-imax',
+        'pp-cl-depth','pp-cl-maxlen',
+      ];
+      var BTN_IDS = ['pp-cl-def-add-btn','pp-cl-recluster'];
+
+      SLIDER_IDS.forEach(function(id) {
+        var visible = innerSecs.querySelector('#'+id);
+        var hidden  = pane.querySelector('#'+id);
+        if (!visible || !hidden) return;
+        ['input','change'].forEach(function(evt) {
+          visible.addEventListener(evt, function() {
+            hidden.value = visible.value;
+            hidden.dispatchEvent(new Event(evt, { bubbles: true }));
+          });
+        });
+      });
+
+      BTN_IDS.forEach(function(id) {
+        var visible = innerSecs.querySelector('#'+id);
+        var hidden  = pane.querySelector('#'+id);
+        if (!visible || !hidden) return;
+        visible.addEventListener('click', function(e) {
+          e.stopPropagation();
+          hidden.click();
+        });
+      });
+
+      // "Add defined cluster" textarea — proxy keydown (Enter) and input
+      var visTa = innerSecs.querySelector('#pp-cl-def-ta');
+      var hidTa = pane.querySelector('#pp-cl-def-ta');
+      if (visTa && hidTa) {
+        ['input','keydown','keyup'].forEach(function(evt) {
+          visTa.addEventListener(evt, function(e) {
+            hidTa.value = visTa.value;
+            hidTa.dispatchEvent(new KeyboardEvent(evt, { key:e.key, bubbles:true, cancelable:true }));
+          });
+        });
+      }
+
+      // Sync val display spans from hidden back to visible after tool updates them
+      var VAL_IDS = [
+        'pp-cl-defthresh-val',
+        'pp-cl-omin-val','pp-cl-omax-val',
+        'pp-cl-imin-val','pp-cl-imax-val',
+        'pp-cl-depth-val','pp-cl-maxlen-val',
+      ];
+      VAL_IDS.forEach(function(id) {
+        var visVal = innerSecs.querySelector('#'+id);
+        var hidVal = pane.querySelector('#'+id);
+        if (!visVal || !hidVal) return;
+        new MutationObserver(function() {
+          visVal.textContent = hidVal.textContent;
+        }).observe(hidVal, { childList: true, characterData: true, subtree: true });
+      });
     }
 
     function _injectPrinciplesAsClusters() {
