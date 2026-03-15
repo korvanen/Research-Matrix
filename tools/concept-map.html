@@ -49,26 +49,6 @@
       overflow: hidden; position: relative;
     }
 
-    /* ── Principle node overlay styling ──
-       Once utils-concept-map.js renders cards, a MutationObserver marks
-       principle nodes with data-principle-color. These rules style them. */
-    [data-principle-color] .pp-cmap-card-top {
-      background: var(--pnc, var(--md-sys-color-primary)) !important;
-      border-radius: 5px 5px 0 0;
-    }
-    [data-principle-color] .pp-cmap-card-cat-num {
-      color: #fff !important; font-weight: 700 !important; font-size: 11px !important;
-      letter-spacing: .04em !important;
-    }
-    [data-principle-color] .pp-cmap-card-level-num,
-    [data-principle-color] .pp-cmap-card-level-label { color: rgba(255,255,255,.85) !important; }
-    [data-principle-color] {
-      border-color: var(--pnc, var(--md-sys-color-primary)) !important;
-      box-shadow: 0 2px 8px rgba(0,0,0,.15) !important;
-    }
-    [data-principle-color] .pp-cmap-card-body .pp-cmap-cell-text {
-      font-weight: 600 !important; font-size: 13px !important;
-    }
     /* Principle badge */
     .cm-principle-badge {
       display: inline-block; font-size: 9px; font-weight: 800;
@@ -517,15 +497,12 @@
         var paneEl = document.getElementById('cm-pane');
         _cmTool    = initConceptMapTool(paneEl, null);
 
-        // Mirror our outer sliders → tool sliders, then hide the duplicate tool sliders
+        // Mirror outer sliders to tool's hidden sliders, hide ALL cm-tool-sections
+        // (the tool's Parameters+Layout sections are already exposed in our Map panel)
         setTimeout(function(){
           _mirrorSliders();
-          // Hide duplicated Parameters section from tool (we expose them in Global/Map)
           var toolSecs = document.getElementById('cm-tool-sections');
-          if (toolSecs) {
-            var paramSec = toolSecs.querySelector('.pp-side-panel-section');
-            if (paramSec) paramSec.style.display = 'none';
-          }
+          if (toolSecs) toolSecs.style.display = 'none';
         }, 100);
 
         // Do NOT call _cmTool.start() here — initConceptMapTool already fires
