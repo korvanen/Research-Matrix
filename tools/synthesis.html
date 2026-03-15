@@ -356,7 +356,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="../utilities/utils-keywords.js?v=7"></script>
   <script src="../utilities/utils-shared.js?v=425998b6"></script>
-  <script src="../utilities/utils-synthesis.js?v=e531b851"></script>
+  <script src="../utilities/utils-synthesis.js?v=2"></script>
   <script type="module" src="../utilities/utils-embedding.js?v=4"></script>
 
   <script>
@@ -481,14 +481,48 @@
     }
 
     function _tryLoadFramework(){
-      // Find FRAMEWORK tabs from the raw all-tabs data
-      // The XLSX fetch loads ALL tabs; we need to re-fetch or read from TABS + a stored copy
-      if (!window.TABS || !window.TABS.length) return;
-      // Look for FRAMEWORK tabs stored via setFrameworkTabs
-      var fwTabs = SY.getFrameworkTabs();
-      fwTabs.forEach(function(tab){
-        var loaded = SY.loadFromFrameworkTab(tab.grid);
-        if (loaded) console.log('[synthesis] loaded state from', tab.name);
+      // The XLSX/sheet fetch only loads TAB-prefixed tabs into window.TABS.
+      // The FRAMEWORK tab is only accessible via the Apps Script endpoint.
+      // We fetch it automatically on load if a script URL is configured.
+      var scriptUrl = SY.getScriptUrl();
+      var sheetUrl  = typeof getSavedSheetUrl === 'function' ? getSavedSheetUrl() : '';
+      if (!scriptUrl || !sheetUrl) {
+        // No script URL yet — nothing to load from sheet
+        return;
+      }
+      // Show loading state
+      var banner = document.getElementById('sy-changed-banner');
+      if (banner) {
+        banner.className = 'sy-changed-banner visible';
+        banner.innerHTML = 'Reading FRAMEWORK tab from sheet...';
+      }
+      SY.readFramework(scriptUrl, sheetUrl).then(function(tabs) {
+        var fwTab = tabs.find(function(t){ return t.name && t.name.indexOf('FRAMEWORK') !== -1; });
+        if (!fwTab) {
+          console.log('[synthesis] No FRAMEWORK tab found in sheet');
+          if (banner) banner.classList.remove('visible');
+          return;
+        }
+        console.log('[synthesis] Loading state from FRAMEWORK tab:', fwTab.name);
+        SY.setFrameworkTabs([{ name: fwTab.name, grid: fwTab.rows }]);
+        var loaded = SY.loadFromFrameworkTab(fwTab.rows);
+        if (loaded) {
+          console.log('[synthesis] State restored from FRAMEWORK tab');
+          if (banner) {
+            banner.innerHTML = 'State restored from FRAMEWORK tab. <button id="sy-dismiss-fw" style="background:none;border:none;cursor:pointer;color:#f57f17;text-decoration:underline;font-size:12px;">Dismiss</button>';
+            document.getElementById('sy-dismiss-fw').addEventListener('click', function(){
+              banner.classList.remove('visible');
+            });
+          }
+          _checkChangedSources();
+          updateCounts();
+          renderAll();
+        } else {
+          if (banner) banner.classList.remove('visible');
+        }
+      }).catch(function(e) {
+        console.warn('[synthesis] Could not read FRAMEWORK tab:', e.message);
+        if (banner) banner.classList.remove('visible');
       });
     }
 
