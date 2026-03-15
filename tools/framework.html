@@ -250,15 +250,7 @@
 
     // ── Global settings ───────────────────────────────────────────────────────
 
-    if (_threshSlider) _threshSlider.addEventListener('input', function(){
-      var v = parseInt(_threshSlider.value);
-      _threshVal.textContent = v + '%';
-      SY.updateSettings({ threshold: v/100 });
     });
-    if (_maxWordsSlider) _maxWordsSlider.addEventListener('input', function(){
-      var v = parseInt(_maxWordsSlider.value);
-      _maxWordsVal.textContent = v;
-      SY.updateSettings({ maxWords: v });
     });
     window.addEventListener('sy-settings-changed', function(){
       var s = SY.getSettings();
