@@ -5,6 +5,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 console.log('[utils-synthesis.js v2.0]');
 
+
 window.SynthesisData = (function () {
   'use strict';
 
@@ -543,3 +544,4 @@ window.SynthesisData = (function () {
     exportCSV, exportMarkdown,
   };
 })();
+SynthesisData.resolveNoteKey(SynthesisData.getRowNoteKeys()[0])
