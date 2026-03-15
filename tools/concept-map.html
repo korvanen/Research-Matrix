@@ -9,7 +9,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="../utilities/utils-keywords.js?v=7"></script>
   <script src="../utilities/utils-shared.js?v=425998b6"></script>
-  <script src="../utilities/utils-synthesis.js?v=8fe72eda"></script>
+  <script src="../utilities/utils-synthesis.js?v=3"></script>
   <script src="../utilities/utils-panel.js?v=7"></script>
   <script type="module" src="../utilities/utils-embedding.js?v=4"></script>
   <style>
@@ -43,10 +43,6 @@
 
     /* ── Panel controls ── */
     .cm-panel-label { font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--md-sys-color-on-surface-variant); padding: 8px 0 4px; }
-    .cm-range-row   { display: flex; align-items: center; gap: 8px; padding: 3px 0; }
-    .cm-range-label { font-size: 12px; color: var(--md-sys-color-on-surface-variant); min-width: 56px; }
-    .cm-range       { flex: 1; accent-color: var(--md-sys-color-primary); cursor: pointer; }
-    .cm-range-val   { font-size: 12px; font-weight: 600; min-width: 32px; text-align: right; }
     .cm-panel-btn {
       display: flex; align-items: center; justify-content: center; gap: 6px;
       width: 100%; height: 30px; border-radius: 15px; border: none; cursor: pointer;
@@ -101,31 +97,31 @@
         '<span id="cm-emb-text">Loading…</span>' +
       '</div>' +
       '<div class="cm-panel-label">Cluster threshold</div>' +
-      '<div class="cm-range-row">' +
-        '<input type="range" class="cm-range" id="cm-thresh-slider" min="20" max="70" value="'+Math.round(SY.getSettings().threshold*100)+'" step="1">' +
-        '<span class="cm-range-val" id="cm-thresh-val">'+Math.round(SY.getSettings().threshold*100)+'%</span>' +
+      '<div class="pp-range-row">' +
+        '<input type="range" class="pp-range" id="cm-thresh-slider" min="20" max="70" value="'+Math.round(SY.getSettings().threshold*100)+'" step="1">' +
+        '<span class="pp-range-val" id="cm-thresh-val">'+Math.round(SY.getSettings().threshold*100)+'%</span>' +
       '</div>' +
       '<div class="cm-panel-label">Max words (split)</div>' +
-      '<div class="cm-range-row">' +
-        '<input type="range" class="cm-range" id="cm-maxwords-slider" min="20" max="300" value="'+SY.getSettings().maxWords+'" step="10">' +
-        '<span class="cm-range-val" id="cm-maxwords-val">'+SY.getSettings().maxWords+'</span>' +
+      '<div class="pp-range-row">' +
+        '<input type="range" class="pp-range" id="cm-maxwords-slider" min="20" max="300" value="'+SY.getSettings().maxWords+'" step="10">' +
+        '<span class="pp-range-val" id="cm-maxwords-val">'+SY.getSettings().maxWords+'</span>' +
       '</div>';
 
     var _toolHtml =
       '<div class="cm-panel-label">Hierarchy depth</div>' +
-      '<div class="cm-range-row">' +
-        '<input type="range" class="cm-range" id="cm-depth-slider" min="1" max="8" value="5" step="1">' +
-        '<span class="cm-range-val" id="cm-depth-val">5</span>' +
+      '<div class="pp-range-row">' +
+        '<input type="range" class="pp-range" id="cm-depth-slider" min="1" max="8" value="5" step="1">' +
+        '<span class="pp-range-val" id="cm-depth-val">5</span>' +
       '</div>' +
       '<div class="cm-panel-label">Edge threshold</div>' +
-      '<div class="cm-range-row">' +
-        '<input type="range" class="cm-range" id="cm-edge-slider" min="20" max="90" value="50" step="5">' +
-        '<span class="cm-range-val" id="cm-edge-val">50%</span>' +
+      '<div class="pp-range-row">' +
+        '<input type="range" class="pp-range" id="cm-edge-slider" min="20" max="90" value="50" step="5">' +
+        '<span class="pp-range-val" id="cm-edge-val">50%</span>' +
       '</div>' +
       '<div class="cm-panel-label">Max parents</div>' +
-      '<div class="cm-range-row">' +
-        '<input type="range" class="cm-range" id="cm-maxpar-slider" min="1" max="6" value="1" step="1">' +
-        '<span class="cm-range-val" id="cm-maxpar-val">1</span>' +
+      '<div class="pp-range-row">' +
+        '<input type="range" class="pp-range" id="cm-maxpar-slider" min="1" max="6" value="1" step="1">' +
+        '<span class="pp-range-val" id="cm-maxpar-val">1</span>' +
       '</div>' +
       '<div class="cm-panel-label">Layout</div>' +
       '<div class="cm-layout-grid" id="cm-layout-grid">' +
@@ -168,6 +164,14 @@
     }) : null;
 
     injectToolNav('concept-map.html');
+    // Upgrade panel sliders to MD3 pp-range style
+    (function(){
+      var panelBody = document.querySelector('.pp-side-panel-body');
+      if (panelBody && typeof upgradeSlider === 'function') {
+        panelBody.querySelectorAll('input[type=range].pp-range').forEach(upgradeSlider);
+      }
+    })();
+
 
     // ── Global settings ───────────────────────────────────────────────────────
     var _threshSlider   = document.getElementById('cm-thresh-slider');
@@ -189,19 +193,19 @@
       var s = ev.detail || SY.getSettings();
       if (_threshSlider)   { _threshSlider.value = Math.round(s.threshold*100); _threshVal.textContent = Math.round(s.threshold*100)+'%'; }
       if (_maxWordsSlider) { _maxWordsSlider.value = s.maxWords; _maxWordsVal.textContent = s.maxWords; }
-      // Re-split and re-embed, then rebuild map if already rendered
-      if (SY.autoSplitAll()) {
-        _buildTextToVec();
-        _overrideEmbeddingUtils();
-        var pending = SY.getEffectiveNoteKeys().filter(function(k){ return !_emb.has(k); });
-        if (pending.length && _embReady) {
-          _embedAll(pending).then(function(){
-            _buildPrincipleVecs(); _buildTextToVec(); _overrideEmbeddingUtils();
-            if (_cmTool) { _cmTool.reset(); _cmTool.start(); }
-          });
-        } else if (_cmTool) {
-          _cmTool.reset(); _cmTool.start();
-        }
+      // Always mirror to tool sliders (handles maxLen/Depth/Thresh)
+      _mirrorSliders();
+      // Re-split unassigned entries, embed new fragments, force rebuild
+      SY.autoSplitAll();
+      var pending = SY.getEffectiveNoteKeys().filter(function(k){ return !_emb.has(k); });
+      if (pending.length && _embReady) {
+        _embedAll(pending).then(function(){
+          _buildPrincipleVecs(); _buildTextToVec(); _overrideEmbeddingUtils();
+          if (_cmTool) { _cmTool.reset(); _cmTool.start(); }
+        });
+      } else if (_cmTool && _embReady) {
+        _buildPrincipleVecs(); _buildTextToVec(); _overrideEmbeddingUtils();
+        _cmTool.reset(); _cmTool.start();
       }
     });
 
@@ -227,16 +231,23 @@
     _syncSlider(_maxParSlider, _maxParVal, '');
 
     function _mirrorSliders() {
-      // Always query from the pane element so we target the hidden copy that
-      // the tool bound its 'input' listeners to, not any outer visible copy.
       var pane = document.getElementById('cm-pane');
       if (!pane) return;
-      var d = pane.querySelector('#pp-cmap-depth');
-      var t = pane.querySelector('#pp-cmap-thresh');
-      var m = pane.querySelector('#pp-cmap-maxpar');
-      if (d && _depthSlider)  { d.value = _depthSlider.value;  d.dispatchEvent(new Event('input')); }
-      if (t && _edgeSlider)   { t.value = _edgeSlider.value;   t.dispatchEvent(new Event('input')); }
-      if (m && _maxParSlider) { m.value = _maxParSlider.value; m.dispatchEvent(new Event('input')); }
+      var d  = pane.querySelector('#pp-cmap-depth');
+      var t  = pane.querySelector('#pp-cmap-thresh');
+      var m  = pane.querySelector('#pp-cmap-maxpar');
+      var ml = pane.querySelector('#pp-cmap-maxlen');
+      if (d  && _depthSlider)  { d.value  = _depthSlider.value;  d.dispatchEvent(new Event('input')); }
+      if (t  && _edgeSlider)   { t.value  = _edgeSlider.value;   t.dispatchEvent(new Event('input')); }
+      if (m  && _maxParSlider) { m.value  = _maxParSlider.value; m.dispatchEvent(new Event('input')); }
+      // Mirror maxWords → pp-cmap-maxlen (word count × avg 5 chars + space ≈ char budget)
+      // pp-cmap-maxlen range is 100-2000 chars; 0 means disabled
+      if (ml && _maxWordsSlider) {
+        var mw = parseInt(_maxWordsSlider.value);
+        var charBudget = mw >= 200 ? 2000 : Math.max(100, mw * 6);
+        ml.value = charBudget;
+        ml.dispatchEvent(new Event('input'));
+      }
     }
 
     // Layout buttons
