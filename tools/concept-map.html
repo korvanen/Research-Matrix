@@ -178,15 +178,7 @@
 
     // ── Global settings ───────────────────────────────────────────────────────
 
-    if (_threshSlider) _threshSlider.addEventListener('input', function(){
-      var v = parseInt(_threshSlider.value);
-      _threshVal.textContent = v + '%';
-      SY.updateSettings({ threshold: v/100 });
     });
-    if (_maxWordsSlider) _maxWordsSlider.addEventListener('input', function(){
-      var v = parseInt(_maxWordsSlider.value);
-      _maxWordsVal.textContent = v;
-      SY.updateSettings({ maxWords: v });
     });
     window.addEventListener('sy-settings-changed', function(ev){
       var s = ev.detail || SY.getSettings();
@@ -239,8 +231,8 @@
       if (m  && _maxParSlider) { m.value  = _maxParSlider.value; m.dispatchEvent(new Event('input')); }
       // Mirror maxWords → pp-cmap-maxlen (word count × avg 5 chars + space ≈ char budget)
       // pp-cmap-maxlen range is 100-2000 chars; 0 means disabled
-      if (ml && _maxWordsSlider) {
-        var mw = parseInt(_maxWordsSlider.value);
+      if (ml) {
+        var mw = parseInt((document.getElementById(window.GlobalPanel.IDS.MAXWORDS)||{value:'200'}).value);
         var charBudget = mw >= 200 ? 2000 : Math.max(100, mw * 6);
         ml.value = charBudget;
         ml.dispatchEvent(new Event('input'));
