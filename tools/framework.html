@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="../design-system.css?v=9fa06a28">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="../utilities/utils-keywords.js?v=7"></script>
-  <script src="../utilities/utils-shared.js?v=98079ea4"></script>
+  <script src="../utilities/utils-shared.js?v=425998b6"></script>
   <script src="../utilities/utils-synthesis.js?v=3"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; }
@@ -241,9 +241,6 @@
     });
 
 
-    window.addEventListener('sy-settings-changed', function(){
-      var s = SY.getSettings();
-                });
 
     // ── Sync panel ────────────────────────────────────────────────────────────
     function _loadScriptUrl() {
@@ -251,14 +248,6 @@
       var inp = document.getElementById('fw-script-url');
       if (inp && url) inp.value = url;
       _updateSyncStatus();
-    }
-    function _updateSyncStatus() {
-      var ls = SY.getLastSync();
-      var el = document.getElementById('fw-panel-status');
-      var topEl = document.getElementById('fw-sync-text');
-      var text = ls ? 'Last sync: ' + new Date(ls).toLocaleString() : 'Not synced yet';
-      if (el) el.textContent = text;
-      if (topEl) topEl.textContent = ls ? 'Synced ' + new Date(ls).toLocaleTimeString() : '';
     }
 
     document.getElementById('fw-script-save-btn').addEventListener('click', function(){
