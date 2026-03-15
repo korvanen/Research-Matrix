@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="../design-system.css?v=9fa06a28">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="../utilities/utils-keywords.js?v=7"></script>
-  <script src="../utilities/utils-shared.js?v=346a2603"></script>
+  <script src="../utilities/utils-shared.js?v=425998b6"></script>
   <script src="../utilities/utils-synthesis.js?v=3"></script>
   <script src="../utilities/utils-panel.js?v=7"></script>
   <script type="module" src="../utilities/utils-embedding.js?v=4"></script>
@@ -292,17 +292,17 @@
 
     // ── Panel HTML ───────────────────────────────────────────────────────────
     var _tabsSectionHtml =
-      '<div style="display:flex;flex-direction:column;gap:2px;padding:4px 0">' +
-        '<button class="cl-panel-chip en-tab-btn active" data-clview="principles" style="display:flex;align-items:center;justify-content:space-between;height:32px;border-radius:8px;padding:0 12px;font-size:13px;font-weight:500">' +
-          'Principles <span id="cl-n-named" style="background:var(--md-sys-color-secondary-container);color:var(--md-sys-color-on-secondary-container);border-radius:8px;padding:0 6px;font-size:10px;font-weight:700">0</span>' +
+      '<div class="pp-panel-tabs">' +
+        '<button class="pp-panel-tab active" data-clview="principles">' +
+          'Principles <span class="pp-panel-tab-n" id="cl-n-named">0</span>' +
         '</button>' +
-        '<button class="cl-panel-chip en-tab-btn" data-clview="visual" style="display:flex;align-items:center;justify-content:space-between;height:32px;border-radius:8px;padding:0 12px;font-size:13px;font-weight:500">' +
-          'Visual clusters <span id="cl-n-pool" style="background:var(--md-sys-color-surface-container-highest);color:var(--md-sys-color-on-surface-variant);border-radius:8px;padding:0 6px;font-size:10px;font-weight:700">0</span>' +
+        '<button class="pp-panel-tab" data-clview="visual">' +
+          'Visual <span class="pp-panel-tab-n" id="cl-n-pool">0</span>' +
         '</button>' +
-        '<div style="display:flex;align-items:center;gap:6px;padding:6px 0 2px">' +
-          '<div class="cl-emb-dot loading" id="cl-dot" style="width:7px;height:7px;border-radius:50%;flex-shrink:0"></div>' +
-          '<span id="cl-emb-text" style="font-size:11px;color:var(--md-sys-color-on-surface-variant)">Loading...</span>' +
-        '</div>' +
+      '</div>' +
+      '<div class="pp-panel-status-row">' +
+        '<div class="pp-panel-dot loading" id="cl-dot"></div>' +
+        '<span id="cl-emb-text">Loading…</span>' +
       '</div>';
 
     var _globalHtml =
@@ -392,20 +392,23 @@
       if (_maxWordsSlider) { _maxWordsSlider.value = s.maxWords; _maxWordsVal.textContent = s.maxWords; }
       _thresh = s.threshold;
       _clusters = null;
+      // Forward threshold to utils-clusters.js visual canvas if loaded
+      if (_clusterTool) {
+        var visualPane = document.getElementById('cl-visual-pane');
+        var defSlider  = visualPane && visualPane.querySelector('#pp-cl-defthresh');
+        if (defSlider) {
+          defSlider.value = Math.round(s.threshold * 100);
+          defSlider.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+      }
     });
 
-    // ── Sub-tab switching (buttons live in panel) ──────────────────────────
+    // ── Sub-tab switching (pp-panel-tab buttons live in panel) ──────────────
     document.addEventListener('click', function(e){
-      var btn = e.target.closest('[data-clview]'); if (!btn) return;
+      var btn = e.target.closest('.pp-panel-tab[data-clview]'); if (!btn) return;
       _view = btn.dataset.clview;
-      document.querySelectorAll('[data-clview]').forEach(function(b){
-        var isActive = b.dataset.clview === _view;
-        b.classList.toggle('active', isActive);
-        var badge = b.querySelector('span');
-        if (badge) {
-          badge.style.background = isActive ? 'var(--md-sys-color-secondary-container)' : 'var(--md-sys-color-surface-container-highest)';
-          badge.style.color = isActive ? 'var(--md-sys-color-on-secondary-container)' : 'var(--md-sys-color-on-surface-variant)';
-        }
+      document.querySelectorAll('.pp-panel-tab[data-clview]').forEach(function(b){
+        b.classList.toggle('active', b.dataset.clview === _view);
       });
       document.getElementById('cl-view-principles').hidden = _view !== 'principles';
       document.getElementById('cl-view-visual').hidden     = _view !== 'visual';
@@ -423,11 +426,11 @@
       var keys = SY.getRowNoteKeys();
       if (!keys.length || !window.EmbeddingUtils) return;
       _embedding = true;
-      document.getElementById('cl-dot').className = 'cl-emb-dot loading';
+      document.getElementById('cl-dot').className = 'pp-panel-dot loading';
       document.getElementById('cl-emb-text').textContent = 'Embedding ' + keys.length + ' entries...';
       _embedAll(keys).then(function(){
         _embedding = false; _embReady = true;
-        document.getElementById('cl-dot').className = 'cl-emb-dot ready';
+        document.getElementById('cl-dot').className = 'pp-panel-dot ready';
         var _clMsg = _emb.size + ' indexed';
         document.getElementById('cl-emb-text').textContent = _clMsg;
         if (_nav && _nav.subtitleEl) _nav.subtitleEl.textContent = _clMsg;
@@ -440,7 +443,7 @@
         }
       }).catch(function(e){
         _embedding = false;
-        document.getElementById('cl-dot').className = 'cl-emb-dot';
+        document.getElementById('cl-dot').className = 'pp-panel-dot';
         console.error('[clusters] embed error:', e);
       });
     }
@@ -778,11 +781,14 @@
             '</div>' +
             '<div class="pp-tool-main" style="flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden;position:relative;"></div>';
 
-          // Wrap existing outer sections for toggling
+          // Only wrap the LAST section (Principles) for toggling.
+          // Views and Global sections must always stay visible.
           if (_outerPanelBody && !document.getElementById('cl-outer-sections')) {
             var wrap = document.createElement('div');
             wrap.id = 'cl-outer-sections';
-            while (_outerPanelBody.firstChild) wrap.appendChild(_outerPanelBody.firstChild);
+            var allSecs = Array.from(_outerPanelBody.querySelectorAll(':scope > .pp-side-panel-section'));
+            // Wrap only sections after the first two (Views, Global)
+            allSecs.slice(2).forEach(function(sec){ wrap.appendChild(sec); });
             _outerPanelBody.appendChild(wrap);
           }
 
