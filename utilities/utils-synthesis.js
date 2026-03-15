@@ -5,7 +5,6 @@
 // ════════════════════════════════════════════════════════════════════════════
 console.log('[utils-synthesis.js v2.0]');
 
-
 window.SynthesisData = (function () {
   'use strict';
 
@@ -75,11 +74,19 @@ window.SynthesisData = (function () {
     return tabName + '::' + dataRowIdx + '::' + cellIdx;
   }
   function parseNoteKey(key) {
+    if (!key || typeof key !== 'string') {
+      console.error('[synthesis] parseNoteKey: invalid key:', key);
+      return { tabName: '', dataRowIdx: 0, cellIdx: 0 };
+    }
     var parts = key.split('::');
     return { tabName: parts[0], dataRowIdx: parseInt(parts[1]), cellIdx: parseInt(parts[2]) };
   }
 
   function resolveNoteKey(key) {
+    if (!key || typeof key !== 'string' || key.indexOf('::') === -1) {
+      console.error('[synthesis] resolveNoteKey: bad key:', key);
+      return null;
+    }
     var p = parseNoteKey(key);
     var tab = (window.TABS||[]).find(function(t){ return t.name === p.tabName; });
     if (!tab) return null;
@@ -111,12 +118,21 @@ window.SynthesisData = (function () {
     var gridCol = (data.colIndices && data.colIndices[p.cellIdx] !== undefined)
       ? data.colIndices[p.cellIdx]
       : p.cellIdx;
-    // Safety: if either is still NaN, log and fall back
+    // Log every resolved reference so we can verify correctness
+    console.log('[synthesis] resolveNoteKey', {
+      key: key,
+      headerRowIdx: data.headerRowIdx,
+      found: found,
+      dataRowIdx: p.dataRowIdx,
+      cellIdx: p.cellIdx,
+      colIndices: data.colIndices,
+      gridRow: gridRow,
+      gridCol: gridCol,
+      ref: cellRef(p.tabName, gridRow, gridCol),
+      text: (cell||'').slice(0,40),
+    });
     if (isNaN(gridRow) || isNaN(gridCol)) {
-      console.warn('[synthesis] resolveNoteKey: NaN coords for key='+key,
-        'headerRowIdx='+data.headerRowIdx, 'found='+found,
-        'dataRowIdx='+p.dataRowIdx, 'cellIdx='+p.cellIdx,
-        'colIndices='+JSON.stringify(data.colIndices));
+      console.error('[synthesis] resolveNoteKey: NaN — using fallback');
       gridRow = isNaN(gridRow) ? p.dataRowIdx + 2 : gridRow;
       gridCol = isNaN(gridCol) ? p.cellIdx        : gridCol;
     }
@@ -188,7 +204,16 @@ window.SynthesisData = (function () {
   // ── Assignments ───────────────────────────────────────────────────────────
   // status: 'confirmed' | 'auto' | 'suggested' | 'unassigned'
 
-  function getAssignments()      { return _load(SK.ASSIGNMENTS, []); }
+  function getAssignments() {
+    var raw = _load(SK.ASSIGNMENTS, []);
+    return raw.filter(function(a) {
+      if (!a.noteKey || typeof a.noteKey !== 'string') {
+        console.warn('[synthesis] dropping assignment with bad noteKey:', a);
+        return false;
+      }
+      return true;
+    });
+  }
   function _saveAssignments(as)  { _save(SK.ASSIGNMENTS, as); }
 
   function getAssignment(noteKey) {
@@ -544,4 +569,3 @@ window.SynthesisData = (function () {
     exportCSV, exportMarkdown,
   };
 })();
-SynthesisData.resolveNoteKey(SynthesisData.getRowNoteKeys()[0])
