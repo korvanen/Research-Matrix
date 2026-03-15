@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="../design-system.css?v=9fa06a28">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="../utilities/utils-keywords.js?v=7"></script>
-  <script src="../utilities/utils-shared.js?v=0aa54525"></script>
+  <script src="../utilities/utils-shared.js?v=425998b6"></script>
   <script src="../utilities/utils-synthesis.js?v=3"></script>
   <script src="../utilities/utils-panel.js?v=7"></script>
   <script type="module" src="../utilities/utils-embedding.js?v=4"></script>
@@ -433,9 +433,9 @@
     // ── Init concept map ──────────────────────────────────────────────────────
     function _initConceptMap() {
       if (_cmTool) {
-        // Already loaded — just rebuild
         _buildPrincipleVecs();
         _buildTextToVec();
+        _overrideEmbeddingUtils();
         _cmTool.reset();
         _cmTool.start();
         return;
@@ -443,26 +443,66 @@
 
       _overrideEmbeddingUtils();
 
-      // Lazy-load utils-concept-map.js
-      var s   = document.createElement('script');
-      s.src   = '../utilities/utils-concept-map.js?v=09bacb2e';
+      // ── Mock PPNavRail to prevent double-panel ──
+      var _realPPNavRail  = window.PPNavRail;
+      var _outerPanelBody = document.querySelector('#cm-body .pp-side-panel-body');
+      var _outerSubtitle  = document.querySelector('#cm-body .pp-side-panel-subtitle');
+      var _outerRail      = document.querySelector('#cm-body .pp-nav-rail');
+      var _outerPanel     = document.querySelector('#cm-body .pp-side-panel');
+
+      window.PPNavRail = {
+        create: function(paneEl, opts) {
+          window.PPNavRail = _realPPNavRail; // restore immediately
+
+          // Append tool panel sections into our outer panel (below Global+Map sections)
+          if (_outerPanelBody && opts && opts.panelSections) {
+            var toolSecs = document.createElement('div');
+            toolSecs.id = 'cm-tool-sections';
+            opts.panelSections.forEach(function(sec){
+              var d = document.createElement('div');
+              d.className = 'pp-side-panel-section';
+              d.innerHTML = '<div class="pp-side-panel-section-label">'+sec.label+'</div>'+sec.html;
+              toolSecs.appendChild(d);
+            });
+            // Insert before Legend section
+            var legend = _outerPanelBody.querySelector('.pp-side-panel-section:last-child');
+            if (legend) _outerPanelBody.insertBefore(toolSecs, legend);
+            else        _outerPanelBody.appendChild(toolSecs);
+          }
+
+          // Use paneEl directly — no inner nav rail created
+          paneEl.innerHTML = '';
+          paneEl.style.cssText = 'flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden;position:relative;';
+
+          return {
+            railEl:     _outerRail,
+            panelEl:    _outerPanel,
+            mainEl:     paneEl,
+            subtitleEl: _outerSubtitle || document.createElement('span'),
+            statusEl:   document.createElement('div'),
+          };
+        }
+      };
+
+      var s = document.createElement('script');
+      s.src = '../utilities/utils-concept-map.js?v=09bacb2e';
       s.onload = function(){
         if (typeof initConceptMapTool !== 'function') return;
         var paneEl = document.getElementById('cm-pane');
         _cmTool    = initConceptMapTool(paneEl, null);
 
-        // Mirror our slider values into the tool's sliders
-        setTimeout(_mirrorSliders, 100);
+        // Mirror our outer sliders → tool sliders, then hide the duplicate tool sliders
+        setTimeout(function(){
+          _mirrorSliders();
+          // Hide duplicated Parameters section from tool (we expose them in Global/Map)
+          var toolSecs = document.getElementById('cm-tool-sections');
+          if (toolSecs) {
+            var paramSec = toolSecs.querySelector('.pp-side-panel-section');
+            if (paramSec) paramSec.style.display = 'none';
+          }
+        }, 100);
 
-        // Set up the side panel if available
-        if (_sidePanel && _cmTool.resize) {
-          // keep cmTool.resize already wired via createSidePanel callbacks
-        }
-
-        // Start rendering
         _cmTool.start();
-
-        // Watch for new cards and style principle nodes
         _watchForPrincipleCards(paneEl);
         _updateLegend();
       };
