@@ -8,8 +8,9 @@
   <link rel="stylesheet" href="../design-system.css?v=9fa06a28">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="../utilities/utils-keywords.js?v=7"></script>
-  <script src="../utilities/utils-shared.js?v=0aa54525"></script>
+  <script src="../utilities/utils-shared.js?v=425998b6"></script>
   <script src="../utilities/utils-synthesis.js?v=3"></script>
+  <script src="../utilities/utils-academic.js?v=66257bc0"></script>
   <script type="module" src="../utilities/utils-embedding.js?v=4"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; }
@@ -430,8 +431,10 @@
     var _embedding  = false;
     var _view       = 'browse';
     var _selectedKey= null;
-    var _filter     = 'all';
+    var _filter      = 'all';
+    var _screenFilter = 'all';   // all | unscreened | included | excluded
     var _browseSearch = '';
+    var _importMode   = null;    // 'bib' | 'csv'
     var _searchResults = [];
     var _searching  = false;
     var _topN       = 20;
@@ -458,7 +461,18 @@
       '<div class="en-panel-range-row">' +
         '<input type="range" class="en-panel-range" id="en-maxwords-slider" min="20" max="300" value="'+SY.getSettings().maxWords+'" step="10">' +
         '<span class="en-panel-range-val" id="en-maxwords-val">'+SY.getSettings().maxWords+'</span>' +
-      '</div>';
+      '</div>' +
+      '<div class="en-panel-label">Screening</div>' +
+      '<div id="en-screening-progress" style="font-size:11px;color:var(--md-sys-color-on-surface-variant);padding:2px 0 4px">–</div>' +
+      '<div class="en-panel-label">Import references</div>' +
+      '<div style="display:flex;flex-direction:column;gap:4px;padding:2px 0 6px">' +
+        '<button class="en-panel-chip" id="en-import-bib-btn" style="text-align:left;height:28px;border-radius:6px">BibTeX file…</button>' +
+        '<button class="en-panel-chip" id="en-import-csv-btn" style="text-align:left;height:28px;border-radius:6px">CSV file…</button>' +
+      '</div>' +
+      '<input type="file" id="en-file-input" accept=".bib,.csv,.txt" style="display:none">' +
+      '<div class="en-panel-label">Methods blurb</div>' +
+      '<button class="en-panel-chip" id="en-methods-btn" style="text-align:left;height:28px;border-radius:6px;width:100%">Generate…</button>' +
+      '<div id="en-methods-blurb" style="display:none;font-size:11px;line-height:1.5;color:var(--md-sys-color-on-surface-variant);padding:6px 0;white-space:pre-wrap"></div>';
 
     var _browsePanelHtml =
       '<div class="en-panel-label">Show</div>' +
@@ -467,6 +481,13 @@
         '<button class="en-panel-chip" data-f="unassigned">Unassigned</button>' +
         '<button class="en-panel-chip" data-f="assigned">Assigned</button>' +
         '<button class="en-panel-chip" data-f="pending">Pending</button>' +
+      '</div>' +
+      '<div class="en-panel-label">Screening</div>' +
+      '<div class="en-panel-chips" id="en-screen-chips">' +
+        '<button class="en-panel-chip active" data-sc="all">All</button>' +
+        '<button class="en-panel-chip" data-sc="unscreened">Unscreened</button>' +
+        '<button class="en-panel-chip" data-sc="included">Included</button>' +
+        '<button class="en-panel-chip" data-sc="excluded">Excluded</button>' +
       '</div>';
 
     var _searchPanelHtml =
@@ -587,6 +608,106 @@
       });
     }
 
+    // ── Screening filter chips ───────────────────────────────────────────────
+    document.addEventListener('click', function(e){
+      var chip = e.target.closest('#en-screen-chips [data-sc]'); if (!chip) return;
+      document.querySelectorAll('#en-screen-chips .en-panel-chip').forEach(function(c){ c.classList.remove('active'); });
+      chip.classList.add('active');
+      _screenFilter = chip.dataset.sc;
+      renderBrowse();
+    });
+
+    // ── Import + methods blurb ───────────────────────────────────────────────
+    document.addEventListener('click', function(e){
+      if (e.target.id === 'en-import-bib-btn') { _importMode='bib'; _triggerFileImport('.bib,.txt'); }
+      if (e.target.id === 'en-import-csv-btn') { _importMode='csv'; _triggerFileImport('.csv,.txt'); }
+      if (e.target.id === 'en-methods-btn')    { _toggleMethodsBlurb(); }
+    });
+
+    function _triggerFileImport(accept) {
+      var inp = document.getElementById('en-file-input');
+      if (!inp) {
+        inp = document.createElement('input');
+        inp.type = 'file'; inp.id = 'en-file-input'; inp.style.display = 'none';
+        document.body.appendChild(inp);
+        inp.addEventListener('change', function(){
+          var file = inp.files[0]; if (!file) return;
+          var reader = new FileReader();
+          reader.onload = function(ev){
+            var text = ev.target.result;
+            var AC   = window.AcademicUtils;
+            if (!AC) return;
+            var entries = _importMode === 'bib' ? AC.parseBibTeX(text) : AC.parseCSVText(text);
+            if (!entries || !entries.length) { alert('No entries found in file.'); return; }
+            var grid    = typeof AC.citationsToGrid === 'function' ? AC.citationsToGrid(entries) : null;
+            if (!grid)  { alert('Imported '+entries.length+' entries but no grid converter available.'); return; }
+            var tabName = 'IMPORT-' + file.name.replace(/\.[^.]*$/, '').toUpperCase().slice(0,20).replace(/[^A-Z0-9]/g,'-');
+            if (!window.TABS) window.TABS = [];
+            if (!window.TABS.find(function(t){ return t.name === tabName; })) {
+              window.TABS.push({ name: tabName, grid: grid });
+              if (typeof AC.saveImportedTabs === 'function') AC.saveImportedTabs([{ name:tabName, grid:grid }]);
+            }
+            window.dispatchEvent(new CustomEvent('sheet-loaded', { detail: { tabCount: window.TABS.length } }));
+            alert('Imported '+entries.length+' entries as "'+tabName+'".');
+          };
+          reader.readAsText(file);
+          inp.value = '';
+        });
+      }
+      inp.accept = accept;
+      inp.click();
+    }
+
+    function _toggleMethodsBlurb() {
+      var btn   = document.getElementById('en-methods-btn');
+      var blurb = document.getElementById('en-methods-blurb');
+      if (!btn || !blurb) return;
+      var AC = window.AcademicUtils;
+      if (!AC || typeof AC.generateMethodsBlurb !== 'function') { alert('AcademicUtils not loaded.'); return; }
+      if (blurb.style.display !== 'none') {
+        blurb.style.display = 'none'; btn.textContent = 'Generate…'; return;
+      }
+      var text = AC.generateMethodsBlurb({
+        threshold: SY.getSettings().threshold,
+        model: 'all-MiniLM-L6-v2 (Xenova/Transformers.js)',
+        toolName: 'Dimensional Framework',
+      });
+      blurb.textContent = text; blurb.style.display = '';
+      btn.textContent = 'Hide';
+      var copyId = 'en-blurb-copy';
+      if (!document.getElementById(copyId)) {
+        var copy = document.createElement('button');
+        copy.id = copyId; copy.className = 'en-panel-chip';
+        copy.textContent = 'Copy'; copy.style.cssText = 'width:100%;text-align:left;height:28px;border-radius:6px;margin-top:3px;';
+        blurb.parentNode.insertBefore(copy, blurb.nextSibling);
+        copy.addEventListener('click', function(){
+          navigator.clipboard.writeText(text).then(function(){ copy.textContent='Copied!'; setTimeout(function(){ copy.textContent='Copy'; },1500); });
+        });
+      }
+    }
+
+    function _updateScreeningProgress() {
+      var el = document.getElementById('en-screening-progress');
+      if (!el || !window.AcademicUtils) return;
+      var AC = window.AcademicUtils;
+      if (typeof AC.getScreeningProgress !== 'function') return;
+      var p = AC.getScreeningProgress();
+      if (!p) { el.textContent = 'Load a sheet first'; return; }
+      var pct = p.total ? Math.round((p.included+p.excluded)/p.total*100) : 0;
+      el.innerHTML =
+        '<span style="color:#2e7d32">✓ '+p.included+'</span> included &nbsp;'+
+        '<span style="color:#b71c1c">✗ '+p.excluded+'</span> excluded &nbsp;'+
+        p.unscreened+' pending &nbsp;<strong>'+pct+'%</strong>';
+    }
+
+    function _tabRowFromKey(key) {
+      var p = SY.parseNoteKey(key);
+      return {
+        tabIdx: (window.TABS||[]).findIndex(function(t){ return t.name === p.tabName; }),
+        rowIdx: p.dataRowIdx,
+      };
+    }
+
     // ── Browse search ────────────────────────────────────────────────────────
     var _browseSearchEl = document.getElementById('en-browse-search');
     if (_browseSearchEl) {
@@ -652,6 +773,7 @@
     window.addEventListener('sheet-loaded', function(){
       updateCounts(); renderBrowse(); _triggerEmbed();
       _loadFrameworkIfNeeded();
+      _updateScreeningProgress();
     });
 
     function _loadFrameworkIfNeeded() {
@@ -688,6 +810,12 @@
         if (_filter === 'unassigned' && a) return false;
         if (_filter === 'assigned'   && (!a || a.status !== 'confirmed')) return false;
         if (_filter === 'pending'    && (!a || a.status !== 'auto')) return false;
+        // Screening filter
+        if (_screenFilter !== 'all' && window.AcademicUtils) {
+          var tr  = _tabRowFromKey(key);
+          var scr = AcademicUtils.getScreeningStatus(tr.tabIdx, tr.rowIdx);
+          if (scr !== _screenFilter) return false;
+        }
         if (_browseSearch) {
           var r = SY.resolveNoteKey(key); if (!r) return false;
           var s = _browseSearch.toLowerCase();
@@ -713,8 +841,12 @@
         var parsed = typeof parseCitation === 'function' ? parseCitation(r.text) : { body:r.text, citation:null };
 
         html += '<div class="en-card'+(isSel?' selected':'')+'" data-key="'+_h(key)+'">';
+        var _tr  = _tabRowFromKey(key);
+        var _scr = window.AcademicUtils ? AcademicUtils.getScreeningStatus(_tr.tabIdx, _tr.rowIdx) : 'unscreened';
         html += '<div class="en-card-top">';
         html += '<span class="en-badge en-badge-tab">'+_h(r.tabName)+'</span>';
+        if (_scr === 'included') html += '<span class="en-badge" style="background:rgba(46,125,50,.12);color:#2e7d32">✓ included</span>';
+        if (_scr === 'excluded') html += '<span class="en-badge" style="background:rgba(183,28,28,.1);color:#b71c1c">✗ excluded</span>';
         if (a && a.status==='auto')      html += '<span class="en-badge en-badge-auto">auto</span>';
         if (a && a.status==='confirmed') html += '<span class="en-badge en-badge-conf">assigned</span>';
         if (p) html += '<span class="en-p-tag" style="background:'+_h(p.color)+'">'+_h(p.name.slice(0,22))+'</span>';
@@ -730,6 +862,11 @@
         if (a) html += '<button class="en-card-btn" data-action="unassign" data-key="'+_h(key)+'">Unassign</button>';
         if (!a && r.text.split(/\s+/).length > SY.getSettings().maxWords)
           html += '<button class="en-card-btn" data-action="split" data-key="'+_h(key)+'">Split</button>';
+        if (window.AcademicUtils) {
+          if (_scr !== 'included') html += '<button class="en-card-btn" data-action="screen-include" data-key="'+_h(key)+'">✓ Include</button>';
+          if (_scr !== 'excluded') html += '<button class="en-card-btn" data-action="screen-exclude" data-key="'+_h(key)+'">✗ Exclude</button>';
+          if (_scr !== 'unscreened') html += '<button class="en-card-btn" data-action="screen-reset" data-key="'+_h(key)+'">Reset</button>';
+        }
         html += '</div>';
         html += '</div>';
       });
@@ -763,6 +900,20 @@
           e.stopPropagation();
           var childKeys = SY.splitNote(btn.dataset.key);
           if (childKeys.length) { renderBrowse(); renderDetail(btn.dataset.key); }
+        });
+      });
+      // Screening actions
+      ['screen-include','screen-exclude','screen-reset'].forEach(function(action){
+        listEl.querySelectorAll('[data-action='+action+']').forEach(function(btn){
+          btn.addEventListener('click', function(e){
+            e.stopPropagation();
+            if (!window.AcademicUtils) return;
+            var tr = _tabRowFromKey(btn.dataset.key);
+            var status = action === 'screen-include' ? 'included' : action === 'screen-exclude' ? 'excluded' : 'unscreened';
+            AcademicUtils.setScreeningStatus(tr.tabIdx, tr.rowIdx, status, '');
+            _updateScreeningProgress();
+            renderBrowse();
+          });
         });
       });
     }
@@ -862,7 +1013,45 @@
       }
       html += '</div>';
 
+      // ── Annotation + screening ────────────────────────────────────────────
+      if (window.AcademicUtils) {
+        var _dtr  = _tabRowFromKey(key);
+        var _dscr = AcademicUtils.getScreeningStatus(_dtr.tabIdx, _dtr.rowIdx);
+        var _dann = AcademicUtils.getAnnotation(_dtr.tabIdx, _dtr.rowIdx);
+        var _sColor = { included:'#2e7d32', excluded:'#b71c1c', unscreened:'var(--md-sys-color-on-surface-variant)' };
+        html += '<div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--md-sys-color-outline-variant)">';
+        html += '<span class="en-section-label">Screening</span>';
+        html += '<div style="display:flex;gap:5px;margin-bottom:10px">';
+        ['included','excluded','unscreened'].forEach(function(s){
+          var lbl = {included:'✓ Include', excluded:'✗ Exclude', unscreened:'Reset'}[s];
+          html += '<button class="en-card-btn" data-action="det-screen" data-s="'+s+'" style="'+(s===_dscr?'font-weight:700;color:'+_sColor[s]:'')+'">'+lbl+'</button>';
+        });
+        html += '</div>';
+        html += '<span class="en-section-label">Annotation</span>';
+        html += '<textarea id="en-det-annotation" style="width:100%;min-height:70px;padding:7px 9px;font-family:var(--font-family);font-size:13px;border:1px solid var(--md-sys-color-outline-variant);border-radius:4px;background:transparent;color:inherit;resize:vertical;outline:none" placeholder="Notes about this entry…">'+_h(_dann)+'</textarea>';
+        html += '</div>';
+      }
+
       contentEl.innerHTML = html;
+
+      // Wire screening in detail pane
+      contentEl.querySelectorAll('[data-action=det-screen]').forEach(function(btn){
+        btn.addEventListener('click', function(){
+          if (!window.AcademicUtils) return;
+          var tr = _tabRowFromKey(key);
+          AcademicUtils.setScreeningStatus(tr.tabIdx, tr.rowIdx, btn.dataset.s, '');
+          _updateScreeningProgress();
+          renderDetail(key); renderBrowse();
+        });
+      });
+      // Wire annotation autosave
+      var annEl = contentEl.querySelector('#en-det-annotation');
+      if (annEl && window.AcademicUtils) {
+        annEl.addEventListener('blur', function(){
+          var tr = _tabRowFromKey(key);
+          AcademicUtils.setAnnotation(tr.tabIdx, tr.rowIdx, annEl.value);
+        });
+      }
 
       // Wire events
       contentEl.querySelectorAll('.en-reg-btn').forEach(function(btn){
@@ -1145,6 +1334,7 @@
     // ── Init ─────────────────────────────────────────────────────────────────
     document.addEventListener('DOMContentLoaded', function(){
       updateCounts();
+      _updateScreeningProgress();
     });
 
   })();
