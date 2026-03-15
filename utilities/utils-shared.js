@@ -1704,13 +1704,19 @@ window.GlobalPanel = (function() {
   }
 
   // ── Set slider value + text + fire input (updates upgradeSlider fill) ────
+  // _syncing flag prevents the 'input' dispatch from re-triggering sy-settings-changed
+  var _syncing = false;
+
   function _set(slId, valId, rawVal) {
     var sl  = document.getElementById(slId);
     var vel = document.getElementById(valId);
     if (!sl) return;
     sl.value = rawVal;
     if (vel) vel.textContent = sl.value; // .value clamps to min/max
+    // Dispatch 'input' only for the visual fill update — guarded against re-entry
+    _syncing = true;
     sl.dispatchEvent(new Event('input'));
+    _syncing = false;
   }
 
   function _syncFromSettings(s) {
@@ -1739,10 +1745,11 @@ window.GlobalPanel = (function() {
     // Sync initial values (upgradeSlider sets fill based on current value)
     _syncFromSettings(sy.getSettings());
 
-    // Wire threshold slider
+    // Wire threshold slider — bail if this event was fired programmatically by _set()
     var tsl = document.getElementById(IDS.THRESH);
     if (tsl) {
       tsl.addEventListener('input', function() {
+        if (_syncing) return;
         var v = parseInt(tsl.value);
         document.getElementById(IDS.THRESH_V).textContent = v + '%';
         sy.updateSettings({ threshold: v / 100 });
@@ -1754,6 +1761,7 @@ window.GlobalPanel = (function() {
     var msl = document.getElementById(IDS.MAXWORDS);
     if (msl) {
       msl.addEventListener('input', function() {
+        if (_syncing) return;
         var v = parseInt(msl.value);
         document.getElementById(IDS.MAXWORDS_V).textContent = v;
         sy.updateSettings({ maxWords: v });
@@ -1762,10 +1770,14 @@ window.GlobalPanel = (function() {
     }
 
     // sy-settings-changed — fired by SY.updateSettings() in this tab
+    var _handlingSettingsChange = false;
     window.addEventListener('sy-settings-changed', function(ev) {
+      if (_handlingSettingsChange) return;
+      _handlingSettingsChange = true;
       var s = (ev && ev.detail) || sy.getSettings();
       _syncFromSettings(s);
       if (opts.onSettingsChanged) opts.onSettingsChanged(s);
+      _handlingSettingsChange = false;
     });
 
     // storage — cross-tab sync (fires in all OTHER open tabs)
@@ -1774,7 +1786,9 @@ window.GlobalPanel = (function() {
       var s = sy.getSettings();
       _syncFromSettings(s);
       // Re-dispatch so the tool's own sy-settings-changed handler runs
-      window.dispatchEvent(new CustomEvent('sy-settings-changed', { detail: s }));
+      if (!_handlingSettingsChange) {
+        window.dispatchEvent(new CustomEvent('sy-settings-changed', { detail: s }));
+      }
     });
   }
 
