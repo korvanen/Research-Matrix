@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="../design-system.css?v=9fa06a28">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="../utilities/utils-keywords.js?v=7"></script>
-  <script src="../utilities/utils-shared.js?v=0067db69"></script>
+  <script src="../utilities/utils-shared.js?v=425998b6"></script>
   <script src="../utilities/utils-synthesis.js?v=3"></script>
   <script src="../utilities/utils-panel.js?v=7"></script>
   <script type="module" src="../utilities/utils-embedding.js?v=4"></script>
@@ -160,31 +160,40 @@
     injectToolNav('concept-map.html');
     window.GlobalPanel.init({
       onSettingsChanged: function(s) {
-        // Update maxLen in the hidden tool panel directly (don't call _mirrorSliders
-        // here — that would trigger tryRender via input events AND we call reset/start below)
+        if (!_embReady) return; // nothing to do until embeddings are ready
+        // Forward maxWords to the tool's internal maxLen slider (char budget)
         var pane = document.getElementById('cm-pane');
         if (pane) {
           var ml = pane.querySelector('#pp-cmap-maxlen');
           if (ml) {
-            var mw = s.maxWords;
-            ml.value = mw >= 200 ? 2000 : Math.max(100, mw * 6);
+            ml.value = s.maxWords >= 200 ? 2000 : Math.max(100, s.maxWords * 6);
             ml.dispatchEvent(new Event('input'));
           }
         }
-        // Re-split and re-embed new fragments, then rebuild map once
+        // Auto-split any entries that are now too long, embed new fragments,
+        // then do ONE rebuild — never concurrent with an ongoing embed
+        if (_embedding) return; // embed in progress; skip (next change will catch up)
         SY.autoSplitAll();
         var pending = SY.getEffectiveNoteKeys().filter(function(k){ return !_emb.has(k); });
-        if (pending.length && _embReady) {
+        if (pending.length) {
           _embedAll(pending).then(function(){
             _buildPrincipleVecs(); _buildTextToVec(); _overrideEmbeddingUtils();
             if (_cmTool) { _cmTool.reset(); _cmTool.start(); }
           });
-        } else if (_cmTool && _embReady) {
+        } else if (_cmTool) {
           _buildPrincipleVecs(); _buildTextToVec(); _overrideEmbeddingUtils();
           _cmTool.reset(); _cmTool.start();
         }
       },
     });
+
+    // Upgrade the map-specific sliders (depth/edge/maxpar) to MD3 pp-range style
+    setTimeout(function(){
+      ['cm-depth-slider','cm-edge-slider','cm-maxpar-slider'].forEach(function(id){
+        var el = document.getElementById(id);
+        if (el && typeof upgradeSlider === 'function') upgradeSlider(el);
+      });
+    }, 0);
 
     // ── Map controls ──────────────────────────────────────────────────────────
     var _depthSlider  = document.getElementById('cm-depth-slider');
@@ -196,14 +205,26 @@
 
     function _syncSlider(slider, valEl, suffix) {
       if (!slider) return;
+      // Update display on every tick (smooth)
       slider.addEventListener('input', function(){
         valEl.textContent = slider.value + (suffix||'');
-        _mirrorSliders();
       });
-      // Blur immediately after mouseup/pointerup so the slider doesn't steal
-      // wheel events (trackpad scroll = zoom) away from the canvas
-      slider.addEventListener('pointerup',  function(){ slider.blur(); });
-      slider.addEventListener('touchend',   function(){ slider.blur(); });
+      // Only mirror + rebuild on release — avoids continuous tryRender calls while dragging
+      function onRelease() {
+        slider.blur();
+        _mirrorSliders();
+        if (_cmTool && _embReady) {
+          _buildPrincipleVecs(); _buildTextToVec(); _overrideEmbeddingUtils();
+          _cmTool.reset(); _cmTool.start();
+        }
+      }
+      slider.addEventListener('pointerup', onRelease);
+      slider.addEventListener('touchend',  onRelease);
+      // Keyboard users: rebuild when they stop arrowing (blur fires after keyup)
+      slider.addEventListener('keyup', function(e){
+        valEl.textContent = slider.value + (suffix||'');
+        onRelease();
+      });
     }
     _syncSlider(_depthSlider,  _depthVal,  '');
     _syncSlider(_edgeSlider,   _edgeVal,   '%');
