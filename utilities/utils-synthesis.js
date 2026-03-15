@@ -105,8 +105,20 @@ window.SynthesisData = (function () {
       if (count === p.dataRowIdx) { found = r; break; }
       count++;
     }
-    var gridRow = found !== -1 ? found : data.headerRowIdx + p.dataRowIdx + 1;
-    var gridCol = data.colIndices ? data.colIndices[p.cellIdx] : p.cellIdx;
+    var _hri = parseInt(data.headerRowIdx);
+    var gridRow = found !== -1 ? found : (!isNaN(_hri) ? _hri + p.dataRowIdx + 1 : p.dataRowIdx + 2);
+    var gridCol = (data.colIndices && data.colIndices[p.cellIdx] !== undefined)
+      ? data.colIndices[p.cellIdx]
+      : p.cellIdx;
+    // Safety: if either is still NaN, log and fall back
+    if (isNaN(gridRow) || isNaN(gridCol)) {
+      console.warn('[synthesis] resolveNoteKey: NaN coords for key='+key,
+        'headerRowIdx='+data.headerRowIdx, 'found='+found,
+        'dataRowIdx='+p.dataRowIdx, 'cellIdx='+p.cellIdx,
+        'colIndices='+JSON.stringify(data.colIndices));
+      gridRow = isNaN(gridRow) ? p.dataRowIdx + 2 : gridRow;
+      gridCol = isNaN(gridCol) ? p.cellIdx        : gridCol;
+    }
 
     return {
       text:       cell,
@@ -504,7 +516,7 @@ window.SynthesisData = (function () {
       byDim[dim].forEach(function(p){
         lines.push('\n### P-'+String(p.seq).padStart(2,'0')+': '+p.name+'\n');
         var pAs=assignments.filter(function(a){return a.principleId===p.id;});
-        var byReg={what:[],why:[],who:[],how:{}}; pAs.forEach(function(a){if(byReg[a.register])byReg[a.register].push(a);});
+        var byReg={what:[],why:[],who:[],how:[]}; pAs.forEach(function(a){if(byReg[a.register])byReg[a.register].push(a);});
         REGS.forEach(function(reg){
           lines.push('**'+reg.toUpperCase()+'?**');
           var rAs=byReg[reg]||[];
