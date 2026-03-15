@@ -179,6 +179,10 @@
     .sy-fw-editable:focus{border-color:var(--md-sys-color-primary);}
     .sy-fw-editable.gap{color:var(--md-sys-color-on-surface-variant);background:rgba(255,193,7,.1);border-color:rgba(255,193,7,.4);font-style:italic;}
     .sy-fw-sep{height:3px;background:var(--md-sys-color-surface-container);}
+    .sy-fw-rule-edit{display:block;width:100%;min-height:32px;padding:4px 6px;border-radius:4px;border:1px solid transparent;font-family:var(--font-family);font-size:13px;line-height:1.5;color:var(--md-sys-color-on-surface);cursor:text;outline:none;transition:border-color .12s;}
+    .sy-fw-rule-edit:focus{border-color:var(--md-sys-color-primary);background:color-mix(in srgb,var(--md-sys-color-primary) 3%,transparent);}
+    .sy-fw-rule-edit.has-ref{color:var(--md-sys-color-on-surface);}
+    .sy-fw-rule-edit.no-note{color:var(--md-sys-color-outline);font-style:italic;}
     .sy-fw-p-name-row td{font-size:13px;font-weight:600;color:var(--md-sys-color-on-surface);padding:7px 12px 5px;}
 
     /* Sync panel */
@@ -205,6 +209,16 @@
     .sy-diff-line{padding:3px 0;}
     .sy-diff-line.added{color:#2e7d32;}.sy-diff-line.removed{color:#b71c1c;}
     .sy-modal-foot{display:flex;gap:8px;justify-content:flex-end;}
+
+    /* Principle create/rename modal */
+    .sy-p-modal-bg{position:fixed;inset:0;z-index:8100;background:rgba(0,0,0,.4);display:none;align-items:center;justify-content:center;}
+    .sy-p-modal-bg.open{display:flex;}
+    .sy-p-modal{background:var(--md-sys-color-surface);border-radius:12px;padding:24px;width:360px;box-shadow:0 8px 32px rgba(0,0,0,.22);}
+    .sy-p-modal-title{font-size:15px;font-weight:600;margin-bottom:16px;color:var(--md-sys-color-on-surface);}
+    .sy-p-modal-foot{display:flex;gap:8px;justify-content:flex-end;margin-top:18px;}
+    .sy-p-dim-chips{display:flex;gap:5px;flex-wrap:wrap;margin-top:6px;}
+    .sy-p-dim-chip{height:28px;padding:0 12px;border-radius:14px;border:1px solid var(--md-sys-color-outline-variant);background:transparent;font-size:12px;font-weight:500;cursor:pointer;color:var(--md-sys-color-on-surface-variant);transition:all .12s;}
+    .sy-p-dim-chip.active{background:var(--md-sys-color-secondary-container);color:var(--md-sys-color-on-secondary-container);border-color:transparent;}
 
     /* Changed-source alert */
     .sy-changed-banner{flex-shrink:0;background:rgba(255,193,7,.12);border-bottom:1px solid rgba(255,193,7,.3);padding:8px 14px;font-size:12px;color:#f57f17;display:none;}
@@ -295,6 +309,31 @@
     </div>
   </div>
 
+  <!-- Principle create/rename modal -->
+  <div class="sy-p-modal-bg" id="sy-p-modal-bg">
+    <div class="sy-p-modal">
+      <div class="sy-p-modal-title" id="sy-p-modal-title">New principle</div>
+      <div class="sy-field">
+        <label class="sy-fl">Name</label>
+        <input class="sy-input" id="sy-p-modal-name" placeholder="e.g. Threshold Gradient" autocomplete="off">
+      </div>
+      <div class="sy-field">
+        <label class="sy-fl">Dimension</label>
+        <div class="sy-p-dim-chips" id="sy-p-modal-dims">
+          <button class="sy-p-dim-chip" data-dim="Physical">Physical</button>
+          <button class="sy-p-dim-chip" data-dim="Social">Social</button>
+          <button class="sy-p-dim-chip" data-dim="Organisational">Organisational</button>
+          <button class="sy-p-dim-chip" data-dim="Temporal">Temporal</button>
+          <button class="sy-p-dim-chip" data-dim="Economic">Economic</button>
+        </div>
+      </div>
+      <div class="sy-p-modal-foot">
+        <button class="sy-btn sy-btn-ghost" id="sy-p-modal-cancel">Cancel</button>
+        <button class="sy-btn sy-btn-primary" id="sy-p-modal-confirm">Create</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Assign popover -->
   <div class="sy-pop" id="sy-pop">
     <div class="sy-pop-label">Assign to principle</div>
@@ -343,7 +382,7 @@
     // ── Init ─────────────────────────────────────────────────────────────
     document.addEventListener('DOMContentLoaded', function(){
       _setupTabs(); _setupThreshold(); _setupSearch(); _setupFilters();
-      _setupAssignPop(); _setupExports(); _setupSync(); _setupNewPrincipleBtn();
+      _setupAssignPop(); _setupExports(); _setupSync(); _setupPrincipleModal(); _setupNewPrincipleBtn();
       _loadScriptUrl();
       // Don't renderAll() here — TABS is not populated yet.
       // sheet-loaded event below handles first render.
@@ -764,7 +803,7 @@
         });
       });
       listEl.querySelectorAll('[data-action=rename-p]').forEach(function(btn){
-        btn.addEventListener('click',function(e){e.stopPropagation();var p=SY.getPrinciples().find(function(x){return x.id===btn.dataset.pid;});if(!p)return;var n=prompt('Rename:',p.name);if(n&&n.trim()){SY.updatePrinciple(p.id,{name:n.trim()});renderAll();}});
+        btn.addEventListener('click',function(e){e.stopPropagation();var p=SY.getPrinciples().find(function(x){return x.id===btn.dataset.pid;});if(!p)return; _openPModal('Rename principle',p.name,p.dimensionHint,function(name,dim){SY.updatePrinciple(p.id,{name:name,dimensionHint:dim});renderAll();});});
       });
       listEl.querySelectorAll('[data-action=archive-p]').forEach(function(btn){
         btn.addEventListener('click',function(e){e.stopPropagation();SY.updatePrinciple(btn.dataset.pid,{archived:true,named:false});SY.getAssignments().filter(function(a){return a.principleId===btn.dataset.pid;}).forEach(function(a){SY.rejectAssignment(a.noteKey);});_clusters=null;renderAll();});
@@ -795,23 +834,29 @@
         html += '<span class="sy-chevron'+(open?' open':'')+'">&#9658;</span>';
         html += '</div>';
         html += '<div class="sy-cl-body'+(open?' open':'')+'">';
+        // Group notes by heuristic register for preview
+        var clByReg = {what:[],why:[],who:[],how:[]};
         cl.noteKeys.forEach(function(key){
           var r=SY.resolveNoteKey(key); if(!r) return;
-          html += '<div class="sy-cl-note"><div class="sy-cl-note-inner"><div class="sy-cl-note-text">'+_h(r.text)+'</div><div class="sy-cl-note-src">'+_h(r.tabName)+(r.cats&&r.cats.filter(Boolean).length?' &rsaquo; '+r.cats.filter(Boolean).map(function(c){return _h(c);}).join(' &rsaquo; '):'')+'</div></div>';
-          html += '<button class="sy-assign-btn" data-key="'+_h(key)+'">Assign</button></div>';
+          var reg = SY.suggestRegister(r.text);
+          if(clByReg[reg]) clByReg[reg].push({key:key,r:r}); else clByReg.what.push({key:key,r:r});
+        });
+        var REG_LABEL_CL = {what:'WHAT?',why:'WHY?',who:'WHO?',how:'HOW?'};
+        var REG_CLS_CL   = {what:'what',why:'why',who:'who',how:'how'};
+        ['what','why','who','how'].forEach(function(reg){
+          var items = clByReg[reg]; if(!items.length) return;
+          html += '<div style="padding:5px 12px 2px;font-size:9px;font-weight:700;letter-spacing:.06em;color:var(--md-sys-color-on-surface-variant)" class="sy-fw-cat '+REG_CLS_CL[reg]+'">'+REG_LABEL_CL[reg]+'</div>';
+          items.forEach(function(item){
+            var r=item.r, key=item.key;
+            html += '<div class="sy-cl-note"><div class="sy-cl-note-inner"><div class="sy-cl-note-text">'+_h(r.text)+'</div><div class="sy-cl-note-src">'+_h(r.tabName)+(r.cats&&r.cats.filter(Boolean).length?' &rsaquo; '+r.cats.filter(Boolean).map(function(cc){return _h(cc);}).join(' &rsaquo; '):'')+'</div></div>';
+            html += '<button class="sy-assign-btn" data-key="'+_h(key)+'">Assign</button></div>';
+          });
         });
         html += '<div class="sy-cl-foot">';
         html += '<button class="sy-btn sy-btn-tonal" data-action="name-cl" data-ci="'+ci+'" style="height:26px;font-size:11px;padding:0 12px">Name this cluster</button>';
         if (cl.sugg) html += '<button class="sy-btn sy-btn-ghost" data-action="merge-cl" data-ci="'+ci+'" data-pid="'+_h(cl.sugg.id)+'" style="height:26px;font-size:11px;padding:0 10px">Merge into '+_h(cl.sugg.name.slice(0,16))+'</button>';
         html += '</div>';
-        html += '<div class="sy-name-form" id="sy-nf-'+ci+'">';
-        html += '<div class="sy-name-row">';
-        html += '<div style="flex:1;min-width:100px"><label class="sy-fl">Principle name</label><input class="sy-input" style="height:32px" placeholder="e.g. Threshold Gradient" id="sy-ni-'+ci+'"></div>';
-        html += '<div style="flex:0 0 130px"><label class="sy-fl">Dimension</label>';
-        html += '<select class="sy-input" style="height:32px;cursor:pointer" id="sy-nd-'+ci+'"><option value="Physical">Physical</option><option value="Social">Social</option><option value="Organisational">Organisational</option><option value="Temporal">Temporal</option><option value="Economic">Economic</option><option value="">— unassigned</option></select></div>';
-        html += '<button class="sy-btn sy-btn-primary" data-action="confirm-name" data-ci="'+ci+'" style="height:32px;font-size:12px;margin-top:auto">Create</button>';
-        html += '<button class="sy-btn sy-btn-ghost"   data-action="cancel-name"  data-ci="'+ci+'" style="height:32px;font-size:12px;margin-top:auto">Cancel</button>';
-        html += '</div></div>';
+
         html += '</div></div>';
       });
 
@@ -843,22 +888,18 @@
         chip.addEventListener('click',function(){var r=chip.getBoundingClientRect();_openAssignPop(chip.dataset.key,r.left,r.bottom+4);});
       });
       poolEl.querySelectorAll('[data-action=name-cl]').forEach(function(btn){
-        btn.addEventListener('click',function(e){e.stopPropagation();var f=document.getElementById('sy-nf-'+btn.dataset.ci);if(f){f.classList.add('open');document.getElementById('sy-ni-'+btn.dataset.ci).focus();}});
-      });
-      poolEl.querySelectorAll('[data-action=cancel-name]').forEach(function(btn){
-        btn.addEventListener('click',function(e){e.stopPropagation();var f=document.getElementById('sy-nf-'+btn.dataset.ci);if(f) f.classList.remove('open');});
-      });
-      poolEl.querySelectorAll('[data-action=confirm-name]').forEach(function(btn){
         btn.addEventListener('click',function(e){
           e.stopPropagation();
-          var ci=btn.dataset.ci, ni=document.getElementById('sy-ni-'+ci), nd=document.getElementById('sy-nd-'+ci);
-          var name=(ni?ni.value:'').trim(); if(!name){if(ni)ni.focus();return;}
-          var p=SY.addPrinciple({name:name,dimensionHint:nd?nd.value:''});
-          var cl=clusters[parseInt(ci)];
-          if(cl) cl.noteKeys.forEach(function(k){SY.setAssignment(k,p.id,SY.suggestRegister((SY.resolveNoteKey(k)||{text:''}).text),'confirmed',null);});
-          _clusters=null; _openP.add(p.id); renderAll();
+          var ci = btn.dataset.ci;
+          var cl = clusters[parseInt(ci)];
+          _openPModal('Name this cluster','',cl&&cl.sugg?cl.sugg.dimensionHint:'',function(name,dim){
+            var p=SY.addPrinciple({name:name,dimensionHint:dim});
+            if(cl) cl.noteKeys.forEach(function(k){SY.setAssignment(k,p.id,SY.suggestRegister((SY.resolveNoteKey(k)||{text:''}).text),'confirmed',null);});
+            _clusters=null; _openP.add(p.id); renderAll();
+          });
         });
       });
+
       poolEl.querySelectorAll('[data-action=merge-cl]').forEach(function(btn){
         btn.addEventListener('click',function(e){
           e.stopPropagation();
@@ -869,12 +910,51 @@
       });
     }
 
+    function _setupPrincipleModal(){
+      var _pModalCb = null;
+      window._openPModal = function(title, defaultName, defaultDim, cb){
+        _pModalCb = cb;
+        document.getElementById('sy-p-modal-title').textContent = title||'New principle';
+        document.getElementById('sy-p-modal-name').value = defaultName||'';
+        var confirmBtn = document.getElementById('sy-p-modal-confirm');
+        confirmBtn.textContent = (title&&title.startsWith('Rename')) ? 'Rename' : 'Create';
+        document.querySelectorAll('.sy-p-dim-chip').forEach(function(ch){
+          ch.classList.toggle('active', ch.dataset.dim===(defaultDim||''));
+        });
+        document.getElementById('sy-p-modal-bg').classList.add('open');
+        setTimeout(function(){ var inp=document.getElementById('sy-p-modal-name'); inp.focus(); inp.select(); }, 60);
+      };
+      document.getElementById('sy-p-modal-cancel').addEventListener('click', function(){
+        document.getElementById('sy-p-modal-bg').classList.remove('open'); _pModalCb=null;
+      });
+      document.getElementById('sy-p-modal-bg').addEventListener('click', function(e){
+        if(e.target===e.currentTarget){ document.getElementById('sy-p-modal-bg').classList.remove('open'); _pModalCb=null; }
+      });
+      document.querySelectorAll('.sy-p-dim-chip').forEach(function(ch){
+        ch.addEventListener('click',function(){
+          document.querySelectorAll('.sy-p-dim-chip').forEach(function(x){x.classList.remove('active');});
+          ch.classList.add('active');
+        });
+      });
+      document.getElementById('sy-p-modal-confirm').addEventListener('click', function(){
+        var name = document.getElementById('sy-p-modal-name').value.trim();
+        if (!name){ document.getElementById('sy-p-modal-name').focus(); return; }
+        var activeChip = document.querySelector('.sy-p-dim-chip.active');
+        var dim = activeChip ? activeChip.dataset.dim : '';
+        document.getElementById('sy-p-modal-bg').classList.remove('open');
+        var cb = _pModalCb; _pModalCb = null;
+        if (cb) cb(name, dim);
+      });
+      document.getElementById('sy-p-modal-name').addEventListener('keydown',function(e){
+        if(e.key==='Enter') document.getElementById('sy-p-modal-confirm').click();
+        if(e.key==='Escape'){ document.getElementById('sy-p-modal-bg').classList.remove('open'); _pModalCb=null; }
+      });
+    }
+
     function _setupNewPrincipleBtn(){
+      // _openPModal is defined in _setupNewPrincipleBtn below
       document.getElementById('sy-new-p-btn').addEventListener('click',function(){
-        var n=prompt('Principle name:'); if(!n||!n.trim()) return;
-        var d=prompt('Dimension (Physical/Social/etc.):') || '';
-        var p=SY.addPrinciple({name:n.trim(),dimensionHint:d.trim()});
-        _openP.add(p.id); renderAll();
+        _openPModal('New principle','','',function(name,dim){ var p=SY.addPrinciple({name:name,dimensionHint:dim}); _openP.add(p.id); renderAll(); });
       });
       var bulk=document.getElementById('sy-bulk-confirm-btn');
       if(bulk) bulk.addEventListener('click',function(){
@@ -895,13 +975,15 @@
       document.addEventListener('click',function(e){if(!document.getElementById('sy-pop').contains(e.target)) _closePop();});
       document.getElementById('sy-pop-new').addEventListener('click',function(){
         if(!_assignCtx) return;
-        var n=prompt('New principle name:'); if(!n||!n.trim()) return;
-        var d=prompt('Dimension:') || '';
-        var p=SY.addPrinciple({name:n.trim(),dimensionHint:d.trim()});
-        var r=SY.resolveNoteKey(_assignCtx.key);
-        SY.setAssignment(_assignCtx.key,p.id,r?SY.suggestRegister(r.text):'what','confirmed',null);
-        _clusters=null; _openP.add(p.id); _closePop(); renderAll();
-        if(_selectedKey===_assignCtx.key) _renderNoteDetail(_assignCtx.key);
+        var _savedCtx = _assignCtx;
+        _closePop();
+        _openPModal('New principle','','',function(name,dim){
+          var p=SY.addPrinciple({name:name,dimensionHint:dim});
+          var r=SY.resolveNoteKey(_savedCtx.key);
+          SY.setAssignment(_savedCtx.key,p.id,r?SY.suggestRegister(r.text):'what','confirmed',null);
+          _clusters=null; _openP.add(p.id); renderAll();
+          if(_selectedKey===_savedCtx.key) _renderNoteDetail(_savedCtx.key);
+        });
       });
     }
 
@@ -964,20 +1046,22 @@
           pAs.forEach(function(a){if(byReg[a.register]) byReg[a.register].push(a);});
           html+='<tr class="sy-fw-sep"><td colspan="5" style="padding:0;height:3px;background:var(--md-sys-color-surface-container)"></td></tr>';
           html+='<tr class="sy-fw-p-name-row"><td class="sy-fw-id">'+_h(pId)+'</td><td colspan="4">'+_h(p.name)+'</td></tr>';
-          REGS.forEach(function(reg,ri){
-            var regAs=byReg[reg],ruleHtml='';
-            if(regAs.length){
-              var r=SY.resolveNoteKey(regAs[0].noteKey);
-              ruleHtml=r?_h(r.text):'<span class="sy-fw-no-note">[source missing]</span>';
-              if(regAs.length>1) ruleHtml+=' <span class="sy-badge" style="background:var(--md-sys-color-surface-container-high);color:var(--md-sys-color-on-surface-variant);font-size:10px">+' + (regAs.length-1)+'</span>';
-            } else {ruleHtml='<span class="sy-fw-no-note">No note assigned</span>';}
-            html+='<tr><td class="sy-fw-id"></td><td class="sy-fw-cat '+reg+'">'+REG_LABEL[reg]+'</td><td>'+ruleHtml+'</td>';
-            if(ri===0){
-              var mv=p.move||'', mt=p.metric||'';
-              html+='<td rowspan="4"><div class="sy-fw-editable'+(mv?'':' gap')+'" contenteditable="true" spellcheck="false" data-pid="'+_h(p.id)+'" data-field="move">'+(mv||'Click to add...')+'</div></td>';
-              html+='<td rowspan="4"><div class="sy-fw-editable'+(mt?'':' gap')+'" contenteditable="true" spellcheck="false" data-pid="'+_h(p.id)+'" data-field="metric">'+(mt||'Click to add...')+'</div></td>';
-            }
-            html+='</tr>';
+          var mbr = p.moveByReg   || {what:'',why:'',who:'',how:''};
+          var tbr = p.metricByReg || {what:'',why:'',who:'',how:''};
+          REGS.forEach(function(reg){
+            var regAs=byReg[reg];
+            var ruleText = regAs.length ? (SY.resolveNoteKey(regAs[0].noteKey)||{text:''}).text : '';
+            var hasNote  = !!ruleText;
+            var ruleDisplay = hasNote ? _h(ruleText) : 'No note assigned';
+            if(regAs.length>1) ruleDisplay += ' <span class="sy-badge" style="background:var(--md-sys-color-surface-container-high);color:var(--md-sys-color-on-surface-variant);font-size:10px">+'+(regAs.length-1)+'</span>';
+            var mv = mbr[reg]||'', mt = tbr[reg]||'';
+            html += '<tr>';
+            html += '<td class="sy-fw-id"></td>';
+            html += '<td class="sy-fw-cat '+reg+'">'+REG_LABEL[reg]+'</td>';
+            html += '<td><div class="sy-fw-rule-edit'+(hasNote?' has-ref':' no-note')+'" contenteditable="'+(hasNote?'false':'true')+'" spellcheck="false" data-pid="'+_h(p.id)+'" data-reg="'+reg+'" data-field="rule">'+ruleDisplay+'</div></td>';
+            html += '<td><div class="sy-fw-editable'+(mv?'':' gap')+'" contenteditable="true" spellcheck="false" data-pid="'+_h(p.id)+'" data-reg="'+reg+'" data-field="move">'+(mv||'Click to add...')+'</div></td>';
+            html += '<td><div class="sy-fw-editable'+(mt?'':' gap')+'" contenteditable="true" spellcheck="false" data-pid="'+_h(p.id)+'" data-reg="'+reg+'" data-field="metric">'+(mt||'Click to add...')+'</div></td>';
+            html += '</tr>';
           });
         });
         html+='</tbody></table></div>';
@@ -985,11 +1069,25 @@
       fw.innerHTML=html;
 
       fw.querySelectorAll('[contenteditable]').forEach(function(el){
-        el.addEventListener('focus',function(){if(el.textContent.trim()==='Click to add...') el.textContent='';});
+        if (el.contentEditable === 'false') return;
+        el.addEventListener('focus',function(){ if(el.textContent.trim()==='Click to add...') el.textContent=''; });
         el.addEventListener('blur',function(){
-          var v=el.textContent.trim(); if(!v){el.textContent='Click to add...';el.classList.add('gap');}else el.classList.remove('gap');
-          var u={}; u[el.dataset.field]=(v==='Click to add...')?'':v;
-          SY.updatePrinciple(el.dataset.pid,u);
+          var v   = el.textContent.trim();
+          var pid = el.dataset.pid;
+          var reg = el.dataset.reg;
+          var field = el.dataset.field;
+          if (!v){ el.textContent='Click to add...'; el.classList.add('gap'); }
+          else el.classList.remove('gap');
+          var val = (v==='Click to add...') ? '' : v;
+          if (field==='move'){
+            var p=SY.getPrinciples().find(function(x){return x.id===pid;}); if(!p) return;
+            var mbr=Object.assign({},p.moveByReg||{what:'',why:'',who:'',how:''}); mbr[reg]=val;
+            SY.updatePrinciple(pid,{moveByReg:mbr});
+          } else if (field==='metric'){
+            var p=SY.getPrinciples().find(function(x){return x.id===pid;}); if(!p) return;
+            var tbr=Object.assign({},p.metricByReg||{what:'',why:'',who:'',how:''}); tbr[reg]=val;
+            SY.updatePrinciple(pid,{metricByReg:tbr});
+          }
         });
         el.addEventListener('keydown',function(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();el.blur();}});
       });
