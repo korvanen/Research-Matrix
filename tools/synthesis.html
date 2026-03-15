@@ -356,7 +356,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="../utilities/utils-keywords.js?v=7"></script>
   <script src="../utilities/utils-shared.js?v=425998b6"></script>
-  <script src="../utilities/utils-synthesis.js?v=cbce3677"></script>
+  <script src="../utilities/utils-synthesis.js?v=2"></script>
   <script type="module" src="../utilities/utils-embedding.js?v=4"></script>
 
   <script>
@@ -391,7 +391,20 @@
 
     document.addEventListener('embedder-ready', _onEmbedReady);
     window.addEventListener('embedding-complete', _onEmbedReady);
-    window.addEventListener('sheet-loaded', function(){ _tryLoadFramework(); _checkChangedSources(); renderAll(); });
+    window.addEventListener('sheet-loaded', function(){
+      _tryLoadFramework(); _checkChangedSources(); renderAll();
+      // If model was already ready before the sheet loaded, embed now
+      if (_embReady && _emb.size === 0) {
+        _embedAll().then(function(){
+          document.getElementById('sy-emb-dot').className = 'sy-emb-dot ready';
+          document.getElementById('sy-emb-label').textContent = _emb.size + ' embedded';
+          _clusters = null;
+          _runAutoAssignment();
+          if (_view === 'principles') renderPrinciples();
+          if (_view === 'notes') renderNotes();
+        });
+      }
+    });
 
     function _onEmbedReady(){
       if (_embReady) return; _embReady = true;
@@ -409,7 +422,7 @@
     }
 
     async function _embedAll(){
-      if (!window.EmbeddingUtils) return;
+      if (!window.EmbeddingUtils || !window.EmbeddingUtils.isReady()) return;
       var keys = SY.getRowNoteKeys();
       for (var i=0; i<keys.length; i++){
         var key = keys[i];
@@ -417,9 +430,9 @@
         var r = SY.resolveNoteKey(key);
         if (!r || !r.text.trim()) continue;
         try {
-          var vec = await window.EmbeddingUtils.embed(r.text);
-          if (vec) _emb.set(key, vec);
-        } catch(e){}
+          var vec = await window.EmbeddingUtils.getCachedEmbedding(r.text);
+          if (vec) _emb.set(key, new Float32Array(vec));
+        } catch(e){ console.warn('[synthesis] embed failed:', e.message); }
       }
     }
 
@@ -428,8 +441,8 @@
       var r = SY.resolveNoteKey(key);
       if (!r || !r.text.trim()) return;
       try {
-        var vec = await window.EmbeddingUtils.embed(r.text);
-        if (vec){ _emb.set(key, vec); _clusters = null; }
+        var vec = await window.EmbeddingUtils.getCachedEmbedding(r.text);
+        if (vec){ _emb.set(key, new Float32Array(vec)); _clusters = null; }
       } catch(e){}
     }
 
@@ -576,7 +589,9 @@
         if (isChanged)                   html += '<span class="sy-badge sy-badge-changed">source changed</span>';
         if (p) html += '<span class="sy-note-p-tag" style="background:'+_h(p.color)+'">'+_h(p.name.slice(0,20))+'</span>';
         html += '</div>';
-        html += '<div class="sy-note-text">'+_h(r.text)+'</div>';
+        var _nc_parsed = typeof parseCitation==='function' ? parseCitation(r.text) : {body:r.text,citation:null};
+        var _nc_pill = _nc_parsed.citation ? ' <span class="pp-cite-pill" style="background:var(--md-sys-color-surface-container-highest);color:var(--md-sys-color-on-surface-variant)">'+_h(_nc_parsed.citation)+'</span>' : '';
+        html += '<div class="sy-note-text">'+_h(_nc_parsed.body)+_nc_pill+'</div>';
         if (r.cats && r.cats.filter(Boolean).length) html += '<div class="sy-note-meta">'+r.cats.filter(Boolean).map(function(c){return _h(c);}).join(' &rsaquo; ')+'</div>';
         html += '<div class="sy-note-actions">';
         html += '<button class="sy-note-action" data-action="assign" data-key="'+_h(key)+'">Assign</button>';
@@ -761,7 +776,9 @@
           });
           html += '</div>';
           html += '<div class="sy-pr-note-content">';
-          html += '<div class="sy-pr-note-text">'+_h(r.text)+'</div>';
+          var _prp = typeof parseCitation==='function' ? parseCitation(r.text) : {body:r.text,citation:null};
+          var _prpill = _prp.citation ? ' <span class="pp-cite-pill" style="background:'+_h(p.color)+';color:#fff">'+_h(_prp.citation)+'</span>' : '';
+          html += '<div class="sy-pr-note-text">'+_h(_prp.body)+_prpill+'</div>';
           html += '<div class="sy-pr-note-src">'+_h(r.tabName)+(r.cats&&r.cats.filter(Boolean).length?' &rsaquo; '+r.cats.filter(Boolean).map(function(c){return _h(c);}).join(' &rsaquo; '):'')+'</div>';
           if (a.status==='auto') html += '<div style="margin-top:3px;display:flex;gap:4px"><span class="sy-badge sy-badge-auto">auto '+(a.similarity?a.similarity.toFixed(2):'')+' </span><button class="sy-note-action" data-action="confirm-a" data-nk="'+_h(a.noteKey)+'" style="height:20px;padding:0 8px;font-size:10px">Confirm</button><button class="sy-note-action" data-action="reject-a" data-nk="'+_h(a.noteKey)+'" style="height:20px;padding:0 8px;font-size:10px;color:var(--md-sys-color-error)">Reject</button></div>';
           if (isChanged) html += '<div class="sy-pr-note-changed">Source changed — <button class="sy-note-action" data-action="ack-change" data-nk="'+_h(a.noteKey)+'" style="height:18px;padding:0 6px;font-size:10px">Acknowledge</button></div>';
@@ -848,7 +865,9 @@
           html += '<div style="padding:5px 12px 2px;font-size:9px;font-weight:700;letter-spacing:.06em;color:var(--md-sys-color-on-surface-variant)" class="sy-fw-cat '+REG_CLS_CL[reg]+'">'+REG_LABEL_CL[reg]+'</div>';
           items.forEach(function(item){
             var r=item.r, key=item.key;
-            html += '<div class="sy-cl-note"><div class="sy-cl-note-inner"><div class="sy-cl-note-text">'+_h(r.text)+'</div><div class="sy-cl-note-src">'+_h(r.tabName)+(r.cats&&r.cats.filter(Boolean).length?' &rsaquo; '+r.cats.filter(Boolean).map(function(cc){return _h(cc);}).join(' &rsaquo; '):'')+'</div></div>';
+            var _clp = typeof parseCitation==='function' ? parseCitation(r.text) : {body:r.text,citation:null};
+            var _clpill = _clp.citation ? ' <span class="pp-cite-pill" style="background:var(--md-sys-color-surface-container-high);color:var(--md-sys-color-on-surface-variant)">'+_h(_clp.citation)+'</span>' : '';
+            html += '<div class="sy-cl-note"><div class="sy-cl-note-inner"><div class="sy-cl-note-text">'+_h(_clp.body)+_clpill+'</div><div class="sy-cl-note-src">'+_h(r.tabName)+(r.cats&&r.cats.filter(Boolean).length?' &rsaquo; '+r.cats.filter(Boolean).map(function(cc){return _h(cc);}).join(' &rsaquo; '):'')+'</div></div>';
             html += '<button class="sy-assign-btn" data-key="'+_h(key)+'">Assign</button></div>';
           });
         });
@@ -1052,8 +1071,18 @@
             var regAs=byReg[reg];
             var ruleText = regAs.length ? (SY.resolveNoteKey(regAs[0].noteKey)||{text:''}).text : '';
             var hasNote  = !!ruleText;
-            var ruleDisplay = hasNote ? _h(ruleText) : 'No note assigned';
-            if(regAs.length>1) ruleDisplay += ' <span class="sy-badge" style="background:var(--md-sys-color-surface-container-high);color:var(--md-sys-color-on-surface-variant);font-size:10px">+'+(regAs.length-1)+'</span>';
+            var ruleDisplay;
+            if (hasNote) {
+              var parsed = typeof parseCitation==='function' ? parseCitation(ruleText) : {body:ruleText,citation:null};
+              var principleColor = p.color || '#555';
+              var pillHtml = parsed.citation
+                ? ' <span class="pp-cite-pill" style="background:'+_h(principleColor)+';color:#fff">'+_h(parsed.citation)+'</span>'
+                : '';
+              ruleDisplay = _h(parsed.body) + pillHtml;
+              if(regAs.length>1) ruleDisplay += ' <span class="sy-badge" style="background:var(--md-sys-color-surface-container-high);color:var(--md-sys-color-on-surface-variant);font-size:10px">+'+(regAs.length-1)+'</span>';
+            } else {
+              ruleDisplay = 'No note assigned';
+            }
             var mv = mbr[reg]||'', mt = tbr[reg]||'';
             html += '<tr>';
             html += '<td class="sy-fw-id"></td>';
