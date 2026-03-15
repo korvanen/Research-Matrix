@@ -135,49 +135,106 @@ window.SynthesisData = (function () {
 
   // Split a note into fragments using simple sentence boundary detection.
   // Only applies to unassigned notes. Returns the fragment noteKeys.
+  // ── Proper sentence boundary detector (matches utils-concept-map.js) ─────
+  var _ABBREV = new Set([
+    'mr','mrs','ms','dr','prof','sr','jr','vs','etc','approx','est','dept',
+    'fig','no','vol','pp','ed','eds','ibid','op','cf','al','et',
+    'jan','feb','mar','apr','jun','jul','aug','sep','oct','nov','dec',
+    'st','ave','blvd','co','corp','inc','ltd','govt','univ','assoc',
+  ]);
+
+  function _sentenceSplit(text) {
+    var sentences = [], start = 0;
+    var t = text.replace(/\r\n|\r/g, '\n');
+    for (var i = 0; i < t.length; i++) {
+      var ch = t[i];
+      if (ch === '\n' && t[i+1] === '\n') {
+        var seg = t.slice(start, i).trim();
+        if (seg.length >= 40) sentences.push(seg);
+        while (i+1 < t.length && t[i+1] === '\n') i++;
+        start = i + 1; continue;
+      }
+      if (ch !== '.' && ch !== '!' && ch !== '?') continue;
+      var after = t.slice(i+1).match(/^(\s+)([A-Z])/);
+      if (!after) continue;
+      var wordBefore = t.slice(0, i).match(/(\b\w+)$/);
+      if (wordBefore) {
+        var w = wordBefore[1];
+        if (_ABBREV.has(w.toLowerCase())) continue;
+        if (w.length === 1 && w === w.toUpperCase()) continue;
+      }
+      if (/\d$/.test(t.slice(0, i))) continue;
+      var seg2 = t.slice(start, i+1).trim();
+      if (seg2.length >= 40) sentences.push(seg2);
+      start = i + 1;
+    }
+    var last = t.slice(start).trim();
+    if (last.length >= 40) sentences.push(last);
+    return sentences;
+  }
+
   function splitNote(parentKey) {
-    if (isSplitKey(parentKey)) return []; // can't split a split
+    if (isSplitKey(parentKey)) return [];
     var existing = getAssignment(parentKey);
-    if (existing && existing.status === 'confirmed') return []; // D: only split unassigned
+    if (existing && existing.status === 'confirmed') return []; // Option D: no split for assigned
     var resolved = resolveNoteKey(parentKey);
     if (!resolved || !resolved.text.trim()) return [];
-    var text = resolved.text.trim();
+    var text     = resolved.text.trim();
     var settings = getSettings();
-    var words = text.split(/\s+/);
-    if (words.length <= settings.maxWords) return []; // short enough, no split needed
+    var wordCount = text.split(/\s+/).length;
+    if (wordCount <= settings.maxWords) return [];
 
-    // Split at sentence boundaries first, then group into chunks under maxWords
-    var sentences = text
-      .split(/(?<=[.!?])\s+/)
-      .map(function(s){ return s.trim(); })
-      .filter(Boolean);
+    // Get sentence-boundary segments
+    var sentences = _sentenceSplit(text);
 
-    // If only one sentence but too long, split at maxWords hard boundary
-    if (sentences.length <= 1) {
-      var chunks = [], current = [];
-      words.forEach(function(w) {
-        current.push(w);
-        if (current.length >= settings.maxWords) { chunks.push(current.join(' ')); current = []; }
-      });
-      if (current.length) chunks.push(current.join(' '));
-      sentences = chunks;
-    } else {
-      // Group sentences into chunks under maxWords
-      var chunks = [], current = [], currentLen = 0;
-      sentences.forEach(function(s) {
-        var wc = s.split(/\s+/).length;
-        if (currentLen + wc > settings.maxWords && current.length) {
-          chunks.push(current.join(' ')); current = [s]; currentLen = wc;
-        } else { current.push(s); currentLen += wc; }
-      });
-      if (current.length) chunks.push(current.join(' '));
-      sentences = chunks;
+    // Group sentences into chunks that stay under maxWords
+    var chunks = [], current = [], currentLen = 0;
+    sentences.forEach(function(s) {
+      var wc = s.split(/\s+/).length;
+      if (currentLen + wc > settings.maxWords && current.length) {
+        chunks.push(current.join(' ')); current = [s]; currentLen = wc;
+      } else { current.push(s); currentLen += wc; }
+    });
+    if (current.length) chunks.push(current.join(' '));
+
+    // Fallback: hard-split at word boundary if sentence detection produced nothing
+    if (chunks.length <= 1) {
+      var words = text.split(/\s+/);
+      chunks = [];
+      while (words.length) { chunks.push(words.splice(0, settings.maxWords).join(' ')); }
     }
 
-    if (sentences.length <= 1) return []; // couldn't meaningfully split
+    if (chunks.length <= 1) return [];
+    storeSplit(parentKey, chunks);
+    return chunks.map(function(_, i){ return makeSplitKey(parentKey, i); });
+  }
 
-    storeSplit(parentKey, sentences);
-    return sentences.map(function(_, i){ return makeSplitKey(parentKey, i); });
+  // Auto-split all unassigned notes that exceed maxWords. Called when settings change.
+  function autoSplitAll() {
+    var settings  = getSettings();
+    var assigned  = new Set(getAssignments().map(function(a){ return a.noteKey; }));
+    var existing  = getSplits();
+    var changed   = false;
+
+    getRowNoteKeys().forEach(function(key) {
+      if (assigned.has(key)) return; // never split assigned
+      var r = resolveNoteKey(key); if (!r || !r.text.trim()) return;
+      var wordCount = r.text.trim().split(/\s+/).length;
+
+      if (wordCount > settings.maxWords) {
+        // Only re-split if not already split (or if split is stale/single-fragment)
+        var frags = existing[key];
+        if (!frags || frags.length <= 1) {
+          splitNote(key);
+          changed = true;
+        }
+      } else if (existing[key]) {
+        // Entry now fits under threshold — remove stale split
+        removeSplit(key);
+        changed = true;
+      }
+    });
+    return changed;
   }
 
   // ── Note key resolution ───────────────────────────────────────────────────
@@ -749,7 +806,7 @@ window.SynthesisData = (function () {
     getRowNoteKeys, getEffectiveNoteKeys,
     bestCellIdx, hashText, colLetter, cellRef,
     // Splits
-    getSplits, getFragments, storeSplit, removeSplit, splitNote,
+    getSplits, getFragments, storeSplit, removeSplit, splitNote, autoSplitAll,
     // Principles
     getPrinciples, addPrinciple, updatePrinciple, deletePrinciple,
     // Assignments
