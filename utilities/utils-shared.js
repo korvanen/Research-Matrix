@@ -1408,7 +1408,7 @@ function processSheetData(grid) {
     if (!cats[0].trim()) continue;
     rows.push({ cats, cells: colIndices.map(i => g[i] || '') });
   }
-  return { catIndices, catHeaders, headers, rows, title };
+  return { catIndices, catHeaders, headers, rows, title, colIndices, headerRowIdx };
 }
 
 function buildRowIndex() {
@@ -1433,7 +1433,13 @@ function buildRowIndex() {
 // BACKGROUND DATA LOADER
 // ════════════════════════════════════════════════════════════════
 
-window.TABS = window.TABS || [];
+window.TABS          = window.TABS          || [];
+window.FRAMEWORK_TABS = window.FRAMEWORK_TABS || [];
+
+// TAB_FILTER: tab names containing this string are loaded as research data
+// Change this to match your sheet naming convention (default: 'TAB')
+var TAB_FILTER       = window.TAB_FILTER       || 'TAB';
+var FRAMEWORK_FILTER = window.FRAMEWORK_FILTER || 'FRAMEWORK';
 
 (async () => {
   if (window.__BRIDGE_GUEST) return;
@@ -1441,11 +1447,15 @@ window.TABS = window.TABS || [];
     const urlToLoad = getSavedSheetUrl();
     console.log('[utils-shared] Loading sheet:', urlToLoad);
     const all = await fetchODS(urlToLoad);
-    window.TABS = all.filter(s => s.name.includes('TAB'));
-    console.log('[utils-shared] Loaded', window.TABS.length, 'tabs');
+    window.TABS           = all.filter(s => s.name.includes(TAB_FILTER));
+    window.FRAMEWORK_TABS = all.filter(s => s.name.includes(FRAMEWORK_FILTER));
+    console.log('[utils-shared] Loaded', window.TABS.length, 'TAB tabs,',
+                window.FRAMEWORK_TABS.length, 'FRAMEWORK tabs');
     if (typeof EmbeddingBridge !== 'undefined') EmbeddingBridge.host();
     if (typeof initEmbeddings  === 'function')  initEmbeddings();
-    window.dispatchEvent(new CustomEvent('sheet-loaded', { detail: { tabCount: window.TABS.length } }));
+    window.dispatchEvent(new CustomEvent('sheet-loaded', {
+      detail: { tabCount: window.TABS.length, frameworkCount: window.FRAMEWORK_TABS.length }
+    }));
   } catch(e) {
     console.warn('[utils-shared] Data load failed:', e);
     window.dispatchEvent(new CustomEvent('sheet-load-error', { detail: { error: e } }));
@@ -1536,14 +1546,17 @@ window.PPNavRail = (function () {
 // Creates MD3 Navigation Rail items with icon + label
 window.injectToolNav = function(currentTool) {
   var tools = [
-    { href: 'spreadsheet.html',  label: 'Spreadsheet',
-      d: '<rect x="1.5" y="1.5" width="15" height="15" rx="2"/><line x1="1.5" y1="6.5" x2="16.5" y2="6.5"/><line x1="1.5" y1="11.5" x2="16.5" y2="11.5"/><line x1="7" y1="6.5" x2="7" y2="16.5"/><line x1="12" y1="6.5" x2="12" y2="16.5"/>' },
-    { href: 'find-matches.html', label: 'Find',
-      d: '<circle cx="8" cy="8" r="5.5"/><line x1="12.5" y1="12.5" x2="16.5" y2="16.5"/>' },
-    { href: 'concept-map.html',  label: 'Concept Map',
+    // Home link
+    { href: '../index.html', label: 'Home', isHome: true,
+      d: '<path d="M2 9L9 2l7 7"/><path d="M4 7v8a1 1 0 001 1h3v-4h2v4h3a1 1 0 001-1V7"/>' },
+    { href: 'entries.html',     label: 'Entries',
+      d: '<rect x="2" y="3" width="14" height="13" rx="2"/><line x1="5" y1="7" x2="13" y2="7"/><line x1="5" y1="10" x2="13" y2="10"/><line x1="5" y1="13" x2="9" y2="13"/>' },
+    { href: 'clusters.html',    label: 'Clusters',
+      d: '<circle cx="5" cy="5" r="3"/><circle cx="13" cy="5" r="3"/><circle cx="5" cy="13" r="3"/><circle cx="13" cy="13" r="3"/><line x1="8" y1="5" x2="10" y2="5"/><line x1="5" y1="8" x2="5" y2="10"/><line x1="8" y1="13" x2="10" y2="13"/><line x1="13" y1="8" x2="13" y2="10"/>' },
+    { href: 'framework.html',   label: 'Framework',
+      d: '<rect x="1.5" y="1.5" width="15" height="15" rx="2"/><line x1="1.5" y1="6.5" x2="16.5" y2="6.5"/><line x1="1.5" y1="11.5" x2="16.5" y2="11.5"/><line x1="7" y1="6.5" x2="7" y2="16.5"/>' },
+    { href: 'concept-map.html', label: 'Map',
       d: '<circle cx="9" cy="4" r="2"/><circle cx="3.5" cy="14" r="2"/><circle cx="9" cy="14" r="2"/><circle cx="14.5" cy="14" r="2"/><line x1="9" y1="6" x2="3.5" y2="12"/><line x1="9" y1="6" x2="9" y2="12"/><line x1="9" y1="6" x2="14.5" y2="12"/>' },
-    { href: 'clusters.html',     label: 'Clusters',
-      d: '<circle cx="5" cy="5" r="3"/><circle cx="13" cy="5" r="3"/><circle cx="5" cy="13" r="3"/><circle cx="13" cy="13" r="3"/>' }
   ];
   var rail = document.querySelector('.pp-nav-rail');
   if (!rail) return;
@@ -1555,7 +1568,9 @@ window.injectToolNav = function(currentTool) {
 
   tools.forEach(function(t) {
     var a = document.createElement('a');
-    a.className = 'pp-nav-item' + (t.href === currentTool ? ' active' : '');
+    // Home link: active only if we're on index.html (no currentTool match)
+    var isActive = t.isHome ? false : (t.href === currentTool);
+    a.className = 'pp-nav-item' + (isActive ? ' active' : '');
     a.href = t.href;
     a.title = t.label;
 
