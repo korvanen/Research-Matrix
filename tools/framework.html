@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Framework — Dimensional Framework</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="../design-system.css?v=9fa06a28">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="../utilities/utils-keywords.js?v=7"></script>
+  <script src="../utilities/utils-shared.js?v=425998b6"></script>
+  <script src="../utilities/utils-synthesis.js?v=3"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body { height: 100%; overflow: hidden; margin: 0; padding: 0; }
+    body {
+      display: flex; flex-direction: column;
+      background: var(--md-sys-color-background);
+      font-family: var(--font-family);
+      color: var(--md-sys-color-on-background);
+    }
+
+    /* ── Topbar ── */
+    .fw-topbar {
+      flex-shrink: 0; display: flex; align-items: center; gap: 8px;
+      height: 48px; padding: 0 12px;
+      background: var(--md-sys-color-surface-container);
+      border-bottom: 1px solid var(--md-sys-color-outline-variant);
+    }
+    .fw-topbar-title { font-size: 16px; font-weight: 500; flex: 1; }
+    .fw-sync-text { font-size: 11px; color: var(--md-sys-color-on-surface-variant); }
+
+    /* ── Body / nav rail area ── */
+    .fw-body { flex: 1; min-height: 0; display: flex; overflow: hidden; }
+
+    /* ── Dimension filter bar ── */
+    .fw-dim-bar {
+      flex-shrink: 0; display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+      padding: 8px 14px; border-bottom: 1px solid var(--md-sys-color-outline-variant);
+      background: var(--md-sys-color-surface-container-low);
+    }
+    .fw-dim-btn {
+      height: 30px; padding: 0 14px; border-radius: 15px;
+      border: 1px solid var(--md-sys-color-outline-variant);
+      background: transparent; font-size: 12px; font-weight: 500; cursor: pointer;
+      color: var(--md-sys-color-on-surface-variant); white-space: nowrap;
+    }
+    .fw-dim-btn.active {
+      background: var(--md-sys-color-secondary-container);
+      color: var(--md-sys-color-on-secondary-container); border-color: transparent;
+    }
+
+    /* ── Main scroll area ── */
+    .fw-main { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+    .fw-scroll { flex: 1; overflow-y: auto; padding: 20px 24px 60px; scrollbar-width: thin; }
+    .fw-scroll::-webkit-scrollbar { width: 4px; }
+    .fw-scroll::-webkit-scrollbar-thumb { background: var(--md-sys-color-outline-variant); border-radius: 2px; }
+
+    /* ── Table ── */
+    .fw-section { margin-bottom: 32px; }
+    .fw-dim-hdr {
+      padding: 11px 16px; font-size: 15px; font-weight: 700; color: #fff; border-radius: 6px 6px 0 0;
+    }
+    .fw-table {
+      width: 100%; border-collapse: collapse;
+      border: 1px solid var(--md-sys-color-outline-variant); border-top: none;
+      font-size: 13px;
+    }
+    .fw-table th {
+      padding: 8px 12px; text-align: left; font-size: 10px; font-weight: 700;
+      letter-spacing: .06em; text-transform: uppercase;
+      color: var(--md-sys-color-on-surface-variant);
+      background: var(--md-sys-color-surface-container);
+      border-bottom: 1px solid var(--md-sys-color-outline-variant);
+    }
+    .fw-table td {
+      padding: 8px 12px; vertical-align: top;
+      border-bottom: 1px solid var(--md-sys-color-outline-variant); line-height: 1.5;
+    }
+    .fw-table tr:last-child td { border-bottom: none; }
+    .fw-id   { font-size: 11px; font-weight: 700; color: var(--md-sys-color-on-surface-variant); width: 60px; white-space: nowrap; }
+    .fw-cat  { width: 80px; font-size: 11px; font-weight: 700; white-space: nowrap; }
+    .fw-cat.what { color: #1565c0; }
+    .fw-cat.why  { color: #e65100; }
+    .fw-cat.who  { color: #2e7d32; }
+    .fw-cat.how  { color: #6a1b9a; }
+    .fw-sep td { padding: 0; height: 3px; background: var(--md-sys-color-surface-container); }
+    .fw-p-name td { font-size: 13px; font-weight: 600; padding: 7px 12px 5px; }
+    .fw-no-note { font-style: italic; color: var(--md-sys-color-outline); font-size: 12px; }
+    .fw-rule-edit {
+      display: block; width: 100%; min-height: 32px; padding: 4px 6px;
+      border-radius: 4px; border: 1px solid transparent;
+      font-family: var(--font-family); font-size: 13px; line-height: 1.5;
+      color: var(--md-sys-color-on-surface); cursor: text; outline: none;
+      transition: border-color .12s;
+    }
+    .fw-rule-edit:focus { border-color: var(--md-sys-color-primary); background: color-mix(in srgb,var(--md-sys-color-primary) 3%,transparent); }
+    .fw-rule-edit.no-note { color: var(--md-sys-color-outline); font-style: italic; }
+    .fw-editable {
+      cursor: text; outline: none; min-height: 36px; padding: 6px 8px;
+      border-radius: 4px; border: 1px solid transparent;
+      transition: border-color .12s; display: block;
+      font-family: var(--font-family); font-size: 13px; line-height: 1.5;
+    }
+    .fw-editable:focus { border-color: var(--md-sys-color-primary); }
+    .fw-editable.gap {
+      color: var(--md-sys-color-on-surface-variant);
+      background: rgba(255,193,7,.1); border-color: rgba(255,193,7,.4); font-style: italic;
+    }
+    .fw-empty {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      min-height: 320px; gap: 10px; text-align: center; padding: 48px 24px;
+      color: var(--md-sys-color-on-surface-variant); font-size: 14px;
+    }
+    .fw-empty p { margin: 0; }
+
+    /* ── Panel controls ── */
+    .fw-panel-label { font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--md-sys-color-on-surface-variant); padding: 8px 0 4px; }
+    .fw-range-row { display: flex; align-items: center; gap: 8px; padding: 4px 0; }
+    .fw-range-label { font-size: 12px; color: var(--md-sys-color-on-surface-variant); min-width: 60px; }
+    .fw-range { flex: 1; accent-color: var(--md-sys-color-primary); cursor: pointer; }
+    .fw-range-val { font-size: 12px; font-weight: 600; min-width: 36px; text-align: right; }
+    .fw-panel-input {
+      width: 100%; height: 32px; padding: 0 10px; margin: 3px 0 8px;
+      border: 1px solid var(--md-sys-color-outline-variant); border-radius: 4px;
+      background: transparent; font-family: var(--font-family); font-size: 12px; color: inherit; outline: none;
+    }
+    .fw-panel-input:focus { border-color: var(--md-sys-color-primary); }
+    .fw-panel-btn {
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+      width: 100%; height: 32px; border-radius: 16px; border: none; cursor: pointer;
+      font-family: var(--font-family); font-size: 12px; font-weight: 500; margin-bottom: 6px;
+    }
+    .fw-panel-btn-primary { background: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary); }
+    .fw-panel-btn-tonal   { background: var(--md-sys-color-secondary-container); color: var(--md-sys-color-on-secondary-container); }
+    .fw-panel-btn-ghost   { background: transparent; color: var(--md-sys-color-on-surface-variant); border: 1px solid var(--md-sys-color-outline-variant); }
+    .fw-panel-status { font-size: 11px; color: var(--md-sys-color-on-surface-variant); padding: 2px 0 4px; }
+
+    /* ── Diff modal ── */
+    .fw-modal-bg { position: fixed; inset: 0; z-index: 8000; background: rgba(0,0,0,.45); display: none; align-items: center; justify-content: center; }
+    .fw-modal-bg.open { display: flex; }
+    .fw-modal { background: var(--md-sys-color-surface); border-radius: 12px; padding: 24px; max-width: 500px; width: 90%; box-shadow: 0 8px 32px rgba(0,0,0,.22); }
+    .fw-modal-title { font-size: 16px; font-weight: 600; margin-bottom: 14px; }
+    .fw-modal-body { max-height: 300px; overflow-y: auto; font-size: 13px; line-height: 1.6; color: var(--md-sys-color-on-surface-variant); margin-bottom: 18px; }
+    .fw-diff-added   { padding: 2px 0; color: #2e7d32; }
+    .fw-diff-removed { padding: 2px 0; color: #b71c1c; }
+    .fw-modal-foot { display: flex; gap: 8px; justify-content: flex-end; }
+    .fw-btn { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 16px; border-radius: 17px; border: none; cursor: pointer; font-family: var(--font-family); font-size: 13px; font-weight: 500; }
+    .fw-btn-primary { background: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary); }
+    .fw-btn-primary:disabled { opacity: .38; cursor: not-allowed; }
+    .fw-btn-ghost   { background: transparent; color: var(--md-sys-color-on-surface-variant); border: 1px solid var(--md-sys-color-outline-variant); }
+  </style>
+</head>
+<body>
+
+  <div class="fw-topbar">
+    <div class="fw-topbar-title">Framework</div>
+    <span class="fw-sync-text" id="fw-sync-text"></span>
+  </div>
+
+  <div class="fw-body" id="fw-body"></div>
+
+  <!-- Diff modal -->
+  <div class="fw-modal-bg" id="fw-diff-modal">
+    <div class="fw-modal">
+      <div class="fw-modal-title">Preview changes</div>
+      <div class="fw-modal-body" id="fw-diff-body"></div>
+      <div class="fw-modal-foot">
+        <button class="fw-btn fw-btn-ghost" id="fw-diff-cancel">Cancel</button>
+        <button class="fw-btn fw-btn-primary" id="fw-diff-confirm">Write to sheet</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  (function(){
+    var SY = window.SynthesisData;
+    if (!SY) { document.body.innerHTML = '<p style="padding:24px">utils-synthesis.js not loaded.</p>'; return; }
+
+    // ── State ────────────────────────────────────────────────────────────────
+    var _activeDim   = 'all';
+    var _pendingWrite = null;
+
+    function _h(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+    // ── Panel HTML ───────────────────────────────────────────────────────────
+    var _globalHtml =
+      '<div class="fw-panel-label">Sheet status</div>' +
+      '<div class="fw-panel-status" id="fw-panel-status">Not synced yet</div>' +
+      '<div class="fw-panel-label">Cluster threshold</div>' +
+      '<div class="fw-range-row">' +
+        '<input type="range" class="fw-range" id="fw-thresh-slider" min="20" max="70" value="'+Math.round(SY.getSettings().threshold*100)+'" step="1">' +
+        '<span class="fw-range-val" id="fw-thresh-val">'+Math.round(SY.getSettings().threshold*100)+'%</span>' +
+      '</div>' +
+      '<div class="fw-panel-label">Max words (split)</div>' +
+      '<div class="fw-range-row">' +
+        '<input type="range" class="fw-range" id="fw-maxwords-slider" min="20" max="300" value="'+SY.getSettings().maxWords+'" step="10">' +
+        '<span class="fw-range-val" id="fw-maxwords-val">'+SY.getSettings().maxWords+'</span>' +
+      '</div>';
+
+    var _syncHtml =
+      '<div class="fw-panel-label">Apps Script URL</div>' +
+      '<input class="fw-panel-input" id="fw-script-url" type="url" placeholder="https://script.google.com/...">' +
+      '<button class="fw-panel-btn fw-panel-btn-ghost" id="fw-script-save-btn">Save URL</button>' +
+      '<div class="fw-panel-label">Write to sheet</div>' +
+      '<button class="fw-panel-btn fw-panel-btn-primary" id="fw-write-btn">Write to sheet</button>' +
+      '<div class="fw-panel-label">Export</div>' +
+      '<button class="fw-panel-btn fw-panel-btn-ghost" id="fw-csv-btn">Export CSV</button>' +
+      '<button class="fw-panel-btn fw-panel-btn-ghost" id="fw-md-btn">Export Markdown</button>';
+
+    // ── Nav rail ─────────────────────────────────────────────────────────────
+    var _paneEl = document.getElementById('fw-body');
+    var _nav = window.PPNavRail.create(_paneEl, {
+      toolName: 'Framework',
+      defaultOpen: true,
+      panelSections: [
+        { label: 'Global', html: _globalHtml },
+        { label: 'Sync',   html: _syncHtml },
+      ],
+    });
+
+    // Build main area
+    _nav.mainEl.style.cssText = 'display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden;';
+    _nav.mainEl.innerHTML =
+      '<div class="fw-dim-bar" id="fw-dim-bar"></div>' +
+      '<div class="fw-scroll" id="fw-scroll"></div>';
+
+    injectToolNav('framework.html');
+
+    // ── Global settings ───────────────────────────────────────────────────────
+    var _threshSlider   = document.getElementById('fw-thresh-slider');
+    var _threshVal      = document.getElementById('fw-thresh-val');
+    var _maxWordsSlider = document.getElementById('fw-maxwords-slider');
+    var _maxWordsVal    = document.getElementById('fw-maxwords-val');
+
+    if (_threshSlider) _threshSlider.addEventListener('input', function(){
+      var v = parseInt(_threshSlider.value);
+      _threshVal.textContent = v + '%';
+      SY.updateSettings({ threshold: v/100 });
+    });
+    if (_maxWordsSlider) _maxWordsSlider.addEventListener('input', function(){
+      var v = parseInt(_maxWordsSlider.value);
+      _maxWordsVal.textContent = v;
+      SY.updateSettings({ maxWords: v });
+    });
+    window.addEventListener('sy-settings-changed', function(){
+      var s = SY.getSettings();
+      if (_threshSlider)   { _threshSlider.value = Math.round(s.threshold*100); _threshVal.textContent = Math.round(s.threshold*100)+'%'; }
+      if (_maxWordsSlider) { _maxWordsSlider.value = s.maxWords; _maxWordsVal.textContent = s.maxWords; }
+    });
+
+    // ── Sync panel ────────────────────────────────────────────────────────────
+    function _loadScriptUrl() {
+      var url = SY.getScriptUrl();
+      var inp = document.getElementById('fw-script-url');
+      if (inp && url) inp.value = url;
+      _updateSyncStatus();
+    }
+    function _updateSyncStatus() {
+      var ls = SY.getLastSync();
+      var el = document.getElementById('fw-panel-status');
+      var topEl = document.getElementById('fw-sync-text');
+      var text = ls ? 'Last sync: ' + new Date(ls).toLocaleString() : 'Not synced yet';
+      if (el) el.textContent = text;
+      if (topEl) topEl.textContent = ls ? 'Synced ' + new Date(ls).toLocaleTimeString() : '';
+    }
+
+    document.getElementById('fw-script-save-btn').addEventListener('click', function(){
+      var url = (document.getElementById('fw-script-url')||{}).value||'';
+      SY.setScriptUrl(url.trim());
+      var btn = document.getElementById('fw-script-save-btn');
+      btn.textContent = 'Saved';
+      setTimeout(function(){ btn.textContent = 'Save URL'; }, 1800);
+    });
+
+    document.getElementById('fw-write-btn').addEventListener('click', _writeToSheet);
+
+    document.getElementById('fw-csv-btn').addEventListener('click', function(){
+      _dl(SY.exportCSV(), 'framework-'+Date.now()+'.csv', 'text/csv');
+    });
+    document.getElementById('fw-md-btn').addEventListener('click', function(){
+      _dl(SY.exportMarkdown(), 'framework-'+Date.now()+'.md', 'text/markdown');
+    });
+
+    function _dl(content, name, mime) {
+      var b = new Blob([content],{type:mime}), u = URL.createObjectURL(b);
+      var a = document.createElement('a'); a.href=u; a.download=name;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(function(){ URL.revokeObjectURL(u); }, 2000);
+    }
+
+    // ── Write flow ────────────────────────────────────────────────────────────
+    async function _writeToSheet() {
+      var scriptUrl = SY.getScriptUrl();
+      if (!scriptUrl) { alert('Paste your Apps Script URL in the Sync panel and save it.'); return; }
+      var sheetUrl = typeof getSavedSheetUrl === 'function' ? getSavedSheetUrl() : '';
+      if (!sheetUrl) { alert('No sheet URL saved. Load a sheet from the home page first.'); return; }
+
+      var grid = SY.buildFrameworkGrid();
+      _pendingWrite = { scriptUrl:scriptUrl, sheetUrl:sheetUrl, tabName:'FRAMEWORK', grid:grid };
+
+      var bodyEl = document.getElementById('fw-diff-body');
+      bodyEl.innerHTML = '<p style="color:var(--md-sys-color-on-surface-variant)">Reading current sheet…</p>';
+      document.getElementById('fw-diff-modal').classList.add('open');
+
+      var existing = null;
+      try {
+        var tabs = await SY.readFramework(scriptUrl, sheetUrl);
+        var fwTab = tabs.find(function(t){ return t.name && t.name.indexOf('FRAMEWORK') !== -1; });
+        if (fwTab) { existing = fwTab.rows; SY.setFrameworkTabs([{ name:fwTab.name, grid:fwTab.rows }]); }
+      } catch(e) { console.warn('[framework] read error:', e.message); }
+
+      var diff = SY.diffFramework(existing, grid);
+      var html = '<p><strong>'+diff.unchanged+'</strong> rows unchanged</p>';
+      if (diff.added.length) {
+        html += '<p><strong>'+diff.added.length+'</strong> rows added:</p>';
+        diff.added.slice(0,20).forEach(function(r){ html += '<div class="fw-diff-added">+ '+_h(r)+'</div>'; });
+        if (diff.added.length > 20) html += '<div style="font-style:italic;color:var(--md-sys-color-on-surface-variant)">…and '+(diff.added.length-20)+' more</div>';
+      }
+      if (diff.removed.length) {
+        html += '<p><strong>'+diff.removed.length+'</strong> rows removed:</p>';
+        diff.removed.slice(0,20).forEach(function(r){ html += '<div class="fw-diff-removed">− '+_h(r)+'</div>'; });
+      }
+      if (!diff.added.length && !diff.removed.length)
+        html += '<p style="color:var(--md-sys-color-on-surface-variant)">No structural changes — only editable fields may have been updated.</p>';
+      bodyEl.innerHTML = html;
+    }
+
+    document.getElementById('fw-diff-cancel').addEventListener('click', function(){
+      document.getElementById('fw-diff-modal').classList.remove('open');
+      _pendingWrite = null;
+    });
+
+    document.getElementById('fw-diff-confirm').addEventListener('click', async function(){
+      if (!_pendingWrite) return;
+      var btn = document.getElementById('fw-diff-confirm');
+      btn.disabled = true; btn.textContent = 'Writing…';
+      try {
+        await SY.writeFramework(_pendingWrite.scriptUrl, _pendingWrite.sheetUrl, _pendingWrite.tabName, _pendingWrite.grid);
+        document.getElementById('fw-diff-modal').classList.remove('open');
+        _updateSyncStatus();
+        _pendingWrite = null;
+      } catch(e) {
+        alert('Write failed: '+e.message+'\n\nCheck Apps Script URL and deployment permissions.');
+      }
+      btn.disabled = false; btn.textContent = 'Write to sheet';
+    });
+
+    // ── Load from sheet on startup ────────────────────────────────────────────
+    function _loadFromSheet() {
+      var scriptUrl = SY.getScriptUrl();
+      var sheetUrl  = typeof getSavedSheetUrl === 'function' ? getSavedSheetUrl() : '';
+      if (!scriptUrl || !sheetUrl) return;
+      SY.readFramework(scriptUrl, sheetUrl).then(function(tabs){
+        var fw = tabs.find(function(t){ return t.name && t.name.indexOf('FRAMEWORK') !== -1; });
+        if (!fw) return;
+        SY.setFrameworkTabs([{ name:fw.name, grid:fw.rows }]);
+        SY.loadFromFrameworkTab(fw.rows);
+        render();
+        _updateSyncStatus();
+      }).catch(function(){});
+    }
+
+    // ── Render ────────────────────────────────────────────────────────────────
+    function render() {
+      var ps = SY.getPrinciples().filter(function(p){ return p.named && !p.archived; });
+      var as = SY.getAssignments().filter(function(a){ return a.status === 'confirmed'; });
+
+      var byDim = {}, dimOrder = [];
+      ps.forEach(function(p){
+        var d = p.dimensionHint || 'Undimensioned';
+        if (!byDim[d]) { byDim[d] = []; dimOrder.push(d); }
+        byDim[d].push(p);
+      });
+
+      // Dimension filter buttons
+      var dimBar = document.getElementById('fw-dim-bar');
+      var dimHtml = '<button class="fw-dim-btn'+(_activeDim==='all'?' active':'')+'" data-dim="all">All</button>';
+      dimOrder.forEach(function(d){ dimHtml += '<button class="fw-dim-btn'+(_activeDim===d?' active':'')+'" data-dim="'+_h(d)+'">'+_h(d)+'</button>'; });
+      dimBar.innerHTML = dimHtml;
+      dimBar.querySelectorAll('.fw-dim-btn').forEach(function(b){
+        b.addEventListener('click', function(){ _activeDim = b.dataset.dim; render(); });
+      });
+
+      var scroll = document.getElementById('fw-scroll');
+      var filtered = ps.filter(function(p){ return _activeDim==='all' || (p.dimensionHint||'Undimensioned')===_activeDim; });
+
+      if (!filtered.length) {
+        scroll.innerHTML =
+          '<div class="fw-empty">' +
+          '<p style="font-size:16px;font-weight:500;color:var(--md-sys-color-on-surface)">No named principles yet</p>' +
+          '<p>Name clusters in the Clusters tool to start building the framework.</p>' +
+          '</div>';
+        return;
+      }
+
+      var byDim2 = {}, dimOrder2 = [];
+      filtered.forEach(function(p){
+        var d = p.dimensionHint || 'Undimensioned';
+        if (!byDim2[d]) { byDim2[d] = []; dimOrder2.push(d); }
+        byDim2[d].push(p);
+      });
+
+      var byP = {};
+      as.forEach(function(a){ if (!byP[a.principleId]) byP[a.principleId]=[]; byP[a.principleId].push(a); });
+
+      var REGS      = ['what','why','who','how'];
+      var REG_LABEL = { what:'WHAT?', why:'WHY?', who:'WHO?', how:'HOW?' };
+      var html = '';
+
+      dimOrder2.forEach(function(dim){
+        var dps   = byDim2[dim];
+        var color = dps[0] ? dps[0].color : '#555';
+        html += '<div class="fw-section">';
+        html += '<div class="fw-dim-hdr" style="background:'+_h(color)+'">The '+_h(dim)+' Dimension</div>';
+        html += '<table class="fw-table"><colgroup><col style="width:60px"><col style="width:80px"><col style="width:25%"><col style="width:25%"><col style="width:25%"></colgroup>';
+        html += '<thead><tr><th>ID</th><th>Category</th><th>Rule / Constraint</th><th>Move / Intervention</th><th>Metric / Proof</th></tr></thead><tbody>';
+
+        dps.forEach(function(p){
+          var pId  = p.sheetId || ('P-'+String(p.seq).padStart(2,'0'));
+          var pAs  = byP[p.id] || [];
+          var byReg = { what:[], why:[], who:[], how:[] };
+          pAs.forEach(function(a){ if (byReg[a.register]) byReg[a.register].push(a); });
+
+          html += '<tr class="fw-sep"><td colspan="5"></td></tr>';
+          html += '<tr class="fw-p-name"><td class="fw-id">'+_h(pId)+'</td><td colspan="4" style="font-weight:600">'+_h(p.name)+'</td></tr>';
+
+          var mbr = p.moveByReg   || { what:'', why:'', who:'', how:'' };
+          var tbr = p.metricByReg || { what:'', why:'', who:'', how:'' };
+
+          REGS.forEach(function(reg){
+            var regAs     = byReg[reg];
+            var mv        = mbr[reg] || '';
+            var mt        = tbr[reg] || '';
+            var noteCount = Math.max(regAs.length, 1);
+
+            // Render one row per assigned note
+            regAs.forEach(function(a, ai){
+              var ruleText = (SY.resolveNoteKey(a.noteKey)||{text:''}).text;
+              var parsed   = typeof parseCitation === 'function' ? parseCitation(ruleText) : { body:ruleText, citation:null };
+              var pillHtml = parsed.citation
+                ? ' <span class="pp-cite-pill" style="background:'+_h(p.color||'#555')+';color:#fff">'+_h(parsed.citation)+'</span>'
+                : '';
+              html += '<tr>';
+              if (ai === 0) {
+                html += '<td class="fw-id" rowspan="'+noteCount+'"></td>';
+                html += '<td class="fw-cat '+reg+'" rowspan="'+noteCount+'">'+REG_LABEL[reg]+'</td>';
+              }
+              html += '<td><div class="fw-rule-edit has-ref" contenteditable="false" data-pid="'+_h(p.id)+'" data-reg="'+reg+'" data-field="rule">'+_h(parsed.body)+pillHtml+'</div></td>';
+              if (ai === 0) {
+                html += '<td rowspan="'+noteCount+'"><div class="fw-editable'+(mv?'':' gap')+'" contenteditable="true" spellcheck="false" data-pid="'+_h(p.id)+'" data-reg="'+reg+'" data-field="move">'+(mv||'Click to add...')+'</div></td>';
+                html += '<td rowspan="'+noteCount+'"><div class="fw-editable'+(mt?'':' gap')+'" contenteditable="true" spellcheck="false" data-pid="'+_h(p.id)+'" data-reg="'+reg+'" data-field="metric">'+(mt||'Click to add...')+'</div></td>';
+              }
+              html += '</tr>';
+            });
+
+            // Empty row when no notes assigned
+            if (!regAs.length) {
+              html += '<tr>';
+              html += '<td class="fw-id"></td>';
+              html += '<td class="fw-cat '+reg+'">'+REG_LABEL[reg]+'</td>';
+              html += '<td><div class="fw-rule-edit no-note" contenteditable="true" spellcheck="false" data-pid="'+_h(p.id)+'" data-reg="'+reg+'" data-field="rule">No note assigned</div></td>';
+              html += '<td><div class="fw-editable'+(mv?'':' gap')+'" contenteditable="true" spellcheck="false" data-pid="'+_h(p.id)+'" data-reg="'+reg+'" data-field="move">'+(mv||'Click to add...')+'</div></td>';
+              html += '<td><div class="fw-editable'+(mt?'':' gap')+'" contenteditable="true" spellcheck="false" data-pid="'+_h(p.id)+'" data-reg="'+reg+'" data-field="metric">'+(mt||'Click to add...')+'</div></td>';
+              html += '</tr>';
+            }
+          });
+        });
+
+        html += '</tbody></table></div>';
+      });
+
+      scroll.innerHTML = html;
+      _bindEditables(scroll);
+    }
+
+    function _bindEditables(container) {
+      container.querySelectorAll('[contenteditable="true"]').forEach(function(el){
+        el.addEventListener('focus', function(){
+          if (el.textContent.trim() === 'Click to add...') el.textContent = '';
+        });
+        el.addEventListener('blur', function(){
+          var v     = el.textContent.trim();
+          var pid   = el.dataset.pid;
+          var reg   = el.dataset.reg;
+          var field = el.dataset.field;
+          if (!v) { el.textContent = 'Click to add...'; el.classList.add('gap'); }
+          else el.classList.remove('gap');
+          var val = (v === 'Click to add...') ? '' : v;
+          if (field === 'move') {
+            var p = SY.getPrinciples().find(function(x){ return x.id === pid; }); if (!p) return;
+            var mbr = Object.assign({}, p.moveByReg || {}); mbr[reg] = val;
+            SY.updatePrinciple(pid, { moveByReg:mbr });
+          } else if (field === 'metric') {
+            var p = SY.getPrinciples().find(function(x){ return x.id === pid; }); if (!p) return;
+            var tbr = Object.assign({}, p.metricByReg || {}); tbr[reg] = val;
+            SY.updatePrinciple(pid, { metricByReg:tbr });
+          }
+        });
+        el.addEventListener('keydown', function(e){
+          if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); el.blur(); }
+        });
+      });
+    }
+
+    // ── Events ────────────────────────────────────────────────────────────────
+    window.addEventListener('sheet-loaded', function(){
+      render();
+      _loadFromSheet();
+    });
+
+    document.addEventListener('DOMContentLoaded', function(){
+      _loadScriptUrl();
+      render();
+    });
+
+  })();
+  </script>
+</body>
+</html>
