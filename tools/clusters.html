@@ -364,24 +364,6 @@
       }
     })();
 
-    if (_threshSlider) {
-      _threshSlider.addEventListener('input', function(){
-        var v = parseInt(_threshSlider.value);
-        _threshVal.textContent = v + '%';
-        _thresh = v / 100;
-        SY.updateSettings({ threshold: v/100 });
-        _clusters = null;
-        if (_view === 'principles') renderPrinciples();
-      });
-    }
-    if (_maxWordsSlider) {
-      _maxWordsSlider.addEventListener('input', function(){
-        var v = parseInt(_maxWordsSlider.value);
-        _maxWordsVal.textContent = v;
-        SY.updateSettings({ maxWords: v });
-      });
-    }
-
     window.addEventListener('sy-settings-changed', function(ev){
       var s = ev.detail || SY.getSettings();
                   _thresh = s.threshold;
