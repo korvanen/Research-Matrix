@@ -9,7 +9,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="../utilities/utils-keywords.js?v=7"></script>
   <script src="../utilities/utils-shared.js?v=425998b6"></script>
-  <script src="../utilities/utils-synthesis.js?v=69ae51cf"></script>
+  <script src="../utilities/utils-synthesis.js?v=3"></script>
   <script src="../utilities/utils-academic.js?v=66257bc0"></script>
   <script type="module" src="../utilities/utils-embedding.js?v=4"></script>
   <style>
@@ -578,11 +578,24 @@
       el.textContent = ls ? 'Last sync: ' + new Date(ls).toLocaleTimeString() : 'Not synced yet';
     }
     _updateGlobalStatus();
-    window.addEventListener('sy-settings-changed', function(){
-      var s = SY.getSettings();
+    window.addEventListener('sy-settings-changed', function(ev){
+      var s = ev.detail || SY.getSettings();
       if (_threshSlider)   { _threshSlider.value   = Math.round(s.threshold*100); _threshVal.textContent   = Math.round(s.threshold*100)+'%'; }
       if (_maxWordsSlider) { _maxWordsSlider.value  = s.maxWords;                 _maxWordsVal.textContent = s.maxWords; }
+      if (SY.autoSplitAll()) { _embedNewSplits(); renderBrowse(); }
     });
+
+    function _embedNewSplits() {
+      if (!window.EmbeddingUtils || !_embReady) return;
+      var keys = SY.getEffectiveNoteKeys();
+      keys.forEach(function(key) {
+        if (_emb.has(key)) return;
+        var r = SY.resolveNoteKey(key); if (!r || !r.text.trim()) return;
+        window.EmbeddingUtils.getCachedEmbedding(r.text).then(function(vec){
+          if (vec) _emb.set(key, new Float32Array(vec));
+        }).catch(function(){});
+      });
+    }
 
     // ── Sub-tab switching (pp-panel-tab buttons live in panel) ──────────────
     document.addEventListener('click', function(e){
@@ -743,6 +756,9 @@
       document.getElementById('en-status-text').textContent = 'Embedding ' + keys.length + ' entries...';
       _embedAll(keys).then(function(){
         _embedding = false; _embReady = true;
+        // Auto-split long entries now that we can embed the fragments
+        SY.autoSplitAll();
+        _embedNewSplits();
         document.getElementById('en-dot').className = 'pp-panel-dot ready';
         var _statusMsg = _emb.size + ' entries indexed';
         document.getElementById('en-status-text').textContent = _statusMsg;
