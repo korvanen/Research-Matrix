@@ -239,19 +239,8 @@
       onSettingsChanged: function(s) {
       },
     });
-    // Upgrade panel sliders to MD3 pp-range style
-    (function(){
-      var panelBody = document.querySelector('.pp-side-panel-body');
-      if (panelBody && typeof upgradeSlider === 'function') {
-        panelBody.querySelectorAll('input[type=range].pp-range').forEach(upgradeSlider);
-      }
-    })();
 
 
-    // ── Global settings ───────────────────────────────────────────────────────
-
-    });
-    });
     window.addEventListener('sy-settings-changed', function(){
       var s = SY.getSettings();
                 });
