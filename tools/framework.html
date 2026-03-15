@@ -8,8 +8,8 @@
   <link rel="stylesheet" href="../design-system.css?v=9fa06a28">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="../utilities/utils-keywords.js?v=7"></script>
-  <script src="../utilities/utils-shared.js?v=346a2603"></script>
-  <script src="../utilities/utils-synthesis.js?v=215b0400"></script>
+  <script src="../utilities/utils-shared.js?v=425998b6"></script>
+  <script src="../utilities/utils-synthesis.js?v=3"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; }
     html, body { height: 100%; overflow: hidden; margin: 0; padding: 0; }
@@ -507,11 +507,15 @@
     window.addEventListener('sheet-loaded', function(){
       render();
       _loadFromSheet();
+      var ps = SY.getPrinciples().filter(function(p){ return p.named&&!p.archived; });
+      if (_nav && _nav.subtitleEl) _nav.subtitleEl.textContent = ps.length + ' principles';
     });
 
     document.addEventListener('DOMContentLoaded', function(){
       _loadScriptUrl();
       render();
+      var ps = SY.getPrinciples().filter(function(p){ return p.named&&!p.archived; });
+      if (_nav && _nav.subtitleEl) _nav.subtitleEl.textContent = ps.length + ' principles';
     });
 
   })();
