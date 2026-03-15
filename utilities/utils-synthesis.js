@@ -95,8 +95,8 @@ window.SynthesisData = (function () {
       tabTitle:   data.title || p.tabName,
       dataRowIdx: p.dataRowIdx,
       cellIdx:    p.cellIdx,
-      gridRow:    data.headerRowIdx + p.dataRowIdx + 1,
-      gridCol:    data.colIndices[p.cellIdx],
+      gridRow:    data.headerRowIdx !== undefined ? data.headerRowIdx + p.dataRowIdx + 1 : p.dataRowIdx + 2,
+      gridCol:    data.colIndices ? data.colIndices[p.cellIdx] : p.cellIdx,
     };
   }
 
