@@ -465,17 +465,44 @@ window.SynthesisData = (function () {
 
   function diffFramework(existingGrid, proposedGrid) {
     var diff = {added:[],changed:[],removed:[],unchanged:0};
-    var existSet = new Set((existingGrid||[]).map(function(r){return (r||[]).filter(Boolean).join('||');}));
-    var propSet  = new Set(proposedGrid.map(function(r){return (r||[]).filter(Boolean).join('||');}));
+
+    // Normalise a row for comparison:
+    // - strip the ISO timestamp from the header row ("Generated: 2026-...")
+    // - strip leading = from formula cells (sheet may return formula string or resolved value)
+    // - skip metadata rows entirely (they always differ due to timestamps embedded in JSON)
+    function normalise(row) {
+      var cells = (row||[]).map(function(v){
+        v = String(v==null?'':v).trim();
+        v = v.replace(/Generated: \d{4}-\d{2}-\d{2}T[\d:.]+Z/,'Generated:');
+        if (v.charAt(0)==='=') v = '=REF'; // treat any formula as equivalent
+        return v;
+      }).filter(Boolean);
+      return cells.join('||');
+    }
+    function isMeta(row) {
+      var first = String((row||[])[0]||'').trim();
+      return first===META_START||first===META_END||
+             first==='PRINCIPLES'||first==='ASSIGNMENTS';
+    }
+
+    var existSet = new Set((existingGrid||[])
+      .filter(function(r){return !isMeta(r);})
+      .map(normalise).filter(Boolean));
+    var propSet  = new Set(proposedGrid
+      .filter(function(r){return !isMeta(r);})
+      .map(normalise).filter(Boolean));
+
     proposedGrid.forEach(function(row){
-      var k=(row||[]).filter(Boolean).join('||'); if(!k) return;
+      if (isMeta(row)) return;
+      var k = normalise(row); if(!k) return;
       if(existSet.has(k)) diff.unchanged++;
-      else diff.added.push(row.filter(Boolean).slice(0,3).join(' | '));
+      else diff.added.push((row||[]).filter(Boolean).slice(0,3).join(' | '));
     });
     (existingGrid||[]).forEach(function(row){
-      var k=(row||[]).filter(Boolean).join('||');
-      if(k&&!propSet.has(k)&&k!==META_START&&k!==META_END&&!k.startsWith('PRINCIPLES')&&!k.startsWith('ASSIGNMENTS'))
-        diff.removed.push(row.filter(Boolean).slice(0,3).join(' | '));
+      if (isMeta(row)) return;
+      var k = normalise(row);
+      if(k && !propSet.has(k))
+        diff.removed.push((row||[]).filter(Boolean).slice(0,3).join(' | '));
     });
     return diff;
   }
@@ -486,6 +513,17 @@ window.SynthesisData = (function () {
   function setScriptUrl(url) { _save(SK.SCRIPT_URL, url.trim()); }
   function getLastSync()     { return _load(SK.LAST_SYNC, null); }
   function setLastSync()     { _save(SK.LAST_SYNC, Date.now()); }
+
+  async function readFramework(scriptUrl, sheetUrl) {
+    var res = await fetch(scriptUrl, {
+      method: 'POST', headers: {'Content-Type':'text/plain'},
+      body: JSON.stringify({action:'readFramework', sheetUrl:sheetUrl}),
+    });
+    if (!res.ok) throw new Error('Script returned '+res.status);
+    var json = await res.json();
+    if (json.error) throw new Error(json.error);
+    return json.tabs || [];
+  }
 
   async function writeFramework(scriptUrl, sheetUrl, tabName, rows) {
     var res = await fetch(scriptUrl, {
@@ -569,7 +607,7 @@ window.SynthesisData = (function () {
     getChangedSources, acknowledgeChangedSource,
     suggestRegister, autoLabel, cosine, centroid, cluster, buildPrincipleVectors, computeAssignmentTiers,
     parseFrameworkTab, loadFromFrameworkTab, buildFrameworkGrid, diffFramework,
-    getScriptUrl, setScriptUrl, getLastSync, setLastSync, writeFramework, getFrameworkTabs, setFrameworkTabs,
+    getScriptUrl, setScriptUrl, getLastSync, setLastSync, readFramework, writeFramework, getFrameworkTabs, setFrameworkTabs,
     exportCSV, exportMarkdown,
   };
 })();
