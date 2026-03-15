@@ -278,19 +278,19 @@
       _embedAll(keys).then(function(){
         _embedding = false; _embReady = true;
         SY.autoSplitAll();
-        // Embed any newly created split fragments
         var _splitKeys = SY.getEffectiveNoteKeys().filter(function(k){ return !_emb.has(k); });
         _embedAll(_splitKeys).then(function(){
           _buildPrincipleVecs();
           _buildTextToVec();
           _overrideEmbeddingUtils();
+          // Single call — _initConceptMap guards against double script load
           _initConceptMap();
         });
         document.getElementById('cm-dot').className = 'pp-panel-dot ready';
         var _cmMsg = _emb.size + ' entries indexed';
         document.getElementById('cm-emb-text').textContent = _cmMsg;
         if (_nav && _nav.subtitleEl) _nav.subtitleEl.textContent = _cmMsg;
-        _initConceptMap();
+        // Do NOT call _initConceptMap here — the inner _embedAll callback does it
       }).catch(function(e){
         _embedding = false;
         document.getElementById('cm-dot').className = 'pp-panel-dot error';
@@ -474,15 +474,13 @@
 
           var mainEl = paneEl.querySelector('.pp-tool-main');
 
-          // Inject visible copy of Parameters section into outer panel (before Legend)
-          // Layout section is already in our Map panel, so we skip it
+          // Append tool sections to outer panel — hidden immediately
           if (_outerPanelBody && sectionsHTML) {
             var toolSecs = document.createElement('div');
             toolSecs.id = 'cm-tool-sections';
+            toolSecs.style.display = 'none';
             toolSecs.innerHTML = sectionsHTML;
-            var legendSec = _outerPanelBody.querySelector('.pp-side-panel-section:last-child');
-            if (legendSec) _outerPanelBody.insertBefore(toolSecs, legendSec);
-            else           _outerPanelBody.appendChild(toolSecs);
+            _outerPanelBody.appendChild(toolSecs);
           }
 
           return {
@@ -494,6 +492,20 @@
           };
         }
       };
+
+      if (document.querySelector('script[src*="utils-concept-map"]')) {
+        // Script already in DOM — just call init directly
+        if (typeof initConceptMapTool === 'function') {
+          var paneEl2 = document.getElementById('cm-pane');
+          _cmTool = initConceptMapTool(paneEl2, null);
+          setTimeout(_mirrorSliders, 100);
+          var toolSecs2 = document.getElementById('cm-tool-sections');
+          if (toolSecs2) toolSecs2.style.display = 'none';
+          _watchForPrincipleCards(paneEl2);
+          _updateLegend();
+        }
+        return;
+      }
 
       var s = document.createElement('script');
       s.src = '../utilities/utils-concept-map.js?v=09bacb2e';
