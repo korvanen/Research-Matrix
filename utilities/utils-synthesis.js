@@ -84,8 +84,30 @@ window.SynthesisData = (function () {
     if (!tab) return null;
     var data = typeof processSheetData === 'function' ? processSheetData(tab.grid) : null;
     if (!data || !data.rows[p.dataRowIdx]) return null;
-    var row = data.rows[p.dataRowIdx];
+    var row  = data.rows[p.dataRowIdx];
     var cell = row.cells[p.cellIdx] || '';
+
+    // ── Find the actual grid row for this data row ────────────────────────
+    // processSheetData skips rows whose first category cell is empty
+    // (continuation rows in a spanned group). dataRowIdx is an index into
+    // the *filtered* rows array, not a direct offset from headerRowIdx.
+    // We must walk the grid to find which raw row corresponds to dataRowIdx.
+    var actualGridRow = data.headerRowIdx + 1; // start scanning from first data row
+    var found = -1, count = 0;
+    var grid = tab.grid;
+    for (var r = data.headerRowIdx + 1; r < grid.length; r++) {
+      var g = grid[r] || [];
+      if (g.every(function(cv){ return !String(cv).trim(); })) continue; // all-empty row
+      var cats = data.catIndices && data.catIndices.length
+        ? data.catIndices.map(function(i){ return g[i] || ''; })
+        : [g[0] || ''];
+      if (!cats[0].trim()) continue; // no category — continuation row, skip
+      if (count === p.dataRowIdx) { found = r; break; }
+      count++;
+    }
+    var gridRow = found !== -1 ? found : data.headerRowIdx + p.dataRowIdx + 1;
+    var gridCol = data.colIndices ? data.colIndices[p.cellIdx] : p.cellIdx;
+
     return {
       text:       cell,
       cats:       row.cats,
@@ -95,8 +117,8 @@ window.SynthesisData = (function () {
       tabTitle:   data.title || p.tabName,
       dataRowIdx: p.dataRowIdx,
       cellIdx:    p.cellIdx,
-      gridRow:    data.headerRowIdx !== undefined ? data.headerRowIdx + p.dataRowIdx + 1 : p.dataRowIdx + 2,
-      gridCol:    data.colIndices ? data.colIndices[p.cellIdx] : p.cellIdx,
+      gridRow:    gridRow,
+      gridCol:    gridCol,
     };
   }
 
