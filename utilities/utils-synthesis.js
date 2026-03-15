@@ -87,55 +87,59 @@ window.SynthesisData = (function () {
       console.error('[synthesis] resolveNoteKey: bad key:', key);
       return null;
     }
-    var p = parseNoteKey(key);
+    var p   = parseNoteKey(key);
     var tab = (window.TABS||[]).find(function(t){ return t.name === p.tabName; });
     if (!tab) return null;
     var data = typeof processSheetData === 'function' ? processSheetData(tab.grid) : null;
     if (!data || !data.rows[p.dataRowIdx]) return null;
     var row  = data.rows[p.dataRowIdx];
     var cell = row.cells[p.cellIdx] || '';
-
-    // ── Find the actual grid row for this data row ────────────────────────
-    // processSheetData skips rows whose first category cell is empty
-    // (continuation rows in a spanned group). dataRowIdx is an index into
-    // the *filtered* rows array, not a direct offset from headerRowIdx.
-    // We must walk the grid to find which raw row corresponds to dataRowIdx.
-    var actualGridRow = data.headerRowIdx + 1; // start scanning from first data row
-    var found = -1, count = 0;
     var grid = tab.grid;
-    for (var r = data.headerRowIdx + 1; r < grid.length; r++) {
+
+    // ── Scan the raw grid independently of processSheetData return values ──
+    // processSheetData in older deployed versions does not return colIndices
+    // or headerRowIdx, so we derive everything from the raw grid here.
+
+    var flagRow = grid[0] || [];
+
+    // catIndices: positions flagged CATEGORY in row 0
+    var catIndices = [];
+    for (var fi = 0; fi < flagRow.length; fi++) {
+      if (String(flagRow[fi]||'').trim() === 'CATEGORY') catIndices.push(fi);
+    }
+    var catIdx0 = catIndices.length ? catIndices[0] : 0;
+
+    // colIndices: positions flagged COLUMN in row 0, excluding any column
+    // that contains 'HEADER ROW' (matching processSheetData's own logic)
+    var colIndices = [];
+    for (var fi = 0; fi < flagRow.length; fi++) {
+      if (String(flagRow[fi]||'').trim() !== 'COLUMN') continue;
+      var colHasHeaderRow = false;
+      for (var ri = 0; ri < grid.length; ri++) {
+        if (String((grid[ri]||[])[fi]||'').trim() === 'HEADER ROW') { colHasHeaderRow = true; break; }
+      }
+      if (!colHasHeaderRow) colIndices.push(fi);
+    }
+    var gridCol = colIndices[p.cellIdx] !== undefined ? colIndices[p.cellIdx] : p.cellIdx;
+
+    // headerRowIdx: first row where the category column (col 0) says 'HEADER ROW'
+    var headerRowIdx = -1;
+    for (var ri = 1; ri < grid.length; ri++) {
+      if (String((grid[ri]||[])[0]||'').trim() === 'HEADER ROW') { headerRowIdx = ri; break; }
+    }
+    if (headerRowIdx === -1) headerRowIdx = 2; // fallback: assume row 2 (0-indexed)
+
+    // gridRow: walk grid from headerRowIdx+1 applying the same two skip rules
+    // processSheetData uses: skip all-empty rows, skip rows with blank category
+    var found = -1, count = 0;
+    for (var r = headerRowIdx + 1; r < grid.length; r++) {
       var g = grid[r] || [];
-      if (g.every(function(cv){ return !String(cv).trim(); })) continue; // all-empty row
-      var cats = data.catIndices && data.catIndices.length
-        ? data.catIndices.map(function(i){ return g[i] || ''; })
-        : [g[0] || ''];
-      if (!cats[0].trim()) continue; // no category — continuation row, skip
+      if (g.every(function(cv){ return !String(cv).trim(); })) continue;
+      if (!String(g[catIdx0]||'').trim()) continue;
       if (count === p.dataRowIdx) { found = r; break; }
       count++;
     }
-    var _hri = parseInt(data.headerRowIdx);
-    var gridRow = found !== -1 ? found : (!isNaN(_hri) ? _hri + p.dataRowIdx + 1 : p.dataRowIdx + 2);
-    var gridCol = (data.colIndices && data.colIndices[p.cellIdx] !== undefined)
-      ? data.colIndices[p.cellIdx]
-      : p.cellIdx;
-    // Log every resolved reference so we can verify correctness
-    console.log('[synthesis] resolveNoteKey', {
-      key: key,
-      headerRowIdx: data.headerRowIdx,
-      found: found,
-      dataRowIdx: p.dataRowIdx,
-      cellIdx: p.cellIdx,
-      colIndices: data.colIndices,
-      gridRow: gridRow,
-      gridCol: gridCol,
-      ref: cellRef(p.tabName, gridRow, gridCol),
-      text: (cell||'').slice(0,40),
-    });
-    if (isNaN(gridRow) || isNaN(gridCol)) {
-      console.error('[synthesis] resolveNoteKey: NaN — using fallback');
-      gridRow = isNaN(gridRow) ? p.dataRowIdx + 2 : gridRow;
-      gridCol = isNaN(gridCol) ? p.cellIdx        : gridCol;
-    }
+    var gridRow = found !== -1 ? found : (headerRowIdx + p.dataRowIdx + 1);
 
     return {
       text:       cell,
