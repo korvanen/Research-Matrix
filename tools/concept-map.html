@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="../design-system.css?v=9fa06a28">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="../utilities/utils-keywords.js?v=7"></script>
-  <script src="../utilities/utils-shared.js?v=68bda731"></script>
+  <script src="../utilities/utils-shared.js?v=425998b6"></script>
   <script src="../utilities/utils-synthesis.js?v=3"></script>
   <script src="../utilities/utils-panel.js?v=7"></script>
   <script type="module" src="../utilities/utils-embedding.js?v=4"></script>
@@ -92,21 +92,7 @@
     function _h(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
     // ── Panel HTML ────────────────────────────────────────────────────────────
-    var _globalHtml =
-      '<div class="pp-panel-status-row">' +
-        '<div class="pp-panel-dot loading" id="cm-dot"></div>' +
-        '<span id="cm-emb-text">Loading…</span>' +
-      '</div>' +
-      '<div class="cm-panel-label">Cluster threshold</div>' +
-      '<div class="pp-range-row">' +
-        '<input type="range" class="pp-range" id="cm-thresh-slider" min="20" max="70" value="'+Math.round(SY.getSettings().threshold*100)+'" step="1">' +
-        '<span class="pp-range-val" id="cm-thresh-val">'+Math.round(SY.getSettings().threshold*100)+'%</span>' +
-      '</div>' +
-      '<div class="cm-panel-label">Max words (split)</div>' +
-      '<div class="pp-range-row">' +
-        '<input type="range" class="pp-range" id="cm-maxwords-slider" min="20" max="300" value="'+SY.getSettings().maxWords+'" step="10">' +
-        '<span class="pp-range-val" id="cm-maxwords-val">'+SY.getSettings().maxWords+'</span>' +
-      '</div>';
+    var _globalHtml = window.GlobalPanel.html();
 
     var _toolHtml =
       '<div class="cm-panel-label">Hierarchy depth</div>' +
@@ -165,6 +151,22 @@
     }) : null;
 
     injectToolNav('concept-map.html');
+    window.GlobalPanel.init({
+      onSettingsChanged: function(s) {
+        _mirrorSliders();
+        SY.autoSplitAll();
+        var pending = SY.getEffectiveNoteKeys().filter(function(k){ return !_emb.has(k); });
+        if (pending.length && _embReady) {
+          _embedAll(pending).then(function(){
+            _buildPrincipleVecs(); _buildTextToVec(); _overrideEmbeddingUtils();
+            if (_cmTool) { _cmTool.reset(); _cmTool.start(); }
+          });
+        } else if (_cmTool && _embReady) {
+          _buildPrincipleVecs(); _buildTextToVec(); _overrideEmbeddingUtils();
+          _cmTool.reset(); _cmTool.start();
+        }
+      },
+    });
     // Upgrade panel sliders to MD3 pp-range style
     (function(){
       var panelBody = document.querySelector('.pp-side-panel-body');
@@ -175,10 +177,6 @@
 
 
     // ── Global settings ───────────────────────────────────────────────────────
-    var _threshSlider   = document.getElementById('cm-thresh-slider');
-    var _threshVal      = document.getElementById('cm-thresh-val');
-    var _maxWordsSlider = document.getElementById('cm-maxwords-slider');
-    var _maxWordsVal    = document.getElementById('cm-maxwords-val');
 
     if (_threshSlider) _threshSlider.addEventListener('input', function(){
       var v = parseInt(_threshSlider.value);
@@ -192,9 +190,7 @@
     });
     window.addEventListener('sy-settings-changed', function(ev){
       var s = ev.detail || SY.getSettings();
-      if (_threshSlider)   { _threshSlider.value = Math.round(s.threshold*100); _threshVal.textContent = Math.round(s.threshold*100)+'%'; }
-      if (_maxWordsSlider) { _maxWordsSlider.value = s.maxWords; _maxWordsVal.textContent = s.maxWords; }
-      // Always mirror to tool sliders (handles maxLen/Depth/Thresh)
+                  // Always mirror to tool sliders (handles maxLen/Depth/Thresh)
       _mirrorSliders();
       // Re-split unassigned entries, embed new fragments, force rebuild
       SY.autoSplitAll();
@@ -716,21 +712,6 @@
         }
       }).catch(function(){});
     }
-
-
-    // ── Cross-tab settings sync ───────────────────────────────────────────────
-    // When another tab updates sy2_settings via SY.updateSettings(), the storage
-    // event fires here so our sliders and state stay in sync.
-    window.addEventListener('storage', function(e) {
-      if (e.key !== 'sy2_settings') return;
-      var s = SY.getSettings();
-      var tsl = document.getElementById('cm-thresh-slider');
-      var msl = document.getElementById('cm-maxwords-slider');
-      if (tsl) { tsl.value = Math.round(s.threshold*100); }
-      if (msl) { msl.value = s.maxWords; }
-      // Fire sy-settings-changed locally so this tab's state also updates
-      window.dispatchEvent(new CustomEvent('sy-settings-changed', { detail: s }));
-    });
     _patchTouchDrag();
 
     document.addEventListener('DOMContentLoaded', function(){
