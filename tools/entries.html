@@ -540,13 +540,6 @@ var _browsePanelHtml =
         if (SY.autoSplitAll()) { _embedNewSplits(); renderBrowse(); }
       },
     });
-    // Upgrade panel sliders to MD3 pp-range style
-    (function(){
-      var panelBody = document.querySelector('.pp-side-panel-body');
-      if (panelBody && typeof upgradeSlider === 'function') {
-        panelBody.querySelectorAll('input[type=range].pp-range').forEach(upgradeSlider);
-      }
-    })();
 
     // Sync global status
     function _updateGlobalStatus() {
