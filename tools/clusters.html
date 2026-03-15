@@ -757,8 +757,11 @@
           // paneEl gets the full PPNavRail structure so all querySelector('#...') calls
           // inside the tool find their elements. We hide the inner panel visually.
           paneEl.style.cssText = 'flex:1;min-height:0;display:flex;flex-direction:row;overflow:hidden;position:relative;';
+          // railExtra buttons (sheet-btn, export-btn) must be inside paneEl so
+          // paneEl.querySelector('#pp-cl-sheet-btn') finds them. They're hidden.
+          var railExtraHTML = opts && opts.railExtra ? opts.railExtra : '';
           paneEl.innerHTML =
-            '<div class="pp-nav-rail" style="display:none"></div>' +
+            '<div class="pp-nav-rail" style="display:none">' + railExtraHTML + '</div>' +
             '<div class="pp-side-panel pp-side-panel--collapsed" style="display:none">' +
               '<div class="pp-side-panel-header"><div class="pp-side-panel-tool-name"></div>' +
               '<div class="pp-side-panel-subtitle" id="cl-visual-subtitle">Loading…</div>' +
