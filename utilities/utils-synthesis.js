@@ -25,9 +25,19 @@ window.SynthesisData = (function () {
     ASSIGNMENTS: 'sy2_assignments',
     SPLITS:      'sy2_splits',      // { parentKey: string[] of fragments }
     SETTINGS:    'sy2_settings',    // { threshold, maxWords }
+    REGISTERS:   'sy2_registers',   // [{key,label}]
+    DIMENSIONS:  'sy2_dimensions',  // string[]
     SCRIPT_URL:  'sy2_script_url',
     LAST_SYNC:   'sy2_last_sync',
   };
+
+  var DEFAULT_REGISTERS = [
+    { key:'what', label:'WHAT?' },
+    { key:'why',  label:'WHY?'  },
+    { key:'who',  label:'WHO?'  },
+    { key:'how',  label:'HOW?'  },
+  ];
+  var DEFAULT_DIMENSIONS = ['Physical','Social','Organisational','Temporal','Economic'];
 
   // ── Persistence ───────────────────────────────────────────────────────────
   function _load(key, def) {
@@ -40,6 +50,75 @@ window.SynthesisData = (function () {
   }
   function _id(pfx) {
     return (pfx||'x') + Date.now().toString(36) + Math.random().toString(36).slice(2,6);
+  }
+
+  // ── Registers (WHAT/WHY/WHO/HOW) ─────────────────────────────────────────
+  function getRegisters() {
+    var stored = _load(SK.REGISTERS, null);
+    return stored && stored.length ? stored : DEFAULT_REGISTERS.slice();
+  }
+  function setRegisters(regs) { _save(SK.REGISTERS, regs); }
+
+  // Rename a register key's label. If newKey differs from oldKey, reassign entries.
+  function updateRegister(oldKey, newKey, newLabel) {
+    var regs = getRegisters().map(function(r){
+      return r.key === oldKey ? { key: newKey, label: newLabel } : r;
+    });
+    setRegisters(regs);
+    if (oldKey !== newKey) {
+      _saveAssignments(getAssignments().map(function(a){
+        return a.register === oldKey ? Object.assign({}, a, { register: newKey }) : a;
+      }));
+    }
+  }
+
+  // Delete a register — unassigns all entries that had that register
+  function deleteRegister(key) {
+    setRegisters(getRegisters().filter(function(r){ return r.key !== key; }));
+    _saveAssignments(getAssignments().filter(function(a){ return a.register !== key; }));
+  }
+
+  function addRegister(key, label) {
+    var regs = getRegisters();
+    if (regs.find(function(r){ return r.key === key; })) return;
+    regs.push({ key: key, label: label });
+    setRegisters(regs);
+  }
+
+  // ── Dimensions ────────────────────────────────────────────────────────────
+  function getDimensions() {
+    var stored = _load(SK.DIMENSIONS, null);
+    return stored && stored.length ? stored : DEFAULT_DIMENSIONS.slice();
+  }
+  function setDimensions(dims) { _save(SK.DIMENSIONS, dims); }
+
+  // Rename a dimension — updates all principles using the old name
+  function updateDimension(oldName, newName) {
+    setDimensions(getDimensions().map(function(d){ return d === oldName ? newName : d; }));
+    _save(SK.PRINCIPLES, getPrinciples().map(function(p){
+      return p.dimensionHint === oldName ? Object.assign({}, p, { dimensionHint: newName }) : p;
+    }));
+  }
+
+  // Delete a dimension — unassigns all entries whose principle is in that dimension
+  function deleteDimension(name) {
+    setDimensions(getDimensions().filter(function(d){ return d !== name; }));
+    var affectedIds = new Set(getPrinciples()
+      .filter(function(p){ return p.dimensionHint === name; })
+      .map(function(p){ return p.id; }));
+    if (affectedIds.size) {
+      _save(SK.PRINCIPLES, getPrinciples().map(function(p){
+        return affectedIds.has(p.id) ? Object.assign({}, p, { dimensionHint: '' }) : p;
+      }));
+      _saveAssignments(getAssignments().filter(function(a){
+        return !affectedIds.has(a.principleId);
+      }));
+    }
+  }
+
+  function addDimension(name) {
+    var dims = getDimensions();
+    if (!dims.includes(name)) { dims.push(name); setDimensions(dims); }
   }
 
   // ── Global settings ───────────────────────────────────────────────────────
@@ -821,6 +900,10 @@ window.SynthesisData = (function () {
     AUTO_THRESHOLD, SUGGEST_THRESHOLD, FRAMEWORK_PREFIX, COLORS,
     // Settings
     getSettings, updateSettings,
+    // Registers & dimensions
+    getRegisters, setRegisters, updateRegister, deleteRegister, addRegister,
+    getDimensions, setDimensions, updateDimension, deleteDimension, addDimension,
+    DEFAULT_REGISTERS, DEFAULT_DIMENSIONS,
     // Helpers
     makeNoteKey, makeSplitKey, isSplitKey, splitKeyParts,
     parseNoteKey, resolveNoteKey,
