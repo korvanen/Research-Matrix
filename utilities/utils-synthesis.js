@@ -715,8 +715,16 @@ window.SynthesisData = (function () {
       _save(SK.SPLITS, localSplits);
     }
 
-    // Restore settings
-    if (parsed.settings) updateSettings(parsed.settings);
+    // Restore settings only if localStorage has no user-set values yet.
+    // Local settings always win — the sheet copy is only a seed for fresh installs.
+    if (parsed.settings) {
+      var localRaw = _load(SK.SETTINGS, null);
+      if (!localRaw) {
+        // No local settings yet — seed from sheet
+        updateSettings(parsed.settings);
+      }
+      // If local settings exist, leave them alone. The user's last change wins.
+    }
 
     return true;
   }
