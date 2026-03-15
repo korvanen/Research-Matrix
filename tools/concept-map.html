@@ -8,8 +8,8 @@
   <link rel="stylesheet" href="../design-system.css?v=9fa06a28">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="../utilities/utils-keywords.js?v=7"></script>
-  <script src="../utilities/utils-shared.js?v=02230b0b"></script>
-  <script src="../utilities/utils-synthesis.js?v=215b0400"></script>
+  <script src="../utilities/utils-shared.js?v=425998b6"></script>
+  <script src="../utilities/utils-synthesis.js?v=3"></script>
   <script src="../utilities/utils-panel.js?v=7"></script>
   <script type="module" src="../utilities/utils-embedding.js?v=4"></script>
   <style>
@@ -528,7 +528,9 @@
           }
         }, 100);
 
-        _cmTool.start();
+        // Do NOT call _cmTool.start() here — initConceptMapTool already fires
+        // tryRender immediately because EmbeddingUtils.isReady() is true at this point.
+        // Calling start() again causes the double-render / position-reset.
         _watchForPrincipleCards(paneEl);
         _updateLegend();
       };
@@ -577,9 +579,20 @@
       }
       if (!p) return;
 
-      // Mark with colour
+      // Override the full card palette so body matches header — no split colours
       card.dataset.principleColor = p.color;
-      card.style.setProperty('--pnc', p.color);
+      card.style.setProperty('--pnc',        p.color);
+      card.style.setProperty('--ppc-bg',     p.color);
+      card.style.setProperty('--ppc-border', p.color);
+      // Compute contrast text color (white for dark hues, dark for light hues)
+      function _lum(hex) {
+        var c = hex.replace('#',''); if (c.length===3) c=c[0]+c[0]+c[1]+c[1]+c[2]+c[2];
+        var n = parseInt(c,16), r=((n>>16)&255)/255, g=((n>>8)&255)/255, b=(n&255)/255;
+        function lin(v){ return v<=0.03928?v/12.92:Math.pow((v+0.055)/1.055,2.4); }
+        return 0.2126*lin(r)+0.7152*lin(g)+0.0722*lin(b);
+      }
+      var onColor = _lum(p.color) > 0.35 ? '#1a1a1a' : '#ffffff';
+      card.style.setProperty('--ppc-on', onColor);
 
       // ── Header: cat-num = "P-{sheetId}", level block stays ──
       var catEl = card.querySelector('.pp-cmap-card-cat-num');
