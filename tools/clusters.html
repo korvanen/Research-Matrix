@@ -356,13 +356,6 @@
         }
       },
     });
-    // Upgrade panel sliders to MD3 pp-range style
-    (function(){
-      var panelBody = document.querySelector('.pp-side-panel-body');
-      if (panelBody && typeof upgradeSlider === 'function') {
-        panelBody.querySelectorAll('input[type=range].pp-range').forEach(upgradeSlider);
-      }
-    })();
 
     window.addEventListener('sy-settings-changed', function(ev){
       var s = ev.detail || SY.getSettings();
