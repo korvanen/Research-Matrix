@@ -179,32 +179,53 @@ window.SynthesisData = (function () {
     if (existing && existing.status === 'confirmed') return []; // Option D: no split for assigned
     var resolved = resolveNoteKey(parentKey);
     if (!resolved || !resolved.text.trim()) return [];
-    var text     = resolved.text.trim();
+
+    var rawText  = resolved.text.trim();
     var settings = getSettings();
-    var wordCount = text.split(/\s+/).length;
+    var wordCount = rawText.split(/\s+/).length;
     if (wordCount <= settings.maxWords) return [];
 
-    // Get sentence-boundary segments
-    var sentences = _sentenceSplit(text);
+    // Strip trailing citation — e.g. "(Author, 2019)" — before splitting.
+    // Each fragment will have it re-appended so it's identifiable.
+    var citation = null;
+    var bodyText = rawText;
+    var _cRe = /\s*\(([^)]+)\)\s*\.?\s*$/;
+    var _cm = _cRe.exec(rawText);
+    if (_cm) { bodyText = rawText.slice(0, _cm.index).trimEnd(); citation = _cm[1]; }
 
-    // Group sentences into chunks that stay under maxWords
+    // Get sentence-boundary segments from body (no citation)
+    var sentences = _sentenceSplit(bodyText);
+
+    // Group sentences into chunks ≤ maxWords.
+    // Flexibility rule: if a single sentence already exceeds maxWords, keep it whole
+    // (don't break mid-sentence). This naturally allows fragments longer than maxWords
+    // when there's no sentence boundary to split at.
     var chunks = [], current = [], currentLen = 0;
     sentences.forEach(function(s) {
       var wc = s.split(/\s+/).length;
-      if (currentLen + wc > settings.maxWords && current.length) {
+      if (currentLen > 0 && currentLen + wc > settings.maxWords) {
+        // flush current group
         chunks.push(current.join(' ')); current = [s]; currentLen = wc;
-      } else { current.push(s); currentLen += wc; }
+      } else {
+        current.push(s); currentLen += wc;
+      }
     });
     if (current.length) chunks.push(current.join(' '));
 
-    // Fallback: hard-split at word boundary if sentence detection produced nothing
-    if (chunks.length <= 1) {
-      var words = text.split(/\s+/);
+    // Fallback hard-split only when sentence detection produced ≤1 segment
+    if (chunks.length <= 1 && wordCount > settings.maxWords) {
+      var words = bodyText.split(/\s+/);
       chunks = [];
       while (words.length) { chunks.push(words.splice(0, settings.maxWords).join(' ')); }
     }
 
     if (chunks.length <= 1) return [];
+
+    // Re-append citation to every fragment so tools can display it
+    if (citation) {
+      chunks = chunks.map(function(ch){ return ch + ' (' + citation + ')'; });
+    }
+
     storeSplit(parentKey, chunks);
     return chunks.map(function(_, i){ return makeSplitKey(parentKey, i); });
   }
