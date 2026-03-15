@@ -300,6 +300,7 @@
         <a class="nav-link" href="tools/find-matches.html">Find Matches</a>
         <a class="nav-link" href="tools/concept-map.html">Concept Map</a>
         <a class="nav-link" href="tools/clusters.html">Clusters</a>
+        <a class="nav-link" href="tools/synthesis.html">Synthesis</a>
       </div>
     </div>
   </nav>
@@ -401,6 +402,23 @@
         <span class="tool-arrow">↗</span>
       </a>
 
+      <a class="tool-row" href="tools/synthesis.html">
+        <div class="tool-left">
+          <span class="tool-number">05</span>
+          <div class="tool-accent" style="background:var(--raw-Sailor Blue);"></div>
+          <div class="tool-info">
+            <span class="tool-name">Synthesis</span>
+            <span class="tool-desc">Build a design framework from your literature. Assign TAB rows to named principles, sort them into WHAT / WHY / WHO / HOW registers, fill in Move and Metric columns, and write the result back to the sheet as a linked FRAMEWORK tab.</span>
+            <div class="tool-tags">
+              <span class="tool-tag">Framework</span>
+              <span class="tool-tag">Principles</span>
+              <span class="tool-tag">Sheet write</span>
+            </div>
+          </div>
+        </div>
+        <span class="tool-arrow">↗</span>
+      </a>
+
     </div>
   </section>
 
@@ -468,7 +486,7 @@
       loadBtn.disabled = true;
       fetchODS(val)
         .then(function(all) {
-          var tabs = all.filter(function(s) { return s.name.includes('TAB'); });
+          var tabs = all.filter(function(s) { return s.name.includes('MX'); });
           if (!tabs.length) { loadBtn.disabled = false; return setStatus('No MX tabs found — check the tab names.', 'error'); }
           saveSheetUrl(val);
           setStatus('Loaded ' + tabs.length + ' tab' + (tabs.length === 1 ? '' : 's') + '. Reloading…', 'success');
