@@ -1742,8 +1742,11 @@ window.GlobalPanel = (function() {
       if (el && typeof upgradeSlider === 'function') upgradeSlider(el);
     });
 
-    // Sync initial values (upgradeSlider sets fill based on current value)
-    _syncFromSettings(sy.getSettings());
+    // Sync from storage — authoritative, always overrides baked HTML attribute value.
+    // Run once now and once after first paint so the fill track renders correctly.
+    var _initSettings = sy.getSettings();
+    _syncFromSettings(_initSettings);
+    requestAnimationFrame(function() { _syncFromSettings(sy.getSettings()); });
 
     // Wire threshold slider — bail if this event was fired programmatically by _set()
     var tsl = document.getElementById(IDS.THRESH);
