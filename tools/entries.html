@@ -1,0 +1,1153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Entries — Dimensional Framework</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="../design-system.css?v=9fa06a28">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="../utilities/utils-keywords.js?v=7"></script>
+  <script src="../utilities/utils-shared.js?v=425998b6"></script>
+  <script src="../utilities/utils-synthesis.js?v=3"></script>
+  <script type="module" src="../utilities/utils-embedding.js?v=4"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body { height: 100%; overflow: hidden; margin: 0; padding: 0; }
+    body {
+      display: flex; flex-direction: column;
+      background: var(--md-sys-color-background);
+      font-family: var(--font-family);
+      color: var(--md-sys-color-on-background);
+    }
+
+    /* ── Topbar ── */
+    .en-topbar {
+      flex-shrink: 0; display: flex; align-items: center; gap: 8px;
+      height: 48px; padding: 0 12px;
+      background: var(--md-sys-color-surface-container);
+      border-bottom: 1px solid var(--md-sys-color-outline-variant);
+    }
+    .en-topbar-title {
+      font-size: 16px; font-weight: 500; color: var(--md-sys-color-on-surface);
+      flex: 1; min-width: 0;
+    }
+    .en-status-dot {
+      width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
+      background: var(--md-sys-color-outline);
+      transition: background .3s;
+    }
+    .en-status-dot.ready   { background: #2e7d32; }
+    .en-status-dot.loading { background: var(--md-sys-color-primary); animation: en-pulse 1.2s infinite; }
+    .en-status-dot.error   { background: var(--md-sys-color-error); }
+    @keyframes en-pulse { 0%,100%{opacity:.3;} 50%{opacity:1;} }
+    .en-status-text {
+      font-size: 11px; color: var(--md-sys-color-on-surface-variant);
+    }
+
+    /* ── Sub-tabs ── */
+    .en-subtabs {
+      flex-shrink: 0; display: flex; align-items: stretch;
+      border-bottom: 1px solid var(--md-sys-color-outline-variant);
+      background: var(--md-sys-color-surface-container-low);
+      padding: 0 4px;
+    }
+    .en-subtab {
+      display: flex; align-items: center; gap: 6px;
+      height: 40px; padding: 0 16px; border: none; background: transparent;
+      font-family: var(--font-family); font-size: 13px; font-weight: 500;
+      color: var(--md-sys-color-on-surface-variant); cursor: pointer;
+      position: relative; overflow: hidden; white-space: nowrap;
+    }
+    .en-subtab::after {
+      content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 2px;
+      background: transparent; transition: background .12s;
+    }
+    .en-subtab.active { color: var(--md-sys-color-primary); }
+    .en-subtab.active::after { background: var(--md-sys-color-primary); }
+    .en-subtab-n {
+      height: 16px; min-width: 16px; padding: 0 4px; border-radius: 8px;
+      background: var(--md-sys-color-surface-container-highest);
+      color: var(--md-sys-color-on-surface-variant);
+      font-size: 10px; font-weight: 600;
+      display: inline-flex; align-items: center; justify-content: center;
+    }
+    .en-subtab.active .en-subtab-n {
+      background: var(--md-sys-color-primary-container);
+      color: var(--md-sys-color-on-primary-container);
+    }
+
+    /* ── Layout ── */
+    .en-body { flex: 1; min-height: 0; display: flex; overflow: hidden; }
+
+    /* ── Sidebar (PPNavRail) ── */
+    /* Uses existing .pp-nav-rail / .pp-side-panel from utils-shared */
+
+    /* ── Main content area ── */
+    .en-main { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; }
+
+    /* ── View panels ── */
+    .en-view { flex: 1; min-height: 0; display: flex; overflow: hidden; }
+    .en-view[hidden] { display: none; }
+
+    /* ════ BROWSE VIEW ════ */
+    .en-browse { flex: 1; min-width: 0; display: flex; overflow: hidden; }
+    .en-list-col {
+      flex: 0 0 380px; display: flex; flex-direction: column; overflow: hidden;
+      border-right: 1px solid var(--md-sys-color-outline-variant);
+    }
+    .en-list-toolbar {
+      flex-shrink: 0; display: flex; align-items: center; gap: 8px;
+      padding: 8px 12px; border-bottom: 1px solid var(--md-sys-color-outline-variant);
+    }
+    .en-search-input {
+      flex: 1; height: 32px; padding: 0 10px;
+      border: 1px solid var(--md-sys-color-outline-variant);
+      border-radius: 16px; background: transparent;
+      font-family: var(--font-family); font-size: 13px; color: inherit; outline: none;
+    }
+    .en-search-input:focus { border-color: var(--md-sys-color-primary); }
+    .en-filter-chip {
+      height: 26px; padding: 0 10px; border-radius: 13px; flex-shrink: 0;
+      border: 1px solid var(--md-sys-color-outline-variant);
+      background: transparent; font-size: 11px; font-weight: 500; cursor: pointer;
+      color: var(--md-sys-color-on-surface-variant); white-space: nowrap;
+    }
+    .en-filter-chip.active {
+      background: var(--md-sys-color-secondary-container);
+      color: var(--md-sys-color-on-secondary-container); border-color: transparent;
+    }
+    .en-list { flex: 1; overflow-y: auto; scrollbar-width: thin; }
+    .en-list::-webkit-scrollbar { width: 4px; }
+    .en-list::-webkit-scrollbar-thumb { background: var(--md-sys-color-outline-variant); border-radius: 2px; }
+
+    /* Entry card */
+    .en-card {
+      padding: 10px 14px; border-bottom: 1px solid var(--md-sys-color-outline-variant);
+      cursor: pointer; position: relative;
+    }
+    .en-card:hover { background: color-mix(in srgb,var(--md-sys-color-on-surface) 4%,transparent); }
+    .en-card.selected { background: color-mix(in srgb,var(--md-sys-color-primary) 7%,transparent); }
+    .en-card-top { display: flex; align-items: center; gap: 5px; margin-bottom: 4px; flex-wrap: wrap; }
+    .en-card-text {
+      font-size: 13px; font-weight: 500; line-height: 1.45;
+      color: var(--md-sys-color-on-surface); margin-bottom: 4px;
+      display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+    }
+    .en-card-meta { font-size: 11px; color: var(--md-sys-color-on-surface-variant); }
+    .en-card-actions { display: flex; gap: 4px; margin-top: 6px; opacity: 0; transition: opacity .12s; }
+    .en-card:hover .en-card-actions { opacity: 1; }
+    .en-card-btn {
+      height: 24px; padding: 0 10px; border-radius: 12px;
+      border: 1px solid var(--md-sys-color-outline-variant);
+      background: transparent; font-size: 11px; font-weight: 500; cursor: pointer; color: inherit;
+    }
+    .en-card-btn:hover { background: var(--md-sys-color-surface-container-high); }
+
+    /* Badges */
+    .en-badge {
+      display: inline-flex; align-items: center; height: 18px; padding: 0 6px;
+      border-radius: 9px; font-size: 10px; font-weight: 600; white-space: nowrap;
+    }
+    .en-badge-tab    { background: var(--md-sys-color-surface-container-highest); color: var(--md-sys-color-on-surface-variant); }
+    .en-badge-auto   { background: rgba(21,101,192,.12); color: #1565c0; border: 1px solid rgba(21,101,192,.25); }
+    .en-badge-conf   { background: rgba(46,125,50,.1); color: #2e7d32; }
+    .en-badge-split  { background: rgba(106,27,154,.1); color: #6a1b9a; }
+    .en-badge-score  { background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); }
+    .en-badge-score.hi { background: rgba(46,125,50,.15); color: #2e7d32; }
+    .en-badge-score.mid { background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); }
+    .en-p-tag {
+      height: 18px; padding: 0 7px; border-radius: 9px;
+      font-size: 10px; font-weight: 600; color: #fff; white-space: nowrap;
+    }
+    .en-cite-pill {
+      display: inline-flex; align-items: center; height: 18px; padding: 0 7px;
+      border-radius: 9px; font-size: 10px; font-weight: 600; white-space: nowrap;
+    }
+
+    /* ── Detail pane ── */
+    .en-detail-col {
+      flex: 1; min-width: 0; overflow-y: auto; padding: 20px 24px 40px;
+      scrollbar-width: thin;
+    }
+    .en-detail-col::-webkit-scrollbar { width: 4px; }
+    .en-detail-col::-webkit-scrollbar-thumb { background: var(--md-sys-color-outline-variant); border-radius: 2px; }
+    .en-detail-empty {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      height: 100%; gap: 8px; text-align: center; padding: 48px 24px;
+      color: var(--md-sys-color-on-surface-variant); font-size: 14px;
+    }
+    .en-detail-empty p { margin: 0; }
+    .en-detail-source { font-size: 13px; color: var(--md-sys-color-on-surface-variant); margin-bottom: 10px; font-style: italic; }
+    .en-detail-text { font-size: 15px; line-height: 1.65; color: var(--md-sys-color-on-surface); margin-bottom: 14px; }
+    .en-detail-cells { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
+    .en-detail-cell-row { display: flex; gap: 8px; align-items: baseline; }
+    .en-detail-cell-label {
+      font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+      color: var(--md-sys-color-on-surface-variant); min-width: 80px; flex-shrink: 0;
+    }
+    .en-detail-cell-val { font-size: 13px; color: var(--md-sys-color-on-surface); line-height: 1.5; }
+    .en-detail-cell-val.active { font-weight: 600; }
+    .en-section-label {
+      font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+      color: var(--md-sys-color-on-surface-variant); margin-bottom: 8px; display: block;
+    }
+    .en-assign-area { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--md-sys-color-outline-variant); }
+    .en-reg-row { display: flex; gap: 4px; margin-top: 8px; }
+    .en-reg-btn {
+      height: 28px; padding: 0 11px; border-radius: 14px;
+      border: 1px solid var(--md-sys-color-outline-variant);
+      background: transparent; font-size: 11px; font-weight: 600; cursor: pointer;
+      color: var(--md-sys-color-on-surface-variant); transition: all .12s;
+    }
+    .en-reg-btn[data-r=what].active { background: rgba(21,101,192,.15); color:#1565c0; border-color:#1565c0; }
+    .en-reg-btn[data-r=why].active  { background: rgba(230,81,0,.15);   color:#e65100; border-color:#e65100; }
+    .en-reg-btn[data-r=who].active  { background: rgba(46,125,50,.15);  color:#2e7d32; border-color:#2e7d32; }
+    .en-reg-btn[data-r=how].active  { background: rgba(106,27,154,.15); color:#6a1b9a; border-color:#6a1b9a; }
+    .en-split-hint {
+      font-size: 11px; color: var(--md-sys-color-on-surface-variant); margin-top: 8px;
+      display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+    }
+
+    /* ════ SEARCH VIEW ════ */
+    .en-search-view { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; }
+    .en-search-bar {
+      flex-shrink: 0; display: flex; align-items: center; gap: 8px;
+      padding: 10px 14px; border-bottom: 1px solid var(--md-sys-color-outline-variant);
+    }
+    .en-search-field {
+      flex: 1; min-width: 0; position: relative; display: flex; align-items: center; height: 44px;
+    }
+    .en-search-field__outline {
+      position: absolute; inset: 0; border-radius: 4px;
+      border: 1px solid var(--md-sys-color-outline); pointer-events: none;
+      transition: border-color .12s;
+    }
+    .en-search-field:focus-within .en-search-field__outline { border: 2px solid var(--md-sys-color-primary); }
+    .en-search-field__icon {
+      padding: 0 10px; flex-shrink: 0; z-index: 1;
+      color: var(--md-sys-color-on-surface-variant); display: flex; align-items: center;
+    }
+    .en-search-field:focus-within .en-search-field__icon { color: var(--md-sys-color-primary); }
+    .en-search-field__input {
+      flex: 1; height: 100%; padding: 0 10px 0 0; background: transparent;
+      border: none; outline: none; z-index: 1;
+      font-family: var(--font-family); font-size: 15px; color: var(--md-sys-color-on-surface);
+      caret-color: var(--md-sys-color-primary);
+    }
+    .en-search-field__input::placeholder { color: var(--md-sys-color-on-surface-variant); opacity: 1; }
+    .en-results { flex: 1; overflow-y: auto; padding: 10px 14px; scrollbar-width: thin; }
+    .en-results::-webkit-scrollbar { width: 4px; }
+    .en-results::-webkit-scrollbar-thumb { background: var(--md-sys-color-outline-variant); border-radius: 2px; }
+    .en-results-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 0 8px; font-size: 11px; color: var(--md-sys-color-on-surface-variant);
+      font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
+    }
+    .en-result-card {
+      padding: 10px 14px; border: 1px solid var(--md-sys-color-outline-variant);
+      border-radius: 10px; margin-bottom: 6px; cursor: pointer; position: relative; overflow: hidden;
+      transition: box-shadow .12s, border-color .12s;
+    }
+    .en-result-card:hover { border-color: var(--md-sys-color-outline); box-shadow: 0 1px 4px rgba(0,0,0,.1); }
+    .en-result-card-top { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+    .en-result-rank {
+      min-width: 20px; height: 20px; padding: 0 5px; border-radius: 10px;
+      background: var(--md-sys-color-surface-container-highest);
+      color: var(--md-sys-color-on-surface-variant);
+      font-size: 10px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center;
+    }
+    .en-result-bar { flex: 1; height: 4px; border-radius: 2px; background: var(--md-sys-color-secondary-container); overflow: hidden; }
+    .en-result-fill { height: 100%; background: var(--md-sys-color-primary); border-radius: 2px; transition: width .3s; }
+    .en-result-score {
+      font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; width: 36px; text-align: right;
+      color: var(--md-sys-color-on-surface-variant);
+    }
+    .en-result-score.hi  { color: #2e7d32; }
+    .en-result-score.mid { color: var(--md-sys-color-primary); }
+    .en-result-text { font-size: 13px; line-height: 1.45; color: var(--md-sys-color-on-surface); margin-bottom: 5px; }
+    .en-result-meta { font-size: 11px; color: var(--md-sys-color-on-surface-variant); display: flex; gap: 6px; flex-wrap: wrap; }
+    .en-result-assign-btn {
+      position: absolute; top: 10px; right: 10px;
+      height: 26px; padding: 0 10px; border-radius: 13px;
+      border: 1px solid var(--md-sys-color-outline-variant);
+      background: var(--md-sys-color-surface); font-size: 11px; font-weight: 500;
+      cursor: pointer; color: var(--md-sys-color-on-surface-variant);
+      opacity: 0; transition: opacity .12s;
+    }
+    .en-result-card:hover .en-result-assign-btn { opacity: 1; }
+    .en-result-assign-btn:hover { background: var(--md-sys-color-secondary-container); color: var(--md-sys-color-on-secondary-container); border-color: transparent; }
+    .en-empty {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      height: 100%; gap: 10px; text-align: center; padding: 48px 24px;
+      color: var(--md-sys-color-on-surface-variant); font-size: 14px;
+    }
+    .en-empty p { margin: 0; }
+
+    /* ── Common buttons ── */
+    .en-btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      height: 34px; padding: 0 16px; border-radius: 17px; border: none; cursor: pointer;
+      font-family: var(--font-family); font-size: 13px; font-weight: 500; white-space: nowrap;
+      transition: box-shadow .12s;
+    }
+    .en-btn-primary { background: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary); }
+    .en-btn-primary:hover { box-shadow: 0 1px 6px rgba(0,0,0,.25); }
+    .en-btn-primary:disabled { opacity: .38; cursor: not-allowed; }
+    .en-btn-tonal { background: var(--md-sys-color-secondary-container); color: var(--md-sys-color-on-secondary-container); }
+    .en-btn-tonal:hover { box-shadow: 0 1px 4px rgba(0,0,0,.18); }
+    .en-btn-ghost { background: transparent; color: var(--md-sys-color-on-surface-variant); border: 1px solid var(--md-sys-color-outline-variant); }
+    .en-btn-ghost:hover { background: color-mix(in srgb,var(--md-sys-color-on-surface) 6%,transparent); }
+    .en-btn-danger { background: transparent; color: var(--md-sys-color-error); border: 1px solid color-mix(in srgb,var(--md-sys-color-error) 40%,transparent); }
+
+    /* ── Assign popover ── */
+    .en-pop {
+      position: fixed; z-index: 9999; min-width: 180px;
+      background: var(--md-sys-color-surface-container);
+      border: 1px solid var(--md-sys-color-outline-variant);
+      border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,.18);
+      overflow: hidden; display: none;
+    }
+    .en-pop.open { display: block; }
+    .en-pop-label { padding: 8px 12px 4px; font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--md-sys-color-on-surface-variant); }
+    .en-pop-item { display: flex; align-items: center; gap: 8px; padding: 8px 12px; cursor: pointer; font-size: 13px; color: var(--md-sys-color-on-surface); transition: background .1s; }
+    .en-pop-item:hover { background: color-mix(in srgb,var(--md-sys-color-on-surface) 6%,transparent); }
+    .en-pop-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .en-pop-new { color: var(--md-sys-color-primary); font-weight: 500; }
+
+    /* ── Principle modal ── */
+    .en-modal-bg { position: fixed; inset: 0; z-index: 8100; background: rgba(0,0,0,.4); display: none; align-items: center; justify-content: center; }
+    .en-modal-bg.open { display: flex; }
+    .en-modal { background: var(--md-sys-color-surface); border-radius: 12px; padding: 24px; width: 360px; box-shadow: 0 8px 32px rgba(0,0,0,.22); }
+    .en-modal-title { font-size: 15px; font-weight: 600; margin-bottom: 16px; }
+    .en-modal-foot { display: flex; gap: 8px; justify-content: flex-end; margin-top: 18px; }
+    .en-field { margin-bottom: 14px; }
+    .en-field-label { font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--md-sys-color-on-surface-variant); margin-bottom: 5px; display: block; }
+    .en-input {
+      width: 100%; height: 36px; padding: 0 12px;
+      border: 1px solid var(--md-sys-color-outline); border-radius: 4px;
+      background: transparent; font-family: var(--font-family); font-size: 14px; color: inherit; outline: none;
+    }
+    .en-input:focus { border: 2px solid var(--md-sys-color-primary); padding: 0 11px; }
+    .en-dim-chips { display: flex; gap: 5px; flex-wrap: wrap; }
+    .en-dim-chip {
+      height: 28px; padding: 0 12px; border-radius: 14px;
+      border: 1px solid var(--md-sys-color-outline-variant);
+      background: transparent; font-size: 12px; font-weight: 500; cursor: pointer;
+      color: var(--md-sys-color-on-surface-variant); transition: all .12s;
+    }
+    .en-dim-chip.active { background: var(--md-sys-color-secondary-container); color: var(--md-sys-color-on-secondary-container); border-color: transparent; }
+
+    /* ── Panel section styles ── */
+    .en-panel-label { font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--md-sys-color-on-surface-variant); padding: 8px 0 4px; }
+    .en-panel-chips { display: flex; flex-wrap: wrap; gap: 5px; padding: 2px 0 6px; }
+    .en-panel-chip {
+      height: 26px; padding: 0 10px; border-radius: 13px;
+      border: 1px solid var(--md-sys-color-outline-variant);
+      background: transparent; font-size: 11px; font-weight: 500; cursor: pointer;
+      color: var(--md-sys-color-on-surface-variant); white-space: nowrap;
+    }
+    .en-panel-chip.active { background: var(--md-sys-color-secondary-container); color: var(--md-sys-color-on-secondary-container); border-color: transparent; }
+    .en-panel-range-row { display: flex; align-items: center; gap: 8px; padding: 4px 0; }
+    .en-panel-range-label { font-size: 12px; color: var(--md-sys-color-on-surface-variant); min-width: 60px; }
+    .en-panel-range { flex: 1; accent-color: var(--md-sys-color-primary); cursor: pointer; }
+    .en-panel-range-val { font-size: 12px; font-weight: 600; color: var(--md-sys-color-on-surface); min-width: 36px; text-align: right; }
+    .en-saved-item { display: flex; align-items: center; gap: 4px; }
+    .en-saved-btn {
+      flex: 1; display: flex; align-items: center; gap: 6px; padding: 5px 6px;
+      border: none; background: none; cursor: pointer; border-radius: 6px; text-align: left;
+      transition: background .1s;
+    }
+    .en-saved-btn:hover { background: color-mix(in srgb,var(--md-sys-color-on-surface) 5%,transparent); }
+    .en-saved-query { font-size: 12px; font-weight: 500; color: var(--md-sys-color-on-surface); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+    .en-saved-meta { font-size: 10px; color: var(--md-sys-color-on-surface-variant); }
+    .en-saved-del { width: 22px; height: 22px; border-radius: 50%; border: none; background: none; cursor: pointer; color: var(--md-sys-color-on-surface-variant); font-size: 14px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .en-saved-del:hover { color: var(--md-sys-color-error); }
+  </style>
+</head>
+<body>
+
+  <!-- Topbar -->
+  <div class="en-topbar">
+    <div class="en-topbar-title">Entries</div>
+    <div class="en-status-dot loading" id="en-dot"></div>
+    <span class="en-status-text" id="en-status-text">Loading...</span>
+  </div>
+
+  <!-- Sub-tabs -->
+  <div class="en-subtabs">
+    <button class="en-subtab active" data-view="browse">
+      Browse <span class="en-subtab-n" id="en-n-browse">0</span>
+    </button>
+    <button class="en-subtab" data-view="search">
+      Search <span class="en-subtab-n" id="en-n-search">–</span>
+    </button>
+  </div>
+
+  <!-- Body: sidebar + main -->
+  <div class="en-body" id="en-body"></div>
+
+  <!-- Assign popover -->
+  <div class="en-pop" id="en-pop">
+    <div class="en-pop-label">Assign to principle</div>
+    <div id="en-pop-list"></div>
+    <div class="en-pop-item en-pop-new" id="en-pop-new">+ New principle</div>
+  </div>
+
+  <!-- Principle modal -->
+  <div class="en-modal-bg" id="en-modal-bg">
+    <div class="en-modal">
+      <div class="en-modal-title" id="en-modal-title">New principle</div>
+      <div class="en-field">
+        <label class="en-field-label">Name</label>
+        <input class="en-input" id="en-modal-name" placeholder="e.g. Threshold Gradient" autocomplete="off">
+      </div>
+      <div class="en-field">
+        <label class="en-field-label">Dimension</label>
+        <div class="en-dim-chips" id="en-modal-dims">
+          <button class="en-dim-chip" data-dim="Physical">Physical</button>
+          <button class="en-dim-chip" data-dim="Social">Social</button>
+          <button class="en-dim-chip" data-dim="Organisational">Organisational</button>
+          <button class="en-dim-chip" data-dim="Temporal">Temporal</button>
+          <button class="en-dim-chip" data-dim="Economic">Economic</button>
+        </div>
+      </div>
+      <div class="en-modal-foot">
+        <button class="en-btn en-btn-ghost" id="en-modal-cancel">Cancel</button>
+        <button class="en-btn en-btn-primary" id="en-modal-confirm">Create</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  (function(){
+    var SY = window.SynthesisData;
+    if (!SY) { document.body.innerHTML = '<p style="padding:24px">utils-synthesis.js not loaded.</p>'; return; }
+
+    // ── State ───────────────────────────────────────────────────────────────
+    var _emb        = new Map();   // noteKey → Float32Array
+    var _embReady   = false;
+    var _embedding  = false;
+    var _view       = 'browse';
+    var _selectedKey= null;
+    var _filter     = 'all';
+    var _browseSearch = '';
+    var _searchResults = [];
+    var _searching  = false;
+    var _topN       = 20;
+    var _minScore   = 0.40;
+    var _assignCtx  = null;
+    var _pModalCb   = null;
+    var _savedSearches = [];
+    try { _savedSearches = JSON.parse(localStorage.getItem('sy_saved_searches')||'[]'); } catch(e){}
+
+    function _h(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+    // ── Nav rail build ──────────────────────────────────────────────────────
+    var _paneEl = document.getElementById('en-body');
+
+    var _globalPanelHtml =
+      '<div class="en-panel-label">Sheet</div>' +
+      '<div id="en-global-status" style="font-size:11px;color:var(--md-sys-color-on-surface-variant);padding:2px 0 6px"></div>' +
+      '<div class="en-panel-label">Cluster threshold</div>' +
+      '<div class="en-panel-range-row">' +
+        '<input type="range" class="en-panel-range" id="en-thresh-slider" min="20" max="70" value="'+Math.round(SY.getSettings().threshold*100)+'" step="1">' +
+        '<span class="en-panel-range-val" id="en-thresh-val">'+Math.round(SY.getSettings().threshold*100)+'%</span>' +
+      '</div>' +
+      '<div class="en-panel-label">Max words (split)</div>' +
+      '<div class="en-panel-range-row">' +
+        '<input type="range" class="en-panel-range" id="en-maxwords-slider" min="20" max="300" value="'+SY.getSettings().maxWords+'" step="10">' +
+        '<span class="en-panel-range-val" id="en-maxwords-val">'+SY.getSettings().maxWords+'</span>' +
+      '</div>';
+
+    var _browsePanelHtml =
+      '<div class="en-panel-label">Show</div>' +
+      '<div class="en-panel-chips" id="en-filter-chips">' +
+        '<button class="en-panel-chip active" data-f="all">All</button>' +
+        '<button class="en-panel-chip" data-f="unassigned">Unassigned</button>' +
+        '<button class="en-panel-chip" data-f="assigned">Assigned</button>' +
+        '<button class="en-panel-chip" data-f="pending">Pending</button>' +
+      '</div>';
+
+    var _searchPanelHtml =
+      '<div class="en-panel-label">Top results</div>' +
+      '<div class="en-panel-chips" id="en-topn-chips">' +
+        ['10','20','40','All'].map(function(v,i){return '<button class="en-panel-chip'+(i===1?' active':'')+'" data-n="'+(v==='All'?'0':v)+'">'+v+'</button>';}).join('') +
+      '</div>' +
+      '<div class="en-panel-label">Min score</div>' +
+      '<div class="en-panel-chips" id="en-score-chips">' +
+        ['Any','0.30','0.40','0.50','0.60'].map(function(v,i){return '<button class="en-panel-chip'+(i===2?' active':'')+'" data-s="'+(v==='Any'?'0':v)+'">'+v+'</button>';}).join('') +
+      '</div>' +
+      '<div class="en-panel-label">Saved searches</div>' +
+      '<div id="en-saved-list"></div>';
+
+    var _nav = window.PPNavRail.create(_paneEl, {
+      toolName: 'Entries',
+      defaultOpen: true,
+      panelSections: [
+        { label: 'Global', html: _globalPanelHtml },
+        { label: 'Browse', html: _browsePanelHtml },
+        { label: 'Search', html: _searchPanelHtml },
+      ],
+    });
+
+    // Build main area
+    _nav.mainEl.style.cssText = 'display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden;';
+    _nav.mainEl.innerHTML =
+      '<div class="en-view" id="en-view-browse">' +
+        '<div class="en-browse">' +
+          '<div class="en-list-col">' +
+            '<div class="en-list-toolbar">' +
+              '<input class="en-search-input" id="en-browse-search" placeholder="Filter entries..." autocomplete="off">' +
+            '</div>' +
+            '<div class="en-list" id="en-list"></div>' +
+          '</div>' +
+          '<div class="en-detail-col" id="en-detail-col">' +
+            '<div class="en-detail-empty" id="en-detail-empty">' +
+              '<p style="font-size:16px;font-weight:500;color:var(--md-sys-color-on-surface)">Select an entry</p>' +
+              '<p>Click any row to see full content and assign it to a principle.</p>' +
+            '</div>' +
+            '<div id="en-detail-content" style="display:none"></div>' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="en-view" id="en-view-search" hidden>' +
+        '<div class="en-search-view">' +
+          '<div class="en-search-bar">' +
+            '<div class="en-search-field">' +
+              '<div class="en-search-field__icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></div>' +
+              '<input class="en-search-field__input" id="en-search-input" placeholder="Describe what you\'re looking for…" disabled autocomplete="off" spellcheck="false">' +
+              '<div class="en-search-field__outline"></div>' +
+            '</div>' +
+            '<button class="en-btn en-btn-primary" id="en-search-btn" disabled style="height:36px;font-size:13px;padding:0 18px">Search</button>' +
+            '<button class="en-btn en-btn-ghost" id="en-save-search-btn" disabled style="height:36px;font-size:13px;padding:0 14px">Save</button>' +
+          '</div>' +
+          '<div class="en-results" id="en-results">' +
+            '<div class="en-empty"><p>Enter a query and press Search.</p></div>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+
+    injectToolNav('entries.html');
+
+    // ── Global settings wiring ───────────────────────────────────────────────
+    var _threshSlider   = document.getElementById('en-thresh-slider');
+    var _threshVal      = document.getElementById('en-thresh-val');
+    var _maxWordsSlider = document.getElementById('en-maxwords-slider');
+    var _maxWordsVal    = document.getElementById('en-maxwords-val');
+
+    if (_threshSlider) {
+      _threshSlider.addEventListener('input', function(){
+        var v = parseInt(_threshSlider.value);
+        _threshVal.textContent = v + '%';
+        SY.updateSettings({ threshold: v/100 });
+      });
+    }
+    if (_maxWordsSlider) {
+      _maxWordsSlider.addEventListener('input', function(){
+        var v = parseInt(_maxWordsSlider.value);
+        _maxWordsVal.textContent = v;
+        SY.updateSettings({ maxWords: v });
+      });
+    }
+
+    // Sync global status
+    function _updateGlobalStatus() {
+      var el = document.getElementById('en-global-status');
+      if (!el) return;
+      var ls = SY.getLastSync();
+      el.textContent = ls ? 'Last sync: ' + new Date(ls).toLocaleTimeString() : 'Not synced yet';
+    }
+    _updateGlobalStatus();
+    window.addEventListener('sy-settings-changed', function(){
+      var s = SY.getSettings();
+      if (_threshSlider)   { _threshSlider.value   = Math.round(s.threshold*100); _threshVal.textContent   = Math.round(s.threshold*100)+'%'; }
+      if (_maxWordsSlider) { _maxWordsSlider.value  = s.maxWords;                 _maxWordsVal.textContent = s.maxWords; }
+    });
+
+    // ── Sub-tab switching ────────────────────────────────────────────────────
+    document.querySelectorAll('.en-subtab').forEach(function(tab){
+      tab.addEventListener('click', function(){
+        _view = tab.dataset.view;
+        document.querySelectorAll('.en-subtab').forEach(function(t){ t.classList.toggle('active', t.dataset.view===_view); });
+        document.getElementById('en-view-browse').hidden = _view !== 'browse';
+        document.getElementById('en-view-search').hidden = _view !== 'search';
+      });
+    });
+
+    // ── Browse filter chips ──────────────────────────────────────────────────
+    var _filterChips = document.getElementById('en-filter-chips');
+    if (_filterChips) {
+      _filterChips.addEventListener('click', function(e){
+        var chip = e.target.closest('[data-f]'); if (!chip) return;
+        _filterChips.querySelectorAll('.en-panel-chip').forEach(function(c){ c.classList.remove('active'); });
+        chip.classList.add('active');
+        _filter = chip.dataset.f;
+        renderBrowse();
+      });
+    }
+
+    // ── Browse search ────────────────────────────────────────────────────────
+    var _browseSearchEl = document.getElementById('en-browse-search');
+    if (_browseSearchEl) {
+      _browseSearchEl.addEventListener('input', function(){ _browseSearch = _browseSearchEl.value; renderBrowse(); });
+    }
+
+    // ── Search panel chips ───────────────────────────────────────────────────
+    var _topnChips  = document.getElementById('en-topn-chips');
+    var _scoreChips = document.getElementById('en-score-chips');
+    if (_topnChips) {
+      _topnChips.addEventListener('click', function(e){
+        var chip = e.target.closest('[data-n]'); if (!chip) return;
+        _topnChips.querySelectorAll('.en-panel-chip').forEach(function(c){ c.classList.remove('active'); });
+        chip.classList.add('active');
+        _topN = parseInt(chip.dataset.n) || 0;
+      });
+    }
+    if (_scoreChips) {
+      _scoreChips.addEventListener('click', function(e){
+        var chip = e.target.closest('[data-s]'); if (!chip) return;
+        _scoreChips.querySelectorAll('.en-panel-chip').forEach(function(c){ c.classList.remove('active'); });
+        chip.classList.add('active');
+        _minScore = parseFloat(chip.dataset.s) || 0;
+      });
+    }
+
+    // ── Embedding ────────────────────────────────────────────────────────────
+    function _triggerEmbed(){
+      if (_embedding) return;
+      var keys = SY.getRowNoteKeys();
+      if (!keys.length || !window.EmbeddingUtils) return;
+      _embedding = true;
+      document.getElementById('en-dot').className = 'en-status-dot loading';
+      document.getElementById('en-status-text').textContent = 'Embedding ' + keys.length + ' entries...';
+      _embedAll(keys).then(function(){
+        _embedding = false; _embReady = true;
+        document.getElementById('en-dot').className = 'en-status-dot ready';
+        document.getElementById('en-status-text').textContent = _emb.size + ' entries indexed';
+        document.getElementById('en-search-input').disabled = false;
+        document.getElementById('en-search-btn').disabled   = false;
+        renderBrowse();
+      }).catch(function(e){
+        _embedding = false;
+        document.getElementById('en-dot').className = 'en-status-dot error';
+        document.getElementById('en-status-text').textContent = 'Embedding error';
+        console.error('[entries] embed error:', e);
+      });
+    }
+
+    async function _embedAll(keys) {
+      for (var i = 0; i < keys.length; i++) {
+        var key = keys[i]; if (_emb.has(key)) continue;
+        var r   = SY.resolveNoteKey(key); if (!r || !r.text.trim()) continue;
+        try {
+          var vec = await window.EmbeddingUtils.getCachedEmbedding(r.text);
+          if (vec) _emb.set(key, new Float32Array(vec));
+        } catch(e){}
+      }
+    }
+
+    document.addEventListener('embedder-ready', _triggerEmbed);
+    window.addEventListener('embedding-complete', function(){ if (!_embReady) _triggerEmbed(); });
+    window.addEventListener('sheet-loaded', function(){
+      updateCounts(); renderBrowse(); _triggerEmbed();
+      _loadFrameworkIfNeeded();
+    });
+
+    function _loadFrameworkIfNeeded() {
+      var scriptUrl = SY.getScriptUrl();
+      var sheetUrl  = typeof getSavedSheetUrl === 'function' ? getSavedSheetUrl() : '';
+      if (!scriptUrl || !sheetUrl) return;
+      SY.readFramework(scriptUrl, sheetUrl).then(function(tabs){
+        var fw = tabs.find(function(t){ return t.name && t.name.indexOf('FRAMEWORK') !== -1; });
+        if (!fw) return;
+        SY.setFrameworkTabs([{ name: fw.name, grid: fw.rows }]);
+        SY.loadFromFrameworkTab(fw.rows);
+        updateCounts(); renderBrowse();
+        _updateGlobalStatus();
+      }).catch(function(){});
+    }
+
+    // ── Count badges ─────────────────────────────────────────────────────────
+    function updateCounts() {
+      var total = SY.getRowNoteKeys().length;
+      document.getElementById('en-n-browse').textContent = total;
+    }
+
+    // ══ BROWSE VIEW ══════════════════════════════════════════════════════════
+
+    function renderBrowse() {
+      var keys        = SY.getRowNoteKeys();
+      var assignments = SY.getAssignments();
+      var principles  = SY.getPrinciples();
+      var pMap        = {}; principles.forEach(function(p){ pMap[p.id] = p; });
+      var aMap        = {}; assignments.forEach(function(a){ aMap[a.noteKey] = a; });
+
+      var filtered = keys.filter(function(key){
+        var a = aMap[key];
+        if (_filter === 'unassigned' && a) return false;
+        if (_filter === 'assigned'   && (!a || a.status !== 'confirmed')) return false;
+        if (_filter === 'pending'    && (!a || a.status !== 'auto')) return false;
+        if (_browseSearch) {
+          var r = SY.resolveNoteKey(key); if (!r) return false;
+          var s = _browseSearch.toLowerCase();
+          if (!(r.text + r.tabName + (r.cats||[]).join(' ')).toLowerCase().includes(s)) return false;
+        }
+        return true;
+      });
+
+      document.getElementById('en-n-browse').textContent = keys.length;
+
+      var listEl = document.getElementById('en-list');
+      if (!filtered.length) {
+        listEl.innerHTML = '<div class="en-empty" style="height:auto;padding:32px 16px"><p>No entries match.</p></div>';
+        return;
+      }
+
+      var html = '';
+      filtered.forEach(function(key){
+        var r  = SY.resolveNoteKey(key); if (!r) return;
+        var a  = aMap[key];
+        var p  = a ? pMap[a.principleId] : null;
+        var isSel = key === _selectedKey;
+        var parsed = typeof parseCitation === 'function' ? parseCitation(r.text) : { body:r.text, citation:null };
+
+        html += '<div class="en-card'+(isSel?' selected':'')+'" data-key="'+_h(key)+'">';
+        html += '<div class="en-card-top">';
+        html += '<span class="en-badge en-badge-tab">'+_h(r.tabName)+'</span>';
+        if (a && a.status==='auto')      html += '<span class="en-badge en-badge-auto">auto</span>';
+        if (a && a.status==='confirmed') html += '<span class="en-badge en-badge-conf">assigned</span>';
+        if (p) html += '<span class="en-p-tag" style="background:'+_h(p.color)+'">'+_h(p.name.slice(0,22))+'</span>';
+        html += '</div>';
+        html += '<div class="en-card-text">';
+        html += _h(parsed.body);
+        if (parsed.citation) html += ' <span class="en-cite-pill" style="background:var(--md-sys-color-surface-container-highest);color:var(--md-sys-color-on-surface-variant)">'+_h(parsed.citation)+'</span>';
+        html += '</div>';
+        if (r.cats && r.cats.filter(Boolean).length)
+          html += '<div class="en-card-meta">'+r.cats.filter(Boolean).map(function(c){return _h(c);}).join(' › ')+'</div>';
+        html += '<div class="en-card-actions">';
+        html += '<button class="en-card-btn" data-action="assign" data-key="'+_h(key)+'">Assign</button>';
+        if (a) html += '<button class="en-card-btn" data-action="unassign" data-key="'+_h(key)+'">Unassign</button>';
+        if (!a && r.text.split(/\s+/).length > SY.getSettings().maxWords)
+          html += '<button class="en-card-btn" data-action="split" data-key="'+_h(key)+'">Split</button>';
+        html += '</div>';
+        html += '</div>';
+      });
+
+      listEl.innerHTML = html;
+
+      listEl.querySelectorAll('.en-card').forEach(function(card){
+        card.addEventListener('click', function(e){
+          if (e.target.closest('[data-action]')) return;
+          _selectedKey = (card.dataset.key === _selectedKey) ? null : card.dataset.key;
+          renderBrowse();
+          renderDetail(_selectedKey);
+        });
+      });
+      listEl.querySelectorAll('[data-action=assign]').forEach(function(btn){
+        btn.addEventListener('click', function(e){
+          e.stopPropagation();
+          var rect = btn.getBoundingClientRect();
+          _openPop(btn.dataset.key, rect.left, rect.bottom + 4);
+        });
+      });
+      listEl.querySelectorAll('[data-action=unassign]').forEach(function(btn){
+        btn.addEventListener('click', function(e){
+          e.stopPropagation();
+          SY.rejectAssignment(btn.dataset.key);
+          renderBrowse(); renderDetail(btn.dataset.key);
+        });
+      });
+      listEl.querySelectorAll('[data-action=split]').forEach(function(btn){
+        btn.addEventListener('click', function(e){
+          e.stopPropagation();
+          var childKeys = SY.splitNote(btn.dataset.key);
+          if (childKeys.length) { renderBrowse(); renderDetail(btn.dataset.key); }
+        });
+      });
+    }
+
+    // ── Detail pane ──────────────────────────────────────────────────────────
+    function renderDetail(key) {
+      var emptyEl   = document.getElementById('en-detail-empty');
+      var contentEl = document.getElementById('en-detail-content');
+      if (!key) { emptyEl.style.display = ''; contentEl.style.display = 'none'; return; }
+      var r = SY.resolveNoteKey(key); if (!r) { emptyEl.style.display = ''; contentEl.style.display = 'none'; return; }
+      var a = SY.getAssignment(key);
+      var p = a ? SY.getPrinciples().find(function(x){ return x.id === a.principleId; }) : null;
+      var parsed = typeof parseCitation === 'function' ? parseCitation(r.text) : { body:r.text, citation:null };
+      var splits = SY.getFragments(key);
+
+      emptyEl.style.display = 'none'; contentEl.style.display = '';
+
+      var html = '';
+      html += '<div class="en-detail-source">'+_h(r.tabName);
+      if (r.tabTitle && r.tabTitle !== r.tabName) html += ' — '+_h(r.tabTitle);
+      html += '</div>';
+
+      // All cells in this row
+      html += '<div class="en-detail-cells">';
+      (r.allCells||[]).forEach(function(cell, ci){
+        if (!cell || !cell.trim()) return;
+        var hdr = (r.headers && r.headers[ci]) ? r.headers[ci] : 'Col '+(ci+1);
+        var isActive = ci === r.cellIdx;
+        html += '<div class="en-detail-cell-row">';
+        html += '<span class="en-detail-cell-label">'+_h(hdr)+'</span>';
+        html += '<span class="en-detail-cell-val'+(isActive?' active':'')+'">';
+        if (isActive) {
+          html += _h(parsed.body);
+          if (parsed.citation) html += ' <span class="en-cite-pill" style="background:var(--md-sys-color-primary-container);color:var(--md-sys-color-on-primary-container)">'+_h(parsed.citation)+'</span>';
+        } else { html += _h(cell); }
+        html += '</span>';
+        html += '</div>';
+      });
+      html += '</div>';
+
+      // Split fragments
+      if (splits) {
+        html += '<div style="margin-top:12px"><span class="en-section-label">Split fragments ('+splits.length+')</span>';
+        splits.forEach(function(frag, fi){
+          var fKey = SY.makeSplitKey(key, fi);
+          var fa   = SY.getAssignment(fKey);
+          var fp   = fa ? SY.getPrinciples().find(function(x){return x.id===fa.principleId;}) : null;
+          html += '<div style="padding:7px 10px;border-radius:6px;margin-bottom:4px;border:1px solid var(--md-sys-color-outline-variant);font-size:13px;line-height:1.5">';
+          html += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">';
+          html += '<span class="en-badge en-badge-split">Fragment '+(fi+1)+'</span>';
+          if (fp) html += '<span class="en-p-tag" style="background:'+_h(fp.color)+'">'+_h(fp.name.slice(0,20))+'</span>';
+          html += '<button class="en-card-btn" data-action="assign-frag" data-key="'+_h(fKey)+'" style="margin-left:auto">Assign</button>';
+          if (fa) html += '<button class="en-card-btn" data-action="unassign-frag" data-key="'+_h(fKey)+'">Unassign</button>';
+          html += '</div>';
+          html += _h(frag);
+          html += '</div>';
+        });
+        html += '<button class="en-btn en-btn-ghost" data-action="remove-split" data-key="'+_h(key)+'" style="height:26px;font-size:11px;padding:0 10px;margin-top:4px">Remove split</button>';
+        html += '</div>';
+      }
+
+      // Assignment section
+      html += '<div class="en-assign-area">';
+      html += '<span class="en-section-label">Assignment</span>';
+      if (p) {
+        html += '<div style="margin-bottom:8px;font-size:13px">Assigned to <strong style="color:'+_h(p.color)+'">'+_h(p.name)+'</strong>';
+        if (a.status==='auto') html += ' <span class="en-badge en-badge-auto">pending confirmation</span>';
+        if (a.similarity) html += ' <span style="font-size:11px;color:var(--md-sys-color-on-surface-variant)">sim '+a.similarity.toFixed(3)+'</span>';
+        html += '</div>';
+        html += '<span class="en-section-label">Register</span>';
+        html += '<div class="en-reg-row">';
+        ['what','why','who','how'].forEach(function(reg){
+          html += '<button class="en-reg-btn'+(a.register===reg?' active':'')+'" data-r="'+reg+'" data-key="'+_h(key)+'">'+reg.toUpperCase()+'</button>';
+        });
+        html += '</div>';
+        if (a.status==='auto') {
+          html += '<div style="display:flex;gap:8px;margin-top:10px">';
+          html += '<button class="en-btn en-btn-tonal" data-action="confirm" data-key="'+_h(key)+'" style="height:30px;font-size:12px">Confirm</button>';
+          html += '<button class="en-btn en-btn-danger" data-action="reject"  data-key="'+_h(key)+'" style="height:30px;font-size:12px">Reject</button>';
+          html += '</div>';
+        } else {
+          html += '<div style="margin-top:8px">';
+          html += '<button class="en-btn en-btn-ghost" data-action="unassign" data-key="'+_h(key)+'" style="height:30px;font-size:12px">Unassign</button>';
+          html += '</div>';
+        }
+      } else if (!splits) {
+        html += '<button class="en-btn en-btn-tonal" data-action="assign" data-key="'+_h(key)+'" style="height:30px;font-size:12px">Assign to principle</button>';
+        var wordCount = r.text.split(/\s+/).length;
+        if (wordCount > SY.getSettings().maxWords && !splits) {
+          html += '<div class="en-split-hint">';
+          html += '<span>'+wordCount+' words — over the '+SY.getSettings().maxWords+'-word threshold.</span>';
+          html += '<button class="en-btn en-btn-ghost" data-action="split" data-key="'+_h(key)+'" style="height:26px;font-size:11px">Split into fragments</button>';
+          html += '</div>';
+        }
+      } else {
+        html += '<div style="font-size:12px;color:var(--md-sys-color-on-surface-variant)">This entry has been split. Assign individual fragments above.</div>';
+      }
+      html += '</div>';
+
+      contentEl.innerHTML = html;
+
+      // Wire events
+      contentEl.querySelectorAll('.en-reg-btn').forEach(function(btn){
+        btn.addEventListener('click', function(){
+          SY.updateAssignmentRegister(btn.dataset.key, btn.dataset.r);
+          renderDetail(key); renderBrowse();
+        });
+      });
+      ['confirm','reject','unassign','assign','split'].forEach(function(action){
+        contentEl.querySelectorAll('[data-action='+action+']').forEach(function(btn){
+          btn.addEventListener('click', function(){
+            var k = btn.dataset.key;
+            if (action==='confirm') { SY.confirmAssignment(k); renderDetail(k); renderBrowse(); }
+            if (action==='reject')  { SY.rejectAssignment(k);  renderDetail(k); renderBrowse(); }
+            if (action==='unassign'){ SY.rejectAssignment(k);  renderDetail(k); renderBrowse(); }
+            if (action==='assign')  { var rect=btn.getBoundingClientRect(); _openPop(k, rect.left, rect.bottom+4); }
+            if (action==='split')   { var ck=SY.splitNote(k); if(ck.length){renderDetail(k);renderBrowse();} }
+          });
+        });
+      });
+      contentEl.querySelectorAll('[data-action=remove-split]').forEach(function(btn){
+        btn.addEventListener('click', function(){ SY.removeSplit(btn.dataset.key); renderDetail(btn.dataset.key); renderBrowse(); });
+      });
+      contentEl.querySelectorAll('[data-action=assign-frag]').forEach(function(btn){
+        btn.addEventListener('click', function(e){ var rect=btn.getBoundingClientRect(); _openPop(btn.dataset.key, rect.left, rect.bottom+4); });
+      });
+      contentEl.querySelectorAll('[data-action=unassign-frag]').forEach(function(btn){
+        btn.addEventListener('click', function(){ SY.rejectAssignment(btn.dataset.key); renderDetail(key); renderBrowse(); });
+      });
+    }
+
+    // ══ SEARCH VIEW ══════════════════════════════════════════════════════════
+
+    var _searchInputEl = document.getElementById('en-search-input');
+    var _searchBtnEl   = document.getElementById('en-search-btn');
+    var _saveBtnEl     = document.getElementById('en-save-search-btn');
+    var _resultsEl     = document.getElementById('en-results');
+
+    if (_searchBtnEl) _searchBtnEl.addEventListener('click', _doSearch);
+    if (_searchInputEl) _searchInputEl.addEventListener('keydown', function(e){ if(e.key==='Enter') _doSearch(); });
+    if (_saveBtnEl) {
+      _saveBtnEl.addEventListener('click', function(){
+        var q = (_searchInputEl||{}).value||'';
+        if (!q || !_searchResults.length) return;
+        _savedSearches.unshift({ id:Date.now(), query:q, count:_searchResults.length, date:new Date().toLocaleDateString() });
+        if (_savedSearches.length>30) _savedSearches = _savedSearches.slice(0,30);
+        try { localStorage.setItem('sy_saved_searches', JSON.stringify(_savedSearches)); } catch(e){}
+        _saveBtnEl.textContent = 'Saved';
+        setTimeout(function(){ _saveBtnEl.textContent = 'Save'; }, 1500);
+        renderSavedSearches();
+      });
+    }
+
+    function _cosine(a,b){
+      if(!a||!b||a.length!==b.length) return 0;
+      var dot=0,na=0,nb=0;
+      for(var i=0;i<a.length;i++){dot+=a[i]*b[i];na+=a[i]*a[i];nb+=b[i]*b[i];}
+      var d=Math.sqrt(na)*Math.sqrt(nb); return d<1e-10?0:dot/d;
+    }
+
+    async function _doSearch(){
+      var query = (_searchInputEl||{}).value||''; query = query.trim();
+      if (!query || _searching) return;
+      _searching = true;
+      if (_searchBtnEl) _searchBtnEl.disabled = true;
+      _resultsEl.innerHTML = '<div class="en-empty"><p>Searching...</p></div>';
+
+      try {
+        var qv = null;
+        if (window.EmbeddingUtils && typeof EmbeddingUtils.getCachedEmbedding === 'function') {
+          try { qv = await EmbeddingUtils.getCachedEmbedding(query); if (qv) qv = new Float32Array(qv); } catch(e){}
+        }
+
+        var keys   = SY.getRowNoteKeys();
+        var scored = keys.map(function(key){
+          var r = SY.resolveNoteKey(key); if (!r) return null;
+          var vec = _emb.get(key);
+          var score = (qv && vec) ? _cosine(qv, vec) : _kwScore(query, r.text);
+          return { key:key, r:r, score:score };
+        }).filter(Boolean);
+
+        scored.sort(function(a,b){ return b.score - a.score; });
+        var filtered = scored.filter(function(x){ return x.score >= _minScore; });
+        _searchResults = _topN > 0 ? filtered.slice(0, _topN) : filtered;
+
+        _renderResults(_searchResults, query, !!qv);
+        if (_saveBtnEl) _saveBtnEl.disabled = _searchResults.length === 0;
+      } catch(e) {
+        _resultsEl.innerHTML = '<div class="en-empty"><p>Search error: '+_h(e.message)+'</p></div>';
+        console.error('[entries] search error:', e);
+      }
+      _searching = false;
+      if (_searchBtnEl) _searchBtnEl.disabled = false;
+    }
+
+    function _kwScore(query, text) {
+      var words = query.toLowerCase().split(/\s+/).filter(Boolean);
+      var t = text.toLowerCase();
+      return words.length ? words.filter(function(w){ return t.includes(w); }).length / words.length : 0;
+    }
+
+    function _renderResults(results, query, isSemantic) {
+      if (!results.length) {
+        _resultsEl.innerHTML = '<div class="en-empty"><p>No matches. Try a different query or lower the minimum score.</p></div>';
+        document.getElementById('en-n-search').textContent = '0';
+        return;
+      }
+      document.getElementById('en-n-search').textContent = results.length;
+      var maxScore = results[0].score || 1;
+      var html     = '<div class="en-results-header"><span>'+results.length+' result'+(results.length===1?'':'s')+'</span><span>'+(isSemantic?'semantic':'keyword')+'</span></div>';
+
+      results.forEach(function(item, i){
+        var r      = item.r;
+        var parsed = typeof parseCitation === 'function' ? parseCitation(r.text) : {body:r.text,citation:null};
+        var a      = SY.getAssignment(item.key);
+        var p      = a ? SY.getPrinciples().find(function(x){return x.id===a.principleId;}) : null;
+        var pct    = Math.round((item.score/maxScore)*100);
+        var scoreCls = item.score >= 0.75 ? 'hi' : item.score >= 0.50 ? 'mid' : '';
+
+        html += '<div class="en-result-card" data-key="'+_h(item.key)+'">';
+        html += '<div class="en-result-card-top">';
+        html += '<span class="en-result-rank">'+(i+1)+'</span>';
+        html += '<div class="en-result-bar"><div class="en-result-fill" style="width:'+pct+'%"></div></div>';
+        html += '<span class="en-result-score '+scoreCls+'">'+item.score.toFixed(2)+'</span>';
+        html += '</div>';
+        html += '<div class="en-result-text">';
+        html += _h(parsed.body);
+        if (parsed.citation) html += ' <span class="en-cite-pill" style="background:var(--md-sys-color-surface-container-highest);color:var(--md-sys-color-on-surface-variant)">'+_h(parsed.citation)+'</span>';
+        html += '</div>';
+        html += '<div class="en-result-meta">';
+        html += '<span>'+_h(r.tabName)+'</span>';
+        if (r.cats && r.cats.filter(Boolean).length) html += '<span>'+r.cats.filter(Boolean).join(' › ')+'</span>';
+        if (p) html += '<span class="en-p-tag" style="background:'+_h(p.color)+'">'+_h(p.name.slice(0,20))+'</span>';
+        html += '</div>';
+        html += '<button class="en-result-assign-btn" data-action="assign" data-key="'+_h(item.key)+'">'+(p?'Reassign':'Assign')+'</button>';
+        html += '</div>';
+      });
+
+      _resultsEl.innerHTML = html;
+
+      _resultsEl.querySelectorAll('.en-result-card').forEach(function(card){
+        card.addEventListener('click', function(e){
+          if (e.target.closest('[data-action]')) return;
+          // Switch to browse and select this entry
+          document.querySelector('[data-view=browse]').click();
+          _selectedKey = card.dataset.key;
+          renderBrowse();
+          renderDetail(card.dataset.key);
+          // Scroll card into view
+          setTimeout(function(){
+            var el = document.querySelector('.en-card[data-key="'+card.dataset.key+'"]');
+            if (el) el.scrollIntoView({ block:'nearest' });
+          }, 100);
+        });
+      });
+      _resultsEl.querySelectorAll('[data-action=assign]').forEach(function(btn){
+        btn.addEventListener('click', function(e){
+          e.stopPropagation();
+          var rect = btn.getBoundingClientRect();
+          _openPop(btn.dataset.key, rect.left, rect.bottom + 4);
+        });
+      });
+    }
+
+    // ── Saved searches ───────────────────────────────────────────────────────
+    function renderSavedSearches() {
+      var container = document.getElementById('en-saved-list');
+      if (!container) return;
+      if (!_savedSearches.length) {
+        container.innerHTML = '<div style="font-size:11px;color:var(--md-sys-color-on-surface-variant);padding:2px 0 8px;font-style:italic">No saved searches yet</div>';
+        return;
+      }
+      var html = '';
+      _savedSearches.forEach(function(s){
+        html += '<div class="en-saved-item">';
+        html += '<button class="en-saved-btn" data-q="'+_h(s.query)+'">';
+        html += '<span class="en-saved-query">'+_h(s.query)+'</span>';
+        html += '<span class="en-saved-meta">'+s.count+' · '+s.date+'</span>';
+        html += '</button>';
+        html += '<button class="en-saved-del" data-id="'+s.id+'" title="Delete">×</button>';
+        html += '</div>';
+      });
+      container.innerHTML = html;
+      container.querySelectorAll('.en-saved-btn').forEach(function(btn){
+        btn.addEventListener('click', function(){
+          if (_searchInputEl) _searchInputEl.value = btn.dataset.q;
+          document.querySelector('[data-view=search]').click();
+        });
+      });
+      container.querySelectorAll('.en-saved-del').forEach(function(btn){
+        btn.addEventListener('click', function(){
+          var id = parseInt(btn.dataset.id);
+          _savedSearches = _savedSearches.filter(function(s){ return s.id !== id; });
+          try { localStorage.setItem('sy_saved_searches', JSON.stringify(_savedSearches)); } catch(e){}
+          renderSavedSearches();
+        });
+      });
+    }
+    renderSavedSearches();
+
+    // ── Assign popover ───────────────────────────────────────────────────────
+    function _openPop(noteKey, x, y) {
+      _assignCtx = noteKey;
+      var ps     = SY.getPrinciples().filter(function(p){ return p.named && !p.archived; });
+      var listEl = document.getElementById('en-pop-list');
+      listEl.innerHTML = '';
+      if (!ps.length) {
+        var it = document.createElement('div'); it.className = 'en-pop-item';
+        it.style.color = 'var(--md-sys-color-on-surface-variant)';
+        it.textContent = 'No named principles yet'; listEl.appendChild(it);
+      }
+      ps.forEach(function(p){
+        var it = document.createElement('div'); it.className = 'en-pop-item';
+        it.innerHTML = '<span class="en-pop-dot" style="background:'+_h(p.color)+'"></span>'+_h(p.name);
+        it.addEventListener('click', function(){
+          var r = SY.resolveNoteKey(_assignCtx);
+          SY.setAssignment(_assignCtx, p.id, r ? SY.suggestRegister(r.text) : 'what', 'confirmed', null);
+          _closePop();
+          renderBrowse(); renderDetail(_assignCtx);
+          if (_view === 'search') _renderResults(_searchResults, (_searchInputEl||{}).value||'', _embReady);
+        });
+        listEl.appendChild(it);
+      });
+      var pop = document.getElementById('en-pop');
+      pop.style.left = Math.min(x, window.innerWidth - 200) + 'px';
+      pop.style.top  = Math.min(y, window.innerHeight - 260) + 'px';
+      pop.classList.add('open');
+    }
+    function _closePop() { document.getElementById('en-pop').classList.remove('open'); _assignCtx = null; }
+
+    document.addEventListener('click', function(e){
+      if (!document.getElementById('en-pop').contains(e.target)) _closePop();
+    });
+
+    document.getElementById('en-pop-new').addEventListener('click', function(){
+      if (!_assignCtx) return;
+      var savedCtx = _assignCtx; _closePop();
+      _openModal('New principle', '', '', function(name, dim){
+        var p = SY.addPrinciple({ name:name, dimensionHint:dim });
+        var r = SY.resolveNoteKey(savedCtx);
+        SY.setAssignment(savedCtx, p.id, r ? SY.suggestRegister(r.text) : 'what', 'confirmed', null);
+        renderBrowse(); renderDetail(savedCtx);
+      });
+    });
+
+    // ── Principle modal ──────────────────────────────────────────────────────
+    function _openModal(title, defaultName, defaultDim, cb) {
+      _pModalCb = cb;
+      document.getElementById('en-modal-title').textContent = title || 'New principle';
+      document.getElementById('en-modal-name').value = defaultName || '';
+      document.getElementById('en-modal-confirm').textContent = title && title.startsWith('Rename') ? 'Rename' : 'Create';
+      document.querySelectorAll('.en-dim-chip').forEach(function(c){
+        c.classList.toggle('active', c.dataset.dim === (defaultDim||''));
+      });
+      document.getElementById('en-modal-bg').classList.add('open');
+      setTimeout(function(){ var i=document.getElementById('en-modal-name'); i.focus(); i.select(); }, 60);
+    }
+    function _closeModal(){ document.getElementById('en-modal-bg').classList.remove('open'); _pModalCb = null; }
+
+    document.getElementById('en-modal-cancel').addEventListener('click', _closeModal);
+    document.getElementById('en-modal-bg').addEventListener('click', function(e){ if(e.target===e.currentTarget) _closeModal(); });
+    document.querySelectorAll('.en-dim-chip').forEach(function(c){
+      c.addEventListener('click', function(){
+        document.querySelectorAll('.en-dim-chip').forEach(function(x){ x.classList.remove('active'); });
+        c.classList.add('active');
+      });
+    });
+    document.getElementById('en-modal-confirm').addEventListener('click', function(){
+      var name = document.getElementById('en-modal-name').value.trim();
+      if (!name) { document.getElementById('en-modal-name').focus(); return; }
+      var dim  = (document.querySelector('.en-dim-chip.active')||{}).dataset && document.querySelector('.en-dim-chip.active').dataset.dim || '';
+      _closeModal();
+      if (_pModalCb) _pModalCb(name, dim);
+    });
+    document.getElementById('en-modal-name').addEventListener('keydown', function(e){
+      if (e.key==='Enter')  document.getElementById('en-modal-confirm').click();
+      if (e.key==='Escape') _closeModal();
+    });
+
+    // ── Init ─────────────────────────────────────────────────────────────────
+    document.addEventListener('DOMContentLoaded', function(){
+      updateCounts();
+    });
+
+  })();
+  </script>
+</body>
+</html>
