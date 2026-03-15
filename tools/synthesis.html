@@ -797,7 +797,9 @@
           html += '<div class="sy-pr-note-src">'+_h(r.tabName)+(r.cats&&r.cats.filter(Boolean).length?' &rsaquo; '+r.cats.filter(Boolean).map(function(c){return _h(c);}).join(' &rsaquo; '):'')+'</div>';
           if (a.status==='auto') html += '<div style="margin-top:3px;display:flex;gap:4px"><span class="sy-badge sy-badge-auto">auto '+(a.similarity?a.similarity.toFixed(2):'')+' </span><button class="sy-note-action" data-action="confirm-a" data-nk="'+_h(a.noteKey)+'" style="height:20px;padding:0 8px;font-size:10px">Confirm</button><button class="sy-note-action" data-action="reject-a" data-nk="'+_h(a.noteKey)+'" style="height:20px;padding:0 8px;font-size:10px;color:var(--md-sys-color-error)">Reject</button></div>';
           if (isChanged) html += '<div class="sy-pr-note-changed">Source changed — <button class="sy-note-action" data-action="ack-change" data-nk="'+_h(a.noteKey)+'" style="height:18px;padding:0 6px;font-size:10px">Acknowledge</button></div>';
-          html += '</div></div>';
+          html += '</div>';
+          html += '<button class="sy-note-action del" data-action="remove-from-p" data-nk="'+_h(a.noteKey)+'" style="margin-left:auto;flex-shrink:0;align-self:flex-start;margin-top:8px" title="Remove from this principle">Remove</button>';
+          html += '</div>';
         });
         html += '<div class="sy-pr-foot">';
         html += '<button class="sy-btn sy-btn-ghost" data-action="rename-p" data-pid="'+_h(p.id)+'" style="height:26px;font-size:11px;padding:0 10px">Rename</button>';
@@ -842,6 +844,13 @@
       });
       listEl.querySelectorAll('[data-action=del-p]').forEach(function(btn){
         btn.addEventListener('click',function(e){e.stopPropagation();if(confirm('Delete this principle?')){SY.deletePrinciple(btn.dataset.pid);_clusters=null;renderAll();}});
+      });
+      listEl.querySelectorAll('[data-action=remove-from-p]').forEach(function(btn){
+        btn.addEventListener('click',function(e){
+          e.stopPropagation();
+          SY.rejectAssignment(btn.dataset.nk);
+          _clusters=null; renderAll();
+        });
       });
     }
 
@@ -1072,7 +1081,7 @@
         var dps=byDim2[dim], color=dps[0]?dps[0].color:'#555';
         html+='<div class="sy-fw-section">';
         html+='<div class="sy-fw-dim-hdr" style="background:'+_h(color)+'">The '+_h(dim)+' Dimension</div>';
-        html+='<table class="sy-fw-table"><colgroup><col style="width:60px"><col style="width:70px"><col><col style="width:150px"><col style="width:150px"></colgroup>';
+        html+='<table class="sy-fw-table"><colgroup><col style="width:60px"><col style="width:80px"><col style="width:25%"><col style="width:25%"><col style="width:25%"></colgroup>';
         html+='<thead><tr><th>ID</th><th>Category</th><th>Rule / Constraint</th><th>Move / Intervention</th><th>Metric / Proof</th></tr></thead><tbody>';
         dps.forEach(function(p){
           var pId='P-'+String(p.seq).padStart(2,'0');
@@ -1084,28 +1093,41 @@
           var tbr = p.metricByReg || {what:'',why:'',who:'',how:''};
           REGS.forEach(function(reg){
             var regAs=byReg[reg];
-            var ruleText = regAs.length ? (SY.resolveNoteKey(regAs[0].noteKey)||{text:''}).text : '';
-            var hasNote  = !!ruleText;
-            var ruleDisplay;
-            if (hasNote) {
-              var parsed = typeof parseCitation==='function' ? parseCitation(ruleText) : {body:ruleText,citation:null};
-              var principleColor = p.color || '#555';
-              var pillHtml = parsed.citation
-                ? ' <span class="pp-cite-pill" style="background:'+_h(principleColor)+';color:#fff">'+_h(parsed.citation)+'</span>'
-                : '';
-              ruleDisplay = _h(parsed.body) + pillHtml;
-              if(regAs.length>1) ruleDisplay += ' <span class="sy-badge" style="background:var(--md-sys-color-surface-container-high);color:var(--md-sys-color-on-surface-variant);font-size:10px">+'+(regAs.length-1)+'</span>';
-            } else {
-              ruleDisplay = 'No note assigned';
-            }
             var mv = mbr[reg]||'', mt = tbr[reg]||'';
-            html += '<tr>';
-            html += '<td class="sy-fw-id"></td>';
-            html += '<td class="sy-fw-cat '+reg+'">'+REG_LABEL[reg]+'</td>';
-            html += '<td><div class="sy-fw-rule-edit'+(hasNote?' has-ref':' no-note')+'" contenteditable="'+(hasNote?'false':'true')+'" spellcheck="false" data-pid="'+_h(p.id)+'" data-reg="'+reg+'" data-field="rule">'+ruleDisplay+'</div></td>';
-            html += '<td><div class="sy-fw-editable'+(mv?'':' gap')+'" contenteditable="true" spellcheck="false" data-pid="'+_h(p.id)+'" data-reg="'+reg+'" data-field="move">'+(mv||'Click to add...')+'</div></td>';
-            html += '<td><div class="sy-fw-editable'+(mt?'':' gap')+'" contenteditable="true" spellcheck="false" data-pid="'+_h(p.id)+'" data-reg="'+reg+'" data-field="metric">'+(mt||'Click to add...')+'</div></td>';
-            html += '</tr>';
+            var noteCount = Math.max(regAs.length, 1); // always at least one row
+
+            regAs.forEach(function(a, ai){
+              var ruleText = (SY.resolveNoteKey(a.noteKey)||{text:''}).text;
+              var parsed   = typeof parseCitation==='function' ? parseCitation(ruleText) : {body:ruleText,citation:null};
+              var pillHtml = parsed.citation
+                ? ' <span class="pp-cite-pill" style="background:'+_h(p.color||'#555')+';color:#fff">'+_h(parsed.citation)+'</span>'
+                : '';
+              var ruleDisplay = _h(parsed.body) + pillHtml;
+              html += '<tr>';
+              // Category label only on first note row for this register
+              if (ai===0) {
+                html += '<td class="sy-fw-id" rowspan="'+noteCount+'"></td>';
+                html += '<td class="sy-fw-cat '+reg+'" rowspan="'+noteCount+'">'+REG_LABEL[reg]+'</td>';
+              }
+              html += '<td><div class="sy-fw-rule-edit has-ref" contenteditable="false" spellcheck="false" data-pid="'+_h(p.id)+'" data-reg="'+reg+'" data-field="rule">'+ruleDisplay+'</div></td>';
+              // Move/Metric only on first row, spanning all note rows
+              if (ai===0) {
+                html += '<td rowspan="'+noteCount+'"><div class="sy-fw-editable'+(mv?'':' gap')+'" contenteditable="true" spellcheck="false" data-pid="'+_h(p.id)+'" data-reg="'+reg+'" data-field="move">'+(mv||'Click to add...')+'</div></td>';
+                html += '<td rowspan="'+noteCount+'"><div class="sy-fw-editable'+(mt?'':' gap')+'" contenteditable="true" spellcheck="false" data-pid="'+_h(p.id)+'" data-reg="'+reg+'" data-field="metric">'+(mt||'Click to add...')+'</div></td>';
+              }
+              html += '</tr>';
+            });
+
+            // Empty row when no notes assigned
+            if (!regAs.length) {
+              html += '<tr>';
+              html += '<td class="sy-fw-id"></td>';
+              html += '<td class="sy-fw-cat '+reg+'">'+REG_LABEL[reg]+'</td>';
+              html += '<td><div class="sy-fw-rule-edit no-note" contenteditable="true" spellcheck="false" data-pid="'+_h(p.id)+'" data-reg="'+reg+'" data-field="rule">No note assigned</div></td>';
+              html += '<td><div class="sy-fw-editable'+(mv?'':' gap')+'" contenteditable="true" spellcheck="false" data-pid="'+_h(p.id)+'" data-reg="'+reg+'" data-field="move">'+(mv||'Click to add...')+'</div></td>';
+              html += '<td><div class="sy-fw-editable'+(mt?'':' gap')+'" contenteditable="true" spellcheck="false" data-pid="'+_h(p.id)+'" data-reg="'+reg+'" data-field="metric">'+(mt||'Click to add...')+'</div></td>';
+              html += '</tr>';
+            }
           });
         });
         html+='</tbody></table></div>';
