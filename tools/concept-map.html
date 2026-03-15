@@ -574,34 +574,28 @@
       var key     = rawText.toLowerCase().trim();
       var p       = nameMap[key];
       if (!p) {
-        var stripped = key.replace(/^\[principle\]\s*/, '');
-        p = nameMap[stripped];
+        var stripped = key.replace(/\[principle\]\s*/i, '');
+        p = nameMap[stripped.toLowerCase().trim()];
       }
       if (!p) return;
 
-      // Override the full card palette so body matches header — no split colours
+      // Mark as principle (for CSS selector) but DO NOT override --ppc-* colours.
+      // The card uses depthColor like any other card at the same level — this makes
+      // it visually identical in size/colour/shape to its neighbours.
       card.dataset.principleColor = p.color;
-      card.style.setProperty('--pnc',        p.color);
-      card.style.setProperty('--ppc-bg',     p.color);
-      card.style.setProperty('--ppc-border', p.color);
-      // Compute contrast text color (white for dark hues, dark for light hues)
-      function _lum(hex) {
-        var c = hex.replace('#',''); if (c.length===3) c=c[0]+c[0]+c[1]+c[1]+c[2]+c[2];
-        var n = parseInt(c,16), r=((n>>16)&255)/255, g=((n>>8)&255)/255, b=(n&255)/255;
-        function lin(v){ return v<=0.03928?v/12.92:Math.pow((v+0.055)/1.055,2.4); }
-        return 0.2126*lin(r)+0.7152*lin(g)+0.0722*lin(b);
-      }
-      var onColor = _lum(p.color) > 0.35 ? '#1a1a1a' : '#ffffff';
-      card.style.setProperty('--ppc-on', onColor);
 
-      // ── Header: cat-num = "P-{sheetId}", level block stays ──
-      var catEl = card.querySelector('.pp-cmap-card-cat-num');
-      if (catEl) {
-        catEl.textContent = 'P-' + (p.sheetId || String(p.seq || '?').padStart(2,'0'));
-        catEl.style.cssText = 'font-size:11px;font-weight:800;letter-spacing:.04em;color:#fff;';
-      }
+      // ── Header: put P-{sheetId} into the level-num slot (the big italic number) ──
+      // and the principle name into the cat-num slot (the small top-left text)
+      var levelNumEl = card.querySelector('.pp-cmap-card-level-num');
+      var levelLblEl = card.querySelector('.pp-cmap-card-level-label');
+      var catNumEl   = card.querySelector('.pp-cmap-card-cat-num');
 
-      // ── Body: replace with register sections ──
+      var pid = 'P-' + (p.sheetId || String(p.seq || '?').padStart(2,'0'));
+      if (levelNumEl) levelNumEl.textContent = pid;
+      if (levelLblEl) levelLblEl.style.display = 'none'; // hide "LEVEL" label
+      if (catNumEl)   catNumEl.textContent = p.name;     // principle name top-left
+
+      // ── Body: replace cell text with register sections ──
       var body = card.querySelector('.pp-cmap-card-body');
       if (!body) return;
 
@@ -614,36 +608,31 @@
         if (r && byReg[a.register]) byReg[a.register].push(r);
       });
 
-      var regColors = { what:'#6ab0f5', why:'#f5a66a', who:'#7dd87d', how:'#c9a4f5' };
+      // Reg label colours — semi-transparent so they work on any card background
+      var regColors = {
+        what: 'color-mix(in srgb, var(--ppc-on,#fff) 70%, transparent)',
+        why:  'color-mix(in srgb, var(--ppc-on,#fff) 70%, transparent)',
+        who:  'color-mix(in srgb, var(--ppc-on,#fff) 70%, transparent)',
+        how:  'color-mix(in srgb, var(--ppc-on,#fff) 70%, transparent)',
+      };
       var regLabels = { what:'WHAT', why:'WHY', who:'WHO', how:'HOW' };
       var html = '';
-
-      // Principle name as bold title
-      html += '<div style="font-size:12px;font-weight:700;margin-bottom:6px;color:#fff">' +
-              _h(p.name) + '</div>';
 
       Object.keys(byReg).forEach(function(reg){
         var items = byReg[reg];
         if (!items.length) return;
-        html += '<div style="margin-bottom:5px">';
-        html += '<div style="font-size:9px;font-weight:800;letter-spacing:.07em;color:' +
-                regColors[reg] + ';margin-bottom:2px">' + regLabels[reg] + '</div>';
+        // Label styled exactly like .pp-cmap-card-cat-num (small, muted, uppercase)
+        html += '<div class="pp-cmap-cell-cat" style="margin-top:4px">' + regLabels[reg] + '</div>';
         items.forEach(function(r){
           var parsed = typeof parseCitation === 'function' ? parseCitation(r.text) : {body:r.text};
-          var cats   = (r.cats||[]).filter(Boolean);
-          html += '<div style="font-size:11px;line-height:1.4;margin-bottom:3px;opacity:.9">';
-          html += _h(parsed.body.slice(0, 120)) + (parsed.body.length > 120 ? '…' : '');
-          if (cats.length) {
-            html += '<span style="font-size:9px;opacity:.65;margin-left:4px">' +
-                    _h(cats.join(' · ')) + '</span>';
-          }
+          html += '<div class="pp-cmap-cell-text">';
+          html += _h(parsed.body.slice(0, 100)) + (parsed.body.length > 100 ? '…' : '');
           html += '</div>';
         });
-        html += '</div>';
       });
 
       if (!assignments.length) {
-        html += '<div style="font-size:11px;opacity:.6;font-style:italic">No notes assigned</div>';
+        html += '<div class="pp-cmap-cell-text" style="opacity:.5;font-style:italic">No notes assigned</div>';
       }
 
       body.innerHTML = html;
@@ -712,15 +701,18 @@
         var fw = tabs.find(function(t){ return t.name && t.name.indexOf('FRAMEWORK') !== -1; });
         if (!fw) return;
         SY.setFrameworkTabs([{ name:fw.name, grid:fw.rows }]);
+        var prevPCount = SY.getPrinciples().filter(function(p){ return p.named&&!p.archived; }).length;
         SY.loadFromFrameworkTab(fw.rows);
-        // If already embedded, rebuild to add principle nodes
-        if (_embReady && _cmTool) {
+        var newPCount  = SY.getPrinciples().filter(function(p){ return p.named&&!p.archived; }).length;
+        _updateLegend();
+        // Only rebuild if principle count changed AND map is already rendered
+        // Avoids the double-render that occurred when framework loaded after embedding
+        if (_embReady && _cmTool && newPCount !== prevPCount) {
           _buildPrincipleVecs();
           _buildTextToVec();
           _overrideEmbeddingUtils();
           _cmTool.reset();
           _cmTool.start();
-          _updateLegend();
         }
       }).catch(function(){});
     }
