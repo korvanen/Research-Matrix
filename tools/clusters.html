@@ -858,6 +858,28 @@
           }
         }
 
+        // Hide the internal Max Words per card slider (Global panel has this)
+        var innerSecs = document.getElementById('cl-inner-sections');
+        if (innerSecs) {
+          var maxLenRow = innerSecs.querySelector('#pp-cl-maxlen');
+          if (maxLenRow) {
+            var row = maxLenRow.closest('.pp-range-row') || maxLenRow.parentElement;
+            // hide both the slider row and its label (prev sibling)
+            if (row) {
+              row.style.display = 'none';
+              // Also hide the label before it if it's a val span row
+              var prev = row.previousElementSibling;
+              if (prev && prev.classList.contains('pp-range-row')) prev.style.display = 'none';
+            }
+          }
+          // Also sync maxLen slider to global maxWords on init
+          var maxLenSlider = innerSecs.querySelector('#pp-cl-maxlen');
+          if (maxLenSlider) {
+            var mw = SY.getSettings().maxWords;
+            maxLenSlider.value = mw > 0 ? mw * 5 : 2000; // rough char estimate
+            maxLenSlider.dispatchEvent(new Event('input', { bubbles: true }));
+          }
+        }
         _showPanelSections('visual');
         // Inject named principles as defined clusters with their colours
         setTimeout(function(){ _injectPrinciplesAsClusters(); }, 350);
