@@ -9,7 +9,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="../utilities/utils-keywords.js?v=7"></script>
   <script src="../utilities/utils-shared.js?v=425998b6"></script>
-  <script src="../utilities/utils-synthesis.js?v=8fe72eda"></script>
+  <script src="../utilities/utils-synthesis.js?v=3"></script>
   <script src="../utilities/utils-panel.js?v=7"></script>
   <script type="module" src="../utilities/utils-embedding.js?v=4"></script>
   <style>
@@ -226,10 +226,6 @@
 
     /* Panel controls */
     .cl-panel-label { font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--md-sys-color-on-surface-variant); padding: 8px 0 4px; }
-    .cl-range-row { display: flex; align-items: center; gap: 8px; padding: 4px 0; }
-    .cl-range-label { font-size: 12px; color: var(--md-sys-color-on-surface-variant); min-width: 60px; }
-    .cl-range { flex: 1; accent-color: var(--md-sys-color-primary); cursor: pointer; }
-    .cl-range-val { font-size: 12px; font-weight: 600; min-width: 36px; text-align: right; }
   </style>
 </head>
 <body>
@@ -309,14 +305,14 @@
       '<div class="cl-panel-label">Sheet</div>' +
       '<div id="cl-sync-status" style="font-size:11px;color:var(--md-sys-color-on-surface-variant);padding:2px 0 6px"></div>' +
       '<div class="cl-panel-label">Cluster threshold</div>' +
-      '<div class="cl-range-row">' +
-        '<input type="range" class="cl-range" id="cl-thresh-slider" min="20" max="70" value="'+Math.round(_thresh*100)+'" step="1">' +
-        '<span class="cl-range-val" id="cl-thresh-val">'+Math.round(_thresh*100)+'%</span>' +
+      '<div class="pp-range-row">' +
+        '<input type="range" class="pp-range" id="cl-thresh-slider" min="20" max="70" value="'+Math.round(_thresh*100)+'" step="1">' +
+        '<span class="pp-range-val" id="cl-thresh-val">'+Math.round(_thresh*100)+'%</span>' +
       '</div>' +
       '<div class="cl-panel-label">Max words (split)</div>' +
-      '<div class="cl-range-row">' +
-        '<input type="range" class="cl-range" id="cl-maxwords-slider" min="20" max="300" value="'+SY.getSettings().maxWords+'" step="10">' +
-        '<span class="cl-range-val" id="cl-maxwords-val">'+SY.getSettings().maxWords+'</span>' +
+      '<div class="pp-range-row">' +
+        '<input type="range" class="pp-range" id="cl-maxwords-slider" min="20" max="300" value="'+SY.getSettings().maxWords+'" step="10">' +
+        '<span class="pp-range-val" id="cl-maxwords-val">'+SY.getSettings().maxWords+'</span>' +
       '</div>';
 
     var _principlesHtml =
@@ -361,6 +357,14 @@
       '</div>';
 
     injectToolNav('clusters.html');
+    // Upgrade panel sliders to MD3 pp-range style
+    (function(){
+      var panelBody = document.querySelector('.pp-side-panel-body');
+      if (panelBody && typeof upgradeSlider === 'function') {
+        panelBody.querySelectorAll('input[type=range].pp-range').forEach(upgradeSlider);
+      }
+    })();
+
 
     // ── Global settings wiring ───────────────────────────────────────────────
     var _threshSlider   = document.getElementById('cl-thresh-slider');
