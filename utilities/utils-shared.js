@@ -1246,6 +1246,54 @@ input[type=range].pp-range {
   color: var(--md-sys-color-on-surface-variant);
 }
 
+/* ── In-panel view tabs ─── */
+.pp-panel-tabs {
+  display: flex; align-items: stretch;
+  margin: 0 -16px; padding: 0 0 0 0;
+  border-bottom: 1px solid var(--md-sys-color-outline-variant);
+  background: var(--md-sys-color-surface-container-low);
+}
+.pp-panel-tab {
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: 5px;
+  height: 38px; padding: 0 8px;
+  border: none; background: transparent; cursor: pointer;
+  font-family: var(--font-family); font-size: 12px; font-weight: 500;
+  color: var(--md-sys-color-on-surface-variant);
+  position: relative; white-space: nowrap;
+}
+.pp-panel-tab::after {
+  content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 2px;
+  background: transparent; transition: background .12s;
+}
+.pp-panel-tab.active { color: var(--md-sys-color-primary); }
+.pp-panel-tab.active::after { background: var(--md-sys-color-primary); }
+.pp-panel-tab-n {
+  height: 16px; min-width: 16px; padding: 0 4px; border-radius: 8px;
+  font-size: 10px; font-weight: 700;
+  background: var(--md-sys-color-surface-container-highest);
+  color: var(--md-sys-color-on-surface-variant);
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.pp-panel-tab.active .pp-panel-tab-n {
+  background: var(--md-sys-color-primary-container);
+  color: var(--md-sys-color-on-primary-container);
+}
+/* Status row inside panel */
+.pp-panel-status-row {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 0 2px; font-size: 11px;
+  color: var(--md-sys-color-on-surface-variant);
+}
+.pp-panel-dot {
+  width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
+  background: var(--md-sys-color-outline);
+  transition: background .3s;
+}
+.pp-panel-dot.ready   { background: #2e7d32; }
+.pp-panel-dot.loading { background: var(--md-sys-color-primary); animation: pp-dot-pulse 1.2s infinite; }
+.pp-panel-dot.error   { background: var(--md-sys-color-error); }
+@keyframes pp-dot-pulse { 0%,100%{opacity:.3;} 50%{opacity:1;} }
+
 /* ─────────────────────────────────────────────────────────────
    MD3 MISC UTILITIES
    ───────────────────────────────────────────────────────────── */
