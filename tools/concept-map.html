@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="../design-system.css?v=9fa06a28">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="../utilities/utils-keywords.js?v=7"></script>
-  <script src="../utilities/utils-shared.js?v=98079ea4"></script>
+  <script src="../utilities/utils-shared.js?v=425998b6"></script>
   <script src="../utilities/utils-synthesis.js?v=3"></script>
   <script src="../utilities/utils-panel.js?v=7"></script>
   <script type="module" src="../utilities/utils-embedding.js?v=4"></script>
@@ -168,25 +168,6 @@
       },
     });
 
-
-    window.addEventListener('sy-settings-changed', function(ev){
-      var s = ev.detail || SY.getSettings();
-                  // Always mirror to tool sliders (handles maxLen/Depth/Thresh)
-      _mirrorSliders();
-      // Re-split unassigned entries, embed new fragments, force rebuild
-      SY.autoSplitAll();
-      var pending = SY.getEffectiveNoteKeys().filter(function(k){ return !_emb.has(k); });
-      if (pending.length && _embReady) {
-        _embedAll(pending).then(function(){
-          _buildPrincipleVecs(); _buildTextToVec(); _overrideEmbeddingUtils();
-          if (_cmTool) { _cmTool.reset(); _cmTool.start(); }
-        });
-      } else if (_cmTool && _embReady) {
-        _buildPrincipleVecs(); _buildTextToVec(); _overrideEmbeddingUtils();
-        _cmTool.reset(); _cmTool.start();
-      }
-    });
-
     // ── Map controls ──────────────────────────────────────────────────────────
     var _depthSlider  = document.getElementById('cm-depth-slider');
     var _depthVal     = document.getElementById('cm-depth-val');
@@ -261,8 +242,7 @@
       var keys = SY.getRowNoteKeys();
       if (!keys.length || !window.EmbeddingUtils) return;
       _embedding = true;
-      document.getElementById('cm-dot').className = 'pp-panel-dot loading';
-      document.getElementById('cm-emb-text').textContent = 'Embedding ' + keys.length + ' entries…';
+      window.GlobalPanel && window.GlobalPanel.setStatus('Embedding ' + keys.length + ' entries…');
 
       _embedAll(keys).then(function(){
         _embedding = false; _embReady = true;
@@ -276,15 +256,13 @@
           _lastInitTime = Date.now();
           _initConceptMap();
         });
-        document.getElementById('cm-dot').className = 'pp-panel-dot ready';
         var _cmMsg = _emb.size + ' entries indexed';
-        document.getElementById('cm-emb-text').textContent = _cmMsg;
+        window.GlobalPanel && window.GlobalPanel.setStatus(_cmMsg);
         if (_nav && _nav.subtitleEl) _nav.subtitleEl.textContent = _cmMsg;
         // Do NOT call _initConceptMap here — the inner _embedAll callback does it
       }).catch(function(e){
         _embedding = false;
-        document.getElementById('cm-dot').className = 'pp-panel-dot error';
-        document.getElementById('cm-emb-text').textContent = 'Embedding error';
+        window.GlobalPanel && window.GlobalPanel.setStatus('Embedding error');
         console.error('[concept-map] embed error:', e);
       });
     }
