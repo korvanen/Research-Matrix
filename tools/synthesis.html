@@ -317,7 +317,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="../utilities/utils-keywords.js?v=7"></script>
   <script src="../utilities/utils-shared.js?v=425998b6"></script>
-  <script src="../utilities/utils-synthesis.js?v=8cac36af"></script>
+  <script src="../utilities/utils-synthesis.js?v=2"></script>
   <script type="module" src="../utilities/utils-embedding.js?v=4"></script>
 
   <script>
@@ -345,11 +345,9 @@
       _setupTabs(); _setupThreshold(); _setupSearch(); _setupFilters();
       _setupAssignPop(); _setupExports(); _setupSync(); _setupNewPrincipleBtn();
       _loadScriptUrl();
-      // Try to load FRAMEWORK tab from already-fetched sheet data
-      _tryLoadFramework();
-      // Check for changed sources
-      _checkChangedSources();
-      renderAll();
+      // Don't renderAll() here — TABS is not populated yet.
+      // sheet-loaded event below handles first render.
+      updateCounts();
     });
 
     document.addEventListener('embedder-ready', _onEmbedReady);
