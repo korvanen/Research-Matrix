@@ -8,8 +8,8 @@
   <link rel="stylesheet" href="../design-system.css?v=9fa06a28">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="../utilities/utils-keywords.js?v=7"></script>
-  <script src="../utilities/utils-shared.js?v=02230b0b"></script>
-  <script src="../utilities/utils-synthesis.js?v=215b0400"></script>
+  <script src="../utilities/utils-shared.js?v=425998b6"></script>
+  <script src="../utilities/utils-synthesis.js?v=3"></script>
   <script src="../utilities/utils-academic.js?v=66257bc0"></script>
   <script type="module" src="../utilities/utils-embedding.js?v=4"></script>
   <style>
@@ -368,24 +368,7 @@
 </head>
 <body>
 
-  <!-- Topbar -->
-  <div class="en-topbar">
-    <div class="en-topbar-title">Entries</div>
-    <div class="en-status-dot loading" id="en-dot"></div>
-    <span class="en-status-text" id="en-status-text">Loading...</span>
-  </div>
-
-  <!-- Sub-tabs -->
-  <div class="en-subtabs">
-    <button class="en-subtab active" data-view="browse">
-      Browse <span class="en-subtab-n" id="en-n-browse">0</span>
-    </button>
-    <button class="en-subtab" data-view="search">
-      Search <span class="en-subtab-n" id="en-n-search">–</span>
-    </button>
-  </div>
-
-  <!-- Body: sidebar + main -->
+  <!-- Body: sidebar + main (nav panel contains sub-tabs + status) -->
   <div class="en-body" id="en-body"></div>
 
   <!-- Assign popover -->
@@ -502,10 +485,25 @@
       '<div class="en-panel-label">Saved searches</div>' +
       '<div id="en-saved-list"></div>';
 
+    var _tabsSectionHtml =
+      '<div style="display:flex;flex-direction:column;gap:2px;padding:4px 0">' +
+        '<button class="en-panel-chip en-tab-btn active" data-view="browse" style="display:flex;align-items:center;justify-content:space-between;height:32px;border-radius:8px;padding:0 12px;font-size:13px;font-weight:500">' +
+          'Browse <span class="en-subtab-n" id="en-n-browse" style="background:var(--md-sys-color-secondary-container);color:var(--md-sys-color-on-secondary-container);border-radius:8px;padding:0 6px;font-size:10px;font-weight:700">0</span>' +
+        '</button>' +
+        '<button class="en-panel-chip en-tab-btn" data-view="search" style="display:flex;align-items:center;justify-content:space-between;height:32px;border-radius:8px;padding:0 12px;font-size:13px;font-weight:500">' +
+          'Search <span class="en-subtab-n" id="en-n-search" style="background:var(--md-sys-color-surface-container-highest);color:var(--md-sys-color-on-surface-variant);border-radius:8px;padding:0 6px;font-size:10px;font-weight:700">–</span>' +
+        '</button>' +
+        '<div style="display:flex;align-items:center;gap:6px;padding:6px 0 2px">' +
+          '<div class="en-status-dot loading" id="en-dot" style="width:7px;height:7px;border-radius:50%;flex-shrink:0"></div>' +
+          '<span id="en-status-text" style="font-size:11px;color:var(--md-sys-color-on-surface-variant)">Loading...</span>' +
+        '</div>' +
+      '</div>';
+
     var _nav = window.PPNavRail.create(_paneEl, {
       toolName: 'Entries',
       defaultOpen: true,
       panelSections: [
+        { label: 'Views', html: _tabsSectionHtml },
         { label: 'Global', html: _globalPanelHtml },
         { label: 'Browse', html: _browsePanelHtml },
         { label: 'Search', html: _searchPanelHtml },
@@ -586,14 +584,23 @@
       if (_maxWordsSlider) { _maxWordsSlider.value  = s.maxWords;                 _maxWordsVal.textContent = s.maxWords; }
     });
 
-    // ── Sub-tab switching ────────────────────────────────────────────────────
-    document.querySelectorAll('.en-subtab').forEach(function(tab){
-      tab.addEventListener('click', function(){
-        _view = tab.dataset.view;
-        document.querySelectorAll('.en-subtab').forEach(function(t){ t.classList.toggle('active', t.dataset.view===_view); });
-        document.getElementById('en-view-browse').hidden = _view !== 'browse';
-        document.getElementById('en-view-search').hidden = _view !== 'search';
+    // ── Sub-tab switching (buttons live in panel) ──────────────────────────
+    document.addEventListener('click', function(e){
+      var btn = e.target.closest('.en-tab-btn[data-view]'); if (!btn) return;
+      _view = btn.dataset.view;
+      document.querySelectorAll('.en-tab-btn').forEach(function(b){
+        var isActive = b.dataset.view === _view;
+        b.classList.toggle('active', isActive);
+        var badge = b.querySelector('.en-subtab-n');
+        if (badge) badge.style.background = isActive
+          ? 'var(--md-sys-color-secondary-container)'
+          : 'var(--md-sys-color-surface-container-highest)';
+        if (badge) badge.style.color = isActive
+          ? 'var(--md-sys-color-on-secondary-container)'
+          : 'var(--md-sys-color-on-surface-variant)';
       });
+      document.getElementById('en-view-browse').hidden = _view !== 'browse';
+      document.getElementById('en-view-search').hidden = _view !== 'search';
     });
 
     // ── Browse filter chips ──────────────────────────────────────────────────
@@ -745,7 +752,9 @@
       _embedAll(keys).then(function(){
         _embedding = false; _embReady = true;
         document.getElementById('en-dot').className = 'en-status-dot ready';
-        document.getElementById('en-status-text').textContent = _emb.size + ' entries indexed';
+        var _statusMsg = _emb.size + ' entries indexed';
+        document.getElementById('en-status-text').textContent = _statusMsg;
+        if (_nav && _nav.subtitleEl) _nav.subtitleEl.textContent = _statusMsg;
         document.getElementById('en-search-input').disabled = false;
         document.getElementById('en-search-btn').disabled   = false;
         renderBrowse();
@@ -774,6 +783,8 @@
       updateCounts(); renderBrowse(); _triggerEmbed();
       _loadFrameworkIfNeeded();
       _updateScreeningProgress();
+      var keys = SY.getRowNoteKeys();
+      if (_nav && _nav.subtitleEl) _nav.subtitleEl.textContent = keys.length + ' entries';
     });
 
     function _loadFrameworkIfNeeded() {
