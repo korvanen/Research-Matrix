@@ -140,6 +140,13 @@
     _nav.mainEl.style.cssText = 'flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden;position:relative;';
     _nav.mainEl.id = 'cm-pane';
 
+    // Prevent wheel events on the side panel from reaching focused range inputs.
+    // Without this, a focused slider would steal trackpad-scroll/zoom from the canvas.
+    var _panelEl = _paneEl.querySelector('.pp-side-panel');
+    if (_panelEl) {
+      _panelEl.addEventListener('wheel', function(e){ e.stopPropagation(); }, { passive: false });
+    }
+
     // Draggable side panel (right side) — re-uses utils-panel.js
     var _layout   = _paneEl.querySelector('.pp-tool-main') || _nav.mainEl;
     var _sidePanel = window.createSidePanel ? createSidePanel(_paneEl, {
@@ -191,10 +198,12 @@
       if (!slider) return;
       slider.addEventListener('input', function(){
         valEl.textContent = slider.value + (suffix||'');
-        var pp = document.getElementById('pp-cmap-depth') || document.getElementById('pp-cmap-thresh') || null;
-        // Mirror values to utils-concept-map.js sliders once it loads
         _mirrorSliders();
       });
+      // Blur immediately after mouseup/pointerup so the slider doesn't steal
+      // wheel events (trackpad scroll = zoom) away from the canvas
+      slider.addEventListener('pointerup',  function(){ slider.blur(); });
+      slider.addEventListener('touchend',   function(){ slider.blur(); });
     }
     _syncSlider(_depthSlider,  _depthVal,  '');
     _syncSlider(_edgeSlider,   _edgeVal,   '%');
