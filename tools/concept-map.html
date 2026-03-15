@@ -584,18 +584,13 @@
       // it visually identical in size/colour/shape to its neighbours.
       card.dataset.principleColor = p.color;
 
-      // ── Header: put P-{sheetId} into the level-num slot (the big italic number) ──
-      // and the principle name into the cat-num slot (the small top-left text)
-      var levelNumEl = card.querySelector('.pp-cmap-card-level-num');
-      var levelLblEl = card.querySelector('.pp-cmap-card-level-label');
-      var catNumEl   = card.querySelector('.pp-cmap-card-cat-num');
-
+      // ── Header: cat-num (top-left, same font/size as normal card IDs) = P-{sheetId}
+      // Level block (top-right "1 LEVEL") stays completely unchanged.
+      var catNumEl = card.querySelector('.pp-cmap-card-cat-num');
       var pid = 'P-' + (p.sheetId || String(p.seq || '?').padStart(2,'0'));
-      if (levelNumEl) levelNumEl.textContent = pid;
-      if (levelLblEl) levelLblEl.style.display = 'none'; // hide "LEVEL" label
-      if (catNumEl)   catNumEl.textContent = p.name;     // principle name top-left
+      if (catNumEl) catNumEl.textContent = pid;
 
-      // ── Body: replace cell text with register sections ──
+      // ── Body: principle name as cell-cat (muted small label), then register sections
       var body = card.querySelector('.pp-cmap-card-body');
       if (!body) return;
 
@@ -608,30 +603,27 @@
         if (r && byReg[a.register]) byReg[a.register].push(r);
       });
 
-      // Reg label colours — semi-transparent so they work on any card background
-      var regColors = {
-        what: 'color-mix(in srgb, var(--ppc-on,#fff) 70%, transparent)',
-        why:  'color-mix(in srgb, var(--ppc-on,#fff) 70%, transparent)',
-        who:  'color-mix(in srgb, var(--ppc-on,#fff) 70%, transparent)',
-        how:  'color-mix(in srgb, var(--ppc-on,#fff) 70%, transparent)',
-      };
       var regLabels = { what:'WHAT', why:'WHY', who:'WHO', how:'HOW' };
       var html = '';
 
-      Object.keys(byReg).forEach(function(reg){
+      // Principle name in the same muted style as the small repeated ID in normal cards
+      html += '<div class="pp-cmap-cell-cat">' + _h(p.name) + '</div>';
+
+      var hasAny = false;
+      ['what','why','who','how'].forEach(function(reg){
         var items = byReg[reg];
         if (!items.length) return;
-        // Label styled exactly like .pp-cmap-card-cat-num (small, muted, uppercase)
-        html += '<div class="pp-cmap-cell-cat" style="margin-top:4px">' + regLabels[reg] + '</div>';
+        hasAny = true;
+        html += '<div class="pp-cmap-cell-cat" style="margin-top:3px">' + regLabels[reg] + '</div>';
         items.forEach(function(r){
           var parsed = typeof parseCitation === 'function' ? parseCitation(r.text) : {body:r.text};
           html += '<div class="pp-cmap-cell-text">';
-          html += _h(parsed.body.slice(0, 100)) + (parsed.body.length > 100 ? '…' : '');
+          html += _h(parsed.body.slice(0, 90)) + (parsed.body.length > 90 ? '…' : '');
           html += '</div>';
         });
       });
 
-      if (!assignments.length) {
+      if (!hasAny) {
         html += '<div class="pp-cmap-cell-text" style="opacity:.5;font-style:italic">No notes assigned</div>';
       }
 
