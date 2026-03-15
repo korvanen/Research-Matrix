@@ -234,21 +234,6 @@
 </head>
 <body>
 
-  <div class="cl-topbar">
-    <div class="cl-topbar-title">Clusters</div>
-    <div class="cl-emb-dot loading" id="cl-dot"></div>
-    <span class="cl-emb-text" id="cl-emb-text">Loading...</span>
-  </div>
-
-  <div class="cl-subtabs">
-    <button class="cl-subtab active" data-view="principles">
-      Principles <span class="cl-subtab-n" id="cl-n-named">0</span>
-    </button>
-    <button class="cl-subtab" data-view="visual">
-      Visual clusters <span class="cl-subtab-n" id="cl-n-pool">0</span>
-    </button>
-  </div>
-
   <div class="cl-body" id="cl-body">
     <!-- PPNavRail injected here -->
   </div>
@@ -306,6 +291,20 @@
     function _h(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
     // ── Panel HTML ───────────────────────────────────────────────────────────
+    var _tabsSectionHtml =
+      '<div style="display:flex;flex-direction:column;gap:2px;padding:4px 0">' +
+        '<button class="cl-panel-chip en-tab-btn active" data-clview="principles" style="display:flex;align-items:center;justify-content:space-between;height:32px;border-radius:8px;padding:0 12px;font-size:13px;font-weight:500">' +
+          'Principles <span id="cl-n-named" style="background:var(--md-sys-color-secondary-container);color:var(--md-sys-color-on-secondary-container);border-radius:8px;padding:0 6px;font-size:10px;font-weight:700">0</span>' +
+        '</button>' +
+        '<button class="cl-panel-chip en-tab-btn" data-clview="visual" style="display:flex;align-items:center;justify-content:space-between;height:32px;border-radius:8px;padding:0 12px;font-size:13px;font-weight:500">' +
+          'Visual clusters <span id="cl-n-pool" style="background:var(--md-sys-color-surface-container-highest);color:var(--md-sys-color-on-surface-variant);border-radius:8px;padding:0 6px;font-size:10px;font-weight:700">0</span>' +
+        '</button>' +
+        '<div style="display:flex;align-items:center;gap:6px;padding:6px 0 2px">' +
+          '<div class="cl-emb-dot loading" id="cl-dot" style="width:7px;height:7px;border-radius:50%;flex-shrink:0"></div>' +
+          '<span id="cl-emb-text" style="font-size:11px;color:var(--md-sys-color-on-surface-variant)">Loading...</span>' +
+        '</div>' +
+      '</div>';
+
     var _globalHtml =
       '<div class="cl-panel-label">Sheet</div>' +
       '<div id="cl-sync-status" style="font-size:11px;color:var(--md-sys-color-on-surface-variant);padding:2px 0 6px"></div>' +
@@ -331,6 +330,7 @@
       toolName: 'Clusters',
       defaultOpen: true,
       panelSections: [
+        { label: 'Views',      html: _tabsSectionHtml },
         { label: 'Global',     html: _globalHtml },
         { label: 'Principles', html: _principlesHtml },
       ],
@@ -394,20 +394,27 @@
       _clusters = null;
     });
 
-    // ── Sub-tab switching ────────────────────────────────────────────────────
-    document.querySelectorAll('.cl-subtab').forEach(function(tab){
-      tab.addEventListener('click', function(){
-        _view = tab.dataset.view;
-        document.querySelectorAll('.cl-subtab').forEach(function(t){ t.classList.toggle('active', t.dataset.view === _view); });
-        document.getElementById('cl-view-principles').hidden = _view !== 'principles';
-        document.getElementById('cl-view-visual').hidden     = _view !== 'visual';
-        if (_view === 'visual') {
-          if (!_clusterTool) _initVisual();
-          else _showPanelSections('visual');
-        } else {
-          _showPanelSections('principles');
+    // ── Sub-tab switching (buttons live in panel) ──────────────────────────
+    document.addEventListener('click', function(e){
+      var btn = e.target.closest('[data-clview]'); if (!btn) return;
+      _view = btn.dataset.clview;
+      document.querySelectorAll('[data-clview]').forEach(function(b){
+        var isActive = b.dataset.clview === _view;
+        b.classList.toggle('active', isActive);
+        var badge = b.querySelector('span');
+        if (badge) {
+          badge.style.background = isActive ? 'var(--md-sys-color-secondary-container)' : 'var(--md-sys-color-surface-container-highest)';
+          badge.style.color = isActive ? 'var(--md-sys-color-on-secondary-container)' : 'var(--md-sys-color-on-surface-variant)';
         }
       });
+      document.getElementById('cl-view-principles').hidden = _view !== 'principles';
+      document.getElementById('cl-view-visual').hidden     = _view !== 'visual';
+      if (_view === 'visual') {
+        if (!_clusterTool) _initVisual();
+        else _showPanelSections('visual');
+      } else {
+        _showPanelSections('principles');
+      }
     });
 
     // ── Embedding ────────────────────────────────────────────────────────────
@@ -421,7 +428,9 @@
       _embedAll(keys).then(function(){
         _embedding = false; _embReady = true;
         document.getElementById('cl-dot').className = 'cl-emb-dot ready';
-        document.getElementById('cl-emb-text').textContent = _emb.size + ' indexed';
+        var _clMsg = _emb.size + ' indexed';
+        document.getElementById('cl-emb-text').textContent = _clMsg;
+        if (_nav && _nav.subtitleEl) _nav.subtitleEl.textContent = _clMsg;
         _clusters = null;
         renderPrinciples();
         // Signal utils-clusters.js if visual tab is initialised
