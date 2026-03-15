@@ -789,16 +789,21 @@
             _outerPanelBody.appendChild(innerWrap);
           }
 
-          // Move rail-extra buttons to outer rail (hidden until visual tab)
-          if (_outerRail && opts && opts.railExtra) {
+          // Put railExtra buttons in a section at the bottom of the outer panel
+          if (_outerPanelBody && opts && opts.railExtra) {
+            var btnSection = document.createElement('div');
+            btnSection.className = 'pp-side-panel-section';
+            btnSection.id = 'cl-visual-actions';
+            btnSection.dataset.clVisualBtn = '1';
+            btnSection.style.cssText = 'display:none;flex-direction:row;gap:6px;padding:8px 12px;';
             var tmp = document.createElement('div');
             tmp.innerHTML = opts.railExtra;
-            while (tmp.firstChild) {
-              var child = tmp.firstChild;
-              child.dataset.clVisualBtn = '1';
-              child.style.display = 'none';
-              _outerRail.appendChild(child);
-            }
+            // Re-style as inline panel buttons
+            Array.from(tmp.children).forEach(function(btn){
+              btn.style.cssText = 'flex:1;height:34px;border-radius:6px;border:1px solid var(--md-sys-color-outline-variant);background:transparent;cursor:pointer;color:var(--md-sys-color-on-surface-variant);display:inline-flex;align-items:center;justify-content:center;';
+              btnSection.appendChild(btn);
+            });
+            _outerPanelBody.appendChild(btnSection);
           }
 
           return {
@@ -835,10 +840,14 @@
     function _showPanelSections(tab) {
       var outer = document.getElementById('cl-outer-sections');
       var inner = document.getElementById('cl-inner-sections');
-      var visualBtns = document.querySelectorAll('[data-cl-visual-btn]');
-      if (outer) outer.style.display = tab === 'principles' ? '' : 'none';
-      if (inner) inner.style.display = tab === 'visual'     ? '' : 'none';
-      visualBtns.forEach(function(b){ b.style.display = tab === 'visual' ? '' : 'none'; });
+      var actions = document.getElementById('cl-visual-actions');
+      if (outer)   { outer.style.display   = tab === 'principles' ? '' : 'none'; }
+      if (inner)   {
+        // pointer-events:none when hidden so it can't intercept canvas pan/zoom
+        inner.style.display        = tab === 'visual' ? '' : 'none';
+        inner.style.pointerEvents  = tab === 'visual' ? '' : 'none';
+      }
+      if (actions) { actions.style.display = tab === 'visual' ? 'flex' : 'none'; }
     }
 
     function _proxyVisualControls(pane) {
