@@ -9,7 +9,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="../utilities/utils-keywords.js?v=7"></script>
   <script src="../utilities/utils-shared.js?v=425998b6"></script>
-  <script src="../utilities/utils-synthesis.js?v=b1c1c35c"></script>
+  <script src="../utilities/utils-synthesis.js?v=3"></script>
   <script src="../utilities/utils-panel.js?v=7"></script>
   <script type="module" src="../utilities/utils-embedding.js?v=4"></script>
   <style>
@@ -86,6 +86,7 @@
     var _embReady  = false;
     var _embedding = false;
     var _cmTool    = null;
+    var _lastInitTime = 0; // timestamp of last _initConceptMap() call
     var _observer  = null;
 
     function _h(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
@@ -294,7 +295,8 @@
           _buildPrincipleVecs();
           _buildTextToVec();
           _overrideEmbeddingUtils();
-          // Single call — _initConceptMap guards against double script load
+          // Single call — guard against double script load
+          _lastInitTime = Date.now();
           _initConceptMap();
         });
         document.getElementById('cm-dot').className = 'pp-panel-dot ready';
@@ -702,9 +704,10 @@
         SY.loadFromFrameworkTab(fw.rows);
         var newPCount  = SY.getPrinciples().filter(function(p){ return p.named&&!p.archived; }).length;
         _updateLegend();
-        // Only rebuild if principle count changed AND map is already rendered
-        // Avoids the double-render that occurred when framework loaded after embedding
-        if (_embReady && _cmTool && newPCount !== prevPCount) {
+        // Rebuild only if principles changed AND the map wasn't just freshly initialised
+        // (within 3s) — prevents the double-render on first load
+        var justInited = (Date.now() - _lastInitTime) < 3000;
+        if (_embReady && _cmTool && newPCount !== prevPCount && !justInited) {
           _buildPrincipleVecs();
           _buildTextToVec();
           _overrideEmbeddingUtils();
@@ -714,6 +717,20 @@
       }).catch(function(){});
     }
 
+
+    // ── Cross-tab settings sync ───────────────────────────────────────────────
+    // When another tab updates sy2_settings via SY.updateSettings(), the storage
+    // event fires here so our sliders and state stay in sync.
+    window.addEventListener('storage', function(e) {
+      if (e.key !== 'sy2_settings') return;
+      var s = SY.getSettings();
+      var tsl = document.getElementById('cm-thresh-slider');
+      var msl = document.getElementById('cm-maxwords-slider');
+      if (tsl) { tsl.value = Math.round(s.threshold*100); }
+      if (msl) { msl.value = s.maxWords; }
+      // Fire sy-settings-changed locally so this tab's state also updates
+      window.dispatchEvent(new CustomEvent('sy-settings-changed', { detail: s }));
+    });
     _patchTouchDrag();
 
     document.addEventListener('DOMContentLoaded', function(){
