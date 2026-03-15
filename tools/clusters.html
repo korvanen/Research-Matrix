@@ -740,53 +740,70 @@
         create: function(paneEl, opts) {
           window.PPNavRail = _realPPNavRail; // restore immediately
 
-          // Wrap our outer sections in a toggleable div
-          var outerSecs = _outerPanelBody && _outerPanelBody.firstChild;
-          if (outerSecs && !document.getElementById('cl-outer-sections')) {
-            var wrap = document.createElement('div');
-            wrap.id = 'cl-outer-sections';
-            _outerPanelBody.insertBefore(wrap, _outerPanelBody.firstChild);
-            while (wrap.nextSibling && wrap.nextSibling.id !== 'cl-inner-sections') {
-              wrap.appendChild(wrap.nextSibling);
-            }
+          // Build combined HTML: tool's panel sections as a hidden lookup target
+          // inside paneEl (so paneEl.querySelector works), PLUS a visible copy
+          // in the outer panel. The inner copy is display:none — purely for JS lookup.
+          var sectionsHTML = '';
+          if (opts && opts.panelSections) {
+            opts.panelSections.forEach(function(sec){
+              sectionsHTML +=
+                '<div class="pp-side-panel-section">' +
+                  '<div class="pp-side-panel-section-label">'+sec.label+'</div>' +
+                  sec.html +
+                '</div>';
+            });
           }
 
-          // Inject tool panel sections into outer panel
-          if (_outerPanelBody && opts && opts.panelSections) {
+          // paneEl gets the full PPNavRail structure so all querySelector('#...') calls
+          // inside the tool find their elements. We hide the inner panel visually.
+          paneEl.style.cssText = 'flex:1;min-height:0;display:flex;flex-direction:row;overflow:hidden;position:relative;';
+          paneEl.innerHTML =
+            '<div class="pp-nav-rail" style="display:none"></div>' +
+            '<div class="pp-side-panel pp-side-panel--collapsed" style="display:none">' +
+              '<div class="pp-side-panel-header"><div class="pp-side-panel-tool-name"></div>' +
+              '<div class="pp-side-panel-subtitle" id="cl-visual-subtitle">Loading…</div>' +
+              '<div class="pp-side-panel-status"></div></div>' +
+              '<div class="pp-side-panel-body">' + sectionsHTML + '</div>' +
+            '</div>' +
+            '<div class="pp-tool-main" style="flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden;position:relative;"></div>';
+
+          var mainEl = paneEl.querySelector('.pp-tool-main');
+
+          // Wrap outer sections in a hide-able div (for principles tab)
+          if (_outerPanelBody && !document.getElementById('cl-outer-sections')) {
+            var wrap = document.createElement('div');
+            wrap.id = 'cl-outer-sections';
+            while (_outerPanelBody.firstChild) wrap.appendChild(_outerPanelBody.firstChild);
+            _outerPanelBody.appendChild(wrap);
+          }
+
+          // Copy visible sections into outer panel (for display when visual tab is active)
+          if (_outerPanelBody) {
             var innerWrap = document.createElement('div');
             innerWrap.id = 'cl-inner-sections';
-            innerWrap.style.display = 'none'; // hidden until tab switch completes
-            opts.panelSections.forEach(function(sec){
-              var d = document.createElement('div');
-              d.className = 'pp-side-panel-section';
-              d.innerHTML = '<div class="pp-side-panel-section-label">'+sec.label+'</div>'+sec.html;
-              innerWrap.appendChild(d);
-            });
+            innerWrap.style.display = 'none';
+            innerWrap.innerHTML = sectionsHTML;
             _outerPanelBody.appendChild(innerWrap);
           }
 
-          // Inject tool rail-extra buttons (table toggle, export) into outer rail
+          // Move rail-extra buttons to outer rail (hidden until visual tab)
           if (_outerRail && opts && opts.railExtra) {
             var tmp = document.createElement('div');
             tmp.innerHTML = opts.railExtra;
             while (tmp.firstChild) {
               var child = tmp.firstChild;
-              child.style.cssText += ';display:none'; // hidden until visual tab active
               child.dataset.clVisualBtn = '1';
+              child.style.display = 'none';
               _outerRail.appendChild(child);
             }
           }
 
-          // Use paneEl directly as mainEl — no inner nav rail
-          paneEl.innerHTML = '';
-          paneEl.style.cssText = 'flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden;position:relative;';
-
           return {
-            railEl:     _outerRail,
-            panelEl:    _outerPanel,
-            mainEl:     paneEl,
-            subtitleEl: _outerSubtitle || document.createElement('span'),
-            statusEl:   document.createElement('div'),
+            railEl:     paneEl.querySelector('.pp-nav-rail'),
+            panelEl:    paneEl.querySelector('.pp-side-panel'),
+            mainEl:     mainEl,
+            subtitleEl: paneEl.querySelector('#cl-visual-subtitle') || document.createElement('span'),
+            statusEl:   paneEl.querySelector('.pp-side-panel-status') || document.createElement('div'),
           };
         }
       };
