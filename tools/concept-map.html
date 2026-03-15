@@ -1,279 +1,624 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Concept Map — Dimensional Framework</title>
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="../design-system.css?v=9fa06a28">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="../utilities/utils-keywords.js?v=7"></script>
+  <script src="../utilities/utils-shared.js?v=425998b6"></script>
+  <script src="../utilities/utils-synthesis.js?v=3"></script>
+  <script src="../utilities/utils-panel.js?v=7"></script>
+  <script type="module" src="../utilities/utils-embedding.js?v=4"></script>
   <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body { height: 100%; overflow: hidden; margin: 0; padding: 0; }
     body {
-      height: 100vh; height: 100dvh;
-      overflow: hidden;
-      display: flex;
-      flex-direction: column;
+      display: flex; flex-direction: column;
       background: var(--md-sys-color-background);
       font-family: var(--font-family);
-      font-size: var(--font-size-base);
       color: var(--md-sys-color-on-background);
     }
 
-    .cm-layout {
-      flex: 1;
-      min-height: 0;
-      display: flex;
-      flex-direction: row;
-      overflow: hidden;
-      position: relative;
+    /* ── Topbar ── */
+    .cm-topbar {
+      flex-shrink: 0; display: flex; align-items: center; gap: 8px;
+      height: 48px; padding: 0 12px;
+      background: var(--md-sys-color-surface-container);
+      border-bottom: 1px solid var(--md-sys-color-outline-variant);
     }
+    .cm-topbar-title { font-size: 16px; font-weight: 500; flex: 1; }
+    .cm-emb-dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--md-sys-color-outline); flex-shrink: 0; transition: background .3s;
+    }
+    .cm-emb-dot.ready   { background: #2e7d32; }
+    .cm-emb-dot.loading { background: var(--md-sys-color-primary); animation: cm-pulse 1.2s infinite; }
+    .cm-emb-dot.error   { background: var(--md-sys-color-error); }
+    @keyframes cm-pulse { 0%,100%{opacity:.3;} 50%{opacity:1;} }
+    .cm-emb-text { font-size: 11px; color: var(--md-sys-color-on-surface-variant); }
 
+    /* ── Body ── */
+    .cm-body { flex: 1; min-height: 0; display: flex; overflow: hidden; position: relative; }
+
+    /* ── Main pane (canvas injected by utils-concept-map.js) ── */
     #cm-pane {
-      flex: 1;
-      min-width: 0;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-      position: relative;
+      flex: 1; min-width: 0; display: flex; flex-direction: column;
+      overflow: hidden; position: relative;
     }
 
-    .cm-canvas, #cm-canvas, [id*="canvas"] {
-      background: var(--md-sys-color-background) !important;
+    /* ── Principle node overlay styling ──
+       Once utils-concept-map.js renders cards, a MutationObserver marks
+       principle nodes with data-principle-color. These rules style them. */
+    [data-principle-color] .pp-cmap-card-top {
+      background: var(--pnc, var(--md-sys-color-primary)) !important;
+      border-radius: 5px 5px 0 0;
+    }
+    [data-principle-color] .pp-cmap-card-cat-num {
+      color: #fff !important; font-weight: 700 !important; font-size: 11px !important;
+      letter-spacing: .04em !important;
+    }
+    [data-principle-color] .pp-cmap-card-level-num,
+    [data-principle-color] .pp-cmap-card-level-label { color: rgba(255,255,255,.85) !important; }
+    [data-principle-color] {
+      border-color: var(--pnc, var(--md-sys-color-primary)) !important;
+      box-shadow: 0 2px 8px rgba(0,0,0,.15) !important;
+    }
+    [data-principle-color] .pp-cmap-card-body .pp-cmap-cell-text {
+      font-weight: 600 !important; font-size: 13px !important;
+    }
+    /* Principle badge */
+    .cm-principle-badge {
+      display: inline-block; font-size: 9px; font-weight: 800;
+      letter-spacing: .08em; text-transform: uppercase;
+      padding: 2px 7px; border-radius: 10px; margin-top: 4px;
+      background: rgba(255,255,255,.2); color: #fff;
     }
 
-    .cm-node, .cmap-node, [class*="cm-node"], [class*="cmap-node"] {
-      background: var(--md-sys-color-surface-container-low) !important;
-      border: 1px solid var(--md-sys-color-outline-variant) !important;
-      border-radius: var(--radius-sm) !important;
-      box-shadow: var(--md-elev-1) !important;
-      color: var(--md-sys-color-on-surface) !important;
+    /* ── Panel controls ── */
+    .cm-panel-label { font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--md-sys-color-on-surface-variant); padding: 8px 0 4px; }
+    .cm-range-row   { display: flex; align-items: center; gap: 8px; padding: 3px 0; }
+    .cm-range-label { font-size: 12px; color: var(--md-sys-color-on-surface-variant); min-width: 56px; }
+    .cm-range       { flex: 1; accent-color: var(--md-sys-color-primary); cursor: pointer; }
+    .cm-range-val   { font-size: 12px; font-weight: 600; min-width: 32px; text-align: right; }
+    .cm-panel-btn {
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+      width: 100%; height: 30px; border-radius: 15px; border: none; cursor: pointer;
+      font-family: var(--font-family); font-size: 12px; font-weight: 500; margin-bottom: 5px;
     }
-    .cm-node:hover, .cmap-node:hover,
-    [class*="cm-node"]:hover, [class*="cmap-node"]:hover {
-      box-shadow: var(--md-elev-2) !important;
-      background: var(--md-sys-color-surface-container) !important;
+    .cm-panel-btn-primary { background: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary); }
+    .cm-panel-btn-ghost   { background: transparent; color: var(--md-sys-color-on-surface-variant); border: 1px solid var(--md-sys-color-outline-variant); }
+    .cm-panel-btn:disabled { opacity: .38; cursor: not-allowed; }
+    .cm-layout-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 2px 0 6px; }
+    .cm-layout-btn {
+      height: 26px; border-radius: 4px; border: 1px solid var(--md-sys-color-outline-variant);
+      background: transparent; font-size: 11px; font-weight: 500; cursor: pointer;
+      color: var(--md-sys-color-on-surface-variant); transition: all .12s;
     }
-
-    .cm-node-label, .cmap-node-label,
-    [class*="cm-node"] span, [class*="cmap-node"] span,
-    [class*="cm-node"] div, [class*="cmap-node"] div {
-      color: var(--md-sys-color-on-surface) !important;
+    .cm-layout-btn.active {
+      background: var(--md-sys-color-secondary-container);
+      color: var(--md-sys-color-on-secondary-container); border-color: transparent;
     }
-
-    .cm-node-cat, .cmap-node-cat,
-    [class*="cm-node-cat"], [class*="cmap-node-cat"] {
-      color: var(--md-sys-color-on-surface-variant) !important;
-    }
-
-    .cm-edge, .cmap-edge,
-    [class*="cm-edge"] path,
-    [class*="cmap-edge"] path,
-
-    .cm-node.selected, .cmap-node.selected,
-    [class*="cm-node"].selected {
-      background: var(--md-sys-color-primary-container) !important;
-      border-color: var(--md-sys-color-primary) !important;
-      color: var(--md-sys-color-on-primary-container) !important;
-      box-shadow: var(--md-elev-2) !important;
-    }
-
-    .cm-tooltip, .cmap-tooltip,
-    [class*="cm-tooltip"], [class*="cmap-tooltip"] {
-      background: var(--md-sys-color-inverse-surface) !important;
-      color: var(--md-sys-color-inverse-on-surface) !important;
-      border-radius: var(--radius-xs) !important;
-      box-shadow: var(--md-elev-2) !important;
-    }
-
-    .cm-controls, .cmap-controls,
-    .cm-panel, .cmap-panel,
-    [class*="cm-control"], [class*="cmap-control"],
-    [id*="cm-control"], [id*="cmap-control"] {
-      background: var(--md-sys-color-surface-container) !important;
-      border-color: var(--md-sys-color-outline-variant) !important;
-      color: var(--md-sys-color-on-surface-variant) !important;
-    }
+    .cm-legend { padding: 4px 0 6px; display: flex; flex-direction: column; gap: 4px; }
+    .cm-legend-item { display: flex; align-items: center; gap: 7px; font-size: 11px; color: var(--md-sys-color-on-surface-variant); }
+    .cm-legend-dot  { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .cm-principle-dot { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
+    .cm-legend-line { width: 18px; height: 2px; background: var(--md-sys-color-outline); flex-shrink: 0; border-radius: 1px; }
   </style>
 </head>
 <body>
 
-  <div class="ds-topbar">
-    <a class="ds-topbar-back" href="../index.html">
-      <svg viewBox="0 0 14 14" width="12" height="12" fill="none"
-           stroke="currentColor" stroke-width="2"
-           stroke-linecap="round" stroke-linejoin="round">
-        <path d="M9 2L4 7l5 5"/>
-      </svg>
-      Back
-    </a>
-    <div class="ds-topbar-title">Concept Map</div>
-    <div class="ds-badge ds-badge--waiting" id="cm-connection-badge">
-      <div class="ds-badge-dot"></div>
-      <span id="cm-badge-text">Connecting…</span>
-    </div>
+  <div class="cm-topbar">
+    <div class="cm-topbar-title">Concept Map</div>
+    <div class="cm-emb-dot loading" id="cm-dot"></div>
+    <span class="cm-emb-text" id="cm-emb-text">Loading...</span>
   </div>
 
-  <div class="cm-layout">
-    <div id="cm-pane">
-      <div class="ds-no-host" id="cm-no-host">
-        <h2>Data not available</h2>
-        <p>Return to the <a href="../index.html">home page</a> to load data first.</p>
-      </div>
-    </div>
+  <div class="cm-body" id="cm-body">
+    <!-- PPNavRail + pane injected here -->
   </div>
-
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  <script src="../utilities/utils-shared.js?v=2c656b35"></script>
-  <script src="../utilities/utils-academic.js?v=66257bc0"></script>
-  <script src="../utilities/utils-panel.js?v=7"></script>
-  <script src="../utilities/embedding-bridge.js?v=7"></script>
-  <script src="../utilities/utils-concept-map.js?v=09bacb2e"></script>
 
   <script>
-    window._cmBridgeRows = null;
+  (function(){
+    var SY = window.SynthesisData;
+    if (!SY) { document.body.innerHTML = '<p style="padding:24px">utils-synthesis.js not loaded.</p>'; return; }
 
-    window.buildRowIndex = function() {
-      return window._cmBridgeRows || [];
-    };
+    // ── State ────────────────────────────────────────────────────────────────
+    var _emb       = new Map();   // "tabIdx:rowIdx" → Float32Array  (TAB rows)
+    var _princVecs = new Map();   // principleId → Float32Array centroid
+    var _textToVec = new Map();   // cellText → Float32Array (lookup for getCachedEmbedding)
+    var _embReady  = false;
+    var _embedding = false;
+    var _cmTool    = null;
+    var _observer  = null;
 
-    if (typeof parseCitation === 'undefined') {
-      window.parseCitation = function(text) {
-        return { body: String(text || ''), citation: null };
-      };
-    }
+    function _h(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
-    window.EmbeddingUtils = {
-      isReady:            function() { return false; },
-      getCachedEmbedding: function()  { return Promise.resolve(null); },
-      getVectorSync:      function()  { return null; }
-    };
+    // ── Panel HTML ────────────────────────────────────────────────────────────
+    var _globalHtml =
+      '<div class="cm-panel-label">Cluster threshold</div>' +
+      '<div class="cm-range-row">' +
+        '<input type="range" class="cm-range" id="cm-thresh-slider" min="20" max="70" value="'+Math.round(SY.getSettings().threshold*100)+'" step="1">' +
+        '<span class="cm-range-val" id="cm-thresh-val">'+Math.round(SY.getSettings().threshold*100)+'%</span>' +
+      '</div>' +
+      '<div class="cm-panel-label">Max words (split)</div>' +
+      '<div class="cm-range-row">' +
+        '<input type="range" class="cm-range" id="cm-maxwords-slider" min="20" max="300" value="'+SY.getSettings().maxWords+'" step="10">' +
+        '<span class="cm-range-val" id="cm-maxwords-val">'+SY.getSettings().maxWords+'</span>' +
+      '</div>';
 
-    var badgeEl   = document.getElementById('cm-connection-badge');
-    var badgeText = document.getElementById('cm-badge-text');
-    var noHost    = document.getElementById('cm-no-host');
-    var paneEl    = document.getElementById('cm-pane');
-    var layout    = document.querySelector('.cm-layout');
+    var _toolHtml =
+      '<div class="cm-panel-label">Hierarchy depth</div>' +
+      '<div class="cm-range-row">' +
+        '<input type="range" class="cm-range" id="cm-depth-slider" min="1" max="8" value="5" step="1">' +
+        '<span class="cm-range-val" id="cm-depth-val">5</span>' +
+      '</div>' +
+      '<div class="cm-panel-label">Edge threshold</div>' +
+      '<div class="cm-range-row">' +
+        '<input type="range" class="cm-range" id="cm-edge-slider" min="20" max="90" value="50" step="5">' +
+        '<span class="cm-range-val" id="cm-edge-val">50%</span>' +
+      '</div>' +
+      '<div class="cm-panel-label">Max parents</div>' +
+      '<div class="cm-range-row">' +
+        '<input type="range" class="cm-range" id="cm-maxpar-slider" min="1" max="6" value="1" step="1">' +
+        '<span class="cm-range-val" id="cm-maxpar-val">1</span>' +
+      '</div>' +
+      '<div class="cm-panel-label">Layout</div>' +
+      '<div class="cm-layout-grid" id="cm-layout-grid">' +
+        ['hflow','vflow','htree','vtree','radial','circle','organic'].map(function(l){
+          var labels = {hflow:'H Flow',vflow:'V Flow',htree:'H Tree',vtree:'V Tree',radial:'Radial',circle:'Circle',organic:'Organic'};
+          return '<button class="cm-layout-btn'+(l==='organic'?' active':'')+'" data-layout="'+l+'">'+labels[l]+'</button>';
+        }).join('') +
+      '</div>' +
+      '<button class="cm-panel-btn cm-panel-btn-primary" id="cm-rebuild-btn" style="margin-top:4px">Rebuild map</button>' +
+      '<div class="cm-panel-label">Legend</div>' +
+      '<div class="cm-legend" id="cm-legend">' +
+        '<div class="cm-legend-item"><span class="cm-principle-dot" style="background:var(--md-sys-color-primary)"></span> Named principle</div>' +
+        '<div class="cm-legend-item"><div class="cm-legend-dot" style="background:var(--md-sys-color-surface-container-high);border:1px solid var(--md-sys-color-outline-variant)"></div> Unassigned entry</div>' +
+        '<div class="cm-legend-item"><div class="cm-legend-line"></div> Semantic edge</div>' +
+      '</div>';
 
-    function setBadge(state, text) {
-      badgeEl.className     = 'ds-badge ds-badge--' + state;
-      badgeText.textContent = text;
-    }
+    // ── Nav rail ──────────────────────────────────────────────────────────────
+    var _paneEl = document.getElementById('cm-body');
+    var _nav = window.PPNavRail.create(_paneEl, {
+      toolName: 'Concept Map',
+      defaultOpen: true,
+      panelSections: [
+        { label: 'Global',     html: _globalHtml },
+        { label: 'Map',        html: _toolHtml   },
+      ],
+    });
 
-    var cmTool = initConceptMapTool(paneEl, null);
+    // The concept map canvas goes inside mainEl
+    _nav.mainEl.style.cssText = 'flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden;position:relative;';
+    _nav.mainEl.id = 'cm-pane';
+
+    // Draggable side panel (right side) — re-uses utils-panel.js
+    var _layout   = _paneEl.querySelector('.pp-tool-main') || _nav.mainEl;
+    var _sidePanel = window.createSidePanel ? createSidePanel(_paneEl, {
+      side: 'right', defaultFraction: 0, minFraction: 0, maxFraction: .65,
+      snapCloseFraction: .10,
+      onResize: function(){ if (_cmTool && _cmTool.resize) _cmTool.resize(); },
+      onOpen:   function(){ if (_cmTool && _cmTool.resize) _cmTool.resize(); },
+      onClose:  function(){ if (_cmTool && _cmTool.resize) _cmTool.resize(); },
+    }) : null;
 
     injectToolNav('concept-map.html');
 
-    var cmPanel = createSidePanel(layout, {
-      side:              'right',
-      defaultFraction:   0,
-      minFraction:       0,
-      maxFraction:       0.65,
-      snapCloseFraction: 0.10,
-      onResize: function() { if (cmTool && cmTool.resize) cmTool.resize(); },
-      onOpen:   function() { if (cmTool && cmTool.resize) cmTool.resize(); },
-      onClose:  function() { if (cmTool && cmTool.resize) cmTool.resize(); },
+    // ── Global settings ───────────────────────────────────────────────────────
+    var _threshSlider   = document.getElementById('cm-thresh-slider');
+    var _threshVal      = document.getElementById('cm-thresh-val');
+    var _maxWordsSlider = document.getElementById('cm-maxwords-slider');
+    var _maxWordsVal    = document.getElementById('cm-maxwords-val');
+
+    if (_threshSlider) _threshSlider.addEventListener('input', function(){
+      var v = parseInt(_threshSlider.value);
+      _threshVal.textContent = v + '%';
+      SY.updateSettings({ threshold: v/100 });
+    });
+    if (_maxWordsSlider) _maxWordsSlider.addEventListener('input', function(){
+      var v = parseInt(_maxWordsSlider.value);
+      _maxWordsVal.textContent = v;
+      SY.updateSettings({ maxWords: v });
+    });
+    window.addEventListener('sy-settings-changed', function(){
+      var s = SY.getSettings();
+      if (_threshSlider)   { _threshSlider.value = Math.round(s.threshold*100); _threshVal.textContent = Math.round(s.threshold*100)+'%'; }
+      if (_maxWordsSlider) { _maxWordsSlider.value = s.maxWords; _maxWordsVal.textContent = s.maxWords; }
     });
 
-    EmbeddingBridge.guest(function(rows) {
-      noHost.classList.remove('visible');
-      setBadge('connected', rows.length + ' entries live');
+    // ── Map controls ──────────────────────────────────────────────────────────
+    var _depthSlider  = document.getElementById('cm-depth-slider');
+    var _depthVal     = document.getElementById('cm-depth-val');
+    var _edgeSlider   = document.getElementById('cm-edge-slider');
+    var _edgeVal      = document.getElementById('cm-edge-val');
+    var _maxParSlider = document.getElementById('cm-maxpar-slider');
+    var _maxParVal    = document.getElementById('cm-maxpar-val');
 
-      window._cmBridgeRows = rows;
+    function _syncSlider(slider, valEl, suffix) {
+      if (!slider) return;
+      slider.addEventListener('input', function(){
+        valEl.textContent = slider.value + (suffix||'');
+        var pp = document.getElementById('pp-cmap-depth') || document.getElementById('pp-cmap-thresh') || null;
+        // Mirror values to utils-concept-map.js sliders once it loads
+        _mirrorSliders();
+      });
+    }
+    _syncSlider(_depthSlider,  _depthVal,  '');
+    _syncSlider(_edgeSlider,   _edgeVal,   '%');
+    _syncSlider(_maxParSlider, _maxParVal, '');
 
-      var textToVec = new Map();
-      rows.forEach(function(r) {
-        if (!r.vec) return;
-        var cells = (r.row && r.row.cells) ? r.row.cells : (r.cells || []);
-        var fullText = cells.join(' ').trim();
-        if (fullText) textToVec.set(fullText, r.vec);
-        cells.forEach(function(c) {
-          if (c && c.trim()) textToVec.set(c.trim(), r.vec);
+    function _mirrorSliders() {
+      var d = document.getElementById('pp-cmap-depth');
+      var t = document.getElementById('pp-cmap-thresh');
+      var m = document.getElementById('pp-cmap-maxpar');
+      if (d && _depthSlider)  { d.value = _depthSlider.value;  d.dispatchEvent(new Event('input')); }
+      if (t && _edgeSlider)   { t.value = _edgeSlider.value;   t.dispatchEvent(new Event('input')); }
+      if (m && _maxParSlider) { m.value = _maxParSlider.value; m.dispatchEvent(new Event('input')); }
+    }
+
+    // Layout buttons
+    var _layoutGrid = document.getElementById('cm-layout-grid');
+    if (_layoutGrid) {
+      _layoutGrid.addEventListener('click', function(e){
+        var btn = e.target.closest('.cm-layout-btn'); if (!btn) return;
+        _layoutGrid.querySelectorAll('.cm-layout-btn').forEach(function(b){ b.classList.remove('active'); });
+        btn.classList.add('active');
+        // Mirror to utils-concept-map.js layout opts
+        var opt = document.querySelector('.pp-cmap-layout-opt[data-layout="'+btn.dataset.layout+'"]');
+        if (opt) { opt.click(); }
+      });
+    }
+
+    // Rebuild button
+    var _rebuildBtn = document.getElementById('cm-rebuild-btn');
+    if (_rebuildBtn) {
+      _rebuildBtn.addEventListener('click', function(){
+        if (!_cmTool) return;
+        _mirrorSliders();
+        var rb = document.getElementById('pp-cmap-rebuild');
+        if (rb) rb.click();
+        else { _cmTool.reset(); _cmTool.start(); }
+      });
+    }
+
+    // ── Embedding ─────────────────────────────────────────────────────────────
+    function _triggerEmbed() {
+      if (_embedding) return;
+      var keys = SY.getRowNoteKeys();
+      if (!keys.length || !window.EmbeddingUtils) return;
+      _embedding = true;
+      document.getElementById('cm-dot').className = 'cm-emb-dot loading';
+      document.getElementById('cm-emb-text').textContent = 'Embedding ' + keys.length + ' entries…';
+
+      _embedAll(keys).then(function(){
+        _embedding = false; _embReady = true;
+        _buildPrincipleVecs();
+        _buildTextToVec();
+        document.getElementById('cm-dot').className = 'cm-emb-dot ready';
+        document.getElementById('cm-emb-text').textContent = _emb.size + ' entries indexed';
+        _initConceptMap();
+      }).catch(function(e){
+        _embedding = false;
+        document.getElementById('cm-dot').className = 'cm-emb-dot error';
+        document.getElementById('cm-emb-text').textContent = 'Embedding error';
+        console.error('[concept-map] embed error:', e);
+      });
+    }
+
+    async function _embedAll(keys) {
+      for (var i = 0; i < keys.length; i++) {
+        var key = keys[i]; if (_emb.has(key)) continue;
+        var r   = SY.resolveNoteKey(key); if (!r || !r.text.trim()) continue;
+        try {
+          var vec = await window.EmbeddingUtils.getCachedEmbedding(r.text);
+          if (vec) _emb.set(key, new Float32Array(vec));
+        } catch(e){}
+      }
+    }
+
+    function _buildPrincipleVecs() {
+      _princVecs.clear();
+      var pvecs = SY.buildPrincipleVectors(_emb);
+      pvecs.forEach(function(pv){
+        if (pv.centroid) _princVecs.set(pv.principle.id, pv.centroid);
+      });
+    }
+
+    function _buildTextToVec() {
+      _textToVec.clear();
+      // Add TAB note text → vec
+      SY.getRowNoteKeys().forEach(function(key){
+        var r = SY.resolveNoteKey(key); if (!r) return;
+        var vec = _emb.get(key); if (!vec) return;
+        _textToVec.set(r.text.trim(), vec);
+        // Also store cell join text (how utils-concept-map.js looks it up)
+        if (r.allCells) {
+          var joined = r.allCells.join(' ').trim();
+          if (joined) _textToVec.set(joined, vec);
+        }
+      });
+      // Add principle name text → centroid
+      SY.getPrinciples().filter(function(p){ return p.named && !p.archived; }).forEach(function(p){
+        var vec = _princVecs.get(p.id); if (!vec) return;
+        var nameText = '[PRINCIPLE] ' + p.name;
+        _textToVec.set(nameText, vec);
+        _textToVec.set(p.name.trim(), vec);
+      });
+    }
+
+    // ── buildRowIndex override ────────────────────────────────────────────────
+    // utils-concept-map.js calls buildRowIndex() to get all rows to map.
+    // We inject principle rows first so they appear as anchor nodes.
+    window.buildRowIndex = function() {
+      var rows = [];
+      var TABS = window.TABS || [];
+
+      // 1. Principle nodes (tabIdx = -1, rowIdx = principle seq)
+      var named = SY.getPrinciples().filter(function(p){ return p.named && !p.archived; });
+      named.forEach(function(p, pi){
+        var vec  = _princVecs.get(p.id); if (!vec) return;
+        var nameText = '[PRINCIPLE] ' + p.name;
+        rows.push({
+          tabIdx:  -1,
+          rowIdx:  pi,
+          row:     { cells: [nameText], cats: [p.dimensionHint || 'Principle'] },
+          headers: ['Principle'],
+          title:   'Principles',
+          vec:     vec,
+          _principleId:    p.id,
+          _principleColor: p.color,
+          _principleName:  p.name,
+          _principleDim:   p.dimensionHint || '',
         });
       });
 
-      window.EmbeddingUtils.isReady = function() { return true; };
+      // 2. Unassigned TAB rows
+      var assigned = new Set(SY.getAssignments().filter(function(a){
+        return a.status === 'confirmed';
+      }).map(function(a){ return a.noteKey; }));
 
-      window.EmbeddingUtils.getCachedEmbedding = function(text) {
-        var t   = text ? text.trim() : '';
-        var vec = textToVec.get(t);
-        if (vec) return Promise.resolve(vec);
-        var prefix = t.slice(0, 40);
-        var found  = null;
-        textToVec.forEach(function(v, k) {
-          if (!found && k.startsWith(prefix)) found = v;
+      TABS.forEach(function(tab, tabIdx){
+        var data = typeof processSheetData === 'function' ? processSheetData(tab.grid) : null;
+        if (!data) return;
+        data.rows.forEach(function(row, rowIdx){
+          var key = SY.makeNoteKey(tab.name, rowIdx, SY.bestCellIdx(row.cells));
+          // Include assigned notes too — they connect to their principle via semantic proximity
+          // But mark them so we can optionally dim them
+          var vec = _emb.get(key);
+          rows.push({
+            tabIdx:  tabIdx,
+            rowIdx:  rowIdx,
+            row:     row,
+            headers: data.headers || [],
+            title:   data.title || tab.name,
+            vec:     vec || null,
+            _noteKey:    key,
+            _isAssigned: assigned.has(key),
+          });
         });
-        return Promise.resolve(found || null);
+      });
+
+      return rows;
+    };
+
+    // ── EmbeddingUtils override ───────────────────────────────────────────────
+    // utils-concept-map.js calls getCachedEmbedding(text) for each row.
+    // We return our pre-computed vectors by text lookup.
+    function _overrideEmbeddingUtils() {
+      window.EmbeddingUtils = Object.assign(window.EmbeddingUtils || {}, {
+        isReady: function(){ return _embReady; },
+        getCachedEmbedding: function(text){
+          var t   = (text||'').trim();
+          var vec = _textToVec.get(t);
+          if (vec) return Promise.resolve(vec);
+          // Partial match fallback
+          var found = null;
+          if (t.length > 20) {
+            var prefix = t.slice(0, 30);
+            _textToVec.forEach(function(v, k){
+              if (!found && k.startsWith(prefix)) found = v;
+            });
+          }
+          return Promise.resolve(found || null);
+        },
+        getVectorSync: function(text){
+          return _textToVec.get((text||'').trim()) || null;
+        },
+      });
+    }
+
+    // ── Init concept map ──────────────────────────────────────────────────────
+    function _initConceptMap() {
+      if (_cmTool) {
+        // Already loaded — just rebuild
+        _buildPrincipleVecs();
+        _buildTextToVec();
+        _cmTool.reset();
+        _cmTool.start();
+        return;
+      }
+
+      _overrideEmbeddingUtils();
+
+      // Lazy-load utils-concept-map.js
+      var s   = document.createElement('script');
+      s.src   = '../utilities/utils-concept-map.js?v=09bacb2e';
+      s.onload = function(){
+        if (typeof initConceptMapTool !== 'function') return;
+        var paneEl = document.getElementById('cm-pane');
+        _cmTool    = initConceptMapTool(paneEl, null);
+
+        // Mirror our slider values into the tool's sliders
+        setTimeout(_mirrorSliders, 100);
+
+        // Set up the side panel if available
+        if (_sidePanel && _cmTool.resize) {
+          // keep cmTool.resize already wired via createSidePanel callbacks
+        }
+
+        // Start rendering
+        _cmTool.start();
+
+        // Watch for new cards and style principle nodes
+        _watchForPrincipleCards(paneEl);
+        _updateLegend();
       };
+      document.head.appendChild(s);
+    }
 
-      cmTool.reset();
-      cmTool.start();
-    });
+    // ── Principle card styling ─────────────────────────────────────────────────
+    // After utils-concept-map.js renders, we find principle cards and apply color.
+    function _watchForPrincipleCards(paneEl) {
+      if (_observer) _observer.disconnect();
 
-    window.addEventListener('bridge-no-host', function() {
-      setBadge('disconnected', 'No data — visit home page first');
-      noHost.classList.add('visible');
-    });
+      // Build name → principle map
+      var nameMap = {};
+      SY.getPrinciples().filter(function(p){ return p.named && !p.archived; }).forEach(function(p){
+        nameMap[('[PRINCIPLE] ' + p.name).toLowerCase()] = p;
+        nameMap[p.name.toLowerCase().trim()]             = p;
+      });
 
-    (function patchTouchDrag() {
+      _observer = new MutationObserver(function(mutations){
+        mutations.forEach(function(m){
+          m.addedNodes.forEach(function(node){
+            if (node.nodeType !== 1) return;
+            // Check cards that were just added
+            var cards = node.classList && node.classList.contains('pp-cmap-card') ? [node] : [];
+            node.querySelectorAll && node.querySelectorAll('.pp-cmap-card').forEach(function(c){ cards.push(c); });
+            cards.forEach(function(card){
+              _stylePrincipleCard(card, nameMap);
+            });
+          });
+        });
+      });
+
+      var world = paneEl.querySelector('#pp-cmap-world');
+      if (world) _observer.observe(world, { childList: true, subtree: true });
+    }
+
+    function _stylePrincipleCard(card, nameMap) {
+      // Read text from the first .pp-cmap-cell-text inside
+      var textEl = card.querySelector('.pp-cmap-cell-text');
+      if (!textEl) return;
+      var rawText = textEl.textContent || '';
+      var key     = rawText.toLowerCase().trim();
+      var p       = nameMap[key];
+      if (!p) {
+        // Try without [PRINCIPLE] prefix
+        var stripped = key.replace(/^\[principle\]\s*/, '');
+        p = nameMap[stripped];
+      }
+      if (!p) return;
+
+      // Mark the card
+      card.dataset.principleColor = p.color;
+      card.style.setProperty('--pnc', p.color);
+
+      // Replace raw text with clean name (strip [PRINCIPLE] prefix)
+      textEl.textContent = p.name;
+
+      // Add principle badge to the top row
+      if (!card.querySelector('.cm-principle-badge')) {
+        var badge = document.createElement('span');
+        badge.className = 'cm-principle-badge';
+        badge.textContent = p.dimensionHint ? p.dimensionHint : 'Principle';
+        badge.style.cssText = 'background:rgba(255,255,255,.25);color:#fff;font-size:9px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:10px;margin-top:5px;display:block;width:fit-content;';
+        var body = card.querySelector('.pp-cmap-card-body');
+        if (body) body.insertBefore(badge, body.firstChild);
+      }
+
+      // Update the cat-num element to show the principle number
+      var catEl = card.querySelector('.pp-cmap-card-cat-num');
+      if (catEl) catEl.textContent = p.dimensionHint || 'P';
+    }
+
+    // ── Legend with principle colours ─────────────────────────────────────────
+    function _updateLegend() {
+      var legendEl = document.getElementById('cm-legend');
+      if (!legendEl) return;
+      var named = SY.getPrinciples().filter(function(p){ return p.named && !p.archived; });
+      var html  = '';
+      named.forEach(function(p){
+        html += '<div class="cm-legend-item"><span class="cm-principle-dot" style="background:'+p.color+'"></span> '+p.name+'</div>';
+      });
+      html += '<div class="cm-legend-item"><div class="cm-legend-dot" style="background:var(--md-sys-color-surface-container-high);border:1px solid var(--md-sys-color-outline-variant)"></div> Unassigned entry</div>';
+      html += '<div class="cm-legend-item"><div class="cm-legend-line"></div> Semantic edge</div>';
+      legendEl.innerHTML = html;
+    }
+
+    // ── Touch drag support ────────────────────────────────────────────────────
+    function _patchTouchDrag() {
       function patch() {
-        var canvas = paneEl.querySelector('[class*="canvas"], [id*="canvas"]');
-        if (!canvas) { setTimeout(patch, 300); return; }
+        var paneEl  = document.getElementById('cm-pane');
+        var canvas  = paneEl && paneEl.querySelector('[id*="canvas"]');
+        if (!canvas) { setTimeout(patch, 400); return; }
 
         var panStart = null;
-        canvas.addEventListener('touchstart', function(e) {
+        canvas.addEventListener('touchstart', function(e){
           if (e.touches.length !== 1) return;
           var target = e.touches[0].target;
-          if (target.closest && target.closest('[class*="cm-node"],[class*="cmap-node"],[class*="pp-cm-node"]')) return;
+          if (target.closest && target.closest('.pp-cmap-card')) return;
           panStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
         }, { passive: true });
 
-        canvas.addEventListener('touchmove', function(e) {
+        canvas.addEventListener('touchmove', function(e){
           if (!panStart || e.touches.length !== 1) return;
           e.preventDefault();
           var dx = e.touches[0].clientX - panStart.x;
           var dy = e.touches[0].clientY - panStart.y;
           panStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-          var world = canvas.querySelector('[class*="world"],[id*="world"]');
+          var world = canvas.querySelector('[id*="world"]');
           if (world) {
             var cur = new DOMMatrix(window.getComputedStyle(world).transform);
-            world.style.transform = 'translate(' + (cur.m41 + dx) + 'px,' + (cur.m42 + dy) + 'px) scale(' + cur.a + ')';
+            world.style.transform = 'translate('+(cur.m41+dx)+'px,'+(cur.m42+dy)+'px) scale('+cur.a+')';
           }
         }, { passive: false });
 
-        canvas.addEventListener('touchend', function() { panStart = null; }, { passive: true });
-
-        canvas.addEventListener('touchstart', function(e) {
-          if (e.touches.length !== 1) return;
-          var node = e.touches[0].target.closest && e.touches[0].target.closest(
-            '[class*="cm-node"],[class*="cmap-node"],[class*="pp-cm-node"],[class*="pp-cmap-node"]'
-          );
-          if (!node) return;
-
-          var t0 = e.touches[0];
-          node.dispatchEvent(new MouseEvent('mousedown', {
-            bubbles: true, cancelable: true,
-            clientX: t0.clientX, clientY: t0.clientY, button: 0
-          }));
-
-          function onMove(ev) {
-            if (ev.touches.length !== 1) return;
-            ev.preventDefault();
-            document.dispatchEvent(new MouseEvent('mousemove', {
-              bubbles: true, cancelable: true,
-              clientX: ev.touches[0].clientX, clientY: ev.touches[0].clientY
-            }));
-          }
-          function onEnd() {
-            document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, button: 0 }));
-            document.removeEventListener('touchmove', onMove);
-            document.removeEventListener('touchend', onEnd);
-          }
-          document.addEventListener('touchmove', onMove, { passive: false });
-          document.addEventListener('touchend', onEnd, { passive: true });
-        }, { passive: true });
+        canvas.addEventListener('touchend', function(){ panStart = null; }, { passive: true });
       }
-      setTimeout(patch, 400);
-    })();
-  </script>
+      setTimeout(patch, 500);
+    }
 
+    // ── Events ────────────────────────────────────────────────────────────────
+    document.addEventListener('embedder-ready', _triggerEmbed);
+    window.addEventListener('embedding-complete', function(){ if (!_embReady) _triggerEmbed(); });
+    window.addEventListener('sheet-loaded', function(){
+      _triggerEmbed();
+      _loadFramework();
+    });
+
+    function _loadFramework() {
+      var scriptUrl = SY.getScriptUrl();
+      var sheetUrl  = typeof getSavedSheetUrl === 'function' ? getSavedSheetUrl() : '';
+      if (!scriptUrl || !sheetUrl) return;
+      SY.readFramework(scriptUrl, sheetUrl).then(function(tabs){
+        var fw = tabs.find(function(t){ return t.name && t.name.indexOf('FRAMEWORK') !== -1; });
+        if (!fw) return;
+        SY.setFrameworkTabs([{ name:fw.name, grid:fw.rows }]);
+        SY.loadFromFrameworkTab(fw.rows);
+        // If already embedded, rebuild to add principle nodes
+        if (_embReady && _cmTool) {
+          _buildPrincipleVecs();
+          _buildTextToVec();
+          _overrideEmbeddingUtils();
+          _cmTool.reset();
+          _cmTool.start();
+          _updateLegend();
+        }
+      }).catch(function(){});
+    }
+
+    _patchTouchDrag();
+
+    document.addEventListener('DOMContentLoaded', function(){
+      // Update legend once DOM is ready
+      _updateLegend();
+    });
+
+  })();
+  </script>
 </body>
 </html>
