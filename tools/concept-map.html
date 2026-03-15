@@ -8,8 +8,8 @@
   <link rel="stylesheet" href="../design-system.css?v=9fa06a28">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="../utilities/utils-keywords.js?v=7"></script>
-  <script src="../utilities/utils-shared.js?v=346a2603"></script>
-  <script src="../utilities/utils-synthesis.js?v=69ae51cf"></script>
+  <script src="../utilities/utils-shared.js?v=425998b6"></script>
+  <script src="../utilities/utils-synthesis.js?v=3"></script>
   <script src="../utilities/utils-panel.js?v=7"></script>
   <script type="module" src="../utilities/utils-embedding.js?v=4"></script>
   <style>
@@ -23,22 +23,6 @@
     }
 
     /* ── Topbar ── */
-    .cm-topbar {
-      flex-shrink: 0; display: flex; align-items: center; gap: 8px;
-      height: 48px; padding: 0 12px;
-      background: var(--md-sys-color-surface-container);
-      border-bottom: 1px solid var(--md-sys-color-outline-variant);
-    }
-    .cm-topbar-title { font-size: 16px; font-weight: 500; flex: 1; }
-    .cm-emb-dot {
-      width: 7px; height: 7px; border-radius: 50%;
-      background: var(--md-sys-color-outline); flex-shrink: 0; transition: background .3s;
-    }
-    .cm-emb-dot.ready   { background: #2e7d32; }
-    .cm-emb-dot.loading { background: var(--md-sys-color-primary); animation: cm-pulse 1.2s infinite; }
-    .cm-emb-dot.error   { background: var(--md-sys-color-error); }
-    @keyframes cm-pulse { 0%,100%{opacity:.3;} 50%{opacity:1;} }
-    .cm-emb-text { font-size: 11px; color: var(--md-sys-color-on-surface-variant); }
 
     /* ── Body ── */
     .cm-body { flex: 1; min-height: 0; display: flex; overflow: hidden; position: relative; }
@@ -90,12 +74,6 @@
 </head>
 <body>
 
-  <div class="cm-topbar">
-    <div class="cm-topbar-title">Concept Map</div>
-    <div class="cm-emb-dot loading" id="cm-dot"></div>
-    <span class="cm-emb-text" id="cm-emb-text">Loading...</span>
-  </div>
-
   <div class="cm-body" id="cm-body">
     <!-- PPNavRail + pane injected here -->
   </div>
@@ -118,6 +96,10 @@
 
     // ── Panel HTML ────────────────────────────────────────────────────────────
     var _globalHtml =
+      '<div class="pp-panel-status-row">' +
+        '<div class="pp-panel-dot loading" id="cm-dot"></div>' +
+        '<span id="cm-emb-text">Loading…</span>' +
+      '</div>' +
       '<div class="cm-panel-label">Cluster threshold</div>' +
       '<div class="cm-range-row">' +
         '<input type="range" class="cm-range" id="cm-thresh-slider" min="20" max="70" value="'+Math.round(SY.getSettings().threshold*100)+'" step="1">' +
@@ -203,10 +185,24 @@
       _maxWordsVal.textContent = v;
       SY.updateSettings({ maxWords: v });
     });
-    window.addEventListener('sy-settings-changed', function(){
-      var s = SY.getSettings();
+    window.addEventListener('sy-settings-changed', function(ev){
+      var s = ev.detail || SY.getSettings();
       if (_threshSlider)   { _threshSlider.value = Math.round(s.threshold*100); _threshVal.textContent = Math.round(s.threshold*100)+'%'; }
       if (_maxWordsSlider) { _maxWordsSlider.value = s.maxWords; _maxWordsVal.textContent = s.maxWords; }
+      // Re-split and re-embed, then rebuild map if already rendered
+      if (SY.autoSplitAll()) {
+        _buildTextToVec();
+        _overrideEmbeddingUtils();
+        var pending = SY.getEffectiveNoteKeys().filter(function(k){ return !_emb.has(k); });
+        if (pending.length && _embReady) {
+          _embedAll(pending).then(function(){
+            _buildPrincipleVecs(); _buildTextToVec(); _overrideEmbeddingUtils();
+            if (_cmTool) { _cmTool.reset(); _cmTool.start(); }
+          });
+        } else if (_cmTool) {
+          _cmTool.reset(); _cmTool.start();
+        }
+      }
     });
 
     // ── Map controls ──────────────────────────────────────────────────────────
@@ -276,19 +272,28 @@
       var keys = SY.getRowNoteKeys();
       if (!keys.length || !window.EmbeddingUtils) return;
       _embedding = true;
-      document.getElementById('cm-dot').className = 'cm-emb-dot loading';
+      document.getElementById('cm-dot').className = 'pp-panel-dot loading';
       document.getElementById('cm-emb-text').textContent = 'Embedding ' + keys.length + ' entries…';
 
       _embedAll(keys).then(function(){
         _embedding = false; _embReady = true;
-        _buildPrincipleVecs();
-        _buildTextToVec();
-        document.getElementById('cm-dot').className = 'cm-emb-dot ready';
-        document.getElementById('cm-emb-text').textContent = _emb.size + ' entries indexed';
+        SY.autoSplitAll();
+        // Embed any newly created split fragments
+        var _splitKeys = SY.getEffectiveNoteKeys().filter(function(k){ return !_emb.has(k); });
+        _embedAll(_splitKeys).then(function(){
+          _buildPrincipleVecs();
+          _buildTextToVec();
+          _overrideEmbeddingUtils();
+          _initConceptMap();
+        });
+        document.getElementById('cm-dot').className = 'pp-panel-dot ready';
+        var _cmMsg = _emb.size + ' entries indexed';
+        document.getElementById('cm-emb-text').textContent = _cmMsg;
+        if (_nav && _nav.subtitleEl) _nav.subtitleEl.textContent = _cmMsg;
         _initConceptMap();
       }).catch(function(e){
         _embedding = false;
-        document.getElementById('cm-dot').className = 'cm-emb-dot error';
+        document.getElementById('cm-dot').className = 'pp-panel-dot error';
         document.getElementById('cm-emb-text').textContent = 'Embedding error';
         console.error('[concept-map] embed error:', e);
       });
