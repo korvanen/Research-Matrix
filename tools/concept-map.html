@@ -454,32 +454,52 @@
         create: function(paneEl, opts) {
           window.PPNavRail = _realPPNavRail; // restore immediately
 
-          // Append tool panel sections into our outer panel (below Global+Map sections)
-          if (_outerPanelBody && opts && opts.panelSections) {
-            var toolSecs = document.createElement('div');
-            toolSecs.id = 'cm-tool-sections';
+          // Build sections HTML
+          var sectionsHTML = '';
+          if (opts && opts.panelSections) {
             opts.panelSections.forEach(function(sec){
-              var d = document.createElement('div');
-              d.className = 'pp-side-panel-section';
-              d.innerHTML = '<div class="pp-side-panel-section-label">'+sec.label+'</div>'+sec.html;
-              toolSecs.appendChild(d);
+              sectionsHTML +=
+                '<div class="pp-side-panel-section">' +
+                  '<div class="pp-side-panel-section-label">'+sec.label+'</div>' +
+                  sec.html +
+                '</div>';
             });
-            // Insert before Legend section
-            var legend = _outerPanelBody.querySelector('.pp-side-panel-section:last-child');
-            if (legend) _outerPanelBody.insertBefore(toolSecs, legend);
-            else        _outerPanelBody.appendChild(toolSecs);
           }
 
-          // Use paneEl directly — no inner nav rail created
-          paneEl.innerHTML = '';
-          paneEl.style.cssText = 'flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden;position:relative;';
+          // paneEl gets full PPNavRail structure (hidden side panel) so all
+          // paneEl.querySelector('#pp-cmap-*') calls inside the tool find their elements
+          paneEl.style.cssText = 'flex:1;min-height:0;display:flex;flex-direction:row;overflow:hidden;position:relative;';
+          paneEl.innerHTML =
+            '<div class="pp-nav-rail" style="display:none"></div>' +
+            '<div class="pp-side-panel pp-side-panel--collapsed" style="display:none">' +
+              '<div class="pp-side-panel-header">' +
+                '<div class="pp-side-panel-tool-name"></div>' +
+                '<div class="pp-side-panel-subtitle" id="cm-tool-subtitle">Loading…</div>' +
+                '<div class="pp-side-panel-status"></div>' +
+              '</div>' +
+              '<div class="pp-side-panel-body">'+sectionsHTML+'</div>' +
+            '</div>' +
+            '<div class="pp-tool-main" style="flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden;position:relative;"></div>';
+
+          var mainEl = paneEl.querySelector('.pp-tool-main');
+
+          // Inject visible copy of Parameters section into outer panel (before Legend)
+          // Layout section is already in our Map panel, so we skip it
+          if (_outerPanelBody && sectionsHTML) {
+            var toolSecs = document.createElement('div');
+            toolSecs.id = 'cm-tool-sections';
+            toolSecs.innerHTML = sectionsHTML;
+            var legendSec = _outerPanelBody.querySelector('.pp-side-panel-section:last-child');
+            if (legendSec) _outerPanelBody.insertBefore(toolSecs, legendSec);
+            else           _outerPanelBody.appendChild(toolSecs);
+          }
 
           return {
-            railEl:     _outerRail,
-            panelEl:    _outerPanel,
-            mainEl:     paneEl,
-            subtitleEl: _outerSubtitle || document.createElement('span'),
-            statusEl:   document.createElement('div'),
+            railEl:     paneEl.querySelector('.pp-nav-rail'),
+            panelEl:    paneEl.querySelector('.pp-side-panel'),
+            mainEl:     mainEl,
+            subtitleEl: paneEl.querySelector('#cm-tool-subtitle') || (_outerSubtitle || document.createElement('span')),
+            statusEl:   paneEl.querySelector('.pp-side-panel-status') || document.createElement('div'),
           };
         }
       };
