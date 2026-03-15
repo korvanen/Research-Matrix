@@ -8,8 +8,8 @@
   <link rel="stylesheet" href="../design-system.css?v=9fa06a28">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="../utilities/utils-keywords.js?v=7"></script>
-  <script src="../utilities/utils-shared.js?v=0aa54525"></script>
-  <script src="../utilities/utils-synthesis.js?v=215b0400"></script>
+  <script src="../utilities/utils-shared.js?v=425998b6"></script>
+  <script src="../utilities/utils-synthesis.js?v=3"></script>
   <script src="../utilities/utils-panel.js?v=7"></script>
   <script type="module" src="../utilities/utils-embedding.js?v=4"></script>
   <style>
@@ -401,7 +401,12 @@
         document.querySelectorAll('.cl-subtab').forEach(function(t){ t.classList.toggle('active', t.dataset.view === _view); });
         document.getElementById('cl-view-principles').hidden = _view !== 'principles';
         document.getElementById('cl-view-visual').hidden     = _view !== 'visual';
-        if (_view === 'visual' && !_clusterTool) _initVisual();
+        if (_view === 'visual') {
+          if (!_clusterTool) _initVisual();
+          else _showPanelSections('visual');
+        } else {
+          _showPanelSections('principles');
+        }
       });
     });
 
@@ -706,36 +711,151 @@
     if (bulkBtn) bulkBtn.addEventListener('click', function(){ SY.getAssignments().filter(function(a){return a.status==='auto';}).forEach(function(a){SY.confirmAssignment(a.noteKey);}); _clusters=null; renderPrinciples(); });
 
     // ══ VISUAL TAB ═══════════════════════════════════════════════════════════
-    // utils-clusters.js is NOT loaded here — it's heavyweight. We lazy-load it
-    // via a <script> tag on first switch to the visual tab.
+    // Lazy-load utils-clusters.js. We mock PPNavRail.create so the tool reuses
+    // our outer panel instead of creating a second one.
 
     function _initVisual() {
-      var paneEl = document.getElementById('cl-visual-pane');
-      if (!paneEl) return;
+      var visualPane = document.getElementById('cl-visual-pane');
+      if (!visualPane) return;
 
-      // utils-clusters.js expects EmbeddingUtils.isReady() and buildRowIndex()
-      // buildRowIndex() is already defined by utils-keywords.js
-      // We override EmbeddingUtils.isReady to reflect our embedding state
       if (window.EmbeddingUtils) {
-        var origIsReady = window.EmbeddingUtils.isReady;
         window.EmbeddingUtils.isReady = function(){ return _embReady; };
       }
 
-      // Load utils-clusters.js dynamically
+      if (_clusterTool) {
+        // Already loaded — show inner sections, hide outer, trigger render
+        _showPanelSections('visual');
+        if (_embReady) { _clusterTool.reset(); _clusterTool.start(); }
+        return;
+      }
+
+      // ── Mock PPNavRail to prevent double-panel ──
+      var _realPPNavRail = window.PPNavRail;
+      var _outerPanelBody = document.querySelector('#cl-body .pp-side-panel-body');
+      var _outerSubtitle  = document.querySelector('#cl-body .pp-side-panel-subtitle');
+      var _outerRail      = document.querySelector('#cl-body .pp-nav-rail');
+      var _outerPanel     = document.querySelector('#cl-body .pp-side-panel');
+
+      window.PPNavRail = {
+        create: function(paneEl, opts) {
+          window.PPNavRail = _realPPNavRail; // restore immediately
+
+          // Wrap our outer sections in a toggleable div
+          var outerSecs = _outerPanelBody && _outerPanelBody.firstChild;
+          if (outerSecs && !document.getElementById('cl-outer-sections')) {
+            var wrap = document.createElement('div');
+            wrap.id = 'cl-outer-sections';
+            _outerPanelBody.insertBefore(wrap, _outerPanelBody.firstChild);
+            while (wrap.nextSibling && wrap.nextSibling.id !== 'cl-inner-sections') {
+              wrap.appendChild(wrap.nextSibling);
+            }
+          }
+
+          // Inject tool panel sections into outer panel
+          if (_outerPanelBody && opts && opts.panelSections) {
+            var innerWrap = document.createElement('div');
+            innerWrap.id = 'cl-inner-sections';
+            innerWrap.style.display = 'none'; // hidden until tab switch completes
+            opts.panelSections.forEach(function(sec){
+              var d = document.createElement('div');
+              d.className = 'pp-side-panel-section';
+              d.innerHTML = '<div class="pp-side-panel-section-label">'+sec.label+'</div>'+sec.html;
+              innerWrap.appendChild(d);
+            });
+            _outerPanelBody.appendChild(innerWrap);
+          }
+
+          // Inject tool rail-extra buttons (table toggle, export) into outer rail
+          if (_outerRail && opts && opts.railExtra) {
+            var tmp = document.createElement('div');
+            tmp.innerHTML = opts.railExtra;
+            while (tmp.firstChild) {
+              var child = tmp.firstChild;
+              child.style.cssText += ';display:none'; // hidden until visual tab active
+              child.dataset.clVisualBtn = '1';
+              _outerRail.appendChild(child);
+            }
+          }
+
+          // Use paneEl directly as mainEl — no inner nav rail
+          paneEl.innerHTML = '';
+          paneEl.style.cssText = 'flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden;position:relative;';
+
+          return {
+            railEl:     _outerRail,
+            panelEl:    _outerPanel,
+            mainEl:     paneEl,
+            subtitleEl: _outerSubtitle || document.createElement('span'),
+            statusEl:   document.createElement('div'),
+          };
+        }
+      };
+
       var s = document.createElement('script');
       s.src = '../utilities/utils-clusters.js?v=96702bbb';
       s.onload = function(){
-        if (typeof initClustersTool === 'function') {
-          _clusterTool = initClustersTool(paneEl, null);
-          if (_embReady) {
-            window.dispatchEvent(new CustomEvent('embedder-ready'));
-            setTimeout(function(){
-              window.dispatchEvent(new CustomEvent('embedding-complete', { detail: { total: _emb.size } }));
-            }, 120);
-          }
+        if (typeof initClustersTool !== 'function') return;
+        _clusterTool = initClustersTool(visualPane, null);
+        _showPanelSections('visual');
+        // Inject named principles as defined clusters with their colours
+        setTimeout(function(){ _injectPrinciplesAsClusters(); }, 300);
+        if (_embReady) {
+          window.dispatchEvent(new CustomEvent('embedder-ready'));
+          setTimeout(function(){
+            window.dispatchEvent(new CustomEvent('embedding-complete', { detail: { total: _emb.size } }));
+          }, 120);
         }
       };
       document.head.appendChild(s);
+    }
+
+    function _showPanelSections(tab) {
+      var outer = document.getElementById('cl-outer-sections');
+      var inner = document.getElementById('cl-inner-sections');
+      var visualBtns = document.querySelectorAll('[data-cl-visual-btn]');
+      if (outer) outer.style.display = tab === 'principles' ? '' : 'none';
+      if (inner) inner.style.display = tab === 'visual'     ? '' : 'none';
+      visualBtns.forEach(function(b){ b.style.display = tab === 'visual' ? '' : 'none'; });
+    }
+
+    function _injectPrinciplesAsClusters() {
+      var named = SY.getPrinciples().filter(function(p){ return p.named && !p.archived; });
+      if (!named.length) return;
+
+      function addNext(idx) {
+        if (idx >= named.length) {
+          // After all added, patch chip colors to match principle colors
+          setTimeout(function(){ _patchClusterChipColors(named); }, 200);
+          return;
+        }
+        var p = named[idx];
+        var addBtn = document.getElementById('pp-cl-def-add-btn');
+        if (!addBtn) return;
+        addBtn.click();
+        setTimeout(function(){
+          var ta = document.getElementById('pp-cl-def-ta');
+          if (!ta) { setTimeout(function(){ addNext(idx); }, 100); return; }
+          ta.value = p.name;
+          ta.dispatchEvent(new Event('input', { bubbles: true }));
+          ta.dispatchEvent(new KeyboardEvent('keydown', { key:'Enter', bubbles:true, cancelable:true }));
+          setTimeout(function(){ addNext(idx + 1); }, 180);
+        }, 100);
+      }
+
+      addNext(0);
+    }
+
+    function _patchClusterChipColors(named) {
+      // pp-cl-chip elements are rendered by renderDefPanel in utils-clusters.js
+      var chips = document.querySelectorAll('#pp-cl-defs-list .pp-cl-chip');
+      chips.forEach(function(chip, i){
+        var p = named[i]; if (!p) return;
+        // Patch the dot color
+        var dot = chip.querySelector('[class*="dot"], [class*="pp-cl-chip-dot"]');
+        if (dot) dot.style.background = p.color;
+        // Patch the chip border/accent CSS variable if present
+        chip.style.setProperty('--chip-color', p.color);
+      });
     }
 
     // ── Assign popover ───────────────────────────────────────────────────────
