@@ -35,6 +35,18 @@ window.SynthesisData = (function () {
     return (pfx||'x') + Date.now().toString(36) + Math.random().toString(36).slice(2,6);
   }
 
+  // Generates a unique 4-digit numeric string (1000-9999) not already used
+  // by any existing principle. Constant for the lifetime of the principle.
+  function _sheetId() {
+    var used = new Set(getPrinciples().map(function(p){ return p.sheetId; }).filter(Boolean));
+    var id, attempts = 0;
+    do {
+      id = String(Math.floor(Math.random() * 9000 + 1000));
+      if (++attempts > 900) throw new Error('Could not generate a unique sheet ID.');
+    } while (used.has(id));
+    return id;
+  }
+
   // ── Hash for change detection ─────────────────────────────────────────────
 
   function hashText(str) {
@@ -116,7 +128,7 @@ window.SynthesisData = (function () {
     var ps  = getPrinciples();
     var seq = ps.filter(function(p){ return !p.archived; }).length + 1;
     var p   = {
-      id: _id('p'), name: String(data.name||'').trim(), named: !!(data.name&&data.name.trim()),
+      id: _id('p'), sheetId: _sheetId(), name: String(data.name||'').trim(), named: !!(data.name&&data.name.trim()),
       dimensionHint: String(data.dimensionHint||'').trim(),
       color: data.color || COLORS[(seq-1) % COLORS.length],
       move:'', metric:'', archived:false, seq:seq, ts:Date.now(),
@@ -359,7 +371,7 @@ window.SynthesisData = (function () {
       rows.push(['The '+dim+' Dimension','','','','']);
       rows.push(['ID','Category','Rule / Constraint','Move / Intervention','Metric / Proof']);
       byDim[dim].forEach(function(p){
-        var pId = 'P-'+String(p.seq).padStart(2,'0');
+        var pId = p.sheetId || ('P-'+String(p.seq).padStart(2,'0'));
         var pAs = assignments.filter(function(a){return a.principleId===p.id;});
         var byReg={what:[],why:[],who:[],how:[]};
         pAs.forEach(function(a){if(byReg[a.register]) byReg[a.register].push(a);});
