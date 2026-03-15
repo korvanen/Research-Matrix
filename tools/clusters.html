@@ -8,8 +8,8 @@
   <link rel="stylesheet" href="../design-system.css?v=9fa06a28">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="../utilities/utils-keywords.js?v=7"></script>
-  <script src="../utilities/utils-shared.js?v=4d9ff672"></script>
-  <script src="../utilities/utils-synthesis.js?v=b4058e56"></script>
+  <script src="../utilities/utils-shared.js?v=425998b6"></script>
+  <script src="../utilities/utils-synthesis.js?v=3"></script>
   <script src="../utilities/utils-panel.js?v=7"></script>
   <script type="module" src="../utilities/utils-embedding.js?v=4"></script>
   <style>
@@ -350,9 +350,16 @@
         _thresh = s.threshold; _clusters = null;
         if (SY.autoSplitAll()) { _embedNewSplits(); }
         if (_clusterTool) {
-          var vp = document.getElementById('cl-visual-pane');
-          var ds = vp && vp.querySelector('#pp-cl-defthresh');
+          // Sliders live in cl-inner-sections after DOM move, query from there
+          var ds = document.getElementById('pp-cl-defthresh');
           if (ds) { ds.value = Math.round(s.threshold*100); ds.dispatchEvent(new Event('input',{bubbles:true})); }
+          // Forward maxWords to pp-cl-maxlen (card text length limiter)
+          var ml = document.getElementById('pp-cl-maxlen');
+          if (ml) {
+            var newLen = s.maxWords >= 200 ? 2000 : Math.max(100, s.maxWords * 6);
+            ml.value = newLen;
+            ml.dispatchEvent(new Event('input',{bubbles:true}));
+          }
         }
       },
     });
@@ -825,11 +832,11 @@
               if (prev && prev.classList.contains('pp-range-row')) prev.style.display = 'none';
             }
           }
-          // Also sync maxLen slider to global maxWords on init
-          var maxLenSlider = innerSecs.querySelector('#pp-cl-maxlen');
+          // Sync maxLen slider to global maxWords on init
+          var maxLenSlider = document.getElementById('pp-cl-maxlen');
           if (maxLenSlider) {
             var mw = SY.getSettings().maxWords;
-            maxLenSlider.value = mw > 0 ? mw * 5 : 2000; // rough char estimate
+            maxLenSlider.value = mw >= 200 ? 2000 : Math.max(100, mw * 6);
             maxLenSlider.dispatchEvent(new Event('input', { bubbles: true }));
           }
         }
