@@ -1758,6 +1758,7 @@ window.GlobalPanel = (function() {
         sy.updateSettings({ threshold: v / 100 });
         if (opts.onThresholdChange) opts.onThresholdChange(v / 100);
       });
+      tsl.addEventListener('pointerup', function(){ tsl.blur(); });
     }
 
     // Wire max-words slider
@@ -1770,6 +1771,7 @@ window.GlobalPanel = (function() {
         sy.updateSettings({ maxWords: v });
         if (opts.onMaxWordsChange) opts.onMaxWordsChange(v);
       });
+      msl.addEventListener('pointerup', function(){ msl.blur(); });
     }
 
     // sy-settings-changed — fired by SY.updateSettings() in this tab
