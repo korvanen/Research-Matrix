@@ -1,28 +1,35 @@
 // ════════════════════════════════════════════════════════════════════════════
-// utils-synthesis.js  v2.0
-// Primary data: TAB tabs (window.TABS). Writes: FRAMEWORK tab via Apps Script.
-// State: localStorage working copy; sheet is source of truth.
+// utils-synthesis.js  v3.0
+// Unified data layer for Entries, Clusters, Framework, Concept Map tools.
+// Adds: global settings (threshold, maxWords), split cell support,
+//       SPLITS metadata persistence.
 // ════════════════════════════════════════════════════════════════════════════
-console.log('[utils-synthesis.js v2.0]');
+console.log('[utils-synthesis.js v3.0]');
 
 window.SynthesisData = (function () {
   'use strict';
 
+  // ── Constants ─────────────────────────────────────────────────────────────
   var AUTO_THRESHOLD    = 0.72;
   var SUGGEST_THRESHOLD = 0.50;
   var FRAMEWORK_PREFIX  = 'FRAMEWORK';
   var META_START        = '##META_START##';
   var META_END          = '##META_END##';
+  var SPLIT_SEP         = '::split::';
 
   var COLORS = ['#9b2335','#7b3f9e','#1a6b8a','#2e6b3e','#b5451b','#4a5568','#1a5276','#6b4226'];
 
+  // ── Storage keys ──────────────────────────────────────────────────────────
   var SK = {
     PRINCIPLES:  'sy2_principles',
     ASSIGNMENTS: 'sy2_assignments',
+    SPLITS:      'sy2_splits',      // { parentKey: string[] of fragments }
+    SETTINGS:    'sy2_settings',    // { threshold, maxWords }
     SCRIPT_URL:  'sy2_script_url',
     LAST_SYNC:   'sy2_last_sync',
   };
 
+  // ── Persistence ───────────────────────────────────────────────────────────
   function _load(key, def) {
     try { var v = localStorage.getItem(key); return v ? JSON.parse(v) : def; }
     catch(e) { return def; }
@@ -35,58 +42,169 @@ window.SynthesisData = (function () {
     return (pfx||'x') + Date.now().toString(36) + Math.random().toString(36).slice(2,6);
   }
 
-  // Generates a unique 4-digit numeric string (1000-9999) not already used
-  // by any existing principle. Constant for the lifetime of the principle.
-  function _sheetId() {
-    var used = new Set(getPrinciples().map(function(p){ return p.sheetId; }).filter(Boolean));
-    var id, attempts = 0;
-    do {
-      id = String(Math.floor(Math.random() * 9000 + 1000));
-      if (++attempts > 900) throw new Error('Could not generate a unique sheet ID.');
-    } while (used.has(id));
-    return id;
+  // ── Global settings ───────────────────────────────────────────────────────
+  var _DEFAULT_SETTINGS = { threshold: 0.42, maxWords: 80 };
+
+  function getSettings() {
+    return Object.assign({}, _DEFAULT_SETTINGS, _load(SK.SETTINGS, {}));
+  }
+  function updateSettings(patch) {
+    var s = getSettings();
+    Object.assign(s, patch);
+    _save(SK.SETTINGS, s);
+    window.dispatchEvent(new CustomEvent('sy-settings-changed', { detail: s }));
+    return s;
   }
 
-  // ── Hash for change detection ─────────────────────────────────────────────
-
+  // ── ID generation ─────────────────────────────────────────────────────────
   function hashText(str) {
     var h = 0;
     for (var i = 0; i < str.length; i++) h = (Math.imul(31,h) + str.charCodeAt(i))|0;
     return (h>>>0).toString(36);
   }
 
-  // ── Sheet column letter ───────────────────────────────────────────────────
+  function _sheetId() {
+    var used = new Set(getPrinciples().map(function(p){ return p.sheetId; }).filter(Boolean));
+    var id, attempts = 0;
+    do {
+      id = String(Math.floor(Math.random() * 9000 + 1000));
+      if (++attempts > 900) throw new Error('Could not generate unique sheet ID.');
+    } while (used.has(id));
+    return id;
+  }
 
+  // ── Cell reference helpers ────────────────────────────────────────────────
   function colLetter(idx) {
     var s = '', n = idx + 1;
     while (n > 0) { n--; s = String.fromCharCode(65 + n%26) + s; n = Math.floor(n/26); }
     return s;
   }
-
   function cellRef(tabName, gridRow, gridCol) {
     return "='" + tabName.replace(/'/g,"''") + "'!" + colLetter(gridCol) + (gridRow + 1);
   }
 
   // ── Note keys ─────────────────────────────────────────────────────────────
-  // Format: "tabName::dataRowIdx::cellIdx"
+  // Base:  "tabName::dataRowIdx::cellIdx"
+  // Split: "tabName::dataRowIdx::cellIdx::split::N"  (N = 0-based fragment index)
 
   function makeNoteKey(tabName, dataRowIdx, cellIdx) {
     return tabName + '::' + dataRowIdx + '::' + cellIdx;
   }
+  function makeSplitKey(parentKey, fragmentIdx) {
+    return parentKey + SPLIT_SEP + fragmentIdx;
+  }
+  function isSplitKey(key) {
+    return key && key.indexOf(SPLIT_SEP) !== -1;
+  }
+  function splitKeyParts(key) {
+    var idx = key.indexOf(SPLIT_SEP);
+    return { parentKey: key.slice(0, idx), fragmentIdx: parseInt(key.slice(idx + SPLIT_SEP.length)) };
+  }
   function parseNoteKey(key) {
-    if (!key || typeof key !== 'string') {
-      console.error('[synthesis] parseNoteKey: invalid key:', key);
-      return { tabName: '', dataRowIdx: 0, cellIdx: 0 };
-    }
-    var parts = key.split('::');
+    if (!key || typeof key !== 'string') return { tabName:'', dataRowIdx:0, cellIdx:0 };
+    var base = isSplitKey(key) ? splitKeyParts(key).parentKey : key;
+    var parts = base.split('::');
     return { tabName: parts[0], dataRowIdx: parseInt(parts[1]), cellIdx: parseInt(parts[2]) };
   }
 
+  // ── Splits storage ────────────────────────────────────────────────────────
+  // Map of parentKey → string[] of fragments (stored in localStorage)
+
+  function getSplits() { return _load(SK.SPLITS, {}); }
+
+  function getFragments(parentKey) {
+    return getSplits()[parentKey] || null;
+  }
+
+  function storeSplit(parentKey, fragments) {
+    var splits = getSplits();
+    splits[parentKey] = fragments;
+    _save(SK.SPLITS, splits);
+  }
+
+  function removeSplit(parentKey) {
+    var splits = getSplits();
+    delete splits[parentKey];
+    _save(SK.SPLITS, splits);
+    // Also remove any child assignments
+    var as = getAssignments().filter(function(a){
+      return !isSplitKey(a.noteKey) || splitKeyParts(a.noteKey).parentKey !== parentKey;
+    });
+    _saveAssignments(as);
+  }
+
+  // Split a note into fragments using simple sentence boundary detection.
+  // Only applies to unassigned notes. Returns the fragment noteKeys.
+  function splitNote(parentKey) {
+    if (isSplitKey(parentKey)) return []; // can't split a split
+    var existing = getAssignment(parentKey);
+    if (existing && existing.status === 'confirmed') return []; // D: only split unassigned
+    var resolved = resolveNoteKey(parentKey);
+    if (!resolved || !resolved.text.trim()) return [];
+    var text = resolved.text.trim();
+    var settings = getSettings();
+    var words = text.split(/\s+/);
+    if (words.length <= settings.maxWords) return []; // short enough, no split needed
+
+    // Split at sentence boundaries first, then group into chunks under maxWords
+    var sentences = text
+      .split(/(?<=[.!?])\s+/)
+      .map(function(s){ return s.trim(); })
+      .filter(Boolean);
+
+    // If only one sentence but too long, split at maxWords hard boundary
+    if (sentences.length <= 1) {
+      var chunks = [], current = [];
+      words.forEach(function(w) {
+        current.push(w);
+        if (current.length >= settings.maxWords) { chunks.push(current.join(' ')); current = []; }
+      });
+      if (current.length) chunks.push(current.join(' '));
+      sentences = chunks;
+    } else {
+      // Group sentences into chunks under maxWords
+      var chunks = [], current = [], currentLen = 0;
+      sentences.forEach(function(s) {
+        var wc = s.split(/\s+/).length;
+        if (currentLen + wc > settings.maxWords && current.length) {
+          chunks.push(current.join(' ')); current = [s]; currentLen = wc;
+        } else { current.push(s); currentLen += wc; }
+      });
+      if (current.length) chunks.push(current.join(' '));
+      sentences = chunks;
+    }
+
+    if (sentences.length <= 1) return []; // couldn't meaningfully split
+
+    storeSplit(parentKey, sentences);
+    return sentences.map(function(_, i){ return makeSplitKey(parentKey, i); });
+  }
+
+  // ── Note key resolution ───────────────────────────────────────────────────
   function resolveNoteKey(key) {
     if (!key || typeof key !== 'string' || key.indexOf('::') === -1) {
       console.error('[synthesis] resolveNoteKey: bad key:', key);
       return null;
     }
+
+    // Handle split keys
+    if (isSplitKey(key)) {
+      var parts   = splitKeyParts(key);
+      var frags   = getFragments(parts.parentKey);
+      if (!frags || !frags[parts.fragmentIdx]) return null;
+      var parent  = resolveNoteKey(parts.parentKey);
+      if (!parent) return null;
+      return Object.assign({}, parent, {
+        text:    frags[parts.fragmentIdx],
+        isSplit: true,
+        splitIdx: parts.fragmentIdx,
+        splitTotal: frags.length,
+        parentKey: parts.parentKey,
+        noteKey: key,
+      });
+    }
+
+    // Base key
     var p   = parseNoteKey(key);
     var tab = (window.TABS||[]).find(function(t){ return t.name === p.tabName; });
     if (!tab) return null;
@@ -96,41 +214,32 @@ window.SynthesisData = (function () {
     var cell = row.cells[p.cellIdx] || '';
     var grid = tab.grid;
 
-    // ── Scan the raw grid independently of processSheetData return values ──
-    // processSheetData in older deployed versions does not return colIndices
-    // or headerRowIdx, so we derive everything from the raw grid here.
-
+    // gridCol: count COLUMN entries in flag row
     var flagRow = grid[0] || [];
+    var colCount = 0, gridCol = -1;
+    for (var fi = 0; fi < flagRow.length; fi++) {
+      if (String(flagRow[fi]||'').trim() === 'COLUMN') {
+        if (colCount === p.cellIdx) { gridCol = fi; break; }
+        colCount++;
+      }
+    }
+    if (gridCol === -1) gridCol = (data.colIndices && data.colIndices[p.cellIdx] !== undefined) ? data.colIndices[p.cellIdx] : p.cellIdx;
 
-    // catIndices: positions flagged CATEGORY in row 0
+    // catIndices from flag row
     var catIndices = [];
     for (var fi = 0; fi < flagRow.length; fi++) {
       if (String(flagRow[fi]||'').trim() === 'CATEGORY') catIndices.push(fi);
     }
     var catIdx0 = catIndices.length ? catIndices[0] : 0;
 
-    // colIndices: positions flagged COLUMN in row 0, excluding any column
-    // that contains 'HEADER ROW' (matching processSheetData's own logic)
-    var colIndices = [];
-    for (var fi = 0; fi < flagRow.length; fi++) {
-      if (String(flagRow[fi]||'').trim() !== 'COLUMN') continue;
-      var colHasHeaderRow = false;
-      for (var ri = 0; ri < grid.length; ri++) {
-        if (String((grid[ri]||[])[fi]||'').trim() === 'HEADER ROW') { colHasHeaderRow = true; break; }
-      }
-      if (!colHasHeaderRow) colIndices.push(fi);
-    }
-    var gridCol = colIndices[p.cellIdx] !== undefined ? colIndices[p.cellIdx] : p.cellIdx;
-
-    // headerRowIdx: first row where the category column (col 0) says 'HEADER ROW'
+    // headerRowIdx: row where catIdx0 cell says 'HEADER ROW'
     var headerRowIdx = -1;
     for (var ri = 1; ri < grid.length; ri++) {
       if (String((grid[ri]||[])[0]||'').trim() === 'HEADER ROW') { headerRowIdx = ri; break; }
     }
-    if (headerRowIdx === -1) headerRowIdx = 2; // fallback: assume row 2 (0-indexed)
+    if (headerRowIdx === -1) headerRowIdx = 2;
 
-    // gridRow: walk grid from headerRowIdx+1 applying the same two skip rules
-    // processSheetData uses: skip all-empty rows, skip rows with blank category
+    // gridRow: walk grid counting non-skipped rows
     var found = -1, count = 0;
     for (var r = headerRowIdx + 1; r < grid.length; r++) {
       var g = grid[r] || [];
@@ -142,6 +251,7 @@ window.SynthesisData = (function () {
     var gridRow = found !== -1 ? found : (headerRowIdx + p.dataRowIdx + 1);
 
     return {
+      noteKey:    key,
       text:       cell,
       cats:       row.cats,
       allCells:   row.cells,
@@ -152,9 +262,11 @@ window.SynthesisData = (function () {
       cellIdx:    p.cellIdx,
       gridRow:    gridRow,
       gridCol:    gridCol,
+      isSplit:    false,
     };
   }
 
+  // ── All note keys (including split children for unassigned long notes) ─────
   function bestCellIdx(rowCells) {
     var best = 0, bestLen = 0;
     rowCells.forEach(function(c,i){ if(c&&c.trim().length>bestLen){bestLen=c.trim().length;best=i;} });
@@ -175,18 +287,42 @@ window.SynthesisData = (function () {
     return keys;
   }
 
-  // ── Principles ────────────────────────────────────────────────────────────
+  // Returns effective keys for clustering/embedding:
+  // - assigned notes: as-is (never split, Option D)
+  // - unassigned notes with stored split: their split children
+  // - unassigned notes without split: as-is
+  function getEffectiveNoteKeys() {
+    var assignments = getAssignments();
+    var assigned    = new Set(assignments.map(function(a){ return a.noteKey; }));
+    var splits      = getSplits();
+    var keys        = [];
+    getRowNoteKeys().forEach(function(key) {
+      if (assigned.has(key)) {
+        keys.push(key);
+      } else if (splits[key]) {
+        splits[key].forEach(function(_, i){ keys.push(makeSplitKey(key, i)); });
+      } else {
+        keys.push(key);
+      }
+    });
+    return keys;
+  }
 
+  // ── Principles ────────────────────────────────────────────────────────────
   function getPrinciples() { return _load(SK.PRINCIPLES, []); }
 
   function addPrinciple(data) {
     var ps  = getPrinciples();
     var seq = ps.filter(function(p){ return !p.archived; }).length + 1;
     var p   = {
-      id: _id('p'), sheetId: _sheetId(), name: String(data.name||'').trim(), named: !!(data.name&&data.name.trim()),
+      id: _id('p'), sheetId: _sheetId(),
+      name: String(data.name||'').trim(), named: !!(data.name&&data.name.trim()),
       dimensionHint: String(data.dimensionHint||'').trim(),
       color: data.color || COLORS[(seq-1) % COLORS.length],
-      move:'', metric:'', moveByReg:{what:'',why:'',who:'',how:''}, metricByReg:{what:'',why:'',who:'',how:''}, archived:false, seq:seq, ts:Date.now(),
+      move:'', metric:'',
+      moveByReg:   {what:'',why:'',who:'',how:''},
+      metricByReg: {what:'',why:'',who:'',how:''},
+      archived:false, seq:seq, ts:Date.now(),
     };
     ps.push(p); _save(SK.PRINCIPLES, ps); return p;
   }
@@ -206,19 +342,14 @@ window.SynthesisData = (function () {
   }
 
   // ── Assignments ───────────────────────────────────────────────────────────
-  // status: 'confirmed' | 'auto' | 'suggested' | 'unassigned'
-
   function getAssignments() {
     var raw = _load(SK.ASSIGNMENTS, []);
     return raw.filter(function(a) {
-      if (!a.noteKey || typeof a.noteKey !== 'string') {
-        console.warn('[synthesis] dropping assignment with bad noteKey:', a);
-        return false;
-      }
+      if (!a.noteKey || typeof a.noteKey !== 'string') return false;
       return true;
     });
   }
-  function _saveAssignments(as)  { _save(SK.ASSIGNMENTS, as); }
+  function _saveAssignments(as) { _save(SK.ASSIGNMENTS, as); }
 
   function getAssignment(noteKey) {
     return getAssignments().find(function(a){ return a.noteKey===noteKey; }) || null;
@@ -231,7 +362,8 @@ window.SynthesisData = (function () {
       as.push({
         id: _id('a'), noteKey: noteKey, principleId: principleId,
         register: register||'what', status: status||'confirmed',
-        similarity: similarity||null, contentHash: resolved ? hashText(resolved.text) : null,
+        similarity: similarity||null,
+        contentHash: resolved ? hashText(resolved.text) : null,
         ts: Date.now(),
       });
     }
@@ -243,23 +375,21 @@ window.SynthesisData = (function () {
       return a.noteKey===noteKey ? Object.assign({},a,{status:'confirmed'}) : a;
     }));
   }
-
   function rejectAssignment(noteKey) {
     _saveAssignments(getAssignments().filter(function(a){ return a.noteKey!==noteKey; }));
   }
-
   function updateAssignmentRegister(noteKey, register) {
     _saveAssignments(getAssignments().map(function(a){
       return a.noteKey===noteKey ? Object.assign({},a,{register:register}) : a;
     }));
   }
 
-  // ── Source change detection ───────────────────────────────────────────────
-
+  // ── Change detection ──────────────────────────────────────────────────────
   function getChangedSources() {
     var changed = [];
     getAssignments().forEach(function(a) {
       if (a.status !== 'confirmed' || !a.contentHash) return;
+      if (isSplitKey(a.noteKey)) return; // splits checked via parent
       var r = resolveNoteKey(a.noteKey);
       if (!r) { changed.push({ noteKey:a.noteKey, reason:'source tab missing', a:a }); return; }
       if (hashText(r.text) !== a.contentHash) changed.push({ noteKey:a.noteKey, reason:'content changed', newText:r.text, a:a });
@@ -277,7 +407,6 @@ window.SynthesisData = (function () {
   }
 
   // ── Register heuristic ────────────────────────────────────────────────────
-
   var _WHO = /\b(resident|inhabitant|architect|user|communit|people|person|occupant|famil|household|designer|dweller|neighbou?r|individual|collective)\b/i;
   var _WHY = /\b(because|enabl|allows?|encourages?|supports?|leads?\s+to|fosters?|promotes?|facilitate|prevent|reduces?|increases?|improves?|creates?|generates?)\b/i;
   var _HOW = /\b(by\s|through\s|using\s|via\s|combin|integrat|applying|implement|designing|providing|placing|arrang|configur|layer|graduat|interlock)\b/i;
@@ -291,7 +420,6 @@ window.SynthesisData = (function () {
   }
 
   // ── Auto-label ────────────────────────────────────────────────────────────
-
   var STOP = new Set(['a','an','the','is','are','was','were','be','been','have','has','had',
     'and','but','or','for','in','on','at','to','of','as','by','from','with','into','through',
     'that','this','these','those','which','when','where','space','design','spatial','area',
@@ -308,14 +436,12 @@ window.SynthesisData = (function () {
   }
 
   // ── Vector maths ──────────────────────────────────────────────────────────
-
   function cosine(a,b) {
     if(!a||!b||a.length!==b.length) return 0;
     var dot=0,na=0,nb=0;
     for(var i=0;i<a.length;i++){dot+=a[i]*b[i];na+=a[i]*a[i];nb+=b[i]*b[i];}
     var d=Math.sqrt(na)*Math.sqrt(nb); return d<1e-10?0:dot/d;
   }
-
   function centroid(vecs) {
     if(!vecs.length) return null;
     var len=vecs[0].length, sum=new Float32Array(len);
@@ -325,8 +451,9 @@ window.SynthesisData = (function () {
     return sum;
   }
 
+  // ── Agglomerative clustering ──────────────────────────────────────────────
   function cluster(items, threshold) {
-    threshold = threshold !== undefined ? threshold : 0.42;
+    threshold = threshold !== undefined ? threshold : getSettings().threshold;
     if (!items.length) return [];
     var cs = items.map(function(it){ return { ids:[it.id], vecs:[it.vec] }; });
     var changed=true, limit=items.length*items.length+10, iter=0;
@@ -345,7 +472,6 @@ window.SynthesisData = (function () {
   }
 
   // ── Auto-assignment tiers ─────────────────────────────────────────────────
-
   function buildPrincipleVectors(embeddings) {
     var principles  = getPrinciples().filter(function(p){return p.named&&!p.archived;});
     var assignments = getAssignments().filter(function(a){return a.status==='confirmed';});
@@ -372,7 +498,6 @@ window.SynthesisData = (function () {
   }
 
   // ── FRAMEWORK tab: parse ──────────────────────────────────────────────────
-
   function parseFrameworkTab(grid) {
     if (!grid||!grid.length) return null;
     var metaStart=-1, metaEnd=-1;
@@ -382,42 +507,63 @@ window.SynthesisData = (function () {
       if(c===META_END)   metaEnd=r;
     }
     if(metaStart===-1||metaEnd===-1||metaEnd<=metaStart) return null;
-    var principles=[], assignments=[];
+    var principles=[], assignments=[], splits={}, settings=null;
     for(var r=metaStart+1;r<metaEnd;r++){
       var key=String(grid[r][0]||'').trim(), val=String(grid[r][1]||'').trim();
       if(!val) continue;
       try {
         if(key==='PRINCIPLES')  principles  = JSON.parse(val);
         if(key==='ASSIGNMENTS') assignments = JSON.parse(val);
+        if(key==='SPLITS')      splits      = JSON.parse(val);
+        if(key==='SETTINGS')    settings    = JSON.parse(val);
       } catch(e){}
     }
-    return { principles:principles, assignments:assignments };
+    return { principles, assignments, splits, settings };
   }
 
   function loadFromFrameworkTab(grid) {
     var parsed = parseFrameworkTab(grid);
     if (!parsed) return false;
+
+    // Merge principles (sheet wins for named/move/metric, local wins for unsaved work)
     var existing = getPrinciples();
     var merged = parsed.principles.map(function(sp){
       var lp = existing.find(function(p){return p.id===sp.id;});
-      return Object.assign({}, sp, lp ? {move:lp.move||sp.move, metric:lp.metric||sp.metric} : {});
+      return Object.assign({}, sp, lp ? {move:lp.move||sp.move, metric:lp.metric||sp.metric,
+        moveByReg:lp.moveByReg||sp.moveByReg, metricByReg:lp.metricByReg||sp.metricByReg} : {});
     });
     existing.forEach(function(p){ if(!merged.find(function(m){return m.id===p.id;})) merged.push(p); });
     _save(SK.PRINCIPLES, merged);
+
+    // Merge assignments
     var localAs = getAssignments();
     var mergedAs = parsed.assignments.slice();
     localAs.forEach(function(a){ if(!mergedAs.find(function(m){return m.noteKey===a.noteKey;})) mergedAs.push(a); });
     _saveAssignments(mergedAs);
+
+    // Restore splits
+    if (parsed.splits && Object.keys(parsed.splits).length) {
+      var localSplits = getSplits();
+      Object.keys(parsed.splits).forEach(function(k){
+        if (!localSplits[k]) localSplits[k] = parsed.splits[k];
+      });
+      _save(SK.SPLITS, localSplits);
+    }
+
+    // Restore settings
+    if (parsed.settings) updateSettings(parsed.settings);
+
     return true;
   }
 
   // ── FRAMEWORK tab: build ──────────────────────────────────────────────────
-
   function buildFrameworkGrid() {
     var principles  = getPrinciples().filter(function(p){return p.named&&!p.archived;});
     var assignments = getAssignments().filter(function(a){return a.status==='confirmed';});
-    var REGS      = ['what','why','who','how'];
-    var REG_LABEL = {what:'WHAT?',why:'WHY?',who:'WHO?',how:'HOW?'};
+    var splits      = getSplits();
+    var settings    = getSettings();
+    var REGS        = ['what','why','who','how'];
+    var REG_LABEL   = {what:'WHAT?',why:'WHY?',who:'WHO?',how:'HOW?'};
 
     var byDim={}, dimOrder=[];
     principles.forEach(function(p){
@@ -426,9 +572,7 @@ window.SynthesisData = (function () {
       byDim[d].push(p);
     });
 
-    var rows = [
-      ['FRAMEWORK — Dimensional Framework','','Generated: '+new Date().toISOString(),'',''],
-    ];
+    var rows = [['FRAMEWORK — Dimensional Framework','','Generated: '+new Date().toISOString(),'','']];
 
     dimOrder.forEach(function(dim){
       rows.push(['']);
@@ -444,16 +588,14 @@ window.SynthesisData = (function () {
         var tbr = p.metricByReg || {what:'',why:'',who:'',how:''};
         REGS.forEach(function(reg){
           var regAs=byReg[reg];
-          var mv = mbr[reg]||'N/A', mt = tbr[reg]||'N/A';
+          var mv=mbr[reg]||'N/A', mt=tbr[reg]||'N/A';
           if (!regAs.length) {
-            // No notes: single empty row
             rows.push(['', REG_LABEL[reg], '', mv, mt]);
           } else {
-            // One row per note; Move/Metric only on first row (subsequent rows blank)
             regAs.forEach(function(a, ai){
               var resolved = resolveNoteKey(a.noteKey);
               var ruleCell = resolved ? cellRef(resolved.tabName,resolved.gridRow,resolved.gridCol) : '[source missing]';
-              rows.push(['', ai===0 ? REG_LABEL[reg] : '', ruleCell, ai===0 ? mv : '', ai===0 ? mt : '']);
+              rows.push(['', ai===0?REG_LABEL[reg]:'', ruleCell, ai===0?mv:'', ai===0?mt:'']);
             });
           }
         });
@@ -464,58 +606,46 @@ window.SynthesisData = (function () {
     rows.push([META_START]);
     rows.push(['PRINCIPLES',  JSON.stringify(principles)]);
     rows.push(['ASSIGNMENTS', JSON.stringify(assignments)]);
+    rows.push(['SPLITS',      JSON.stringify(splits)]);
+    rows.push(['SETTINGS',    JSON.stringify(settings)]);
     rows.push([META_END]);
     return rows;
   }
 
   // ── Diff ──────────────────────────────────────────────────────────────────
-
   function diffFramework(existingGrid, proposedGrid) {
     var diff = {added:[],changed:[],removed:[],unchanged:0};
-
-    // Normalise a row for comparison:
-    // - strip the ISO timestamp from the header row ("Generated: 2026-...")
-    // - strip leading = from formula cells (sheet may return formula string or resolved value)
-    // - skip metadata rows entirely (they always differ due to timestamps embedded in JSON)
     function normalise(row) {
-      var cells = (row||[]).map(function(v){
+      return (row||[]).map(function(v){
         v = String(v==null?'':v).trim();
         v = v.replace(/Generated: \d{4}-\d{2}-\d{2}T[\d:.]+Z/,'Generated:');
-        if (v.charAt(0)==='=') v = '=REF'; // treat any formula as equivalent
+        if (v.charAt(0)==='=') v = '=REF';
         return v;
-      }).filter(Boolean);
-      return cells.join('||');
+      }).filter(Boolean).join('||');
     }
     function isMeta(row) {
       var first = String((row||[])[0]||'').trim();
       return first===META_START||first===META_END||
-             first==='PRINCIPLES'||first==='ASSIGNMENTS';
+             first==='PRINCIPLES'||first==='ASSIGNMENTS'||
+             first==='SPLITS'||first==='SETTINGS';
     }
-
-    var existSet = new Set((existingGrid||[])
-      .filter(function(r){return !isMeta(r);})
-      .map(normalise).filter(Boolean));
-    var propSet  = new Set(proposedGrid
-      .filter(function(r){return !isMeta(r);})
-      .map(normalise).filter(Boolean));
-
+    var existSet = new Set((existingGrid||[]).filter(function(r){return !isMeta(r);}).map(normalise).filter(Boolean));
+    var propSet  = new Set(proposedGrid.filter(function(r){return !isMeta(r);}).map(normalise).filter(Boolean));
     proposedGrid.forEach(function(row){
-      if (isMeta(row)) return;
-      var k = normalise(row); if(!k) return;
+      if(isMeta(row)) return;
+      var k=normalise(row); if(!k) return;
       if(existSet.has(k)) diff.unchanged++;
       else diff.added.push((row||[]).filter(Boolean).slice(0,3).join(' | '));
     });
     (existingGrid||[]).forEach(function(row){
-      if (isMeta(row)) return;
-      var k = normalise(row);
-      if(k && !propSet.has(k))
-        diff.removed.push((row||[]).filter(Boolean).slice(0,3).join(' | '));
+      if(isMeta(row)) return;
+      var k=normalise(row);
+      if(k&&!propSet.has(k)) diff.removed.push((row||[]).filter(Boolean).slice(0,3).join(' | '));
     });
     return diff;
   }
 
-  // ── Apps Script integration ───────────────────────────────────────────────
-
+  // ── Apps Script ───────────────────────────────────────────────────────────
   function getScriptUrl()    { return _load(SK.SCRIPT_URL,'') || ''; }
   function setScriptUrl(url) { _save(SK.SCRIPT_URL, url.trim()); }
   function getLastSync()     { return _load(SK.LAST_SYNC, null); }
@@ -523,7 +653,7 @@ window.SynthesisData = (function () {
 
   async function readFramework(scriptUrl, sheetUrl) {
     var res = await fetch(scriptUrl, {
-      method: 'POST', headers: {'Content-Type':'text/plain'},
+      method:'POST', headers:{'Content-Type':'text/plain'},
       body: JSON.stringify({action:'readFramework', sheetUrl:sheetUrl}),
     });
     if (!res.ok) throw new Error('Script returned '+res.status);
@@ -543,11 +673,10 @@ window.SynthesisData = (function () {
     setLastSync(); return json;
   }
 
-  function getFrameworkTabs()       { return window._SY_FW_TABS || []; }
-  function setFrameworkTabs(tabs)   { window._SY_FW_TABS = tabs; }
+  function getFrameworkTabs()     { return window._SY_FW_TABS || []; }
+  function setFrameworkTabs(tabs) { window._SY_FW_TABS = tabs; }
 
   // ── Export ────────────────────────────────────────────────────────────────
-
   function _esc(v){
     v=String(v==null?'':v);
     if(v.indexOf(',')!==-1||v.indexOf('"')!==-1||v.indexOf('\n')!==-1) return '"'+v.replace(/"/g,'""')+'"';
@@ -563,15 +692,16 @@ window.SynthesisData = (function () {
     var lines=[['Dimension','ID','Category','Rule / Constraint','Move / Intervention','Metric / Proof'].map(_esc).join(',')];
     dimOrder.forEach(function(dim){
       byDim[dim].forEach(function(p){
-        var pId='P-'+String(p.seq).padStart(2,'0');
+        var pId=p.sheetId||('P-'+String(p.seq).padStart(2,'0'));
         var pAs=assignments.filter(function(a){return a.principleId===p.id;});
         var byReg={what:[],why:[],who:[],how:[]}; pAs.forEach(function(a){if(byReg[a.register])byReg[a.register].push(a);});
         REGS.forEach(function(reg,ri){
           var rAs=byReg[reg];
-          if(!rAs.length){lines.push([ri===0?dim:'',pId,reg.toUpperCase()+'?','',ri===0?(p.move||'N/A'):'',ri===0?(p.metric||'N/A'):''].map(_esc).join(','));}
+          var mv=(p.moveByReg||{})[reg]||'N/A', mt=(p.metricByReg||{})[reg]||'N/A';
+          if(!rAs.length){lines.push([ri===0?dim:'',pId,reg.toUpperCase()+'?','',mv,mt].map(_esc).join(','));}
           else rAs.forEach(function(a,ai){
             var r=resolveNoteKey(a.noteKey);
-            lines.push([ri===0&&ai===0?dim:'',ai===0?pId:'',ai===0?reg.toUpperCase()+'?':'',(r?r.text:a.noteKey),ri===0&&ai===0?(p.move||'N/A'):'',ri===0&&ai===0?(p.metric||'N/A'):''].map(_esc).join(','));
+            lines.push([ri===0&&ai===0?dim:'',ai===0?pId:'',ai===0?reg.toUpperCase()+'?':'',(r?r.text:a.noteKey),ai===0?mv:'',ai===0?mt:''].map(_esc).join(','));
           });
         });
       });
@@ -591,7 +721,7 @@ window.SynthesisData = (function () {
       byDim[dim].forEach(function(p){
         lines.push('\n### P-'+String(p.seq).padStart(2,'0')+': '+p.name+'\n');
         var pAs=assignments.filter(function(a){return a.principleId===p.id;});
-        var byReg={what:[],why:[],who:[],how:[]}; pAs.forEach(function(a){if(byReg[a.register])byReg[a.register].push(a);});
+        var byReg={what:[],why:[],who:[],how:[]}; pAs.forEach(function(a){if(byReg[a.register]) byReg[a.register].push(a);});
         REGS.forEach(function(reg){
           lines.push('**'+reg.toUpperCase()+'?**');
           var rAs=byReg[reg]||[];
@@ -599,22 +729,42 @@ window.SynthesisData = (function () {
           if(!rAs.length) lines.push('- _No note assigned_');
           lines.push('');
         });
-        lines.push('**Move / Intervention:** '+(p.move||'_To be defined_'));
-        lines.push('**Metric / Proof:** '+(p.metric||'_To be defined_')+'\n');
+        var mbr=p.moveByReg||{};var tbr=p.metricByReg||{};
+        lines.push('**Move / Intervention:** '+(Object.values(mbr).filter(Boolean).join('; ')||'_To be defined_'));
+        lines.push('**Metric / Proof:** '+(Object.values(tbr).filter(Boolean).join('; ')||'_To be defined_')+'\n');
       });
     });
     return lines.join('\n');
   }
 
+  // ── Public API ────────────────────────────────────────────────────────────
   return {
+    // Constants
     AUTO_THRESHOLD, SUGGEST_THRESHOLD, FRAMEWORK_PREFIX, COLORS,
-    makeNoteKey, parseNoteKey, resolveNoteKey, getRowNoteKeys, bestCellIdx, hashText, colLetter, cellRef,
+    // Settings
+    getSettings, updateSettings,
+    // Helpers
+    makeNoteKey, makeSplitKey, isSplitKey, splitKeyParts,
+    parseNoteKey, resolveNoteKey,
+    getRowNoteKeys, getEffectiveNoteKeys,
+    bestCellIdx, hashText, colLetter, cellRef,
+    // Splits
+    getSplits, getFragments, storeSplit, removeSplit, splitNote,
+    // Principles
     getPrinciples, addPrinciple, updatePrinciple, deletePrinciple,
-    getAssignments, getAssignment, setAssignment, confirmAssignment, rejectAssignment, updateAssignmentRegister,
+    // Assignments
+    getAssignments, getAssignment, setAssignment, confirmAssignment,
+    rejectAssignment, updateAssignmentRegister,
     getChangedSources, acknowledgeChangedSource,
-    suggestRegister, autoLabel, cosine, centroid, cluster, buildPrincipleVectors, computeAssignmentTiers,
+    // Analysis
+    suggestRegister, autoLabel, cosine, centroid, cluster,
+    buildPrincipleVectors, computeAssignmentTiers,
+    // Sheet I/O
     parseFrameworkTab, loadFromFrameworkTab, buildFrameworkGrid, diffFramework,
-    getScriptUrl, setScriptUrl, getLastSync, setLastSync, readFramework, writeFramework, getFrameworkTabs, setFrameworkTabs,
+    getScriptUrl, setScriptUrl, getLastSync, setLastSync,
+    readFramework, writeFramework, getFrameworkTabs, setFrameworkTabs,
+    // Export
     exportCSV, exportMarkdown,
   };
+
 })();
