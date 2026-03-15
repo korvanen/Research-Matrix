@@ -491,7 +491,7 @@ var _browsePanelHtml =
       defaultOpen: true,
       panelSections: [
         { label: 'Views', html: _tabsSectionHtml },
-        { label: 'Global', html: _globalPanelHtml },
+        { label: 'Global', html: _globalHtml },
         { label: 'Browse', html: _browsePanelHtml },
         { label: 'Search', html: _searchPanelHtml },
       ],
@@ -547,21 +547,6 @@ var _browsePanelHtml =
         panelBody.querySelectorAll('input[type=range].pp-range').forEach(upgradeSlider);
       }
     })();
-
-    if (_threshSlider) {
-      _threshSlider.addEventListener('input', function(){
-        var v = parseInt(_threshSlider.value);
-        _threshVal.textContent = v + '%';
-        SY.updateSettings({ threshold: v/100 });
-      });
-    }
-    if (_maxWordsSlider) {
-      _maxWordsSlider.addEventListener('input', function(){
-        var v = parseInt(_maxWordsSlider.value);
-        _maxWordsVal.textContent = v;
-        SY.updateSettings({ maxWords: v });
-      });
-    }
 
     // Sync global status
     function _updateGlobalStatus() {
