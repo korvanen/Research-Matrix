@@ -464,6 +464,8 @@
         '<button class="en-panel-chip" data-f="unassigned">Unassigned</button>' +
         '<button class="en-panel-chip" data-f="assigned">Assigned</button>' +
         '<button class="en-panel-chip" data-f="pending">Pending</button>' +
+        '<button class="en-panel-chip" data-f="split">Split</button>' +
+        '<button class="en-panel-chip" data-f="unsplit">Unsplit</button>' +
       '</div>' +
       '<div class="en-panel-label">Screening</div>' +
       '<div class="en-panel-chips" id="en-screen-chips">' +
@@ -811,14 +813,14 @@
 
     // ── Count badges ─────────────────────────────────────────────────────────
     function updateCounts() {
-      var total = SY.getRowNoteKeys().length;
+      var total = SY.getEffectiveNoteKeys().length;
       document.getElementById('en-n-browse').textContent = total;
     }
 
     // ══ BROWSE VIEW ══════════════════════════════════════════════════════════
 
     function renderBrowse() {
-      var keys        = SY.getRowNoteKeys();
+      var keys        = SY.getEffectiveNoteKeys(); // includes split fragments
       var assignments = SY.getAssignments();
       var principles  = SY.getPrinciples();
       var pMap        = {}; principles.forEach(function(p){ pMap[p.id] = p; });
@@ -829,6 +831,13 @@
         if (_filter === 'unassigned' && a) return false;
         if (_filter === 'assigned'   && (!a || a.status !== 'confirmed')) return false;
         if (_filter === 'pending'    && (!a || a.status !== 'auto')) return false;
+        // Split filter
+        if (_filter === 'split'   && !SY.isSplitKey(key)) return false;
+        if (_filter === 'unsplit') {
+          if (SY.isSplitKey(key)) return false;
+          // Also hide parent keys that have been split (their children show instead)
+          if (SY.getFragments(key)) return false;
+        }
         // Screening filter
         if (_screenFilter !== 'all' && window.AcademicUtils) {
           var tr  = _tabRowFromKey(key);
@@ -843,7 +852,7 @@
         return true;
       });
 
-      document.getElementById('en-n-browse').textContent = keys.length;
+      document.getElementById('en-n-browse').textContent = SY.getEffectiveNoteKeys().length;
 
       var listEl = document.getElementById('en-list');
       if (!filtered.length) {
@@ -864,6 +873,7 @@
         var _scr = window.AcademicUtils ? AcademicUtils.getScreeningStatus(_tr.tabIdx, _tr.rowIdx) : 'unscreened';
         html += '<div class="en-card-top">';
         html += '<span class="en-badge en-badge-tab">'+_h(r.tabName)+'</span>';
+        if (r.isSplit) html += '<span class="en-badge en-badge-split">'+_h((r.splitIdx+1)+'/'+r.splitTotal)+' split</span>';
         if (_scr === 'included') html += '<span class="en-badge" style="background:rgba(46,125,50,.12);color:#2e7d32">✓ included</span>';
         if (_scr === 'excluded') html += '<span class="en-badge" style="background:rgba(183,28,28,.1);color:#b71c1c">✗ excluded</span>';
         if (a && a.status==='auto')      html += '<span class="en-badge en-badge-auto">auto</span>';
