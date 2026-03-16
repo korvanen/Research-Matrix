@@ -1859,8 +1859,16 @@ var _browsePanelHtml =
       document.getElementById('en-modal-title').textContent = title || 'New principle';
       document.getElementById('en-modal-name').value = defaultName || '';
       document.getElementById('en-modal-confirm').textContent = title && title.startsWith('Rename') ? 'Rename' : 'Create';
-      document.querySelectorAll('.en-dim-chip').forEach(function(c){
-        c.classList.toggle('active', c.dataset.dim === (defaultDim||''));
+      // Dynamic dimension chips
+      var dimsEl = document.getElementById('en-modal-dims');
+      var dims = SY.getDimensions();
+      dimsEl.innerHTML = '';
+      dims.forEach(function(d){
+        var btn = document.createElement('button');
+        btn.className = 'en-dim-chip' + (d === (defaultDim||'') ? ' active' : '');
+        btn.dataset.dim = d; btn.textContent = d;
+        btn.addEventListener('click', function(){ dimsEl.querySelectorAll('.en-dim-chip').forEach(function(x){ x.classList.remove('active'); }); btn.classList.add('active'); });
+        dimsEl.appendChild(btn);
       });
       document.getElementById('en-modal-bg').classList.add('open');
       setTimeout(function(){ var i=document.getElementById('en-modal-name'); i.focus(); i.select(); }, 60);
@@ -1869,12 +1877,6 @@ var _browsePanelHtml =
 
     document.getElementById('en-modal-cancel').addEventListener('click', _closeModal);
     document.getElementById('en-modal-bg').addEventListener('click', function(e){ if(e.target===e.currentTarget) _closeModal(); });
-    document.querySelectorAll('.en-dim-chip').forEach(function(c){
-      c.addEventListener('click', function(){
-        document.querySelectorAll('.en-dim-chip').forEach(function(x){ x.classList.remove('active'); });
-        c.classList.add('active');
-      });
-    });
     document.getElementById('en-modal-confirm').addEventListener('click', function(){
       var name = document.getElementById('en-modal-name').value.trim();
       var dim  = (document.querySelector('.en-dim-chip.active')||{}).dataset && document.querySelector('.en-dim-chip.active').dataset.dim || '';
