@@ -553,9 +553,12 @@ window.SynthesisData = (function () {
   function addPrinciple(data) {
     var ps  = getPrinciples();
     var seq = ps.filter(function(p){ return !p.archived; }).length + 1;
+    var rawName = String(data.name||'').trim();
+    var pid = _id('p');
+    if (!rawName) rawName = 'Principle – ' + pid.slice(1,7).toUpperCase();
     var p   = {
-      id: _id('p'), sheetId: _sheetId(),
-      name: String(data.name||'').trim(), named: !!(data.name&&data.name.trim()),
+      id: pid, sheetId: _sheetId(),
+      name: rawName, named: true,
       description: String(data.description||'').trim(),
       dimensionHint: String(data.dimensionHint||'').trim(),
       color: data.color || COLORS[(seq-1) % COLORS.length],
