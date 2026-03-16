@@ -625,7 +625,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
 
     return groups.map(function(segs, ni) {
       return {
-        tabIdx: row.tabIdx, rowIdx: row.rowIdx,
+        tabIdx: row.tabIdx, rowIdx: row.rowIdx, _cellIdx: row._cellIdx || 0,
         headers: row.headers || [], title: row.title || '',
         kws: row.kws || new Set(),
         _splitFrom: catStr, _splitN: ni + 1, _splitT: numGroups,
@@ -674,7 +674,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
         if (chunks.length <= 1) { result.push(row); continue; }
         var catStr = cats.filter(function(c){ return c.trim(); }).join(' · ') || 'Cell';
         chunks.forEach(function(chunk, ni) {
-          result.push({ tabIdx:row.tabIdx, rowIdx:row.rowIdx, headers:row.headers||[], title:row.title||'', kws:row.kws||new Set(),
+          result.push({ tabIdx:row.tabIdx, rowIdx:row.rowIdx, _cellIdx:row._cellIdx||0, headers:row.headers||[], title:row.title||'', kws:row.kws||new Set(),
             _splitFrom:catStr, _splitN:ni+1, _splitT:chunks.length, vec:row.vec,
             row:{ cells:cells.map(function(c,ci){ return ci===bestIdx?chunk:c; }), cats:cats } });
         });
@@ -722,7 +722,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
       if (finalChunks.length <= 1) { result.push(row); continue; }
       var catStr2 = cats.filter(function(c){ return c.trim(); }).join(' · ') || 'Cell';
       finalChunks.forEach(function(chunk, ni) {
-        result.push({ tabIdx:row.tabIdx, rowIdx:row.rowIdx, headers:row.headers||[], title:row.title||'', kws:row.kws||new Set(),
+        result.push({ tabIdx:row.tabIdx, rowIdx:row.rowIdx, _cellIdx:row._cellIdx||0, headers:row.headers||[], title:row.title||'', kws:row.kws||new Set(),
           _splitFrom:catStr2, _splitN:ni+1, _splitT:finalChunks.length, vec:chunk.vec||row.vec,
           row:{ cells:cells.map(function(c,ci){ return ci===bestIdx?chunk.text:c; }), cats:cats } });
       });
@@ -736,7 +736,8 @@ function initConceptMapTool(paneEl, sidebarEl) {
     // Split siblings share the same parent vec — exclude them from comparing against each other
     function areSplitSiblings(i, j) {
       return rows[i]._splitFrom && rows[j]._splitFrom && rows[i]._splitFrom === rows[j]._splitFrom
-        && rows[i].tabIdx === rows[j].tabIdx && rows[i].rowIdx === rows[j].rowIdx;
+        && rows[i].tabIdx === rows[j].tabIdx && rows[i].rowIdx === rows[j].rowIdx
+        && (rows[i]._cellIdx||0) === (rows[j]._cellIdx||0);
     }
 
     var scores=new Float32Array(n);
@@ -1299,12 +1300,12 @@ function initConceptMapTool(paneEl, sidebarEl) {
     if (_rows) { doRender(); return; }
     var rawRows=buildRowIndex(); if (!rawRows.length) return;
     setStatus('loading','Embedding '+rawRows.length+' cells\u2026'); emptyEl.style.display='none';
-    Promise.all(rawRows.map(function(r){ var text=(r.row&&r.row.cells?r.row.cells:(r.cells||[])).join(' ').trim(); if(!text) return Promise.resolve(null); return window.EmbeddingUtils.getCachedEmbedding(text).then(function(vec){ return {key:r.tabIdx+':'+r.rowIdx,vec:vec}; }).catch(function(){ return null; }); })).then(function(results){
+    Promise.all(rawRows.map(function(r){ var text=(r.row&&r.row.cells?r.row.cells:(r.cells||[])).join(' ').trim(); if(!text) return Promise.resolve(null); var rkey=r.tabIdx+':'+r.rowIdx+':'+(r._cellIdx||0); return window.EmbeddingUtils.getCachedEmbedding(text).then(function(vec){ return {key:rkey,vec:vec}; }).catch(function(){ return null; }); })).then(function(results){
       var vectors=new Map(); results.forEach(function(res){ if(res&&res.vec) vectors.set(res.key,res.vec); });
       if (!vectors.size){ setStatus('error','No vectors available'); return; }
-      var embedded=rawRows.filter(function(r){ return vectors.has(r.tabIdx+':'+r.rowIdx); });
+      var embedded=rawRows.filter(function(r){ return vectors.has(r.tabIdx+':'+r.rowIdx+':'+(r._cellIdx||0)); });
       if (embedded.length<3){ setStatus('error','Not enough data (\u22653 cells needed)'); return; }
-      embedded.forEach(function(r){ r.vec=vectors.get(r.tabIdx+':'+r.rowIdx); }); _rows=embedded; doRender();
+      embedded.forEach(function(r){ r.vec=vectors.get(r.tabIdx+':'+r.rowIdx+':'+(r._cellIdx||0)); }); _rows=embedded; doRender();
     });
   }
 
