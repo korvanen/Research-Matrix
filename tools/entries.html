@@ -1263,8 +1263,12 @@ var _browsePanelHtml =
         html += _h(parsed.body);
         if (parsed.citation) html += ' <span class="en-cite-pill" style="background:var(--md-sys-color-surface-container-highest);color:var(--md-sys-color-on-surface-variant)">'+_h(parsed.citation)+'</span>';
         html += '</div>';
-        if (r.cats && r.cats.filter(Boolean).length)
-          html += '<div class="en-card-meta">'+r.cats.filter(Boolean).map(function(c){return _h(c);}).join(' › ')+'</div>';
+        var _cardCatParts = [];
+        if (r.cats && r.cats.filter(Boolean).length) _cardCatParts.push(r.cats.filter(Boolean).join(' · '));
+        var _cardColHdr = (r.headers && r.headers[r.cellIdx]) ? r.headers[r.cellIdx] : '';
+        if (_cardColHdr) _cardCatParts.push(_cardColHdr);
+        if (_cardCatParts.length)
+          html += '<div class="en-card-meta">'+_h(_cardCatParts.join(' / '))+'</div>';
         html += '<div class="en-card-actions">';
         html += '<button class="en-card-btn" data-action="assign" data-key="'+_h(key)+'">Assign</button>';
         if (a) html += '<button class="en-card-btn" data-action="unassign" data-key="'+_h(key)+'">Unassign</button>';
@@ -1342,15 +1346,18 @@ var _browsePanelHtml =
       var html = '';
       html += '<div class="en-detail-source">'+_h(r.tabTitle||r.tabName)+'</div>';
 
-      // Show the active cell's column header and text
+      // Show categories / column header label, then text below
       html += '<div class="en-detail-cells">';
       var activeHdr = (r.headers && r.headers[r.cellIdx]) ? r.headers[r.cellIdx] : '';
-      html += '<div class="en-detail-cell-row">';
-      if (activeHdr) html += '<span class="en-detail-cell-label">'+_h(activeHdr)+'</span>';
-      html += '<span class="en-detail-cell-val active">';
+      var catParts = [];
+      if (r.cats && r.cats.filter(Boolean).length) catParts.push(r.cats.filter(Boolean).join(' · '));
+      if (activeHdr) catParts.push(activeHdr);
+      if (catParts.length) {
+        html += '<div class="en-detail-cell-label" style="margin-bottom:4px">'+_h(catParts.join(' / '))+'</div>';
+      }
+      html += '<div class="en-detail-cell-val active">';
       html += _h(parsed.body);
       if (parsed.citation) html += ' <span class="en-cite-pill" style="background:var(--md-sys-color-primary-container);color:var(--md-sys-color-on-primary-container)">'+_h(parsed.citation)+'</span>';
-      html += '</span>';
       html += '</div>';
       html += '</div>';
 
