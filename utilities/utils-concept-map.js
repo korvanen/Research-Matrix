@@ -953,12 +953,16 @@ function initConceptMapTool(paneEl, sidebarEl) {
         if (idx>0) { var sep=document.createElement('div'); sep.className='pp-cmap-merge-sep'; body.appendChild(sep); }
         var r=rows[ri], cells=r.row&&r.row.cells?r.row.cells:(r.cells||[]);
         var cats=r.row&&r.row.cats?r.row.cats.filter(function(c){ return c.trim(); }):[];
-        var best=cells.reduce(function(b,c){ return c.trim().length>b.length?c.trim():b; },'');
+        var hdrs=r.headers||[];
+        var bestIdx=0, bestLen=0;
+        cells.forEach(function(c,ci){ if(c.trim().length>bestLen){bestLen=c.trim().length;bestIdx=ci;} });
+        var best=cells[bestIdx]||'';
+        var colHeader=hdrs[bestIdx]||'';
         var parsed=typeof parseCitation==='function'?parseCitation(best):{body:best};
-        if (cats.length) {
+        if (colHeader) {
           var ce=document.createElement('div');
           ce.className='pp-cmap-cell-cat';
-          ce.textContent=cats.join(' \u00b7 ');
+          ce.textContent=colHeader;
           body.appendChild(ce);
         }
         var te=document.createElement('div');
