@@ -9,8 +9,8 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="../utilities/utils-keywords.js?v=7"></script>
   <script src="../utilities/utils-shared.js?v=0067db69"></script>
-  <script src="../utilities/utils-synthesis.js?v=ea7a2c35"></script>
-  <script src="../utilities/utils-academic.js?v=ccb594d8"></script>
+  <script src="../utilities/utils-synthesis.js?v=b4058e56"></script>
+  <script src="../utilities/utils-academic.js?v=66257bc0"></script>
   <script type="module" src="../utilities/utils-embedding.js?v=4"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; }
@@ -205,6 +205,17 @@
     .en-reg-btn[data-r=why].active  { background: rgba(230,81,0,.15);   color:#e65100; border-color:#e65100; }
     .en-reg-btn[data-r=who].active  { background: rgba(46,125,50,.15);  color:#2e7d32; border-color:#2e7d32; }
     .en-reg-btn[data-r=how].active  { background: rgba(106,27,154,.15); color:#6a1b9a; border-color:#6a1b9a; }
+    .en-col-btn {
+      height: 28px; padding: 0 11px; border-radius: 14px;
+      border: 1px solid var(--md-sys-color-outline-variant);
+      background: transparent; font-size: 11px; font-weight: 600; cursor: pointer;
+      color: var(--md-sys-color-on-surface-variant); transition: all .12s;
+    }
+    .en-col-btn.active {
+      background: var(--md-sys-color-secondary-container);
+      color: var(--md-sys-color-on-secondary-container);
+      border-color: transparent;
+    }
     .en-split-hint {
       font-size: 11px; color: var(--md-sys-color-on-surface-variant); margin-top: 8px;
       display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
@@ -1351,8 +1362,20 @@ var _browsePanelHtml =
         html += '</div>';
         html += '<span class="en-section-label">Register</span>';
         html += '<div class="en-reg-row">';
-        ['what','why','who','how'].forEach(function(reg){
-          html += '<button class="en-reg-btn'+(a.register===reg?' active':'')+'" data-r="'+reg+'" data-key="'+_h(key)+'">'+reg.toUpperCase()+'</button>';
+        var _regs = SY.getRegisters();
+        _regs.forEach(function(reg){
+          html += '<button class="en-reg-btn'+(a.register===reg.key?' active':'')+'" data-r="'+_h(reg.key)+'" data-key="'+_h(key)+'">'+_h(reg.label||reg.key.toUpperCase())+'</button>';
+        });
+        html += '</div>';
+        // Column assignment
+        var _colTitles;
+        try { _colTitles = JSON.parse(localStorage.getItem('df_fw_col_titles')); } catch(e){}
+        if (!Array.isArray(_colTitles)||_colTitles.length!==3) _colTitles = ['Rule / Constraint','Move / Intervention','Metric / Proof'];
+        var _curCol = (a.column != null) ? a.column : 0;
+        html += '<span class="en-section-label" style="margin-top:8px">Column</span>';
+        html += '<div class="en-reg-row">';
+        _colTitles.forEach(function(ct, ci){
+          html += '<button class="en-col-btn'+(ci===_curCol?' active':'')+'" data-col="'+ci+'" data-key="'+_h(key)+'">'+_h(ct)+'</button>';
         });
         html += '</div>';
         if (a.status==='auto') {
@@ -1426,14 +1449,20 @@ var _browsePanelHtml =
           renderDetail(key); renderBrowse();
         });
       });
+      contentEl.querySelectorAll('.en-col-btn').forEach(function(btn){
+        btn.addEventListener('click', function(){
+          SY.updateAssignmentColumn(btn.dataset.key, parseInt(btn.dataset.col));
+          renderDetail(key); renderBrowse();
+        });
+      });
       ['confirm','reject','unassign','assign','split'].forEach(function(action){
         contentEl.querySelectorAll('[data-action='+action+']').forEach(function(btn){
-          btn.addEventListener('click', function(){
+          btn.addEventListener('click', function(e){
             var k = btn.dataset.key;
             if (action==='confirm') { SY.confirmAssignment(k); renderDetail(k); renderBrowse(); }
             if (action==='reject')  { SY.rejectAssignment(k);  renderDetail(k); renderBrowse(); }
             if (action==='unassign'){ SY.rejectAssignment(k);  renderDetail(k); renderBrowse(); }
-            if (action==='assign')  { var rect=btn.getBoundingClientRect(); _openPop(k, rect.left, rect.bottom+4); }
+            if (action==='assign')  { e.stopPropagation(); var rect=btn.getBoundingClientRect(); _openPop(k, rect.left, rect.bottom+4); }
             if (action==='split')   { var ck=SY.splitNote(k); if(ck.length){renderDetail(k);renderBrowse();} }
           });
         });
@@ -1650,7 +1679,9 @@ var _browsePanelHtml =
         it.innerHTML = '<span class="en-pop-dot" style="background:'+_h(p.color)+'"></span>'+_h(p.name);
         it.addEventListener('click', function(){
           var r = SY.resolveNoteKey(_assignCtx);
-          SY.setAssignment(_assignCtx, p.id, r ? SY.suggestRegister(r.text) : 'what', 'confirmed', null);
+          var vec = _emb.get(_assignCtx);
+          var placement = SY.suggestPlacement(vec, r ? r.text : '', _emb);
+          SY.setAssignment(_assignCtx, p.id, placement.register, 'confirmed', null, placement.column);
           _closePop();
           renderBrowse(); renderDetail(_assignCtx);
           if (_view === 'search') _renderResults(_searchResults, (_searchInputEl||{}).value||'', _embReady);
@@ -1674,7 +1705,9 @@ var _browsePanelHtml =
       _openModal('New principle', '', '', function(name, dim){
         var p = SY.addPrinciple({ name:name, dimensionHint:dim });
         var r = SY.resolveNoteKey(savedCtx);
-        SY.setAssignment(savedCtx, p.id, r ? SY.suggestRegister(r.text) : 'what', 'confirmed', null);
+        var vec = _emb.get(savedCtx);
+        var pl = SY.suggestPlacement(vec, r ? r.text : '', _emb);
+        SY.setAssignment(savedCtx, p.id, pl.register, 'confirmed', null, pl.column);
         renderBrowse(); renderDetail(savedCtx);
       });
     });
