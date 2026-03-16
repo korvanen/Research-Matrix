@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="../design-system.css?v=9fa06a28">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="../utilities/utils-keywords.js?v=7"></script>
-  <script src="../utilities/utils-shared.js?v=bb18396f"></script>
+  <script src="../utilities/utils-shared.js?v=0067db69"></script>
   <script src="../utilities/utils-synthesis.js?v=b4058e56"></script>
   <script src="../utilities/utils-academic.js?v=66257bc0"></script>
   <script type="module" src="../utilities/utils-embedding.js?v=4"></script>
@@ -467,6 +467,7 @@
     var _filter      = 'all';
     var _screenFilter = 'all';   // all | unscreened | included | excluded
     var _browseSearch = '';
+    var _refSort      = 'added'; // added | alpha | year-desc | year-asc
     var _searchResults = [];
     var _searching  = false;
     var _topN       = 20;
@@ -547,7 +548,14 @@ var _browsePanelHtml =
       '<textarea id="en-ref-paste" style="width:100%;min-height:70px;padding:6px 8px;border-radius:6px;border:1px solid var(--md-sys-color-outline-variant);background:transparent;font-size:11px;font-family:monospace;color:inherit;resize:vertical;outline:none;box-sizing:border-box" placeholder="@article{key,\n  author = {...},\n  ...}"></textarea>' +
       '<button class="en-panel-chip" id="en-ref-paste-btn" style="text-align:center;width:100%;height:28px;border-radius:6px;margin-top:4px;background:var(--md-sys-color-secondary-container);color:var(--md-sys-color-on-secondary-container);border:none;font-weight:500">Parse</button>' +
       '<div class="en-panel-label" style="padding-top:10px">Matching</div>' +
-      '<div id="en-ref-match-summary" style="font-size:11px;color:var(--md-sys-color-on-surface-variant);line-height:1.6">–</div>';
+      '<div id="en-ref-match-summary" style="font-size:11px;color:var(--md-sys-color-on-surface-variant);line-height:1.6">–</div>' +
+      '<div class="en-panel-label" style="padding-top:10px">Sort</div>' +
+      '<div class="en-panel-chips" id="en-ref-sort-chips">' +
+        '<button class="en-panel-chip active" data-sort="added">Latest added</button>' +
+        '<button class="en-panel-chip" data-sort="alpha">A → Z</button>' +
+        '<button class="en-panel-chip" data-sort="year-desc">Newest</button>' +
+        '<button class="en-panel-chip" data-sort="year-asc">Oldest</button>' +
+      '</div>';
 
     var _nav = window.PPNavRail.create(_paneEl, {
       toolName: 'Entries',
@@ -758,7 +766,6 @@ var _browsePanelHtml =
         document.getElementById('en-dot').className = 'pp-panel-dot ready';
         var _statusMsg = _emb.size + ' entries indexed';
         document.getElementById('en-status-text').textContent = _statusMsg;
-        if (_nav && _nav.subtitleEl) _nav.subtitleEl.textContent = _statusMsg;
         document.getElementById('en-search-input').disabled = false;
         document.getElementById('en-search-btn').disabled   = false;
         renderBrowse();
@@ -787,8 +794,6 @@ var _browsePanelHtml =
       updateCounts(); renderBrowse(); _triggerEmbed();
       _loadFrameworkIfNeeded();
       _updateScreeningProgress();
-      var keys = SY.getRowNoteKeys();
-      if (_nav && _nav.subtitleEl) _nav.subtitleEl.textContent = keys.length + ' entries';
     });
 
     function _loadFrameworkIfNeeded() {
@@ -853,15 +858,35 @@ var _browsePanelHtml =
         });
       });
 
-      var html = '<div style="padding:8px 14px;font-size:11px;color:var(--md-sys-color-on-surface-variant);font-weight:600;letter-spacing:.04em;text-transform:uppercase;border-bottom:1px solid var(--md-sys-color-outline-variant)">' + refs.length + ' references</div>';
+      // Sort refs based on current sort mode
+      var sortedRefs = refs.map(function(ref, idx){ return { ref:ref, origIdx:idx }; });
+      if (_refSort === 'alpha') {
+        sortedRefs.sort(function(a, b){
+          var ka = a.ref.inTextKey.toLowerCase(), kb = b.ref.inTextKey.toLowerCase();
+          return ka < kb ? -1 : ka > kb ? 1 : 0;
+        });
+      } else if (_refSort === 'year-desc') {
+        sortedRefs.sort(function(a, b){
+          return (parseInt(b.ref.year)||0) - (parseInt(a.ref.year)||0);
+        });
+      } else if (_refSort === 'year-asc') {
+        sortedRefs.sort(function(a, b){
+          return (parseInt(a.ref.year)||0) - (parseInt(b.ref.year)||0);
+        });
+      }
+      // 'added' = default storage order, no sort needed
 
-      refs.forEach(function(ref, idx){
+      var sortLabel = { added:'latest added', alpha:'A \u2192 Z', 'year-desc':'newest first', 'year-asc':'oldest first' }[_refSort] || '';
+      var html = '<div style="padding:8px 14px;font-size:11px;color:var(--md-sys-color-on-surface-variant);font-weight:600;letter-spacing:.04em;text-transform:uppercase;border-bottom:1px solid var(--md-sys-color-outline-variant)">' + refs.length + ' references \u00b7 ' + sortLabel + '</div>';
+
+      sortedRefs.forEach(function(item){
+        var ref = item.ref;
         var nk = ref.inTextKey.toLowerCase().replace(/\s+/g,' ').trim();
         var linkCount = keyCounts[nk] || 0;
         // Render APA with italics
         var apaHtml = _h(ref.apa).replace(/\*([^*]+)\*/g, '<em>$1</em>');
 
-        html += '<div class="en-ref-card" data-ref-idx="'+idx+'">';
+        html += '<div class="en-ref-card">';
         html += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px;flex-wrap:wrap">';
         html += '<span class="en-ref-key">(' + _h(ref.inTextKey) + ')</span>';
         if (linkCount > 0) {
@@ -987,6 +1012,15 @@ var _browsePanelHtml =
         var bg3 = document.getElementById('en-ref-assign-bg');
         if (bg3) bg3.classList.remove('open');
       }
+    });
+
+    // ── Sort chips ───────────────────────────────────────────────────────────
+    document.addEventListener('click', function(e){
+      var chip = e.target.closest('#en-ref-sort-chips [data-sort]'); if (!chip) return;
+      document.querySelectorAll('#en-ref-sort-chips .en-panel-chip').forEach(function(c){ c.classList.remove('active'); });
+      chip.classList.add('active');
+      _refSort = chip.dataset.sort;
+      renderRefs();
     });
 
     // File input change handler
