@@ -9,7 +9,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="../utilities/utils-keywords.js?v=7"></script>
   <script src="../utilities/utils-shared.js?v=0067db69"></script>
-  <script src="../utilities/utils-synthesis.js?v=65b18144"></script>
+  <script src="../utilities/utils-synthesis.js?v=3"></script>
   <script src="../utilities/utils-panel.js?v=7"></script>
   <script type="module" src="../utilities/utils-embedding.js?v=4"></script>
   <style>
@@ -196,6 +196,12 @@
 
     /* Cite pill */
     .cl-cite-pill { display: inline-flex; align-items: center; height: 16px; padding: 0 6px; border-radius: 8px; font-size: 10px; font-weight: 600; color: #fff; white-space: nowrap; vertical-align: middle; }
+    .cl-sim-badge {
+      display: inline-flex; align-items: center; height: 16px; padding: 0 6px;
+      border-radius: 8px; font-size: 9px; font-weight: 700; white-space: nowrap;
+      background: var(--md-sys-color-surface-container-highest);
+      font-variant-numeric: tabular-nums;
+    }
 
     /* Assign popover */
     .cl-pop {
@@ -674,11 +680,19 @@
 
       clusters.forEach(function(cl, ci){
         var open = _openCl.has(String(ci));
-        var byReg = {what:[],why:[],who:[],how:[]};
+        // Analyze each entry for placement
+        var analyzed = [];
         cl.noteKeys.forEach(function(k){
           var r = SY.resolveNoteKey(k); if (!r) return;
-          var reg = SY.suggestPlacement(_emb.get(k), r.text, _emb).register;
-          if (byReg[reg]) byReg[reg].push({key:k,r:r}); else byReg.what.push({key:k,r:r});
+          var a = SY.analyzePlacement(_emb.get(k), r.text, _emb);
+          analyzed.push({key:k, r:r, analysis:a});
+        });
+        // Group by suggested register
+        var byReg = {};
+        SY.getRegisters().forEach(function(rg){ byReg[rg.key] = []; });
+        analyzed.forEach(function(item){
+          var reg = item.analysis.register.key;
+          if (byReg[reg]) byReg[reg].push(item); else { if(!byReg.what) byReg.what=[]; byReg.what.push(item); }
         });
         html += '<div class="cl-pool-card">';
         html += '<div class="cl-pool-head" data-ci="'+ci+'">';
@@ -688,14 +702,29 @@
         html += '<span class="cl-chevron'+(open?' open':'')+'">&#9658;</span>';
         html += '</div>';
         html += '<div class="cl-pool-body'+(open?' open':'')+'">';
-        ['what','why','who','how'].forEach(function(reg){
-          var items = byReg[reg]; if (!items.length) return;
-          var regColors = {what:'#1565c0',why:'#e65100',who:'#2e7d32',how:'#6a1b9a'};
-          html += '<div style="padding:4px 12px 2px;font-size:9px;font-weight:700;letter-spacing:.06em;color:'+regColors[reg]+'">'+reg.toUpperCase()+'?</div>';
+        var _regs = SY.getRegisters();
+        var regColors = {what:'#1565c0',why:'#e65100',who:'#2e7d32',how:'#6a1b9a'};
+        _regs.forEach(function(rg){
+          var items = byReg[rg.key]; if (!items || !items.length) return;
+          html += '<div style="padding:4px 12px 2px;font-size:9px;font-weight:700;letter-spacing:.06em;color:'+(regColors[rg.key]||'var(--md-sys-color-primary)')+'">'+_h(rg.label||rg.key.toUpperCase()+'?')+'</div>';
           items.forEach(function(item){
             var parsed = typeof parseCitation==='function' ? parseCitation(item.r.text) : {body:item.r.text,citation:null};
+            var a = item.analysis;
             html += '<div class="cl-pool-note">';
             html += '<div class="cl-pool-note-inner"><div class="cl-pool-note-text">'+_h(parsed.body)+(parsed.citation?' <span class="cl-cite-pill" style="background:var(--md-sys-color-surface-container-high);color:var(--md-sys-color-on-surface-variant)">'+_h(parsed.citation)+'</span>':'')+'</div>';
+            // Similarity badges
+            html += '<div style="display:flex;flex-wrap:wrap;gap:3px;margin-top:3px">';
+            // Register scores
+            if (a.register.scores.length) {
+              var topReg = a.register.scores[0];
+              if (topReg.sim > 0.25) html += '<span class="cl-sim-badge" style="color:'+(regColors[topReg.key]||'var(--md-sys-color-primary)')+'">'+_h(topReg.label||topReg.key.toUpperCase())+' '+Math.round(topReg.sim*100)+'%</span>';
+            }
+            // Principle suggestion
+            if (a.principles.length && a.principles[0].similarity >= SY.SUGGEST_THRESHOLD) {
+              var topP = a.principles[0];
+              html += '<span class="cl-sim-badge" style="background:'+_h(topP.color)+';color:#fff">→ '+_h(topP.name.slice(0,14))+' '+Math.round(topP.similarity*100)+'%</span>';
+            }
+            html += '</div>';
             html += '<div class="cl-pool-note-src">'+_h(item.r.tabName)+'</div></div>';
             html += '<button class="cl-assign-btn" data-key="'+_h(item.key)+'">Assign</button>';
             html += '</div>';
