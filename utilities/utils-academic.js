@@ -349,7 +349,7 @@ window.AcademicUtils = (function () {
   function generateMethodsBlurb(opts) {
     opts = opts||{};
     var today=new Date().toLocaleDateString('en-GB',{year:'numeric',month:'long',day:'numeric'});
-    var model=opts.model||'all-MiniLM-L6-v2 (Sentence Transformers)';
+    var model=opts.model||'BGE-small-en-v1.5 (BAAI)';
     var threshold=opts.threshold!==undefined?opts.threshold:0.40;
     var progress=getScreeningProgress();
     var entryCount=progress?progress.total:(opts.entryCount||0);
