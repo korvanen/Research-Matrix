@@ -589,38 +589,104 @@ window.AcademicUtils = (function () {
       reader.onload = function(e) {
         try {
           var text = e.target.result;
+          // Strip UTF-8 BOM if present
+          if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
           var tabName = 'MX-' + file.name.replace(/\.[^.]+$/,'').replace(/[^a-zA-Z0-9]/g,'-').replace(/-+/g,'-');
+          var rows = _parseCSVRows(text);
+          if (rows.length < 2) { msgEl.textContent='No data found in file.'; msgEl.className='acad-import-msg err'; return; }
 
-          // Try structured parse (title/authors/year columns → proper grid)
+          var hdrs = rows[0].map(function(h){ return h.trim().toLowerCase().replace(/[^a-z0-9_]/g,''); });
+          var titleIdx    = hdrs.indexOf('title');
+          var citationIdx = hdrs.indexOf('citation');
+          if (citationIdx === -1) citationIdx = hdrs.indexOf('keywords');  // fallback to Keywords col
+
+          // ── Python extractor format: has Title + Citation columns ──
+          if (titleIdx !== -1 && citationIdx !== -1) {
+
+            // Collect all existing entry texts from loaded Sheet tabs for dedup
+            var existingTexts = new Set();
+            if (window.TABS && window.TABS.length && typeof processSheetData === 'function') {
+              window.TABS.forEach(function(tab) {
+                // Skip previously imported CSV tabs so we don't dedup against ourselves
+                if (tab.name === tabName) return;
+                var data = processSheetData(tab.grid);
+                if (!data) return;
+                data.rows.forEach(function(row) {
+                  row.cells.forEach(function(cell) {
+                    if (!cell || !cell.trim()) return;
+                    existingTexts.add(cell.trim());
+                    // Also store the body without trailing citation so re-imports dedup correctly
+                    if (typeof parseCitation === 'function') {
+                      var parsed = parseCitation(cell);
+                      if (parsed.body) existingTexts.add(parsed.body.trim());
+                    }
+                  });
+                });
+              });
+            }
+
+            // Build entries: passage + citation, skip duplicates
+            var newEntries = [];
+            var skipped = 0;
+            var idCounter = 1;
+            for (var ri = 1; ri < rows.length; ri++) {
+              var passage  = (rows[ri][titleIdx] || '').trim();
+              var citation = (rows[ri][citationIdx] || '').trim();
+              if (!passage) continue;
+
+              // Dedup: check if exact passage text already exists in any loaded tab
+              if (existingTexts.has(passage)) { skipped++; continue; }
+
+              // Combine passage + citation for parseCitation() to pick up
+              var entryText = citation ? passage + ' ' + citation : passage;
+              var entryId = 'CSV-' + String(idCounter).padStart(3, '0');
+              idCounter++;
+              newEntries.push({ id: entryId, text: entryText });
+            }
+
+            if (!newEntries.length) {
+              msgEl.textContent = 'All ' + skipped + ' entries already exist in loaded sheet. Nothing to import.';
+              msgEl.className = 'acad-import-msg ok';
+              return;
+            }
+
+            // Build grid: CATEGORY | COLUMN
+            var flagRow   = ['CATEGORY', 'COLUMN'];
+            var titleRow  = ['TITLE', tabName];
+            var headerRow = ['HEADER ROW', 'Passage'];
+            var dataRows  = newEntries.map(function(entry) {
+              return [entry.id, entry.text];
+            });
+            var grid = [flagRow, titleRow, headerRow].concat(dataRows);
+
+            saveImportedTabs([{ name: tabName, grid: grid }]);
+            var msg = newEntries.length + ' new entries imported from ' + file.name;
+            if (skipped) msg += ' (' + skipped + ' duplicates skipped)';
+            msg += '. Reloading\u2026';
+            msgEl.textContent = msg;
+            msgEl.className = 'acad-import-msg ok';
+            clearBtn.style.display = 'block';
+            setTimeout(function(){ location.reload(); }, 900);
+            return;
+          }
+
+          // ── Fallback: generic CSV with academic columns ──
           var entries = parseCSVText(text);
           if (entries.length) {
             var grid = citationsToGrid(entries, tabName);
             saveImportedTabs([{ name: tabName, grid: grid }]);
             msgEl.textContent = entries.length + ' entries imported from ' + file.name + '. Reloading\u2026';
-            msgEl.className='acad-import-msg ok';
-            clearBtn.style.display='block';
-            setTimeout(function(){location.reload();},900);
+            msgEl.className = 'acad-import-msg ok';
+            clearBtn.style.display = 'block';
+            setTimeout(function(){ location.reload(); }, 900);
             return;
           }
 
-          // Fallback: raw CSV rows → wrap in CATEGORY/COLUMN/HEADER ROW structure
-          var rows = _parseCSVRows(text);
-          if (!rows.length) { msgEl.textContent='No data found in file.'; msgEl.className='acad-import-msg err'; return; }
-          var hdrs = rows[0];
-          var flagRow = ['CATEGORY','COLUMN'].concat(hdrs.map(function(){return 'COLUMN';}));
-          var titleRow = ['TITLE', tabName].concat(hdrs.map(function(){return '';}));
-          var headerRow = ['HEADER ROW',''].concat(hdrs);
-          var dataRows = rows.slice(1).map(function(r,i){
-            return ['Entry '+(i+1),''].concat(r);
-          });
-          var grid = [flagRow, titleRow, headerRow].concat(dataRows);
-          saveImportedTabs([{ name: tabName, grid: grid }]);
-          msgEl.textContent = (rows.length-1) + ' rows imported from ' + file.name + '. Reloading\u2026';
-          msgEl.className='acad-import-msg ok';
-          clearBtn.style.display='block';
-          setTimeout(function(){location.reload();},900);
+          msgEl.textContent = 'Could not parse file. Expected Title + Citation columns.';
+          msgEl.className = 'acad-import-msg err';
         } catch(err) {
-          msgEl.textContent='Parse error: '+err.message; msgEl.className='acad-import-msg err';
+          msgEl.textContent = 'Parse error: ' + err.message;
+          msgEl.className = 'acad-import-msg err';
         }
       };
       reader.readAsText(file);
