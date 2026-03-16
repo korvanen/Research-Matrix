@@ -1541,11 +1541,16 @@ function buildRowIndex() {
     const data = processSheetData(tab.grid);
     if (!data) return;
     data.rows.forEach((row, rowIdx) => {
-      rows.push({
-        tabIdx, rowIdx, row,
-        headers: data.headers,
-        title:   data.title || tab.name,
-        kws: new Set(typeof panelExtractKW === 'function' ? panelExtractKW(row.cells.join(' ')) : []),
+      // Create one row per non-empty cell (matching getRowNoteKeys)
+      row.cells.forEach((cell, ci) => {
+        if (!cell || cell.trim().length <= 5) return;
+        rows.push({
+          tabIdx, rowIdx, _cellIdx: ci,
+          row: { cells: [cell], cats: row.cats },
+          headers: [data.headers[ci] || 'Col '+(ci+1)],
+          title:   data.title || tab.name,
+          kws: new Set(typeof panelExtractKW === 'function' ? panelExtractKW(cell) : []),
+        });
       });
     });
   });
