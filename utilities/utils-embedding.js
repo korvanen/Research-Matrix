@@ -8,7 +8,7 @@ import { pipeline, env }
 
 env.allowLocalModels = false;
 
-const EMBEDDING_MODEL = 'Xenova/bge-base-en-v1.5';
+const EMBEDDING_MODEL = 'Xenova/bge-small-en-v1.5';
 const CACHE_PREFIX = 'pp_emb_v4_';
 
 // ── Model loader ──────────────────────────────────────────────────────────────
@@ -180,3 +180,11 @@ window.EmbeddingUtils = {
 
 // Start downloading the model in the background immediately.
 _loadEmbedder().catch(() => {/* already warned above */});
+
+// Purge stale caches from previous model versions
+try {
+  const STALE = ['pp_emb_v1_', 'pp_emb_v2_', 'pp_emb_v3_'];
+  Object.keys(localStorage)
+    .filter(k => STALE.some(p => k.startsWith(p)))
+    .forEach(k => localStorage.removeItem(k));
+} catch {}
