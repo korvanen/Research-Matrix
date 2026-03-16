@@ -913,72 +913,44 @@ function initConceptMapTool(paneEl, sidebarEl) {
       if (isSplit) console.log('[concept-map] card',i,'isSplit=true _splitN='+primaryRow._splitN+'/'+primaryRow._splitT);
       var numParents=(parentsOf.get(i)||[]).length;
 
-      var topRow=document.createElement('div');
-      topRow.className='pp-cmap-card-top';
+      // Use shared card builder for the primary row
+      var info = window.buildCardContent(card, {
+        row: primaryRow, accent: accent, onColor: lc,
+        label: 'Level', levelNum: level,
+      });
 
-      var catNumEl=document.createElement('div');
-      catNumEl.className='pp-cmap-card-cat-num';
-      var allCats = primaryRow.row&&primaryRow.row.cats ? primaryRow.row.cats.filter(function(c){ return c.trim(); }) : [];
-      var catChar = allCats.length ? allCats.join(' \u00b7 ') : String(level);
-      catNumEl.textContent = catChar;
-
-      var levelBlock=document.createElement('div');
-      levelBlock.className='pp-cmap-card-level-block';
-      var levelNum=document.createElement('div');
-      levelNum.className='pp-cmap-card-level-num';
-      levelNum.textContent = String(level);
-      var levelLbl=document.createElement('div');
-      levelLbl.className='pp-cmap-card-level-label';
-      levelLbl.textContent = 'Level';
-      levelBlock.appendChild(levelNum);
-      levelBlock.appendChild(levelLbl);
-
-      topRow.appendChild(catNumEl);
-      topRow.appendChild(levelBlock);
-      card.appendChild(topRow);
-
+      // If merged, add extra row content into the body
       if (extras.length>0) {
         var mg=document.createElement('div');
-        mg.className='pp-cmap-card-merged';
+        mg.className='pp-card-split-badge';
         mg.textContent='\u00d7'+allRows.length+' merged';
-        card.appendChild(mg);
+        // Insert merged badge before body
+        var bodyEl = info.body;
+        card.insertBefore(mg, bodyEl);
+
+        extras.forEach(function(ri){
+          var sep=document.createElement('div');
+          sep.style.cssText='height:1px;margin:4px 0;background:color-mix(in srgb, var(--ppc-on,#fff) 20%, var(--ppc-bg,#888))';
+          bodyEl.appendChild(sep);
+          var r2=rows[ri], cells2=r2.row&&r2.row.cells?r2.row.cells:(r2.cells||[]);
+          var hdrs2=r2.headers||[];
+          var bestIdx2=0, bestLen2=0;
+          cells2.forEach(function(c,ci){ if(c.trim().length>bestLen2){bestLen2=c.trim().length;bestIdx2=ci;} });
+          var best2=cells2[bestIdx2]||'';
+          var colH2=hdrs2[bestIdx2]||'';
+          var parsed2=typeof parseCitation==='function'?parseCitation(best2):{body:best2};
+          if (colH2) {
+            var ce2=document.createElement('div'); ce2.className='pp-card-col-label';
+            ce2.textContent=colH2; bodyEl.appendChild(ce2);
+          }
+          var te2=document.createElement('div'); te2.className='pp-card-text';
+          te2.textContent=parsed2.body; bodyEl.appendChild(te2);
+          if (r2._splitFrom) {
+            var sb2=document.createElement('div'); sb2.className='pp-card-split-badge';
+            sb2.textContent=r2._splitN+'/'+r2._splitT+' Split'; bodyEl.appendChild(sb2);
+          }
+        });
       }
-
-      var rule=document.createElement('div');
-      rule.className='pp-cmap-card-rule';
-      card.appendChild(rule);
-
-      var body=document.createElement('div');
-      body.className='pp-cmap-card-body';
-      allRows.forEach(function(ri,idx){
-        if (idx>0) { var sep=document.createElement('div'); sep.className='pp-cmap-merge-sep'; body.appendChild(sep); }
-        var r=rows[ri], cells=r.row&&r.row.cells?r.row.cells:(r.cells||[]);
-        var cats=r.row&&r.row.cats?r.row.cats.filter(function(c){ return c.trim(); }):[];
-        var hdrs=r.headers||[];
-        var bestIdx=0, bestLen=0;
-        cells.forEach(function(c,ci){ if(c.trim().length>bestLen){bestLen=c.trim().length;bestIdx=ci;} });
-        var best=cells[bestIdx]||'';
-        var colHeader=hdrs[bestIdx]||'';
-        var parsed=typeof parseCitation==='function'?parseCitation(best):{body:best};
-        if (colHeader) {
-          var ce=document.createElement('div');
-          ce.className='pp-cmap-cell-cat';
-          ce.textContent=colHeader;
-          body.appendChild(ce);
-        }
-        var te=document.createElement('div');
-        te.className='pp-cmap-cell-text';
-        te.textContent=parsed.body;
-        body.appendChild(te);
-        var r2=rows[ri];
-        if (r2._splitFrom) {
-          var sb=document.createElement('div');
-          sb.style.cssText='font-size:9px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:'+lc+';opacity:0.7;padding:5px 0 2px;';
-          sb.textContent=r2._splitN+'/'+r2._splitT+' Split';
-          body.appendChild(sb);
-        }
-      });
-      card.appendChild(body);
 
       var hasChildren=childrenOf[i].length>0;
       var hasParents=numParents>0;
