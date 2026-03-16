@@ -801,6 +801,8 @@ var _browsePanelHtml =
       document.getElementById('en-dot').className = 'pp-panel-dot loading';
       document.getElementById('en-status-text').textContent = 'Embedding ' + keys.length + ' entries...';
       _embedAll(keys).then(function(){
+        return _embedSchemaDescriptions();
+      }).then(function(){
         _embedding = false; _embReady = true;
         // Auto-split long entries now that we can embed the fragments
         SY.autoSplitAll();
@@ -827,6 +829,57 @@ var _browsePanelHtml =
         try {
           var vec = await window.EmbeddingUtils.getCachedEmbedding(r.text);
           if (vec) _emb.set(key, new Float32Array(vec));
+        } catch(e){}
+      }
+    }
+
+    // Embed schema descriptions so analyzePlacement works in the entries tool
+    async function _embedSchemaDescriptions() {
+      if (!window.EmbeddingUtils) return;
+      // Principle descriptions
+      var ps = SY.getPrinciples().filter(function(p){ return p.named && !p.archived; });
+      for (var i = 0; i < ps.length; i++) {
+        var p = ps[i];
+        var text = SY.getPrincipleEmbedText(p);
+        if (!text) continue;
+        try {
+          var vec = await window.EmbeddingUtils.getCachedEmbedding(text);
+          if (vec) _emb.set('__pdesc__' + p.id, new Float32Array(vec));
+        } catch(e){}
+      }
+      // Register descriptions
+      var regs = SY.getRegisters();
+      for (var ri = 0; ri < regs.length; ri++) {
+        var r = regs[ri];
+        var rDesc = SY.getSchemaDescription('registers', r.key);
+        if (!rDesc) continue;
+        var rText = r.label + '. ' + rDesc;
+        try {
+          var rv = await window.EmbeddingUtils.getCachedEmbedding(rText);
+          if (rv) _emb.set('__rdesc__' + r.key, new Float32Array(rv));
+        } catch(e){}
+      }
+      // Dimension descriptions
+      var dims = SY.getDimensions();
+      for (var di = 0; di < dims.length; di++) {
+        var dDesc = SY.getSchemaDescription('dimensions', dims[di]);
+        if (!dDesc) continue;
+        var dText = dims[di] + '. ' + dDesc;
+        try {
+          var dv = await window.EmbeddingUtils.getCachedEmbedding(dText);
+          if (dv) _emb.set('__ddesc__' + dims[di], new Float32Array(dv));
+        } catch(e){}
+      }
+      // Column descriptions
+      var colTitles;
+      try { colTitles = JSON.parse(localStorage.getItem('df_fw_col_titles')); } catch(e){}
+      if (!Array.isArray(colTitles)||colTitles.length!==3) colTitles = ['Rule / Constraint','Move / Intervention','Metric / Proof'];
+      for (var ci = 0; ci < 3; ci++) {
+        var cDesc = SY.getSchemaDescription('columns', String(ci));
+        var cText = colTitles[ci] + (cDesc ? '. ' + cDesc : '');
+        try {
+          var cv = await window.EmbeddingUtils.getCachedEmbedding(cText);
+          if (cv) _emb.set('__cdesc__' + ci, new Float32Array(cv));
         } catch(e){}
       }
     }
