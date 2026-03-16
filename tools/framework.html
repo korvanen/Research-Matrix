@@ -9,7 +9,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="../utilities/utils-keywords.js?v=7"></script>
   <script src="../utilities/utils-shared.js?v=0067db69"></script>
-  <script src="../utilities/utils-synthesis.js?v=f1508c1f"></script>
+  <script src="../utilities/utils-synthesis.js?v=b4058e56"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; }
     html, body { height: 100%; overflow: hidden; margin: 0; padding: 0; }
@@ -126,7 +126,7 @@
 
     /* ── Schema editor ── */
     .fw-schema-item {
-      display: flex; align-items: center; gap: 6px;
+      display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
       padding: 5px 0; border-bottom: 1px solid var(--md-sys-color-outline-variant);
     }
     .fw-schema-item:last-of-type { border-bottom: none; }
@@ -158,6 +158,22 @@
       background: transparent; font-size: 12px; color: inherit; outline: none;
     }
     .fw-reg-color { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .fw-schema-desc {
+      width: 100%; margin-top: 4px; padding: 4px 8px; border-radius: 6px;
+      font-size: 11px; line-height: 1.5; cursor: pointer;
+      color: var(--md-sys-color-on-surface-variant);
+      background: var(--md-sys-color-surface-container-low);
+      border: 1px solid transparent;
+      transition: border-color .12s;
+    }
+    .fw-schema-desc:hover { border-color: var(--md-sys-color-outline-variant); }
+    .fw-schema-desc-input {
+      width: 100%; margin-top: 4px; padding: 4px 8px; border-radius: 6px;
+      font-size: 11px; line-height: 1.5; resize: vertical; min-height: 40px;
+      color: inherit; background: transparent; outline: none;
+      border: 1px solid var(--md-sys-color-primary);
+      font-family: var(--font-family);
+    }
 
     /* ── Diff modal ── */
     .fw-modal-bg { position: fixed; inset: 0; z-index: 8000; background: rgba(0,0,0,.45); display: none; align-items: center; justify-content: center; }
@@ -525,22 +541,26 @@
       var html = '<div class="fw-panel-label">Questions (registers)</div>';
       regs.forEach(function(r){
         var col = REG_COLORS[r.key] || 'var(--md-sys-color-primary)';
+        var desc = SY.getSchemaDescription('registers', r.key);
         html += '<div class="fw-schema-item" data-rkey="'+_h(r.key)+'">';
         html += '<span class="fw-reg-color" style="background:'+col+'"></span>';
         html += '<span class="fw-schema-key">'+_h(r.key)+'</span>';
         html += '<span class="fw-schema-label">'+_h(r.label)+'</span>';
         html += '<button class="fw-schema-btn" data-action="edit-reg" data-key="'+_h(r.key)+'">Edit</button>';
         html += '<button class="fw-schema-btn del" data-action="del-reg" data-key="'+_h(r.key)+'">Delete</button>';
+        html += '<div class="fw-schema-desc" data-action="edit-desc" data-desc-type="registers" data-desc-key="'+_h(r.key)+'">'+(desc ? _h(desc) : '<span style="opacity:.4">+ Add description…</span>')+'</div>';
         html += '</div>';
       });
       html += '<button class="fw-schema-add" data-action="add-reg">+ Add question</button>';
 
       html += '<div class="fw-panel-label" style="margin-top:10px">Dimensions</div>';
       dims.forEach(function(d){
+        var desc = SY.getSchemaDescription('dimensions', d);
         html += '<div class="fw-schema-item" data-dim="'+_h(d)+'">';
         html += '<span class="fw-schema-label">'+_h(d)+'</span>';
         html += '<button class="fw-schema-btn" data-action="edit-dim" data-dim="'+_h(d)+'">Edit</button>';
         html += '<button class="fw-schema-btn del" data-action="del-dim" data-dim="'+_h(d)+'">Delete</button>';
+        html += '<div class="fw-schema-desc" data-action="edit-desc" data-desc-type="dimensions" data-desc-key="'+_h(d)+'">'+(desc ? _h(desc) : '<span style="opacity:.4">+ Add description…</span>')+'</div>';
         html += '</div>';
       });
       html += '<button class="fw-schema-add" data-action="add-dim">+ Add dimension</button>';
@@ -548,10 +568,12 @@
       html += '<div class="fw-panel-label" style="margin-top:10px">Column titles</div>';
       var _ct = _getColTitles();
       ['0','1','2'].forEach(function(ci){
+        var desc = SY.getSchemaDescription('columns', ci);
         html += '<div class="fw-schema-item" data-col="'+ci+'">';
         html += '<span class="fw-schema-label">'+_h(_ct[parseInt(ci)])+'</span>';
         html += '<button class="fw-schema-btn" data-action="edit-col" data-col="'+ci+'">Edit</button>';
         html += '<button class="fw-schema-btn" data-action="reset-col" data-col="'+ci+'" style="font-size:10px;color:var(--md-sys-color-on-surface-variant)">Reset</button>';
+        html += '<div class="fw-schema-desc" data-action="edit-desc" data-desc-type="columns" data-desc-key="'+ci+'">'+(desc ? _h(desc) : '<span style="opacity:.4">+ Add description…</span>')+'</div>';
         html += '</div>';
       });
 
@@ -655,6 +677,32 @@
           ct[ci] = _COL_DEFAULTS[ci];
           _setColTitles(ct);
           render(); renderSchema();
+        });
+      });
+
+      // Description editing (inline textarea)
+      el.querySelectorAll('[data-action=edit-desc]').forEach(function(descEl){
+        descEl.addEventListener('click', function(){
+          var type = descEl.dataset.descType;
+          var key  = descEl.dataset.descKey;
+          var current = SY.getSchemaDescription(type, key);
+          var ta = document.createElement('textarea');
+          ta.className = 'fw-schema-desc-input';
+          ta.value = current;
+          ta.placeholder = 'Describe this item…';
+          descEl.style.display = 'none';
+          descEl.parentNode.insertBefore(ta, descEl.nextSibling);
+          ta.focus();
+          function finish() {
+            var val = ta.value.trim();
+            SY.setSchemaDescription(type, key, val);
+            ta.remove();
+            renderSchema();
+          }
+          ta.addEventListener('blur', finish);
+          ta.addEventListener('keydown', function(e){
+            if (e.key==='Escape') { ta.remove(); renderSchema(); }
+          });
         });
       });
     }
