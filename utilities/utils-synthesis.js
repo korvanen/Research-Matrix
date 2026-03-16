@@ -518,9 +518,11 @@ window.SynthesisData = (function () {
       var data = typeof processSheetData === 'function' ? processSheetData(tab.grid) : null;
       if (!data) return;
       data.rows.forEach(function(row, ri) {
-        var ci = bestCellIdx(row.cells);
-        if (row.cells[ci] && row.cells[ci].trim().length > 5)
-          keys.push(makeNoteKey(tab.name, ri, ci));
+        // Create one key per non-empty column cell (not just the longest)
+        row.cells.forEach(function(cell, ci) {
+          if (cell && cell.trim().length > 5)
+            keys.push(makeNoteKey(tab.name, ri, ci));
+        });
       });
     });
     return keys;
