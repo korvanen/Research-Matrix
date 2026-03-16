@@ -8,8 +8,8 @@
   <link rel="stylesheet" href="../design-system.css?v=9fa06a28">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="../utilities/utils-keywords.js?v=7"></script>
-  <script src="../utilities/utils-shared.js?v=54876d07"></script>
-  <script src="../utilities/utils-synthesis.js?v=a2582885"></script>
+  <script src="../utilities/utils-shared.js?v=425998b6"></script>
+  <script src="../utilities/utils-synthesis.js?v=3"></script>
   <script src="../utilities/utils-panel.js?v=7"></script>
   <script type="module" src="../utilities/utils-embedding.js?v=4"></script>
   <style>
@@ -384,19 +384,21 @@
         var data = typeof processSheetData === 'function' ? processSheetData(tab.grid) : null;
         if (!data) return;
         data.rows.forEach(function(row, rowIdx){
-          var key = SY.makeNoteKey(tab.name, rowIdx, SY.bestCellIdx(row.cells));
-          // Include assigned notes too — they connect to their principle via semantic proximity
-          // But mark them so we can optionally dim them
-          var vec = _emb.get(key);
-          rows.push({
-            tabIdx:  tabIdx,
-            rowIdx:  rowIdx,
-            row:     row,
-            headers: data.headers || [],
-            title:   data.title || tab.name,
-            vec:     vec || null,
-            _noteKey:    key,
-            _isAssigned: assigned.has(key),
+          // Create one row per non-empty cell (matching getRowNoteKeys)
+          row.cells.forEach(function(cell, ci){
+            if (!cell || cell.trim().length <= 5) return;
+            var key = SY.makeNoteKey(tab.name, rowIdx, ci);
+            var vec = _emb.get(key);
+            rows.push({
+              tabIdx:  tabIdx,
+              rowIdx:  rowIdx,
+              row:     { cells: [cell], cats: row.cats },
+              headers: [data.headers[ci] || 'Col '+(ci+1)],
+              title:   data.title || tab.name,
+              vec:     vec || null,
+              _noteKey:    key,
+              _isAssigned: assigned.has(key),
+            });
           });
         });
       });
