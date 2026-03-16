@@ -13,6 +13,7 @@ window.AcademicUtils = (function () {
     ANNOTATION:     'df_annotation_',
     SAVED_SEARCHES: 'df_saved_searches',
     IMPORTED_DATA:  'df_imported_tabs',
+    REFERENCES:     'df_references',
   };
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -1084,6 +1085,234 @@ window.AcademicUtils = (function () {
   }
 
   // ══════════════════════════════════════════════════════════════════════════
+  // REFERENCE MANAGEMENT — RIS parser, APA formatter, library, matching
+  // ══════════════════════════════════════════════════════════════════════════
+
+  // ── RIS Parser ─────────────────────────────────────────────────
+  function parseRIS(text) {
+    var entries = [];
+    var blocks = text.split(/\nER\s*-/).filter(function(b){return b.trim();});
+    for (var bi = 0; bi < blocks.length; bi++) {
+      var f = {}, lines = blocks[bi].split('\n');
+      for (var li = 0; li < lines.length; li++) {
+        var m = lines[li].match(/^([A-Z][A-Z0-9])\s*-\s*(.*)$/);
+        if (!m) continue;
+        var tag = m[1].trim(), val = m[2].trim();
+        if (tag==='AU'||tag==='A1') { f.authorList = f.authorList||[]; f.authorList.push(val); }
+        else if (tag==='TI'||tag==='T1') f.title = val;
+        else if (tag==='PY'||tag==='Y1') f.year = val.replace(/\/.*/, '');
+        else if (tag==='JO'||tag==='JF'||tag==='T2') f.journal = f.journal || val;
+        else if (tag==='VL') f.volume = val;
+        else if (tag==='IS') f.issue = val;
+        else if (tag==='SP') f.startpage = val;
+        else if (tag==='EP') f.endpage = val;
+        else if (tag==='DO') f.doi = normaliseDOI(val) || '';
+        else if (tag==='PB') f.publisher = val;
+        else if (tag==='AB') f.abstract = val;
+        else if (tag==='KW') { f.keywords = f.keywords ? f.keywords+'; '+val : val; }
+        else if (tag==='UR') f.url = val;
+      }
+      if (f.title || f.authorList) {
+        var authors = (f.authorList||[]).map(function(a){
+          a = a.trim();
+          if (a.indexOf(',')!==-1) { var p=a.split(','); return (p[1]||'').trim()+' '+p[0].trim(); }
+          return a;
+        }).filter(Boolean).join('; ');
+        var pages = (f.startpage && f.endpage) ? f.startpage+'-'+f.endpage : f.startpage||'';
+        entries.push({
+          title: f.title||'', authors: authors, year: f.year||'',
+          journal: f.journal||'', volume: f.volume||'', issue: f.issue||'',
+          pages: pages, doi: f.doi||'', publisher: f.publisher||'',
+          abstract: f.abstract||'', keywords: f.keywords||'',
+          url: f.url || (f.doi ? 'https://doi.org/'+f.doi : ''),
+        });
+      }
+    }
+    return entries;
+  }
+
+  // ── Surname extractor ──────────────────────────────────────────
+  function _extractSurname(authorStr) {
+    var s = authorStr.trim();
+    // "First Last" → "Last";  "Last, First" → "Last"
+    if (s.indexOf(',') !== -1) return s.split(',')[0].trim();
+    var parts = s.split(/\s+/);
+    return parts[parts.length - 1];
+  }
+
+  // ── Build in-text key from surnames + year ─────────────────────
+  function _buildInTextKey(surnames, year) {
+    if (surnames.length === 1) return surnames[0] + ', ' + year;
+    if (surnames.length === 2) return surnames[0] + ' & ' + surnames[1] + ', ' + year;
+    return surnames[0] + ' et al., ' + year;
+  }
+
+  // ── Format parsed entry → APA 7th ed ──────────────────────────
+  function formatAPA(entry) {
+    // entry: { authors, year, title, journal, volume, issue, pages, doi, publisher }
+    // authors is semicolon-separated "First Last; First Last" or similar
+    var rawAuthors = (entry.authors||'').split(/\s*;\s*/).filter(Boolean);
+    var surnames = rawAuthors.map(_extractSurname);
+    var formatted = rawAuthors.map(function(a) {
+      var sur = _extractSurname(a);
+      var rest = a.replace(sur, '').replace(',', '').trim();
+      var initials = rest.split(/[\s.]+/).filter(Boolean).map(function(n){
+        return n[0].toUpperCase() + '.';
+      }).join(' ');
+      return initials ? sur + ', ' + initials : sur;
+    });
+
+    var authPart = '';
+    if (formatted.length === 1) authPart = formatted[0];
+    else if (formatted.length === 2) authPart = formatted[0] + ' & ' + formatted[1];
+    else if (formatted.length <= 20) authPart = formatted.slice(0,-1).join(', ') + ', & ' + formatted[formatted.length-1];
+    else authPart = formatted.slice(0,19).join(', ') + ', ... ' + formatted[formatted.length-1];
+
+    var apa = authPart + ' (' + (entry.year||'n.d.') + '). ' + (entry.title||'Untitled') + '.';
+    if (entry.journal) {
+      apa += ' *' + entry.journal + '*';
+      if (entry.volume) apa += ', *' + entry.volume + '*';
+      if (entry.issue)  apa += '(' + entry.issue + ')';
+      if (entry.pages)  apa += ', ' + entry.pages;
+      apa += '.';
+    } else if (entry.publisher) {
+      apa += ' ' + entry.publisher + '.';
+    }
+    if (entry.doi) {
+      var d = entry.doi.replace(/^https?:\/\/doi\.org\//, '');
+      apa += ' https://doi.org/' + d;
+    }
+
+    var inTextKey = _buildInTextKey(surnames, entry.year || 'n.d.');
+    return { apa: apa, inTextKey: inTextKey, surnames: surnames, year: entry.year||'' };
+  }
+
+  // ── Auto-extract in-text key from pasted APA string ────────────
+  function extractKeyFromAPA(apaText) {
+    var mYear = apaText.match(/\((\d{4}[a-z]?)\)/);
+    if (!mYear) return null;
+    var year = mYear[1];
+    var before = apaText.slice(0, mYear.index).trim().replace(/,\s*$/, '');
+    // Split on & to get author groups
+    var chunks = before.split(/,?\s*&\s*/);
+    var surnames = [];
+    for (var i = 0; i < chunks.length; i++) {
+      var parts = chunks[i].split(',').map(function(s){return s.trim();});
+      // Surname is the first meaningful multi-char token (skip initials like "L.")
+      var tokens = parts[0].split(/\s+/).filter(function(s){
+        return s.length > 1 && !/^[A-Z]\.?$/.test(s);
+      });
+      if (tokens.length) surnames.push(tokens[tokens.length - 1]);
+    }
+    if (!surnames.length) return null;
+    return { key: _buildInTextKey(surnames, year), surnames: surnames, year: year };
+  }
+
+  // ── Reference library — localStorage persistence ───────────────
+  function _loadRefs() {
+    try { return JSON.parse(localStorage.getItem(SK.REFERENCES) || '[]'); }
+    catch(e) { return []; }
+  }
+  function _saveRefs(refs) {
+    try { localStorage.setItem(SK.REFERENCES, JSON.stringify(refs)); } catch(e){}
+  }
+
+  function getReferences() { return _loadRefs(); }
+
+  // Add a fully-formed reference: { apa, inTextKey, year, doi? }
+  // Returns the reference if added, null if duplicate
+  function addReference(ref) {
+    var refs = _loadRefs();
+    var nk = ref.inTextKey.toLowerCase().replace(/\s+/g,' ').trim();
+    for (var i=0;i<refs.length;i++) {
+      if (refs[i].inTextKey.toLowerCase().replace(/\s+/g,' ').trim()===nk) return null;
+    }
+    refs.push(ref);
+    _saveRefs(refs);
+    return ref;
+  }
+
+  // Remove by inTextKey
+  function removeReference(inTextKey) {
+    var refs = _loadRefs();
+    var nk = inTextKey.toLowerCase().replace(/\s+/g,' ').trim();
+    refs = refs.filter(function(r){ return r.inTextKey.toLowerCase().replace(/\s+/g,' ').trim() !== nk; });
+    _saveRefs(refs);
+  }
+
+  // Import from BibTeX or RIS text — returns count added
+  function importReferences(text) {
+    var entries = parseBibTeX(text);
+    if (!entries.length) entries = parseRIS(text);
+    if (!entries.length) return 0;
+    var count = 0;
+    for (var i = 0; i < entries.length; i++) {
+      var formatted = formatAPA(entries[i]);
+      if (addReference({ apa: formatted.apa, inTextKey: formatted.inTextKey, year: formatted.year, doi: entries[i].doi||'' })) count++;
+    }
+    return count;
+  }
+
+  // Import from a pasted APA string
+  function importAPAString(apaText) {
+    var extracted = extractKeyFromAPA(apaText);
+    if (!extracted) return null;
+    return addReference({ apa: apaText.trim(), inTextKey: extracted.key, year: extracted.year, doi: '' });
+  }
+
+  // Manual assignment override: store overrides separately
+  // _refOverrides: { citationKey: inTextKey-of-reference }
+  var _overrideKey = 'df_ref_overrides';
+  function _loadOverrides() { try{return JSON.parse(localStorage.getItem(_overrideKey)||'{}');}catch(e){return {};} }
+  function _saveOverrides(o) { try{localStorage.setItem(_overrideKey,JSON.stringify(o));}catch(e){} }
+  function setRefOverride(citeKey, refInTextKey) {
+    var o = _loadOverrides(); o[citeKey.toLowerCase().trim()] = refInTextKey; _saveOverrides(o);
+  }
+  function clearRefOverride(citeKey) {
+    var o = _loadOverrides(); delete o[citeKey.toLowerCase().trim()]; _saveOverrides(o);
+  }
+
+  // Match a citation key to a reference
+  // Returns the reference object or null
+  function matchReference(citeKey) {
+    if (!citeKey) return null;
+    var nk = citeKey.toLowerCase().replace(/\s+/g,' ').trim();
+    // Check overrides first
+    var overrides = _loadOverrides();
+    var overrideTarget = overrides[nk];
+    var refs = _loadRefs();
+    if (overrideTarget) {
+      var ot = overrideTarget.toLowerCase().replace(/\s+/g,' ').trim();
+      for (var i=0;i<refs.length;i++) {
+        if (refs[i].inTextKey.toLowerCase().replace(/\s+/g,' ').trim()===ot) return refs[i];
+      }
+    }
+    // Auto-match
+    for (var j=0;j<refs.length;j++) {
+      if (refs[j].inTextKey.toLowerCase().replace(/\s+/g,' ').trim()===nk) return refs[j];
+    }
+    return null;
+  }
+
+  // Get all unique citation keys from loaded entries + their match status
+  function getRefMatchSummary() {
+    if (typeof window.TABS==='undefined'||!window.TABS.length) return {matched:0,unmatched:0,total:0,keys:[]};
+    var keySet = {};
+    var SY = window.SynthesisData;
+    if (!SY) return {matched:0,unmatched:0,total:0,keys:[]};
+    var noteKeys = SY.getRowNoteKeys ? SY.getRowNoteKeys() : [];
+    noteKeys.forEach(function(nk){
+      var r = SY.resolveNoteKey(nk); if (!r||!r.text) return;
+      var cites = typeof extractAllCitations==='function' ? extractAllCitations(r.text) : [];
+      cites.forEach(function(c){ keySet[c.key] = true; });
+    });
+    var allKeys = Object.keys(keySet);
+    var matched = 0, unmatched = 0;
+    allKeys.forEach(function(k){ if (matchReference(k)) matched++; else unmatched++; });
+    return { matched:matched, unmatched:unmatched, total:allKeys.length, keys:allKeys };
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
   // AUTO-INIT
   // ══════════════════════════════════════════════════════════════════════════
 
@@ -1099,7 +1328,7 @@ window.AcademicUtils = (function () {
   // PUBLIC API
   // ══════════════════════════════════════════════════════════════════════════
   return {
-    resolveDOI:resolveDOI, parseBibTeX:parseBibTeX, parseCSVText:parseCSVText,
+    resolveDOI:resolveDOI, parseBibTeX:parseBibTeX, parseRIS:parseRIS, parseCSVText:parseCSVText,
     citationsToGrid:citationsToGrid, validateSchema:validateSchema,
     getScreeningStatus:getScreeningStatus, setScreeningStatus:setScreeningStatus,
     getScreeningProgress:getScreeningProgress, getAnnotation:getAnnotation, setAnnotation:setAnnotation,
@@ -1109,5 +1338,11 @@ window.AcademicUtils = (function () {
     exportConceptMapSVG:exportConceptMapSVG, generateMethodsBlurb:generateMethodsBlurb,
     downloadBlob:downloadBlob, rowsToCSV:rowsToCSV,
     loadImportedTabs:loadImportedTabs, clearImportedTabs:clearImportedTabs, normaliseDOI:normaliseDOI,
+    // Reference management
+    formatAPA:formatAPA, extractKeyFromAPA:extractKeyFromAPA, parseRIS:parseRIS,
+    getReferences:getReferences, addReference:addReference, removeReference:removeReference,
+    importReferences:importReferences, importAPAString:importAPAString,
+    matchReference:matchReference, setRefOverride:setRefOverride, clearRefOverride:clearRefOverride,
+    getRefMatchSummary:getRefMatchSummary,
   };
 })();
