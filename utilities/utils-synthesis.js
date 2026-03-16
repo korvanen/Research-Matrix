@@ -689,9 +689,10 @@ window.SynthesisData = (function () {
   function suggestColumnByVec(vec, embeddings) {
     if (!vec || !embeddings) return 0;
     var best = 0, bestSim = 0.30;
-    for (var ci = 0; ci < 3; ci++) {
+    // Check all possible column embeddings (dynamic count)
+    for (var ci = 0; ci < 20; ci++) {
       var cv = embeddings.get('__cdesc__' + ci);
-      if (!cv) continue;
+      if (!cv) { if (ci > 2) break; continue; } // stop scanning after gap past default 3
       var sim = cosine(vec, cv);
       if (sim > bestSim) { bestSim = sim; best = ci; }
     }
@@ -738,8 +739,10 @@ window.SynthesisData = (function () {
 
     // Column similarities
     if (vec && embeddings) {
+      var _colCount = 3;
+      try { var _ctParsed = JSON.parse(localStorage.getItem('df_fw_col_titles')); if (Array.isArray(_ctParsed)) _colCount = _ctParsed.length; } catch(e){}
       var bestCol = 0, bestColSim = 0;
-      for (var ci = 0; ci < 3; ci++) {
+      for (var ci = 0; ci < _colCount; ci++) {
         var cv = embeddings.get('__cdesc__' + ci);
         var sim = cv ? cosine(vec, cv) : 0;
         result.column.scores.push({ index: ci, sim: sim });
@@ -990,7 +993,7 @@ window.SynthesisData = (function () {
     // Column titles from localStorage (framework.html stores these)
     var colTitles;
     try { colTitles = JSON.parse(localStorage.getItem('df_fw_col_titles')); } catch(e){}
-    if (!Array.isArray(colTitles) || colTitles.length !== 3) colTitles = ['Rule / Constraint','Move / Intervention','Metric / Proof'];
+    if (!Array.isArray(colTitles) || colTitles.length < 1) colTitles = ['Rule / Constraint','Move / Intervention','Metric / Proof'];
 
     var byDim={}, dimOrder=[];
     principles.forEach(function(p){
@@ -999,31 +1002,57 @@ window.SynthesisData = (function () {
       byDim[d].push(p);
     });
 
-    var rows = [['FRAMEWORK — Dimensional Framework','','Generated: '+new Date().toISOString(),'','']];
+    var numCols = colTitles.length;
+    var emptyRow = ['',''];
+    for (var _ei = 0; _ei < numCols; _ei++) emptyRow.push('');
+
+    var rows = [['FRAMEWORK — Dimensional Framework','','Generated: '+new Date().toISOString()]];
 
     dimOrder.forEach(function(dim){
       rows.push(['']);
-      rows.push(['The '+dim+' Dimension','','','','']);
-      rows.push(['ID','Category',colTitles[0],colTitles[1],colTitles[2]]);
+      var dimRow = ['The '+dim+' Dimension',''];
+      for (var _di = 0; _di < numCols; _di++) dimRow.push('');
+      rows.push(dimRow);
+      var hdrRow = ['ID','Category'];
+      colTitles.forEach(function(ct){ hdrRow.push(ct); });
+      rows.push(hdrRow);
       byDim[dim].forEach(function(p){
         var pId = p.sheetId || ('P-'+String(p.seq).padStart(2,'0'));
         var pAs = assignments.filter(function(a){return a.principleId===p.id;});
         var byReg={};
         REGS.forEach(function(k){ byReg[k]=[]; });
         pAs.forEach(function(a){if(byReg[a.register]) byReg[a.register].push(a);});
-        rows.push([pId, p.name + (p.description ? ' — ' + p.description : ''), '', '', '']);
-        var mbr = p.moveByReg   || {};
+        var pRow = [pId, p.name + (p.description ? ' — ' + p.description : '')];
+        for (var _pi = 0; _pi < numCols; _pi++) pRow.push('');
+        rows.push(pRow);
+        var ctbr = p.colTextByReg || {};
+        var mbr = p.moveByReg || {};
         var tbr = p.metricByReg || {};
         REGS.forEach(function(reg){
           var regAs=byReg[reg];
-          var mv=mbr[reg]||'N/A', mt=tbr[reg]||'N/A';
           if (!regAs.length) {
-            rows.push(['', REG_LABEL[reg]||reg.toUpperCase()+'?', '', mv, mt]);
+            var row = ['', REG_LABEL[reg]||reg.toUpperCase()+'?'];
+            for (var ci = 0; ci < numCols; ci++) {
+              var text = (ctbr[ci] && ctbr[ci][reg]) ? ctbr[ci][reg] : (ci===1 ? mbr[reg] : ci===2 ? tbr[reg] : '') || 'N/A';
+              row.push(text);
+            }
+            rows.push(row);
           } else {
             regAs.forEach(function(a, ai){
               var resolved = resolveNoteKey(a.noteKey);
-              var ruleCell = resolved ? cellRef(resolved.tabName,resolved.gridRow,resolved.gridCol) : '[source missing]';
-              rows.push(['', ai===0?(REG_LABEL[reg]||reg.toUpperCase()+'?'):'', ruleCell, ai===0?mv:'', ai===0?mt:'']);
+              var assignedCol = (a.column != null) ? a.column : 0;
+              var row = ['', ai===0?(REG_LABEL[reg]||reg.toUpperCase()+'?'):''];
+              for (var ci = 0; ci < numCols; ci++) {
+                if (ci === assignedCol) {
+                  row.push(resolved ? cellRef(resolved.tabName,resolved.gridRow,resolved.gridCol) : '[source missing]');
+                } else if (ai === 0) {
+                  var text = (ctbr[ci] && ctbr[ci][reg]) ? ctbr[ci][reg] : (ci===1 ? mbr[reg] : ci===2 ? tbr[reg] : '') || '';
+                  row.push(text);
+                } else {
+                  row.push('');
+                }
+              }
+              rows.push(row);
             });
           }
         });
@@ -1134,10 +1163,12 @@ window.SynthesisData = (function () {
     var REG_LABEL = {}; regs.forEach(function(r){ REG_LABEL[r.key]=r.label; });
     var colTitles;
     try { colTitles = JSON.parse(localStorage.getItem('df_fw_col_titles')); } catch(e){}
-    if (!Array.isArray(colTitles) || colTitles.length !== 3) colTitles = ['Rule / Constraint','Move / Intervention','Metric / Proof'];
+    if (!Array.isArray(colTitles) || colTitles.length < 1) colTitles = ['Rule / Constraint','Move / Intervention','Metric / Proof'];
     var byDim={},dimOrder=[];
     principles.forEach(function(p){var d=p.dimensionHint||'Undimensioned';if(!byDim[d]){byDim[d]=[];dimOrder.push(d);}byDim[d].push(p);});
-    var lines=[['Dimension','ID','Category','Description',colTitles[0],colTitles[1],colTitles[2]].map(_esc).join(',')];
+    var hdr = ['Dimension','ID','Category','Description'];
+    colTitles.forEach(function(ct){ hdr.push(ct); });
+    var lines=[hdr.map(_esc).join(',')];
     dimOrder.forEach(function(dim){
       var dimDesc = getSchemaDescription('dimensions', dim);
       byDim[dim].forEach(function(p){
@@ -1145,13 +1176,25 @@ window.SynthesisData = (function () {
         var pAs=assignments.filter(function(a){return a.principleId===p.id;});
         var byReg={}; REGS.forEach(function(k){ byReg[k]=[]; });
         pAs.forEach(function(a){if(byReg[a.register])byReg[a.register].push(a);});
+        var ctbr = p.colTextByReg || {};
+        var mbr = p.moveByReg || {};
+        var tbr = p.metricByReg || {};
         REGS.forEach(function(reg,ri){
           var rAs=byReg[reg]||[];
-          var mv=(p.moveByReg||{})[reg]||'N/A', mt=(p.metricByReg||{})[reg]||'N/A';
-          if(!rAs.length){lines.push([ri===0?dim+(dimDesc?' ('+dimDesc+')':''):'',pId,REG_LABEL[reg]||reg.toUpperCase()+'?',ri===0?(p.description||''):'','',mv,mt].map(_esc).join(','));}
-          else rAs.forEach(function(a,ai){
+          if(!rAs.length){
+            var row = [ri===0?dim+(dimDesc?' ('+dimDesc+')':''):'',pId,REG_LABEL[reg]||reg.toUpperCase()+'?',ri===0?(p.description||''):''];
+            for(var ci=0;ci<colTitles.length;ci++) row.push((ctbr[ci]&&ctbr[ci][reg])?ctbr[ci][reg]:(ci===1?mbr[reg]:ci===2?tbr[reg]:'')||'');
+            lines.push(row.map(_esc).join(','));
+          } else rAs.forEach(function(a,ai){
             var r=resolveNoteKey(a.noteKey);
-            lines.push([ri===0&&ai===0?dim+(dimDesc?' ('+dimDesc+')':''):'',ai===0?pId:'',ai===0?(REG_LABEL[reg]||reg.toUpperCase()+'?'):'',ri===0&&ai===0?(p.description||''):'',(r?r.text:a.noteKey),ai===0?mv:'',ai===0?mt:''].map(_esc).join(','));
+            var assignedCol = (a.column!=null)?a.column:0;
+            var row = [ri===0&&ai===0?dim+(dimDesc?' ('+dimDesc+')':''):'',ai===0?pId:'',ai===0?(REG_LABEL[reg]||reg.toUpperCase()+'?'):'',ri===0&&ai===0?(p.description||''):''];
+            for(var ci=0;ci<colTitles.length;ci++){
+              if(ci===assignedCol) row.push(r?r.text:a.noteKey);
+              else if(ai===0) row.push((ctbr[ci]&&ctbr[ci][reg])?ctbr[ci][reg]:(ci===1?mbr[reg]:ci===2?tbr[reg]:'')||'');
+              else row.push('');
+            }
+            lines.push(row.map(_esc).join(','));
           });
         });
       });
