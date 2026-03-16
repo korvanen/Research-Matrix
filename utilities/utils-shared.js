@@ -3,7 +3,7 @@
 // Loaded by: index.html, tools/spreadsheet.html, tools/*.html
 // MD3 upgrade: Navigation Rail 80px, component classes injected globally
 // ════════════════════════════════════════════════════════════════
-console.log('[utils-shared.js v.12-md3]');
+console.log('[utils-shared.js v.999-md3]');
 
 // ════════════════════════════════════════════════════════════════
 // DARK / LIGHT MODE
@@ -1568,12 +1568,14 @@ function buildRowIndex() {
   s.textContent = `
 /* ── Shared card top row ── */
 .pp-card-top {
+  --pp-card-heading: 26px;
   display:flex; align-items:flex-start; justify-content:space-between;
   padding:8px 12px 4px; gap:6px;
+  font-size: var(--pp-card-heading);
 }
 .pp-card-cat-num {
   font-family: var(--font-family-serif, Georgia, serif);
-  font-size:26px; font-weight:400; font-style:italic; line-height:1;
+  font-size:1em; font-weight:400; font-style:italic; line-height:1;
   letter-spacing:-0.02em;
   color: color-mix(in srgb, var(--ppc-on,#fff) 92%, var(--ppc-bg,transparent));
   flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
@@ -1582,11 +1584,11 @@ function buildRowIndex() {
   display:flex; flex-direction:column; align-items:flex-end; flex-shrink:0;
 }
 .pp-card-level-num {
-  font-size:16px; font-weight:900; line-height:1;
+  font-size:0.62em; font-weight:900; line-height:1;
   color: color-mix(in srgb, var(--ppc-on,#fff) 95%, black);
 }
 .pp-card-level-label {
-  font-size:8px; font-weight:600; letter-spacing:.08em; text-transform:uppercase;
+  font-size:0.31em; font-weight:600; letter-spacing:.08em; text-transform:uppercase;
   color: color-mix(in srgb, var(--ppc-on,#fff) 55%, var(--ppc-bg,transparent));
 }
 .pp-card-rule {
