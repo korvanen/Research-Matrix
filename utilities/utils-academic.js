@@ -381,13 +381,20 @@ window.AcademicUtils = (function () {
   function loadImportedTabs() { try{return JSON.parse(localStorage.getItem(SK.IMPORTED_DATA)||'[]');}catch(e){return[];} }
   function clearImportedTabs() { try{localStorage.removeItem(SK.IMPORTED_DATA);}catch(e){} }
 
+  var _merging = false;
   function mergeImportedIntoTABS() {
+    if (_merging) return;                       // guard against re-entrant dispatch
     var imported=loadImportedTabs(); if (!imported.length) return;
     if (typeof window.TABS==='undefined') window.TABS=[];
+    var added = 0;
     imported.forEach(function(tab){
-      if (!window.TABS.some(function(t){return t.name===tab.name;})) window.TABS.push(tab);
+      if (!window.TABS.some(function(t){return t.name===tab.name;})) { window.TABS.push(tab); added++; }
     });
-    window.dispatchEvent(new CustomEvent('sheet-loaded',{detail:{tabCount:window.TABS.length}}));
+    if (added) {
+      _merging = true;
+      window.dispatchEvent(new CustomEvent('sheet-loaded',{detail:{tabCount:window.TABS.length}}));
+      _merging = false;
+    }
   }
   window.addEventListener('sheet-loaded', mergeImportedIntoTABS);
   document.addEventListener('DOMContentLoaded', function(){
@@ -581,11 +588,34 @@ window.AcademicUtils = (function () {
       var reader = new FileReader();
       reader.onload = function(e) {
         try {
-          var rows = _parseCSVRows(e.target.result);
-          if (!rows.length) { msgEl.textContent='No data found in file.'; msgEl.className='acad-import-msg err'; return; }
+          var text = e.target.result;
           var tabName = 'MX-' + file.name.replace(/\.[^.]+$/,'').replace(/[^a-zA-Z0-9]/g,'-').replace(/-+/g,'-');
-          saveImportedTabs([{ name: tabName, grid: rows }]);
-          msgEl.textContent = rows.length + ' rows imported from ' + file.name + '. Reloading…';
+
+          // Try structured parse (title/authors/year columns → proper grid)
+          var entries = parseCSVText(text);
+          if (entries.length) {
+            var grid = citationsToGrid(entries, tabName);
+            saveImportedTabs([{ name: tabName, grid: grid }]);
+            msgEl.textContent = entries.length + ' entries imported from ' + file.name + '. Reloading\u2026';
+            msgEl.className='acad-import-msg ok';
+            clearBtn.style.display='block';
+            setTimeout(function(){location.reload();},900);
+            return;
+          }
+
+          // Fallback: raw CSV rows → wrap in CATEGORY/COLUMN/HEADER ROW structure
+          var rows = _parseCSVRows(text);
+          if (!rows.length) { msgEl.textContent='No data found in file.'; msgEl.className='acad-import-msg err'; return; }
+          var hdrs = rows[0];
+          var flagRow = ['CATEGORY','COLUMN'].concat(hdrs.map(function(){return 'COLUMN';}));
+          var titleRow = ['TITLE', tabName].concat(hdrs.map(function(){return '';}));
+          var headerRow = ['HEADER ROW',''].concat(hdrs);
+          var dataRows = rows.slice(1).map(function(r,i){
+            return ['Entry '+(i+1),''].concat(r);
+          });
+          var grid = [flagRow, titleRow, headerRow].concat(dataRows);
+          saveImportedTabs([{ name: tabName, grid: grid }]);
+          msgEl.textContent = (rows.length-1) + ' rows imported from ' + file.name + '. Reloading\u2026';
           msgEl.className='acad-import-msg ok';
           clearBtn.style.display='block';
           setTimeout(function(){location.reload();},900);
