@@ -588,8 +588,7 @@ var _browsePanelHtml =
     }
     _syncPanelSections();
 
-    // Build main area — hide subtitle (redundant with status row)
-    if (_nav.subtitleEl) _nav.subtitleEl.style.display = 'none';
+    // Build main area
     _nav.mainEl.style.cssText = 'display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden;';
     _nav.mainEl.innerHTML =
       '<div class="en-view" id="en-view-browse">' +
@@ -786,6 +785,7 @@ var _browsePanelHtml =
         document.getElementById('en-dot').className = 'pp-panel-dot ready';
         var _statusMsg = _emb.size + ' entries indexed';
         document.getElementById('en-status-text').textContent = _statusMsg;
+        if (_nav && _nav.subtitleEl) _nav.subtitleEl.textContent = _statusMsg;
         document.getElementById('en-search-input').disabled = false;
         document.getElementById('en-search-btn').disabled   = false;
         renderBrowse();
@@ -814,6 +814,8 @@ var _browsePanelHtml =
       updateCounts(); renderBrowse(); _triggerEmbed();
       _loadFrameworkIfNeeded();
       _updateScreeningProgress();
+      var keys = SY.getRowNoteKeys();
+      if (_nav && _nav.subtitleEl) _nav.subtitleEl.textContent = keys.length + ' entries';
     });
 
     function _loadFrameworkIfNeeded() {
