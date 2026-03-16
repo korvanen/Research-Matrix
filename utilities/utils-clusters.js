@@ -2089,6 +2089,7 @@ function initClustersTool(paneEl, sidebarEl) {
       row: r, accent: col.accent, onColor: contrastFor(col.accent),
       label: clusterLabel, delay: delay,
       similarity: similarity, simLabel: 'to cluster',
+      mode: 'cluster',
     });
     card.addEventListener('mouseenter', ev => { if (_nestDrag && _nestDrag.moved) return; showTooltip(ev, r, col.accent, clusterLabel || ''); });
     card.addEventListener('mousemove',  ev => { if (_nestDrag && _nestDrag.moved) { hideTooltip(); return; } moveTooltip(ev); });
