@@ -569,6 +569,25 @@ var _browsePanelHtml =
       ],
     });
 
+    // Tag panel sections for contextual visibility
+    (function(){
+      var sectionLabels = ['Views','Global','Browse','Search','Refs'];
+      var viewMap = { Views:'all', Global:'all', Browse:'browse', Search:'search', Refs:'refs' };
+      var sections = _paneEl.querySelectorAll('.pp-side-panel-section');
+      sections.forEach(function(sec, i){
+        if (i < sectionLabels.length) sec.dataset.panelFor = viewMap[sectionLabels[i]] || 'all';
+      });
+    })();
+
+    function _syncPanelSections() {
+      var sections = _paneEl.querySelectorAll('.pp-side-panel-section[data-panel-for]');
+      sections.forEach(function(sec){
+        var show = sec.dataset.panelFor === 'all' || sec.dataset.panelFor === _view;
+        sec.style.display = show ? '' : 'none';
+      });
+    }
+    _syncPanelSections();
+
     // Build main area — hide subtitle (redundant with status row)
     if (_nav.subtitleEl) _nav.subtitleEl.style.display = 'none';
     _nav.mainEl.style.cssText = 'display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden;';
@@ -645,6 +664,7 @@ var _browsePanelHtml =
       document.getElementById('en-view-browse').hidden = _view !== 'browse';
       document.getElementById('en-view-search').hidden = _view !== 'search';
       document.getElementById('en-view-refs').hidden   = _view !== 'refs';
+      _syncPanelSections();
       if (_view === 'refs') renderRefs();
     });
 
