@@ -598,13 +598,14 @@ window.SynthesisData = (function () {
     return getAssignments().find(function(a){ return a.noteKey===noteKey; }) || null;
   }
 
-  function setAssignment(noteKey, principleId, register, status, similarity) {
+  function setAssignment(noteKey, principleId, register, status, similarity, column) {
     var as = getAssignments().filter(function(a){ return a.noteKey!==noteKey; });
     if (principleId) {
       var resolved = resolveNoteKey(noteKey);
       as.push({
         id: _id('a'), noteKey: noteKey, principleId: principleId,
-        register: register||'what', status: status||'confirmed',
+        register: register||'what', column: (column != null) ? column : 0,
+        status: status||'confirmed',
         similarity: similarity||null,
         contentHash: resolved ? hashText(resolved.text) : null,
         ts: Date.now(),
@@ -624,6 +625,11 @@ window.SynthesisData = (function () {
   function updateAssignmentRegister(noteKey, register) {
     _saveAssignments(getAssignments().map(function(a){
       return a.noteKey===noteKey ? Object.assign({},a,{register:register}) : a;
+    }));
+  }
+  function updateAssignmentColumn(noteKey, column) {
+    _saveAssignments(getAssignments().map(function(a){
+      return a.noteKey===noteKey ? Object.assign({},a,{column:column}) : a;
     }));
   }
 
@@ -650,9 +656,9 @@ window.SynthesisData = (function () {
   }
 
   // ── Register heuristic ────────────────────────────────────────────────────
-  var _WHO = /\b(resident|inhabitant|architect|user|communit|people|person|occupant|famil|household|designer|dweller|neighbou?r|individual|collective)\b/i;
-  var _WHY = /\b(because|enabl|allows?|encourages?|supports?|leads?\s+to|fosters?|promotes?|facilitate|prevent|reduces?|increases?|improves?|creates?|generates?)\b/i;
-  var _HOW = /\b(by\s|through\s|using\s|via\s|combin|integrat|applying|implement|designing|providing|placing|arrang|configur|layer|graduat|interlock)\b/i;
+  var _WHO = /\b(resident|inhabitant|architect|user|communit|people|person|occupant|famil|household|designer|dweller|neighbou?r|individual|collective|owner|stakeholder|tenant|citizen|client|organisation|organization)\w*\b/i;
+  var _WHY = /\b(because|enabl|allow|encourage|support|leads?\s+to|foster|promot|facilitat|prevent|reduc|increas|improv|creat|generat)\w*\b/i;
+  var _HOW = /\b(by\s|through\s|using\s|via\s|combin|integrat|apply|implement|designing|providing|placing|arrang|configur|layer|graduat|interlock)\w*\b/i;
 
   function suggestRegister(text) {
     if (!text) return 'what';
@@ -666,7 +672,7 @@ window.SynthesisData = (function () {
   // register description embeddings stored as __rdesc__<key> in the map.
   // Falls back to keyword heuristic if no embeddings available.
   function suggestRegisterByVec(vec, embeddings) {
-    if (!vec || !embeddings) return 'what';
+    if (!vec || !embeddings) return null;
     var regs = getRegisters();
     var best = null, bestSim = 0.30;
     regs.forEach(function(r) {
@@ -675,7 +681,36 @@ window.SynthesisData = (function () {
       var sim = cosine(vec, rv);
       if (sim > bestSim) { bestSim = sim; best = r.key; }
     });
-    return best || 'what';
+    return best;
+  }
+
+  // Embedding-based column suggestion: compares entry vector against
+  // column title+description embeddings stored as __cdesc__0, __cdesc__1, __cdesc__2.
+  function suggestColumnByVec(vec, embeddings) {
+    if (!vec || !embeddings) return 0;
+    var best = 0, bestSim = 0.30;
+    for (var ci = 0; ci < 3; ci++) {
+      var cv = embeddings.get('__cdesc__' + ci);
+      if (!cv) continue;
+      var sim = cosine(vec, cv);
+      if (sim > bestSim) { bestSim = sim; best = ci; }
+    }
+    return best;
+  }
+
+  // Full semantic placement: suggests register + column.
+  // Uses embeddings when available, falls back to keywords for register.
+  function suggestPlacement(vec, text, embeddings) {
+    var reg = null;
+    var col = 0;
+    // Try embedding-based register suggestion first
+    if (vec && embeddings) {
+      reg = suggestRegisterByVec(vec, embeddings);
+      col = suggestColumnByVec(vec, embeddings);
+    }
+    // Fall back to keyword heuristic for register
+    if (!reg) reg = suggestRegister(text || '');
+    return { register: reg, column: col };
   }
 
   // ── Auto-label ────────────────────────────────────────────────────────────
@@ -1117,10 +1152,10 @@ window.SynthesisData = (function () {
     getPrinciples, addPrinciple, updatePrinciple, deletePrinciple, getPrincipleEmbedText,
     // Assignments
     getAssignments, getAssignment, setAssignment, confirmAssignment,
-    rejectAssignment, updateAssignmentRegister,
+    rejectAssignment, updateAssignmentRegister, updateAssignmentColumn,
     getChangedSources, acknowledgeChangedSource,
     // Analysis
-    suggestRegister, suggestRegisterByVec, autoLabel, cosine, centroid, cluster,
+    suggestRegister, suggestRegisterByVec, suggestColumnByVec, suggestPlacement, autoLabel, cosine, centroid, cluster,
     buildPrincipleVectors, computeAssignmentTiers,
     // Sheet I/O
     parseFrameworkTab, loadFromFrameworkTab, buildFrameworkGrid, diffFramework,
