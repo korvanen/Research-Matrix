@@ -8,8 +8,8 @@
   <link rel="stylesheet" href="../design-system.css?v=9fa06a28">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="../utilities/utils-keywords.js?v=7"></script>
-  <script src="../utilities/utils-shared.js?v=54876d07"></script>
-  <script src="../utilities/utils-synthesis.js?v=58a613f8"></script>
+  <script src="../utilities/utils-shared.js?v=0067db69"></script>
+  <script src="../utilities/utils-synthesis.js?v=b4058e56"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; }
     html, body { height: 100%; overflow: hidden; margin: 0; padding: 0; }
@@ -200,6 +200,17 @@
     var _pendingWrite = null;
 
     function _h(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+    // ── Column titles (editable, persisted) ───────────────────────────────
+    var _COL_DEFAULTS = ['Rule / Constraint', 'Move / Intervention', 'Metric / Proof'];
+    var _COL_STORAGE  = 'df_fw_col_titles';
+    function _getColTitles() {
+      try { var s = JSON.parse(localStorage.getItem(_COL_STORAGE)); if (Array.isArray(s)&&s.length===3) return s; } catch(e){}
+      return _COL_DEFAULTS.slice();
+    }
+    function _setColTitles(titles) {
+      try { localStorage.setItem(_COL_STORAGE, JSON.stringify(titles)); } catch(e){}
+    }
 
     // ── Panel HTML ───────────────────────────────────────────────────────────
     var _globalHtml = window.GlobalPanel.html();
@@ -401,7 +412,8 @@
         html += '<div class="fw-section">';
         html += '<div class="fw-dim-hdr" style="background:'+_h(color)+'">The '+_h(dim)+' Dimension</div>';
         html += '<table class="fw-table"><colgroup><col style="width:60px"><col style="width:80px"><col style="width:25%"><col style="width:25%"><col style="width:25%"></colgroup>';
-        html += '<thead><tr><th>ID</th><th>Category</th><th>Rule / Constraint</th><th>Move / Intervention</th><th>Metric / Proof</th></tr></thead><tbody>';
+        var _ct = _getColTitles();
+        html += '<thead><tr><th>ID</th><th>Category</th><th>'+_h(_ct[0])+'</th><th>'+_h(_ct[1])+'</th><th>'+_h(_ct[2])+'</th></tr></thead><tbody>';
 
         dps.forEach(function(p){
           var pId  = p.sheetId || ('P-'+String(p.seq).padStart(2,'0'));
@@ -533,6 +545,16 @@
       });
       html += '<button class="fw-schema-add" data-action="add-dim">+ Add dimension</button>';
 
+      html += '<div class="fw-panel-label" style="margin-top:10px">Column titles</div>';
+      var _ct = _getColTitles();
+      ['0','1','2'].forEach(function(ci){
+        html += '<div class="fw-schema-item" data-col="'+ci+'">';
+        html += '<span class="fw-schema-label">'+_h(_ct[parseInt(ci)])+'</span>';
+        html += '<button class="fw-schema-btn" data-action="edit-col" data-col="'+ci+'">Edit</button>';
+        html += '<button class="fw-schema-btn" data-action="reset-col" data-col="'+ci+'" style="font-size:10px;color:var(--md-sys-color-on-surface-variant)">Reset</button>';
+        html += '</div>';
+      });
+
       el.innerHTML = html;
 
       // Wire events
@@ -606,6 +628,33 @@
           if (!name || !name.trim()) return;
           SY.addDimension(name.trim());
           renderSchema();
+        });
+      });
+
+      // Column title editing
+      el.querySelectorAll('[data-action=edit-col]').forEach(function(btn){
+        btn.addEventListener('click', function(){
+          var ci   = parseInt(btn.dataset.col);
+          var ct   = _getColTitles();
+          var item = btn.closest('.fw-schema-item');
+          _inlineEdit(item, ct[ci], function(newTitle){
+            if (newTitle && newTitle !== ct[ci]) {
+              ct[ci] = newTitle;
+              _setColTitles(ct);
+              render();
+            }
+            renderSchema();
+          });
+        });
+      });
+
+      el.querySelectorAll('[data-action=reset-col]').forEach(function(btn){
+        btn.addEventListener('click', function(){
+          var ci = parseInt(btn.dataset.col);
+          var ct = _getColTitles();
+          ct[ci] = _COL_DEFAULTS[ci];
+          _setColTitles(ct);
+          render(); renderSchema();
         });
       });
     }
