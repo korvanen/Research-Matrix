@@ -701,16 +701,82 @@ window.SynthesisData = (function () {
   // Full semantic placement: suggests register + column.
   // Uses embeddings when available, falls back to keywords for register.
   function suggestPlacement(vec, text, embeddings) {
-    var reg = null;
-    var col = 0;
-    // Try embedding-based register suggestion first
+    var a = analyzePlacement(vec, text, embeddings);
+    return { register: a.register.key, column: a.column.index };
+  }
+
+  // Comprehensive placement analysis: returns all similarity scores for
+  // registers, columns, dimensions, and principles.
+  // Used by UI to show semantic similarity breakdown.
+  function analyzePlacement(vec, text, embeddings) {
+    var result = {
+      register:   { key: 'what', scores: [] },
+      column:     { index: 0, scores: [] },
+      dimension:  { name: null, scores: [] },
+      principles: [],  // [{id, name, color, similarity}] sorted by similarity
+    };
+
+    var regs = getRegisters();
+    var dims = getDimensions();
+
+    // Register similarities
     if (vec && embeddings) {
-      reg = suggestRegisterByVec(vec, embeddings);
-      col = suggestColumnByVec(vec, embeddings);
+      var bestReg = null, bestRegSim = 0;
+      regs.forEach(function(r) {
+        var rv = embeddings.get('__rdesc__' + r.key);
+        var sim = rv ? cosine(vec, rv) : 0;
+        result.register.scores.push({ key: r.key, label: r.label, sim: sim });
+        if (sim > bestRegSim) { bestRegSim = sim; bestReg = r.key; }
+      });
+      result.register.scores.sort(function(a,b){ return b.sim - a.sim; });
+      if (bestReg && bestRegSim > 0.30) result.register.key = bestReg;
     }
-    // Fall back to keyword heuristic for register
-    if (!reg) reg = suggestRegister(text || '');
-    return { register: reg, column: col };
+    // Fallback to keyword
+    if (!result.register.scores.length || result.register.scores[0].sim < 0.30) {
+      result.register.key = suggestRegister(text || '');
+    }
+
+    // Column similarities
+    if (vec && embeddings) {
+      var bestCol = 0, bestColSim = 0;
+      for (var ci = 0; ci < 3; ci++) {
+        var cv = embeddings.get('__cdesc__' + ci);
+        var sim = cv ? cosine(vec, cv) : 0;
+        result.column.scores.push({ index: ci, sim: sim });
+        if (sim > bestColSim) { bestColSim = sim; bestCol = ci; }
+      }
+      result.column.scores.sort(function(a,b){ return b.sim - a.sim; });
+      if (bestColSim > 0.30) result.column.index = bestCol;
+    }
+
+    // Dimension similarities
+    if (vec && embeddings) {
+      var bestDim = null, bestDimSim = 0;
+      dims.forEach(function(d) {
+        var dv = embeddings.get('__ddesc__' + d);
+        var sim = dv ? cosine(vec, dv) : 0;
+        result.dimension.scores.push({ name: d, sim: sim });
+        if (sim > bestDimSim) { bestDimSim = sim; bestDim = d; }
+      });
+      result.dimension.scores.sort(function(a,b){ return b.sim - a.sim; });
+      if (bestDim && bestDimSim > 0.30) result.dimension.name = bestDim;
+    }
+
+    // Principle similarities
+    if (vec && embeddings) {
+      var pvecs = buildPrincipleVectors(embeddings);
+      pvecs.forEach(function(pv) {
+        var sim = pv.centroid ? cosine(vec, pv.centroid) : 0;
+        result.principles.push({
+          id: pv.principle.id, name: pv.principle.name,
+          color: pv.principle.color, dimensionHint: pv.principle.dimensionHint,
+          similarity: sim,
+        });
+      });
+      result.principles.sort(function(a,b){ return b.similarity - a.similarity; });
+    }
+
+    return result;
   }
 
   // ── Auto-label ────────────────────────────────────────────────────────────
@@ -1155,7 +1221,7 @@ window.SynthesisData = (function () {
     rejectAssignment, updateAssignmentRegister, updateAssignmentColumn,
     getChangedSources, acknowledgeChangedSource,
     // Analysis
-    suggestRegister, suggestRegisterByVec, suggestColumnByVec, suggestPlacement, autoLabel, cosine, centroid, cluster,
+    suggestRegister, suggestRegisterByVec, suggestColumnByVec, suggestPlacement, analyzePlacement, autoLabel, cosine, centroid, cluster,
     buildPrincipleVectors, computeAssignmentTiers,
     // Sheet I/O
     parseFrameworkTab, loadFromFrameworkTab, buildFrameworkGrid, diffFramework,
