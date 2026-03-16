@@ -1863,7 +1863,7 @@ function initClustersTool(paneEl, sidebarEl) {
 
   function makeRow(row, cells, cats, bestIdx, text, catStr, ni, total, vec) {
     return {
-      tabIdx: row.tabIdx, rowIdx: row.rowIdx,
+      tabIdx: row.tabIdx, rowIdx: row.rowIdx, _cellIdx: row._cellIdx || 0,
       headers: row.headers || [], title: row.title || '',
       kws: row.kws || new Set(),
       _splitFrom: catStr, _splitN: ni + 1, _splitT: total,
@@ -2104,7 +2104,7 @@ function initClustersTool(paneEl, sidebarEl) {
     levelBlock.appendChild(levelLbl); topRow.appendChild(catNumEl); topRow.appendChild(levelBlock); card.appendChild(topRow);
     const rule = document.createElement('div'); rule.className = 'pp-cmap-card-rule'; card.appendChild(rule);
     const body = document.createElement('div'); body.className = 'pp-cl-card-body';
-    if (colHeader) { const ce = document.createElement('div'); ce.className = 'pp-cl-card-cat'; ce.textContent = colHeader; body.appendChild(ce); }
+    if (cats.length) { const ce = document.createElement('div'); ce.className = 'pp-cl-card-cat'; ce.textContent = cats.join(' \u00b7 '); body.appendChild(ce); }
     const te = document.createElement('div'); te.className = 'pp-cl-card-text'; te.textContent = parsed.body; body.appendChild(te);
     if (r._splitN && r._splitT && r._splitT > 1) { const sp = document.createElement('div'); sp.className = 'pp-cl-card-split'; sp.textContent = r._splitN + '/' + r._splitT + ' Split'; body.appendChild(sp); }
     if (r._borderline || r._outlier) {
@@ -2387,7 +2387,7 @@ function initClustersTool(paneEl, sidebarEl) {
     const rows = buildRowIndex(); if (!rows.length) return;
     const preVeced = rows.filter(r => r.vec && r.vec.length);
     if (preVeced.length >= 2) {
-      const vectors = new Map(); preVeced.forEach(r => vectors.set(r.tabIdx+':'+r.rowIdx, r.vec));
+      const vectors = new Map(); preVeced.forEach(r => vectors.set(r.tabIdx+':'+r.rowIdx+':'+(r._cellIdx||0), r.vec));
       _cachedEmbedded = preVeced; _cachedVectors = vectors;
       requestAnimationFrame(doRender); return;
     }
@@ -2397,13 +2397,14 @@ function initClustersTool(paneEl, sidebarEl) {
     Promise.all(rows.map(r => {
       const text = (r.row?.cells || r.cells || []).join(' ').trim();
       if (!text) return Promise.resolve(null);
-      return window.EmbeddingUtils.getCachedEmbedding(text).then(vec => ({ key: r.tabIdx+':'+r.rowIdx, vec })).catch(() => null);
+      var rkey = r.tabIdx+':'+r.rowIdx+':'+(r._cellIdx||0);
+      return window.EmbeddingUtils.getCachedEmbedding(text).then(vec => ({ key: rkey, vec })).catch(() => null);
     })).then(results => {
       const vectors = new Map(); results.forEach(res => { if (res?.vec) vectors.set(res.key, res.vec); });
       if (!vectors.size) { setStatus('error', 'No vectors available'); return; }
-      const embedded = rows.filter(r => vectors.has(r.tabIdx+':'+r.rowIdx));
+      const embedded = rows.filter(r => vectors.has(r.tabIdx+':'+r.rowIdx+':'+(r._cellIdx||0)));
       if (embedded.length < 2) { setStatus('error', 'Not enough data'); return; }
-      embedded.forEach(r => { r.vec = vectors.get(r.tabIdx+':'+r.rowIdx); });
+      embedded.forEach(r => { r.vec = vectors.get(r.tabIdx+':'+r.rowIdx+':'+(r._cellIdx||0)); });
       _cachedEmbedded = embedded; _cachedVectors = vectors;
       requestAnimationFrame(doRender);
     });
