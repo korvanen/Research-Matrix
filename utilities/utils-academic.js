@@ -1101,6 +1101,7 @@ window.AcademicUtils = (function () {
         if (tag==='AU'||tag==='A1') { f.authorList = f.authorList||[]; f.authorList.push(val); }
         else if (tag==='TI'||tag==='T1') f.title = val;
         else if (tag==='PY'||tag==='Y1') f.year = val.replace(/\/.*/, '');
+        else if (tag==='DA') { if (!f.year) { var ym = val.match(/(\d{4})/); if (ym) f.year = ym[1]; } }
         else if (tag==='JO'||tag==='JF'||tag==='T2') f.journal = f.journal || val;
         else if (tag==='VL') f.volume = val;
         else if (tag==='IS') f.issue = val;
