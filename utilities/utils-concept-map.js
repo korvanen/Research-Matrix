@@ -917,12 +917,13 @@ function initConceptMapTool(paneEl, sidebarEl) {
       var info = window.buildCardContent(card, {
         row: primaryRow, accent: accent, onColor: lc,
         label: 'Level', levelNum: level,
+        mode: 'cmap',
       });
 
       // If merged, add extra row content into the body
       if (extras.length>0) {
         var mg=document.createElement('div');
-        mg.className='pp-card-split-badge';
+        mg.className='pp-cmap-card-merged';
         mg.textContent='\u00d7'+allRows.length+' merged';
         // Insert merged badge before body
         var bodyEl = info.body;
@@ -930,7 +931,7 @@ function initConceptMapTool(paneEl, sidebarEl) {
 
         extras.forEach(function(ri){
           var sep=document.createElement('div');
-          sep.style.cssText='height:1px;margin:4px 0;background:color-mix(in srgb, var(--ppc-on,#fff) 20%, var(--ppc-bg,#888))';
+          sep.className='pp-cmap-merge-sep';
           bodyEl.appendChild(sep);
           var r2=rows[ri], cells2=r2.row&&r2.row.cells?r2.row.cells:(r2.cells||[]);
           var hdrs2=r2.headers||[];
@@ -940,13 +941,13 @@ function initConceptMapTool(paneEl, sidebarEl) {
           var colH2=hdrs2[bestIdx2]||'';
           var parsed2=typeof parseCitation==='function'?parseCitation(best2):{body:best2};
           if (colH2) {
-            var ce2=document.createElement('div'); ce2.className='pp-card-col-label';
+            var ce2=document.createElement('div'); ce2.className='pp-cmap-cell-cat';
             ce2.textContent=colH2; bodyEl.appendChild(ce2);
           }
-          var te2=document.createElement('div'); te2.className='pp-card-text';
+          var te2=document.createElement('div'); te2.className='pp-cmap-cell-text';
           te2.textContent=parsed2.body; bodyEl.appendChild(te2);
           if (r2._splitFrom) {
-            var sb2=document.createElement('div'); sb2.className='pp-card-split-badge';
+            var sb2=document.createElement('div'); sb2.className='pp-cmap-split-num';
             sb2.textContent=r2._splitN+'/'+r2._splitT+' Split'; bodyEl.appendChild(sb2);
           }
         });
