@@ -9,7 +9,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="../utilities/utils-keywords.js?v=7"></script>
   <script src="../utilities/utils-shared.js?v=0067db69"></script>
-  <script src="../utilities/utils-synthesis.js?v=ea7a2c35"></script>
+  <script src="../utilities/utils-synthesis.js?v=3"></script>
   <script src="../utilities/utils-panel.js?v=7"></script>
   <script type="module" src="../utilities/utils-embedding.js?v=4"></script>
   <style>
@@ -487,6 +487,18 @@
           if (dv) _emb.set('__ddesc__' + dims[di], new Float32Array(dv));
         } catch(e){}
       }
+      // Column title descriptions
+      var colTitles;
+      try { colTitles = JSON.parse(localStorage.getItem('df_fw_col_titles')); } catch(e){}
+      if (!Array.isArray(colTitles)||colTitles.length!==3) colTitles = ['Rule / Constraint','Move / Intervention','Metric / Proof'];
+      for (var ci = 0; ci < 3; ci++) {
+        var cDesc = SY.getSchemaDescription('columns', String(ci));
+        var cText = colTitles[ci] + (cDesc ? '. ' + cDesc : '');
+        try {
+          var cv = await window.EmbeddingUtils.getCachedEmbedding(cText);
+          if (cv) _emb.set('__cdesc__' + ci, new Float32Array(cv));
+        } catch(e){}
+      }
     }
 
     document.addEventListener('embedder-ready', _triggerEmbed);
@@ -584,7 +596,7 @@
         as.forEach(function(a){
           var r = SY.resolveNoteKey(a.noteKey); if (!r) return;
           var isChanged = changed.has(a.noteKey);
-          var reg = a.register || SY.suggestRegister(r.text);
+          var reg = a.register || SY.suggestPlacement(_emb.get(a.noteKey), r.text, _emb).register;
           var parsed = typeof parseCitation==='function' ? parseCitation(r.text) : {body:r.text,citation:null};
           html += '<div class="cl-pr-note'+(isChanged?' changed':'')+'">';
           html += '<div style="display:flex;flex-direction:column;gap:2px;flex-shrink:0">';
@@ -665,7 +677,7 @@
         var byReg = {what:[],why:[],who:[],how:[]};
         cl.noteKeys.forEach(function(k){
           var r = SY.resolveNoteKey(k); if (!r) return;
-          var reg = SY.suggestRegister(r.text);
+          var reg = SY.suggestPlacement(_emb.get(k), r.text, _emb).register;
           if (byReg[reg]) byReg[reg].push({key:k,r:r}); else byReg.what.push({key:k,r:r});
         });
         html += '<div class="cl-pool-card">';
@@ -727,7 +739,7 @@
           var ci = parseInt(btn.dataset.ci), cl = clusters[ci];
           _openModal('Name this cluster', '', '', function(name, dim, desc){
             var p = SY.addPrinciple({ name:name, dimensionHint:dim, description:desc });
-            if (cl) cl.noteKeys.forEach(function(k){ SY.setAssignment(k, p.id, SY.suggestRegister((SY.resolveNoteKey(k)||{text:''}).text), 'confirmed', null); });
+            if (cl) cl.noteKeys.forEach(function(k){ var r=SY.resolveNoteKey(k); var pl=SY.suggestPlacement(_emb.get(k),r?r.text:'',_emb); SY.setAssignment(k, p.id, pl.register, 'confirmed', null, pl.column); });
             _clusters=null; _openP.add(p.id); renderPrinciples();
           });
         });
@@ -736,7 +748,7 @@
         btn.addEventListener('click', function(e){
           e.stopPropagation();
           var cl = clusters[parseInt(btn.dataset.ci)]; if (!cl) return;
-          cl.noteKeys.forEach(function(k){ SY.setAssignment(k, btn.dataset.pid, SY.suggestRegister((SY.resolveNoteKey(k)||{text:''}).text), 'confirmed', null); });
+          cl.noteKeys.forEach(function(k){ var r=SY.resolveNoteKey(k); var pl=SY.suggestPlacement(_emb.get(k),r?r.text:'',_emb); SY.setAssignment(k, btn.dataset.pid, pl.register, 'confirmed', null, pl.column); });
           _clusters=null; _openP.add(btn.dataset.pid); renderPrinciples();
         });
       });
@@ -968,7 +980,8 @@
         it.innerHTML = '<span class="cl-pop-dot" style="background:'+_h(p.color)+'"></span>'+_h(p.name);
         it.addEventListener('click', function(){
           var r = SY.resolveNoteKey(_assignCtx);
-          SY.setAssignment(_assignCtx, p.id, r ? SY.suggestRegister(r.text) : 'what', 'confirmed', null);
+          var pl = SY.suggestPlacement(_emb.get(_assignCtx), r ? r.text : '', _emb);
+          SY.setAssignment(_assignCtx, p.id, pl.register, 'confirmed', null, pl.column);
           _clusters=null; _openP.add(p.id); _closePop(); renderPrinciples();
         });
         listEl.appendChild(it);
@@ -987,7 +1000,8 @@
       _openModal('New principle', '', '', function(name, dim, desc){
         var p = SY.addPrinciple({ name:name, dimensionHint:dim, description:desc });
         var r = SY.resolveNoteKey(savedCtx);
-        SY.setAssignment(savedCtx, p.id, r ? SY.suggestRegister(r.text) : 'what', 'confirmed', null);
+        var pl = SY.suggestPlacement(_emb.get(savedCtx), r ? r.text : '', _emb);
+        SY.setAssignment(savedCtx, p.id, pl.register, 'confirmed', null, pl.column);
         _clusters=null; _openP.add(p.id); renderPrinciples();
       });
     });
