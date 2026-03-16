@@ -317,7 +317,6 @@
                 placeholder="Paste a Google Sheets link…" autocomplete="off" spellcheck="false"/>
             </div>
             <button class="sheet-btn sheet-btn--primary" id="sheet-load-btn">Load</button>
-            <button class="sheet-btn" id="sheet-default-btn">Default</button>
           </div>
           <div class="sheet-loader-status" id="sheet-status"></div>
           <div class="sheet-active-url">
@@ -423,8 +422,8 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="utilities/embedding-bridge.js?v=4"></script>
   <script src="utilities/utils-keywords.js?v=4"></script>
-  <script src="utilities/utils-shared.js?v=54876d07"></script>
-  <script src="utilities/utils-academic.js?v=ccb594d8"></script>
+  <script src="utilities/utils-shared.js?v=0067db69"></script>
+  <script src="utilities/utils-academic.js?v=1"></script>
   <script type="module" src="utilities/utils-embedding.js?v=4"></script>
 
   <script>console.log('[index.html v.10]');</script>
@@ -432,7 +431,6 @@
   <script>
     var input      = document.getElementById('sheet-url-input');
     var loadBtn    = document.getElementById('sheet-load-btn');
-    var defaultBtn = document.getElementById('sheet-default-btn');
     var statusEl   = document.getElementById('sheet-status');
     var dotEl      = document.getElementById('sheet-dot');
     var labelEl    = document.getElementById('sheet-active-label');
@@ -483,14 +481,6 @@
             setStatus('Error: ' + e.message, 'error');
           }
         });
-    });
-
-    defaultBtn.addEventListener('click', function() {
-      if (isUsingDefaultSheet()) return setStatus('Already using the default sheet.', '');
-      clearSavedSheetUrl();
-      input.value = '';
-      setStatus('Switched to default. Reloading…', 'success');
-      setTimeout(function() { location.reload(); }, 700);
     });
 
     input.addEventListener('keydown', function(e) { if (e.key === 'Enter') loadBtn.click(); });
