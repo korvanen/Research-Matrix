@@ -487,8 +487,8 @@ window.AcademicUtils = (function () {
     sec.className = 'acad-import-section';
     sec.innerHTML =
       '<span class="acad-section-label">Import from file</span>' +
-      '<div class="acad-import-drop" id="acad-drop">Drop a <b>.bib</b> or <b>.csv</b> file here, or <b>click to browse</b></div>' +
-      '<input type="file" id="acad-file-input" accept=".bib,.csv,.txt" style="display:none">' +
+      '<div class="acad-import-drop" id="acad-drop">Drop an <b>.xlsx</b> or <b>.csv</b> file here, or <b>click to browse</b></div>' +
+      '<input type="file" id="acad-file-input" accept=".xlsx,.xls,.csv,.tsv,.txt" style="display:none">' +
       '<div class="acad-import-msg" id="acad-import-msg"></div>' +
       '<button class="acad-clear-btn" id="acad-clear-btn">Clear imported data</button>' +
       '<div id="acad-schema-wrap"></div>' +
@@ -514,23 +514,84 @@ window.AcademicUtils = (function () {
       msgEl.className = 'acad-import-msg ok';
     }
 
+    function _parseCSVRows(text) {
+      // Simple CSV parser: handles quoted fields, newlines inside quotes
+      var rows = [], row = [], field = '', inQ = false;
+      for (var i = 0; i < text.length; i++) {
+        var ch = text[i], next = text[i+1];
+        if (inQ) {
+          if (ch === '"' && next === '"') { field += '"'; i++; }
+          else if (ch === '"') inQ = false;
+          else field += ch;
+        } else {
+          if (ch === '"') inQ = true;
+          else if (ch === ',' || ch === '\t') { row.push(field); field = ''; }
+          else if (ch === '\n' || (ch === '\r' && next === '\n')) { row.push(field); field = ''; rows.push(row); row = []; if (ch === '\r') i++; }
+          else if (ch === '\r') { row.push(field); field = ''; rows.push(row); row = []; }
+          else field += ch;
+        }
+      }
+      if (field || row.length) { row.push(field); rows.push(row); }
+      return rows.filter(function(r){ return r.some(function(c){ return c.trim(); }); });
+    }
+
     function handleFile(file) {
       if (!file) return;
+      var ext = file.name.toLowerCase().replace(/.*\./,'');
+
+      if (ext === 'xlsx' || ext === 'xls') {
+        // Load SheetJS dynamically if not available
+        var doXlsx = function() {
+          var reader = new FileReader();
+          reader.onload = function(e) {
+            try {
+              var wb = XLSX.read(new Uint8Array(e.target.result), {type:'array'});
+              var tabs = [];
+              wb.SheetNames.forEach(function(sn) {
+                // Only include sheets with MX or TAB in name, or include all if none match
+                var rows = XLSX.utils.sheet_to_json(wb.Sheets[sn], {header:1, defval:''});
+                if (!rows.length) return;
+                var tabName = sn.match(/^MX|^TAB/i) ? sn : 'MX-' + sn.replace(/[^a-zA-Z0-9]/g,'-').replace(/-+/g,'-');
+                tabs.push({ name: tabName, grid: rows });
+              });
+              if (!tabs.length) { msgEl.textContent='No data sheets found in file.'; msgEl.className='acad-import-msg err'; return; }
+              saveImportedTabs(tabs);
+              var totalRows = tabs.reduce(function(s,t){ return s+t.grid.length; },0);
+              msgEl.textContent = tabs.length + ' sheet(s), ' + totalRows + ' rows imported. Reloading…';
+              msgEl.className='acad-import-msg ok';
+              clearBtn.style.display='block';
+              setTimeout(function(){location.reload();},900);
+            } catch(err) {
+              msgEl.textContent='XLSX parse error: '+err.message; msgEl.className='acad-import-msg err';
+            }
+          };
+          reader.readAsArrayBuffer(file);
+        };
+        if (typeof XLSX === 'undefined') {
+          var s = document.createElement('script');
+          s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+          s.onload = doXlsx;
+          s.onerror = function(){ msgEl.textContent='Failed to load XLSX library.'; msgEl.className='acad-import-msg err'; };
+          document.head.appendChild(s);
+        } else doXlsx();
+        return;
+      }
+
+      // CSV/TSV/TXT: read as text
       var reader = new FileReader();
-      reader.onload = function (e) {
-        var text=e.target.result, name=file.name, entries=[];
+      reader.onload = function(e) {
         try {
-          entries = name.toLowerCase().endsWith('.bib') ? parseBibTeX(text) : parseCSVText(text);
+          var rows = _parseCSVRows(e.target.result);
+          if (!rows.length) { msgEl.textContent='No data found in file.'; msgEl.className='acad-import-msg err'; return; }
+          var tabName = 'MX-' + file.name.replace(/\.[^.]+$/,'').replace(/[^a-zA-Z0-9]/g,'-').replace(/-+/g,'-');
+          saveImportedTabs([{ name: tabName, grid: rows }]);
+          msgEl.textContent = rows.length + ' rows imported from ' + file.name + '. Reloading…';
+          msgEl.className='acad-import-msg ok';
+          clearBtn.style.display='block';
+          setTimeout(function(){location.reload();},900);
         } catch(err) {
-          msgEl.textContent='Parse error: '+err.message; msgEl.className='acad-import-msg err'; return;
+          msgEl.textContent='Parse error: '+err.message; msgEl.className='acad-import-msg err';
         }
-        if (!entries.length) { msgEl.textContent='No entries found in file.'; msgEl.className='acad-import-msg err'; return; }
-        var grid = citationsToGrid(entries, name.replace(/\.[^.]+$/,''));
-        saveImportedTabs([{ name:'MX-'+name.replace(/[^a-zA-Z0-9]/g,'-').replace(/-+/g,'-'), grid:grid }]);
-        msgEl.textContent=entries.length+' entries imported from '+name+'. Reloading...';
-        msgEl.className='acad-import-msg ok';
-        clearBtn.style.display='block';
-        setTimeout(function(){location.reload();},900);
       };
       reader.readAsText(file);
     }
