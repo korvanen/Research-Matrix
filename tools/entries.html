@@ -9,7 +9,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="../utilities/utils-keywords.js?v=7"></script>
   <script src="../utilities/utils-shared.js?v=0067db69"></script>
-  <script src="../utilities/utils-synthesis.js?v=c685386c"></script>
+  <script src="../utilities/utils-synthesis.js?v=b4058e56"></script>
   <script src="../utilities/utils-academic.js?v=66257bc0"></script>
   <script type="module" src="../utilities/utils-embedding.js?v=4"></script>
   <style>
@@ -874,8 +874,8 @@ var _browsePanelHtml =
       // Column descriptions
       var colTitles;
       try { colTitles = JSON.parse(localStorage.getItem('df_fw_col_titles')); } catch(e){}
-      if (!Array.isArray(colTitles)||colTitles.length!==3) colTitles = ['Rule / Constraint','Move / Intervention','Metric / Proof'];
-      for (var ci = 0; ci < 3; ci++) {
+      if (!Array.isArray(colTitles)||colTitles.length<1) colTitles = ['Rule / Constraint','Move / Intervention','Metric / Proof'];
+      for (var ci = 0; ci < colTitles.length; ci++) {
         var cDesc = SY.getSchemaDescription('columns', String(ci));
         var cText = colTitles[ci] + (cDesc ? '. ' + cDesc : '');
         try {
@@ -1436,7 +1436,7 @@ var _browsePanelHtml =
         // Column assignment
         var _colTitles;
         try { _colTitles = JSON.parse(localStorage.getItem('df_fw_col_titles')); } catch(e){}
-        if (!Array.isArray(_colTitles)||_colTitles.length!==3) _colTitles = ['Rule / Constraint','Move / Intervention','Metric / Proof'];
+        if (!Array.isArray(_colTitles)||_colTitles.length<1) _colTitles = ['Rule / Constraint','Move / Intervention','Metric / Proof'];
         var _curCol = (a.column != null) ? a.column : 0;
         html += '<span class="en-section-label" style="margin-top:8px">Column</span>';
         html += '<div class="en-reg-row">';
@@ -1507,7 +1507,7 @@ var _browsePanelHtml =
         // Column suggestion
         var _colTitlesS;
         try { _colTitlesS = JSON.parse(localStorage.getItem('df_fw_col_titles')); } catch(e){}
-        if (!Array.isArray(_colTitlesS)||_colTitlesS.length!==3) _colTitlesS = ['Rule / Constraint','Move / Intervention','Metric / Proof'];
+        if (!Array.isArray(_colTitlesS)||_colTitlesS.length<1) _colTitlesS = ['Rule / Constraint','Move / Intervention','Metric / Proof'];
         if (_an.column.scores.length) {
           html += '<div style="margin-bottom:8px">';
           html += '<div style="font-size:11px;font-weight:600;color:var(--md-sys-color-on-surface-variant);margin-bottom:4px">Column</div>';
