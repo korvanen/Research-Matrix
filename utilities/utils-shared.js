@@ -3,7 +3,7 @@
 // Loaded by: index.html, tools/spreadsheet.html, tools/*.html
 // MD3 upgrade: Navigation Rail 80px, component classes injected globally
 // ════════════════════════════════════════════════════════════════
-console.log('[utils-shared.js v.999-md3]');
+console.log('[utils-shared.js v.12-md3]');
 
 // ════════════════════════════════════════════════════════════════
 // DARK / LIGHT MODE
@@ -1561,101 +1561,22 @@ function buildRowIndex() {
 // GLOBAL CARD BUILDER — shared between clusters visual and concept map
 // ════════════════════════════════════════════════════════════════
 
-// Inject shared card CSS once
-(function _injectCardCSS() {
-  if (document.getElementById('pp-global-card-css')) return;
-  var s = document.createElement('style'); s.id = 'pp-global-card-css';
-  s.textContent = `
-/* ── Shared card top row ── */
-.pp-card-top {
-  --pp-card-heading: 26px;
-  display:flex; align-items:flex-start; justify-content:space-between;
-  padding:8px 12px 4px; gap:6px;
-  font-size: var(--pp-card-heading);
-}
-.pp-card-cat-num {
-  font-family: var(--font-family-serif, Georgia, serif);
-  font-size:1em; font-weight:400; font-style:italic; line-height:1;
-  letter-spacing:-0.02em;
-  color: color-mix(in srgb, var(--ppc-on,#fff) 92%, var(--ppc-bg,transparent));
-  flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
-}
-.pp-card-level-block {
-  display:flex; flex-direction:column; align-items:flex-end; flex-shrink:0;
-}
-.pp-card-level-num {
-  font-size:0.62em; font-weight:900; line-height:1;
-  color: color-mix(in srgb, var(--ppc-on,#fff) 95%, black);
-}
-.pp-card-level-label {
-  font-size:0.31em; font-weight:600; letter-spacing:.08em; text-transform:uppercase;
-  color: color-mix(in srgb, var(--ppc-on,#fff) 55%, var(--ppc-bg,transparent));
-}
-.pp-card-rule {
-  height:1px; margin:4px 12px 0; flex-shrink:0;
-  background: color-mix(in srgb, var(--ppc-on,#fff) 22%, var(--ppc-bg,transparent));
-}
-/* ── Shared card body ── */
-.pp-card-body {
-  padding:8px 12px 10px; display:flex; flex-direction:column; gap:3px;
-}
-.pp-card-col-label {
-  font-size:9px; font-weight:600; letter-spacing:.06em; text-transform:uppercase;
-  color: color-mix(in srgb, var(--ppc-on,#fff) 60%, var(--ppc-bg,transparent));
-  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
-}
-.pp-card-text {
-  font-family: var(--font-family-serif, Georgia, serif);
-  font-size:13px; font-weight:400; line-height:1.35; letter-spacing:-0.01em;
-  color: color-mix(in srgb, var(--ppc-on,#fff) 92%, var(--ppc-bg,transparent));
-  overflow-wrap:break-word; word-break:break-word;
-}
-.pp-card-split-badge {
-  font-size:8px; font-weight:600; letter-spacing:.06em; text-transform:uppercase;
-  color: color-mix(in srgb, var(--ppc-on,#fff) 50%, var(--ppc-bg,transparent));
-  margin-top:2px;
-}
-.pp-card-badge-row { display:flex; gap:4px; flex-wrap:wrap; margin-top:2px; }
-.pp-card-badge {
-  font-size:8px; font-weight:600; letter-spacing:.04em; text-transform:uppercase;
-  padding:1px 6px; border-radius:6px;
-  background: color-mix(in srgb, var(--ppc-on,#fff) 10%, var(--ppc-bg,transparent));
-  color: color-mix(in srgb, var(--ppc-on,#fff) 70%, var(--ppc-bg,transparent));
-}
-.pp-card-sim-row {
-  display:flex; align-items:center; gap:4px; margin-top:3px;
-  font-size:9px; font-weight:600;
-  color: color-mix(in srgb, var(--ppc-on,#fff) 60%, var(--ppc-bg,transparent));
-}
-.pp-card-sim-pct {
-  font-weight:800; font-variant-numeric:tabular-nums;
-  color: color-mix(in srgb, var(--ppc-on,#fff) 92%, black);
-}
-.pp-card-sim-bar {
-  flex:1; height:3px; border-radius:2px;
-  background: color-mix(in srgb, var(--ppc-on,#fff) 12%, var(--ppc-bg,transparent));
-}
-.pp-card-sim-fill {
-  height:100%; border-radius:2px;
-  background: color-mix(in srgb, var(--ppc-on,#fff) 55%, var(--ppc-bg,transparent));
-}
-`;
-  document.head.appendChild(s);
-})();
-
 /**
- * Build shared card content and append to a container element.
+ * Global card builder — uses existing design-system.css classes.
+ * Both clusters (.pp-cl-card) and concept map (.pp-cmap-card) call this.
+ *
  * opts: {
  *   row:        row object with .row.cells, .row.cats, .headers
  *   accent:     CSS color string
- *   onColor:    contrast color (optional, computed if missing)
+ *   onColor:    contrast color (optional)
  *   label:      cluster/level label (string)
  *   levelNum:   level number (string/number, optional)
  *   similarity: number 0-1 (optional)
  *   simLabel:   string (default 'to cluster')
  *   delay:      animation delay ms (optional)
+ *   mode:       'cluster' | 'cmap' — picks the right body class names
  * }
- * Returns: { card: container, body: bodyEl, cats, colHeader, text }
+ * Returns: { body, cats, colHeader, text }
  */
 window.buildCardContent = function(container, opts) {
   var r       = opts.row || {};
@@ -1668,78 +1589,82 @@ window.buildCardContent = function(container, opts) {
   var colHeader = headers[bestIdx] || '';
   var parsed    = typeof parseCitation === 'function' ? parseCitation(best) : { body: best };
   var accent    = opts.accent || '#888';
+  var mode      = opts.mode || 'cluster';
 
-  // Set CSS vars on container
+  // CSS vars on container
   container.style.setProperty('--ppc-bg', accent);
   if (opts.onColor) container.style.setProperty('--ppc-on', opts.onColor);
   if (opts.delay) container.style.animationDelay = opts.delay + 'ms';
 
-  // Top row: categories + level
-  var topRow = document.createElement('div'); topRow.className = 'pp-card-top';
-  var catNumEl = document.createElement('div'); catNumEl.className = 'pp-card-cat-num';
+  // ── Top row (shared classes from design-system.css §16b) ──
+  var topRow = document.createElement('div'); topRow.className = 'pp-cmap-card-top';
+  var catNumEl = document.createElement('div'); catNumEl.className = 'pp-cmap-card-cat-num';
   catNumEl.textContent = cats.length ? cats.join(' · ') : (opts.label ? opts.label.slice(0, 6) : '·');
-  var levelBlock = document.createElement('div'); levelBlock.className = 'pp-card-level-block';
+  var levelBlock = document.createElement('div'); levelBlock.className = 'pp-cmap-card-level-block';
   if (opts.levelNum != null) {
-    var levelNum = document.createElement('div'); levelNum.className = 'pp-card-level-num';
+    var levelNum = document.createElement('div'); levelNum.className = 'pp-cmap-card-level-num';
     levelNum.textContent = String(opts.levelNum);
     levelBlock.appendChild(levelNum);
   }
-  var levelLbl = document.createElement('div'); levelLbl.className = 'pp-card-level-label';
+  var levelLbl = document.createElement('div'); levelLbl.className = 'pp-cmap-card-level-label';
   levelLbl.textContent = opts.label || 'Cluster';
   levelBlock.appendChild(levelLbl);
   topRow.appendChild(catNumEl); topRow.appendChild(levelBlock);
   container.appendChild(topRow);
 
-  // Rule
-  var rule = document.createElement('div'); rule.className = 'pp-card-rule';
+  // ── Rule (shared class from design-system.css §16c) ──
+  var rule = document.createElement('div'); rule.className = 'pp-cmap-card-rule';
   container.appendChild(rule);
 
-  // Body
-  var body = document.createElement('div'); body.className = 'pp-card-body';
+  // ── Body (class names differ by mode) ──
+  var bodyCls = mode === 'cmap' ? 'pp-cmap-card-body' : 'pp-cl-card-body';
+  var catCls  = mode === 'cmap' ? 'pp-cmap-cell-cat'  : 'pp-cl-card-cat';
+  var textCls = mode === 'cmap' ? 'pp-cmap-cell-text' : 'pp-cl-card-text';
+  var splitCls= mode === 'cmap' ? 'pp-cmap-split-num' : 'pp-cl-card-split';
 
-  // Column header
+  var body = document.createElement('div'); body.className = bodyCls;
+
+  // Column header label
   if (colHeader) {
-    var ce = document.createElement('div'); ce.className = 'pp-card-col-label';
+    var ce = document.createElement('div'); ce.className = catCls;
     ce.textContent = colHeader; body.appendChild(ce);
   }
 
-  // Text
-  var te = document.createElement('div'); te.className = 'pp-card-text';
+  // Entry text
+  var te = document.createElement('div'); te.className = textCls;
   te.textContent = parsed.body; body.appendChild(te);
 
   // Split badge
   if (r._splitN && r._splitT && r._splitT > 1) {
-    var sp = document.createElement('div'); sp.className = 'pp-card-split-badge';
+    var sp = document.createElement('div'); sp.className = splitCls;
     sp.textContent = r._splitN + '/' + r._splitT + ' Split'; body.appendChild(sp);
   }
 
-  // Boundary / outlier badges
-  if (r._borderline || r._outlier) {
-    var badges = document.createElement('div'); badges.className = 'pp-card-badge-row';
+  // Boundary / outlier badges (cluster mode only)
+  if (mode === 'cluster' && (r._borderline || r._outlier)) {
+    var badges = document.createElement('div'); badges.className = 'pp-cl-card-badges';
     if (r._borderline) {
-      var b = document.createElement('span'); b.className = 'pp-card-badge';
-      b.textContent = '~ boundary';
-      b.title = 'This card\u2019s cluster assignment is unstable.';
-      badges.appendChild(b);
+      var b = document.createElement('span'); b.className = 'pp-cl-badge pp-cl-badge--boundary';
+      b.textContent = '~ boundary'; badges.appendChild(b);
     }
     if (r._outlier) {
-      var o = document.createElement('span'); o.className = 'pp-card-badge';
-      o.textContent = '\u2197 outlier';
-      o.title = 'Least similar card in its cluster.';
-      badges.appendChild(o);
+      var o = document.createElement('span'); o.className = 'pp-cl-badge pp-cl-badge--outlier';
+      o.textContent = '\u2197 outlier'; badges.appendChild(o);
     }
     body.appendChild(badges);
   }
 
-  // Similarity row
-  if (typeof opts.similarity === 'number') {
+  // Similarity row (cluster mode)
+  if (mode === 'cluster' && typeof opts.similarity === 'number') {
     var pct = Math.round(opts.similarity * 100);
-    var sim = document.createElement('div'); sim.className = 'pp-card-sim-row';
+    var sim = document.createElement('div'); sim.className = 'pp-cl-sim-row';
     sim.innerHTML =
-      '<span>\u2191</span>' +
-      '<span class="pp-card-sim-pct">' + pct + '%</span>' +
-      '<div class="pp-card-sim-bar"><div class="pp-card-sim-fill" style="width:' + pct + '%"></div></div>' +
-      '<span>' + (opts.simLabel || 'to cluster') + '</span>';
+      '<svg class="pp-cl-sim-arrow" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="9" height="9">' +
+        '<polyline points="1,8 4,4 6.5,6.5 9,2"/>' +
+      '</svg>' +
+      '<span class="pp-cl-sim-pct">' + pct + '%</span>' +
+      '<div class="pp-cl-sim-bar"><div class="pp-cl-sim-fill" style="width:' + pct + '%"></div></div>' +
+      '<span class="pp-cl-sim-label">' + (opts.simLabel || 'to cluster') + '</span>';
     body.appendChild(sim);
   }
 
