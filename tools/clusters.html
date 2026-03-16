@@ -9,7 +9,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="../utilities/utils-keywords.js?v=7"></script>
   <script src="../utilities/utils-shared.js?v=0067db69"></script>
-  <script src="../utilities/utils-synthesis.js?v=a2582885"></script>
+  <script src="../utilities/utils-synthesis.js?v=3"></script>
   <script src="../utilities/utils-panel.js?v=7"></script>
   <script type="module" src="../utilities/utils-embedding.js?v=4"></script>
   <style>
@@ -610,7 +610,7 @@
           html += '</div>';
           html += '<div class="cl-pr-note-content">';
           html += '<div class="cl-pr-note-text">'+_h(parsed.body)+(parsed.citation?' <span class="cl-cite-pill" style="background:'+_h(p.color)+'">'+_h(parsed.citation)+'</span>':'')+'</div>';
-          html += '<div class="cl-pr-note-src">'+_h(r.tabName)+'</div>';
+          html += '<div class="cl-pr-note-src">'+_h(r.tabTitle||r.tabName)+'</div>';
           if (a.status==='auto') html += '<div style="display:flex;gap:4px;margin-top:3px"><span class="cl-badge cl-badge-auto">auto '+(a.similarity?a.similarity.toFixed(2):'')+' </span><button class="cl-btn cl-btn-ghost" data-action="confirm-a" data-nk="'+_h(a.noteKey)+'" style="height:20px;font-size:10px;padding:0 8px">Confirm</button><button class="cl-btn cl-btn-ghost" data-action="reject-a" data-nk="'+_h(a.noteKey)+'" style="height:20px;font-size:10px;padding:0 8px;color:var(--md-sys-color-error)">Reject</button></div>';
           if (isChanged) html += '<div class="cl-pr-note-changed">Source changed — <button class="cl-btn cl-btn-ghost" data-action="ack-change" data-nk="'+_h(a.noteKey)+'" style="height:18px;padding:0 6px;font-size:10px">Acknowledge</button></div>';
           html += '</div>';
@@ -723,7 +723,7 @@
             html += '<span class="cl-sim-badge" style="background:'+_h(topP.color)+';color:#fff">→ '+_h(topP.name.slice(0,14))+' '+Math.round(topP.similarity*100)+'%</span>';
           }
           html += '</div>';
-          html += '<div class="cl-pool-note-src">'+_h(item.r.tabName)+'</div></div>';
+          html += '<div class="cl-pool-note-src">'+_h(item.r.tabTitle||item.r.tabName)+'</div></div>';
           html += '<button class="cl-assign-btn" data-key="'+_h(item.key)+'">Assign</button>';
           html += '</div>';
         });
