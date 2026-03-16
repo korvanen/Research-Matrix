@@ -2104,7 +2104,7 @@ function initClustersTool(paneEl, sidebarEl) {
     levelBlock.appendChild(levelLbl); topRow.appendChild(catNumEl); topRow.appendChild(levelBlock); card.appendChild(topRow);
     const rule = document.createElement('div'); rule.className = 'pp-cmap-card-rule'; card.appendChild(rule);
     const body = document.createElement('div'); body.className = 'pp-cl-card-body';
-    if (cats.length) { const ce = document.createElement('div'); ce.className = 'pp-cl-card-cat'; ce.textContent = cats.join(' \u00b7 '); body.appendChild(ce); }
+    if (colHeader) { const ce = document.createElement('div'); ce.className = 'pp-cl-card-cat'; ce.textContent = colHeader; body.appendChild(ce); }
     const te = document.createElement('div'); te.className = 'pp-cl-card-text'; te.textContent = parsed.body; body.appendChild(te);
     if (r._splitN && r._splitT && r._splitT > 1) { const sp = document.createElement('div'); sp.className = 'pp-cl-card-split'; sp.textContent = r._splitN + '/' + r._splitT + ' Split'; body.appendChild(sp); }
     if (r._borderline || r._outlier) {
