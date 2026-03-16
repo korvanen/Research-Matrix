@@ -8,9 +8,9 @@
   <link rel="stylesheet" href="../design-system.css?v=9fa06a28">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="../utilities/utils-keywords.js?v=7"></script>
-  <script src="../utilities/utils-shared.js?v=a143032c"></script>
+  <script src="../utilities/utils-shared.js?v=0067db69"></script>
   <script src="../utilities/utils-synthesis.js?v=b4058e56"></script>
-  <script src="../utilities/utils-academic.js?v=a2ddc8f0"></script>
+  <script src="../utilities/utils-academic.js?v=66257bc0"></script>
   <script type="module" src="../utilities/utils-embedding.js?v=4"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; }
@@ -360,6 +360,31 @@
     .en-saved-meta { font-size: 10px; color: var(--md-sys-color-on-surface-variant); }
     .en-saved-del { width: 22px; height: 22px; border-radius: 50%; border: none; background: none; cursor: pointer; color: var(--md-sys-color-on-surface-variant); font-size: 14px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
     .en-saved-del:hover { color: var(--md-sys-color-error); }
+
+    /* ── Refs view ── */
+    .en-refs-view {
+      flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden;
+    }
+    .en-refs-list {
+      flex: 1; overflow-y: auto; scrollbar-width: thin;
+    }
+    .en-refs-list::-webkit-scrollbar { width: 4px; }
+    .en-refs-list::-webkit-scrollbar-thumb { background: var(--md-sys-color-outline-variant); border-radius: 2px; }
+    .en-ref-card {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--md-sys-color-outline-variant);
+    }
+    .en-ref-card:hover { background: color-mix(in srgb,var(--md-sys-color-on-surface) 3%,transparent); }
+    .en-ref-key {
+      font-family: 'SF Mono', 'Consolas', monospace;
+      font-size: 11px; font-weight: 600;
+      background: var(--md-sys-color-surface-container-highest);
+      padding: 2px 6px; border-radius: 4px;
+      white-space: nowrap;
+    }
+    .en-ref-assign-option:hover {
+      background: color-mix(in srgb,var(--md-sys-color-primary) 6%,transparent) !important;
+    }
   </style>
 </head>
 <body>
@@ -395,6 +420,19 @@
       <div class="en-modal-foot">
         <button class="en-btn en-btn-ghost" id="en-modal-cancel">Cancel</button>
         <button class="en-btn en-btn-primary" id="en-modal-confirm">Create</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Reference assign dialog -->
+  <div class="en-modal-bg" id="en-ref-assign-bg">
+    <div class="en-modal" style="width:500px;max-height:80vh;overflow:auto">
+      <div class="en-modal-title" id="en-ref-assign-title">Assign reference</div>
+      <div id="en-ref-assign-list" style="max-height:50vh;overflow-y:auto"></div>
+      <div class="en-modal-foot">
+        <button class="en-card-btn" id="en-ref-assign-clear" style="color:var(--md-sys-color-on-surface-variant)">Clear assignment</button>
+        <span style="flex:1"></span>
+        <button class="en-btn en-btn-ghost" id="en-ref-assign-close">Close</button>
       </div>
     </div>
   </div>
@@ -480,11 +518,27 @@ var _browsePanelHtml =
         '<button class="pp-panel-tab" data-view="search">' +
           'Search <span class="pp-panel-tab-n" id="en-n-search">–</span>' +
         '</button>' +
+        '<button class="pp-panel-tab" data-view="refs">' +
+          'Refs <span class="pp-panel-tab-n" id="en-n-refs">0</span>' +
+        '</button>' +
       '</div>' +
       '<div class="pp-panel-status-row">' +
         '<div class="pp-panel-dot loading" id="en-dot"></div>' +
         '<span id="en-status-text">Loading…</span>' +
       '</div>';
+
+    var _refsPanelHtml =
+      '<div class="en-panel-label">Import</div>' +
+      '<div style="display:flex;flex-direction:column;gap:4px;padding:2px 0 6px">' +
+        '<button class="en-panel-chip" id="en-ref-import-btn" style="text-align:left;height:28px;border-radius:6px">Upload .bib / .ris file…</button>' +
+        '<button class="en-panel-chip" id="en-ref-manual-btn" style="text-align:left;height:28px;border-radius:6px;color:var(--md-sys-color-primary)">+ Add APA manually…</button>' +
+      '</div>' +
+      '<input type="file" id="en-ref-file-input" accept=".bib,.ris,.txt" style="display:none">' +
+      '<div class="en-panel-label">Paste BibTeX / RIS</div>' +
+      '<textarea id="en-ref-paste" style="width:100%;min-height:70px;padding:6px 8px;border-radius:6px;border:1px solid var(--md-sys-color-outline-variant);background:transparent;font-size:11px;font-family:monospace;color:inherit;resize:vertical;outline:none;box-sizing:border-box" placeholder="@article{key,\n  author = {...},\n  ...}"></textarea>' +
+      '<button class="en-panel-chip" id="en-ref-paste-btn" style="text-align:center;width:100%;height:28px;border-radius:6px;margin-top:4px;background:var(--md-sys-color-secondary-container);color:var(--md-sys-color-on-secondary-container);border:none;font-weight:500">Parse</button>' +
+      '<div class="en-panel-label" style="padding-top:10px">Matching</div>' +
+      '<div id="en-ref-match-summary" style="font-size:11px;color:var(--md-sys-color-on-surface-variant);line-height:1.6">–</div>';
 
     var _nav = window.PPNavRail.create(_paneEl, {
       toolName: 'Entries',
@@ -494,6 +548,7 @@ var _browsePanelHtml =
         { label: 'Global', html: _globalHtml },
         { label: 'Browse', html: _browsePanelHtml },
         { label: 'Search', html: _searchPanelHtml },
+        { label: 'Refs', html: _refsPanelHtml },
       ],
     });
 
@@ -532,6 +587,13 @@ var _browsePanelHtml =
             '<div class="en-empty"><p>Enter a query and press Search.</p></div>' +
           '</div>' +
         '</div>' +
+      '</div>' +
+      '<div class="en-view" id="en-view-refs" hidden>' +
+        '<div class="en-refs-view">' +
+          '<div class="en-refs-list" id="en-refs-list">' +
+            '<div class="en-empty"><p>No references loaded.</p><p>Upload a BibTeX or RIS file, paste raw text, or add manually.</p></div>' +
+          '</div>' +
+        '</div>' +
       '</div>';
 
     injectToolNav('entries.html');
@@ -564,6 +626,8 @@ var _browsePanelHtml =
       });
       document.getElementById('en-view-browse').hidden = _view !== 'browse';
       document.getElementById('en-view-search').hidden = _view !== 'search';
+      document.getElementById('en-view-refs').hidden   = _view !== 'refs';
+      if (_view === 'refs') renderRefs();
     });
 
     // ── Browse filter chips ──────────────────────────────────────────────────
@@ -771,7 +835,200 @@ var _browsePanelHtml =
     function updateCounts() {
       var total = SY.getEffectiveNoteKeys().length;
       document.getElementById('en-n-browse').textContent = total;
+      _updateRefCounts();
     }
+    function _updateRefCounts() {
+      var AC = window.AcademicUtils;
+      if (!AC) return;
+      var refs = AC.getReferences();
+      var nEl = document.getElementById('en-n-refs');
+      if (nEl) nEl.textContent = refs.length;
+      var sumEl = document.getElementById('en-ref-match-summary');
+      if (sumEl) {
+        var s = AC.getRefMatchSummary();
+        sumEl.innerHTML =
+          '<span style="color:#2e7d32;font-weight:600">' + s.matched + '</span> matched &nbsp;' +
+          '<span style="color:#b71c1c;font-weight:600">' + s.unmatched + '</span> unmatched &nbsp;' +
+          s.total + ' in-text citations';
+      }
+    }
+
+    // ══ REFS VIEW ══════════════════════════════════════════════════════════
+
+    function renderRefs() {
+      var AC = window.AcademicUtils; if (!AC) return;
+      var refs = AC.getReferences();
+      var listEl = document.getElementById('en-refs-list');
+      if (!listEl) return;
+      _updateRefCounts();
+
+      if (!refs.length) {
+        listEl.innerHTML = '<div class="en-empty" style="height:auto;padding:32px 16px"><p>No references loaded.</p><p>Upload a BibTeX or RIS file, paste raw text, or add APA manually.</p></div>';
+        return;
+      }
+
+      // Gather all cite keys from entries for link counts
+      var keyCounts = {};
+      var noteKeys = SY.getRowNoteKeys();
+      noteKeys.forEach(function(nk){
+        var r = SY.resolveNoteKey(nk); if (!r||!r.text) return;
+        var cites = typeof extractAllCitations==='function' ? extractAllCitations(r.text) : [];
+        cites.forEach(function(c){
+          var k = c.key.toLowerCase().replace(/\s+/g,' ').trim();
+          keyCounts[k] = (keyCounts[k]||0) + c.occurrences.length;
+        });
+      });
+
+      var html = '<div style="padding:8px 14px;font-size:11px;color:var(--md-sys-color-on-surface-variant);font-weight:600;letter-spacing:.04em;text-transform:uppercase;border-bottom:1px solid var(--md-sys-color-outline-variant)">' + refs.length + ' references</div>';
+
+      refs.forEach(function(ref, idx){
+        var nk = ref.inTextKey.toLowerCase().replace(/\s+/g,' ').trim();
+        var linkCount = keyCounts[nk] || 0;
+        // Render APA with italics
+        var apaHtml = _h(ref.apa).replace(/\*([^*]+)\*/g, '<em>$1</em>');
+
+        html += '<div class="en-ref-card" data-ref-idx="'+idx+'">';
+        html += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px;flex-wrap:wrap">';
+        html += '<span class="en-ref-key">(' + _h(ref.inTextKey) + ')</span>';
+        if (linkCount > 0) {
+          html += '<span class="en-badge" style="background:rgba(46,125,50,.12);color:#2e7d32">' + linkCount + ' linked</span>';
+        } else {
+          html += '<span class="en-badge en-badge-tab">0 entries</span>';
+        }
+        html += '</div>';
+        html += '<div style="font-size:13px;line-height:1.6;color:var(--md-sys-color-on-surface)">' + apaHtml + '</div>';
+        html += '<button class="en-card-btn en-ref-remove-btn" data-ref-key="' + _h(ref.inTextKey) + '" style="margin-top:6px;color:var(--md-sys-color-error)">Remove</button>';
+        html += '</div>';
+      });
+
+      // Unmatched section
+      var summary = AC.getRefMatchSummary();
+      var unmatchedKeys = summary.keys.filter(function(k){ return !AC.matchReference(k); });
+      if (unmatchedKeys.length) {
+        html += '<div style="padding:10px 14px;font-size:11px;color:#b71c1c;font-weight:600;letter-spacing:.04em;text-transform:uppercase;border-top:1px solid var(--md-sys-color-outline-variant);margin-top:4px">Unmatched in-text citations (' + unmatchedKeys.length + ')</div>';
+        unmatchedKeys.forEach(function(key){
+          html += '<div class="en-ref-unmatched" style="display:flex;align-items:center;justify-content:space-between;padding:8px 14px;border-bottom:1px solid var(--md-sys-color-outline-variant)">';
+          html += '<span class="en-ref-key">(' + _h(key) + ')</span>';
+          html += '<button class="en-card-btn en-ref-assign-btn" data-cite-key="' + _h(key) + '">Assign</button>';
+          html += '</div>';
+        });
+      }
+
+      listEl.innerHTML = html;
+
+      // Wire remove buttons
+      listEl.querySelectorAll('.en-ref-remove-btn').forEach(function(btn){
+        btn.addEventListener('click', function(e){
+          e.stopPropagation();
+          AC.removeReference(btn.dataset.refKey);
+          renderRefs(); renderBrowse();
+          if (_selectedKey) renderDetail(_selectedKey);
+        });
+      });
+
+      // Wire assign buttons for unmatched
+      listEl.querySelectorAll('.en-ref-assign-btn').forEach(function(btn){
+        btn.addEventListener('click', function(e){
+          e.stopPropagation();
+          _openRefAssignDialog(btn.dataset.citeKey);
+        });
+      });
+    }
+
+    // ── Ref assign dialog ────────────────────────────────────────────────────
+    function _openRefAssignDialog(citeKey) {
+      var AC = window.AcademicUtils; if (!AC) return;
+      var refs = AC.getReferences();
+      var bg = document.getElementById('en-ref-assign-bg');
+      if (!bg) return;
+      var listHtml = '';
+      if (!refs.length) {
+        listHtml = '<div style="padding:12px;font-size:13px;color:var(--md-sys-color-on-surface-variant)">No references loaded. Upload a file first.</div>';
+      } else {
+        refs.forEach(function(ref){
+          var apaHtml = _h(ref.apa).replace(/\*([^*]+)\*/g, '<em>$1</em>');
+          listHtml += '<div class="en-ref-assign-option" data-ref-itk="' + _h(ref.inTextKey) + '" style="padding:10px 14px;border-radius:8px;margin-bottom:5px;cursor:pointer;border:1px solid var(--md-sys-color-outline-variant);transition:background .1s">';
+          listHtml += '<span class="en-ref-key">(' + _h(ref.inTextKey) + ')</span>';
+          listHtml += '<div style="margin-top:3px;font-size:13px;line-height:1.5">' + apaHtml + '</div>';
+          listHtml += '</div>';
+        });
+      }
+      document.getElementById('en-ref-assign-title').innerHTML = 'Assign reference for <span class="en-ref-key">(' + _h(citeKey) + ')</span>';
+      document.getElementById('en-ref-assign-list').innerHTML = listHtml;
+      bg.classList.add('open');
+      bg.dataset.citeKey = citeKey;
+
+      // Wire option clicks
+      bg.querySelectorAll('.en-ref-assign-option').forEach(function(opt){
+        opt.addEventListener('click', function(){
+          AC.setRefOverride(citeKey, opt.dataset.refItk);
+          bg.classList.remove('open');
+          renderRefs(); renderBrowse();
+          if (_selectedKey) renderDetail(_selectedKey);
+        });
+      });
+    }
+
+    // ── Ref panel button wiring ──────────────────────────────────────────────
+    document.addEventListener('click', function(e){
+      // File import
+      if (e.target.id === 'en-ref-import-btn') {
+        var inp = document.getElementById('en-ref-file-input');
+        if (inp) inp.click();
+      }
+      // Parse pasted text
+      if (e.target.id === 'en-ref-paste-btn') {
+        var ta = document.getElementById('en-ref-paste');
+        if (!ta || !ta.value.trim()) return;
+        var AC = window.AcademicUtils; if (!AC) return;
+        var count = AC.importReferences(ta.value);
+        if (count) { ta.value = ''; renderRefs(); renderBrowse(); if (_selectedKey) renderDetail(_selectedKey); }
+        else { alert('Could not parse any entries from pasted text.'); }
+      }
+      // Manual add
+      if (e.target.id === 'en-ref-manual-btn') {
+        var apa = prompt('Paste a full APA citation:\ne.g. Tummers, L. (2015). Title. Journal, 53(10), 23–40.');
+        if (!apa || !apa.trim()) return;
+        var AC2 = window.AcademicUtils; if (!AC2) return;
+        var added = AC2.importAPAString(apa);
+        if (added) { renderRefs(); renderBrowse(); if (_selectedKey) renderDetail(_selectedKey); }
+        else { alert('Could not extract author/year. Expected: Surname, I. (Year). Title...'); }
+      }
+      // Clear assignment in dialog
+      if (e.target.id === 'en-ref-assign-clear') {
+        var bg2 = document.getElementById('en-ref-assign-bg');
+        if (bg2 && bg2.dataset.citeKey) {
+          var AC3 = window.AcademicUtils;
+          if (AC3) AC3.clearRefOverride(bg2.dataset.citeKey);
+          bg2.classList.remove('open');
+          renderRefs(); renderBrowse();
+          if (_selectedKey) renderDetail(_selectedKey);
+        }
+      }
+      // Close dialog
+      if (e.target.id === 'en-ref-assign-close' || e.target.id === 'en-ref-assign-bg') {
+        var bg3 = document.getElementById('en-ref-assign-bg');
+        if (bg3) bg3.classList.remove('open');
+      }
+    });
+
+    // File input change handler
+    (function(){
+      var inp = document.getElementById('en-ref-file-input');
+      if (!inp) return;
+      inp.addEventListener('change', function(){
+        var file = inp.files[0]; if (!file) return;
+        var reader = new FileReader();
+        reader.onload = function(ev){
+          var AC = window.AcademicUtils; if (!AC) return;
+          var count = AC.importReferences(ev.target.result);
+          if (count) { renderRefs(); renderBrowse(); if (_selectedKey) renderDetail(_selectedKey); }
+          else { alert('No entries found in file.'); }
+        };
+        reader.readAsText(file);
+        inp.value = '';
+      });
+    })();
 
     // ══ BROWSE VIEW ══════════════════════════════════════════════════════════
 
@@ -834,6 +1091,12 @@ var _browsePanelHtml =
         if (_scr === 'excluded') html += '<span class="en-badge" style="background:rgba(183,28,28,.1);color:#b71c1c">✗ excluded</span>';
         if (a && a.status==='auto')      html += '<span class="en-badge en-badge-auto">auto</span>';
         if (a && a.status==='confirmed') html += '<span class="en-badge en-badge-conf">assigned</span>';
+        // Ref badge
+        if (parsed.citations && parsed.citations.length && window.AcademicUtils) {
+          var _anyRef = parsed.citations.some(function(c){ return AcademicUtils.matchReference(c.key); });
+          if (_anyRef) html += '<span class="en-badge" style="background:rgba(46,125,50,.12);color:#2e7d32">ref ✓</span>';
+          else html += '<span class="en-badge" style="background:rgba(183,28,28,.1);color:#b71c1c">ref ?</span>';
+        }
         if (p) html += '<span class="en-p-tag" style="background:'+_h(p.color)+'">'+_h(p.name.slice(0,22))+'</span>';
         html += '</div>';
         html += '<div class="en-card-text">';
@@ -961,6 +1224,41 @@ var _browsePanelHtml =
       }
 
       // Assignment section
+      // ── Reference section ──────────────────────────────────────
+      if (window.AcademicUtils && parsed.citations && parsed.citations.length) {
+        html += '<div class="en-assign-area">';
+        html += '<span class="en-section-label">Reference</span>';
+        parsed.citations.forEach(function(cite) {
+          var refMatch = AcademicUtils.matchReference(cite.key);
+          if (refMatch) {
+            var apaHtml = _h(refMatch.apa).replace(/\*([^*]+)\*/g, '<em>$1</em>');
+            html += '<div style="padding:10px 12px;border-radius:8px;border:1px solid var(--md-sys-color-outline-variant);background:var(--md-sys-color-surface-container-low);margin-bottom:6px">';
+            html += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px">';
+            html += '<span class="en-badge" style="background:rgba(46,125,50,.12);color:#2e7d32">matched</span>';
+            html += '<span class="en-ref-key">(' + _h(refMatch.inTextKey) + ')</span>';
+            html += '</div>';
+            html += '<div style="font-size:13px;line-height:1.6">' + apaHtml + '</div>';
+            html += '<div style="display:flex;gap:5px;margin-top:6px">';
+            html += '<button class="en-card-btn" data-action="ref-reassign" data-cite-key="' + _h(cite.key) + '">Reassign</button>';
+            html += '<button class="en-card-btn" data-action="ref-unlink" data-cite-key="' + _h(cite.key) + '">Unlink</button>';
+            html += '</div>';
+            html += '</div>';
+          } else {
+            html += '<div style="padding:10px 12px;border-radius:8px;border:1px solid rgba(183,28,28,.2);background:rgba(183,28,28,.03);margin-bottom:6px">';
+            html += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px">';
+            html += '<span class="en-badge" style="background:rgba(183,28,28,.1);color:#b71c1c">unmatched</span>';
+            html += '<span class="en-ref-key">(' + _h(cite.key) + ')</span>';
+            html += '</div>';
+            html += '<div style="font-size:12px;color:var(--md-sys-color-on-surface-variant);margin-bottom:6px">No matching reference found.</div>';
+            html += '<div style="display:flex;gap:5px">';
+            html += '<button class="en-card-btn" data-action="ref-reassign" data-cite-key="' + _h(cite.key) + '">Assign manually</button>';
+            html += '<button class="en-card-btn" data-action="ref-goto" style="background:var(--md-sys-color-secondary-container);color:var(--md-sys-color-on-secondary-container);border-color:transparent">Go to Refs</button>';
+            html += '</div>';
+            html += '</div>';
+          }
+        });
+        html += '</div>';
+      }
       html += '<div class="en-assign-area">';
       html += '<span class="en-section-label">Assignment</span>';
       if (p) {
@@ -1065,6 +1363,22 @@ var _browsePanelHtml =
       });
       contentEl.querySelectorAll('[data-action=unassign-frag]').forEach(function(btn){
         btn.addEventListener('click', function(){ SY.rejectAssignment(btn.dataset.key); renderDetail(key); renderBrowse(); });
+      });
+      // Reference buttons
+      contentEl.querySelectorAll('[data-action=ref-reassign]').forEach(function(btn){
+        btn.addEventListener('click', function(){ _openRefAssignDialog(btn.dataset.citeKey); });
+      });
+      contentEl.querySelectorAll('[data-action=ref-unlink]').forEach(function(btn){
+        btn.addEventListener('click', function(){
+          if (window.AcademicUtils) AcademicUtils.clearRefOverride(btn.dataset.citeKey);
+          renderDetail(key); renderBrowse(); renderRefs();
+        });
+      });
+      contentEl.querySelectorAll('[data-action=ref-goto]').forEach(function(btn){
+        btn.addEventListener('click', function(){
+          var refsTab = document.querySelector('.pp-panel-tab[data-view=refs]');
+          if (refsTab) refsTab.click();
+        });
       });
     }
 
