@@ -781,7 +781,7 @@ window.SynthesisData = (function () {
       if(c===META_END)   metaEnd=r;
     }
     if(metaStart===-1||metaEnd===-1||metaEnd<=metaStart) return null;
-    var principles=[], assignments=[], splits={}, settings=null, registers=null, dimensions=null, schemaDesc=null, colTitles=null;
+    var principles=[], assignments=[], splits={}, settings=null, registers=null, dimensions=null, schemaDesc=null, colTitles=null, references=null, refOverrides=null;
     for(var r=metaStart+1;r<metaEnd;r++){
       var key=String(grid[r][0]||'').trim(), val=String(grid[r][1]||'').trim();
       if(!val) continue;
@@ -794,9 +794,11 @@ window.SynthesisData = (function () {
         if(key==='DIMENSIONS')  dimensions  = JSON.parse(val);
         if(key==='SCHEMA_DESC') schemaDesc  = JSON.parse(val);
         if(key==='COL_TITLES')  colTitles   = JSON.parse(val);
+        if(key==='REFERENCES')  references  = JSON.parse(val);
+        if(key==='REF_OVERRIDES') refOverrides = JSON.parse(val);
       } catch(e){}
     }
-    return { principles, assignments, splits, settings, registers, dimensions, schemaDesc, colTitles };
+    return { principles, assignments, splits, settings, registers, dimensions, schemaDesc, colTitles, references, refOverrides };
   }
 
   function loadFromFrameworkTab(grid) {
@@ -851,6 +853,21 @@ window.SynthesisData = (function () {
     }
     if (parsed.colTitles && Array.isArray(parsed.colTitles)) {
       try { if (!localStorage.getItem('df_fw_col_titles')) localStorage.setItem('df_fw_col_titles', JSON.stringify(parsed.colTitles)); } catch(e){}
+    }
+
+    // Restore references and overrides (seed from sheet, local wins)
+    var AC = window.AcademicUtils;
+    if (AC && parsed.references && parsed.references.length) {
+      var localRefs = typeof AC.getReferences === 'function' ? AC.getReferences() : [];
+      if (!localRefs.length) {
+        if (typeof AC.setReferences === 'function') AC.setReferences(parsed.references);
+      }
+    }
+    if (AC && parsed.refOverrides && Object.keys(parsed.refOverrides).length) {
+      var localOv = typeof AC.getRefOverrides === 'function' ? AC.getRefOverrides() : {};
+      if (!Object.keys(localOv).length) {
+        if (typeof AC.setRefOverrides === 'function') AC.setRefOverrides(parsed.refOverrides);
+      }
     }
 
     return true;
@@ -922,6 +939,14 @@ window.SynthesisData = (function () {
     rows.push(['DIMENSIONS',  JSON.stringify(dims)]);
     rows.push(['SCHEMA_DESC', JSON.stringify(schemaDesc)]);
     rows.push(['COL_TITLES',  JSON.stringify(colTitles)]);
+    // References (from AcademicUtils if available)
+    var AC = window.AcademicUtils;
+    if (AC) {
+      var refs = typeof AC.getReferences === 'function' ? AC.getReferences() : [];
+      var refOv = typeof AC.getRefOverrides === 'function' ? AC.getRefOverrides() : {};
+      if (refs.length) rows.push(['REFERENCES', JSON.stringify(refs)]);
+      if (Object.keys(refOv).length) rows.push(['REF_OVERRIDES', JSON.stringify(refOv)]);
+    }
     rows.push([META_END]);
     return rows;
   }
@@ -943,7 +968,8 @@ window.SynthesisData = (function () {
              first==='PRINCIPLES'||first==='ASSIGNMENTS'||
              first==='SPLITS'||first==='SETTINGS'||
              first==='REGISTERS'||first==='DIMENSIONS'||
-             first==='SCHEMA_DESC'||first==='COL_TITLES';
+             first==='SCHEMA_DESC'||first==='COL_TITLES'||
+             first==='REFERENCES'||first==='REF_OVERRIDES';
     }
     var existSet = new Set((existingGrid||[]).filter(function(r){return !isMeta(r);}).map(normalise).filter(Boolean));
     var propSet  = new Set(proposedGrid.filter(function(r){return !isMeta(r);}).map(normalise).filter(Boolean));
