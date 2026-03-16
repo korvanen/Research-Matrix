@@ -991,8 +991,9 @@
       if (!name) { document.getElementById('cl-modal-name').focus(); return; }
       var dim  = (document.querySelector('.cl-dim-chip.active')||{}).dataset && document.querySelector('.cl-dim-chip.active').dataset.dim || '';
       var desc = (document.getElementById('cl-modal-desc')||{}).value || '';
+      var cb = _pModalCb;
       _closeModal();
-      if (_pModalCb) _pModalCb(name, dim, desc.trim());
+      if (cb) cb(name, dim, desc.trim());
     });
     document.getElementById('cl-modal-name').addEventListener('keydown', function(e){
       if (e.key==='Enter') document.getElementById('cl-modal-confirm').click();
