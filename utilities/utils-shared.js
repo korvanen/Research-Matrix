@@ -1693,6 +1693,19 @@ var FRAMEWORK_FILTER = window.FRAMEWORK_FILTER || 'FRAMEWORK';
     const all = await fetchODS(urlToLoad);
     window.TABS           = all.filter(s => s.name.includes(TAB_FILTER));
     window.FRAMEWORK_TABS = all.filter(s => s.name.includes(FRAMEWORK_FILTER));
+
+    // ── Merge CSV-imported tabs BEFORE embeddings so all tools see them ──
+    try {
+      var _imp = JSON.parse(localStorage.getItem('df_imported_tabs') || '[]');
+      if (_imp.length) {
+        _imp.forEach(function(tab) {
+          if (!window.TABS.some(function(t){ return t.name === tab.name; }))
+            window.TABS.push(tab);
+        });
+        console.log('[utils-shared] Merged', _imp.length, 'imported tab(s) →', window.TABS.length, 'total');
+      }
+    } catch(e) {}
+
     console.log('[utils-shared] Loaded', window.TABS.length, 'TAB tabs,',
                 window.FRAMEWORK_TABS.length, 'FRAMEWORK tabs');
     if (typeof EmbeddingBridge !== 'undefined') EmbeddingBridge.host();
