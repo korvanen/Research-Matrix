@@ -9,7 +9,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="../utilities/utils-keywords.js?v=7"></script>
   <script src="../utilities/utils-shared.js?v=0067db69"></script>
-  <script src="../utilities/utils-synthesis.js?v=5f857ddc"></script>
+  <script src="../utilities/utils-synthesis.js?v=b4058e56"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; }
     html, body { height: 100%; overflow: hidden; margin: 0; padding: 0; }
@@ -270,6 +270,16 @@
 
 
     // ── Sync panel ────────────────────────────────────────────────────────────
+    function _updateSyncStatus() {
+      var lastSync = SY.getLastSync ? SY.getLastSync() : null;
+      var scriptUrl = SY.getScriptUrl();
+      var btn = document.getElementById('fw-write-btn');
+      if (btn) {
+        btn.disabled = !scriptUrl;
+        btn.title = scriptUrl ? '' : 'Set Apps Script URL first';
+      }
+    }
+
     function _loadScriptUrl() {
       var url = SY.getScriptUrl();
       var inp = document.getElementById('fw-script-url');
