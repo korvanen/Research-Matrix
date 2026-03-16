@@ -9,8 +9,8 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="../utilities/utils-keywords.js?v=7"></script>
   <script src="../utilities/utils-shared.js?v=0067db69"></script>
-  <script src="../utilities/utils-synthesis.js?v=58a613f8"></script>
-  <script src="../utilities/utils-academic.js?v=5ac0d404"></script>
+  <script src="../utilities/utils-synthesis.js?v=b4058e56"></script>
+  <script src="../utilities/utils-academic.js?v=66257bc0"></script>
   <script type="module" src="../utilities/utils-embedding.js?v=4"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; }
@@ -561,7 +561,8 @@ var _browsePanelHtml =
       ],
     });
 
-    // Build main area
+    // Build main area — hide subtitle (redundant with status row)
+    if (_nav.subtitleEl) _nav.subtitleEl.style.display = 'none';
     _nav.mainEl.style.cssText = 'display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden;';
     _nav.mainEl.innerHTML =
       '<div class="en-view" id="en-view-browse">' +
