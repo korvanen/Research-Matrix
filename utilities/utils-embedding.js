@@ -8,20 +8,26 @@ import { pipeline, env }
 
 env.allowLocalModels = false;
 
-const EMBEDDING_MODEL = 'Xenova/specter2';
-const CACHE_PREFIX = 'pp_emb_v2_';
+const EMBEDDING_MODEL = 'Xenova/bge-base-en-v1.5';
+const CACHE_PREFIX = 'pp_emb_v4_';
 
 // ── Model loader ──────────────────────────────────────────────────────────────
 let _embedder    = null;
 let _loadPromise = null;
+let _loadFailed  = false;          // hard stop — no infinite 401 loops
+const MAX_LOAD_RETRIES = 2;
+let _loadAttempts = 0;
 
 async function _loadEmbedder() {
   if (_embedder) return _embedder;
+  if (_loadFailed) throw new Error('[embedding-utils] Model permanently failed to load');
   if (_loadPromise) return _loadPromise;
 
+  _loadAttempts++;
   _loadPromise = pipeline('feature-extraction', EMBEDDING_MODEL, { quantized: true })
     .then(model => {
       _embedder = model;
+      _loadAttempts = 0;
       window.dispatchEvent(new CustomEvent('embedder-ready'));
       console.log('[embedding-utils] Model ready');
 
@@ -37,7 +43,11 @@ async function _loadEmbedder() {
     })
     .catch(err => {
       _loadPromise = null;
-      console.warn('[embedding-utils] Model load failed:', err);
+      console.warn('[embedding-utils] Model load failed (attempt ' + _loadAttempts + '/' + MAX_LOAD_RETRIES + '):', err.message || err);
+      if (_loadAttempts >= MAX_LOAD_RETRIES) {
+        _loadFailed = true;
+        console.error('[embedding-utils] Giving up after ' + MAX_LOAD_RETRIES + ' attempts.');
+      }
       throw err;
     });
 
