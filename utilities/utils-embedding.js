@@ -8,8 +8,8 @@ import { pipeline, env }
 
 env.allowLocalModels = false;
 
-const EMBEDDING_MODEL = 'Xenova/all-MiniLM-L6-v2';
-const CACHE_PREFIX    = 'pp_emb_v1_';
+const EMBEDDING_MODEL = 'Xenova/specter2';
+const CACHE_PREFIX = 'pp_emb_v2_';
 
 // ── Model loader ──────────────────────────────────────────────────────────────
 let _embedder    = null;
