@@ -1558,6 +1558,195 @@ function buildRowIndex() {
 }
 
 // ════════════════════════════════════════════════════════════════
+// GLOBAL CARD BUILDER — shared between clusters visual and concept map
+// ════════════════════════════════════════════════════════════════
+
+// Inject shared card CSS once
+(function _injectCardCSS() {
+  if (document.getElementById('pp-global-card-css')) return;
+  var s = document.createElement('style'); s.id = 'pp-global-card-css';
+  s.textContent = `
+/* ── Shared card top row ── */
+.pp-card-top {
+  display:flex; align-items:flex-start; justify-content:space-between;
+  padding:8px 12px 4px; gap:6px;
+}
+.pp-card-cat-num {
+  font-family: var(--font-family-serif, Georgia, serif);
+  font-size:26px; font-weight:400; font-style:italic; line-height:1;
+  letter-spacing:-0.02em;
+  color: color-mix(in srgb, var(--ppc-on,#fff) 92%, var(--ppc-bg,transparent));
+  flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.pp-card-level-block {
+  display:flex; flex-direction:column; align-items:flex-end; flex-shrink:0;
+}
+.pp-card-level-num {
+  font-size:16px; font-weight:900; line-height:1;
+  color: color-mix(in srgb, var(--ppc-on,#fff) 95%, black);
+}
+.pp-card-level-label {
+  font-size:8px; font-weight:600; letter-spacing:.08em; text-transform:uppercase;
+  color: color-mix(in srgb, var(--ppc-on,#fff) 55%, var(--ppc-bg,transparent));
+}
+.pp-card-rule {
+  height:1px; margin:4px 12px 0; flex-shrink:0;
+  background: color-mix(in srgb, var(--ppc-on,#fff) 22%, var(--ppc-bg,transparent));
+}
+/* ── Shared card body ── */
+.pp-card-body {
+  padding:8px 12px 10px; display:flex; flex-direction:column; gap:3px;
+}
+.pp-card-col-label {
+  font-size:9px; font-weight:600; letter-spacing:.06em; text-transform:uppercase;
+  color: color-mix(in srgb, var(--ppc-on,#fff) 60%, var(--ppc-bg,transparent));
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.pp-card-text {
+  font-family: var(--font-family-serif, Georgia, serif);
+  font-size:13px; font-weight:400; line-height:1.35; letter-spacing:-0.01em;
+  color: color-mix(in srgb, var(--ppc-on,#fff) 92%, var(--ppc-bg,transparent));
+  overflow-wrap:break-word; word-break:break-word;
+}
+.pp-card-split-badge {
+  font-size:8px; font-weight:600; letter-spacing:.06em; text-transform:uppercase;
+  color: color-mix(in srgb, var(--ppc-on,#fff) 50%, var(--ppc-bg,transparent));
+  margin-top:2px;
+}
+.pp-card-badge-row { display:flex; gap:4px; flex-wrap:wrap; margin-top:2px; }
+.pp-card-badge {
+  font-size:8px; font-weight:600; letter-spacing:.04em; text-transform:uppercase;
+  padding:1px 6px; border-radius:6px;
+  background: color-mix(in srgb, var(--ppc-on,#fff) 10%, var(--ppc-bg,transparent));
+  color: color-mix(in srgb, var(--ppc-on,#fff) 70%, var(--ppc-bg,transparent));
+}
+.pp-card-sim-row {
+  display:flex; align-items:center; gap:4px; margin-top:3px;
+  font-size:9px; font-weight:600;
+  color: color-mix(in srgb, var(--ppc-on,#fff) 60%, var(--ppc-bg,transparent));
+}
+.pp-card-sim-pct {
+  font-weight:800; font-variant-numeric:tabular-nums;
+  color: color-mix(in srgb, var(--ppc-on,#fff) 92%, black);
+}
+.pp-card-sim-bar {
+  flex:1; height:3px; border-radius:2px;
+  background: color-mix(in srgb, var(--ppc-on,#fff) 12%, var(--ppc-bg,transparent));
+}
+.pp-card-sim-fill {
+  height:100%; border-radius:2px;
+  background: color-mix(in srgb, var(--ppc-on,#fff) 55%, var(--ppc-bg,transparent));
+}
+`;
+  document.head.appendChild(s);
+})();
+
+/**
+ * Build shared card content and append to a container element.
+ * opts: {
+ *   row:        row object with .row.cells, .row.cats, .headers
+ *   accent:     CSS color string
+ *   onColor:    contrast color (optional, computed if missing)
+ *   label:      cluster/level label (string)
+ *   levelNum:   level number (string/number, optional)
+ *   similarity: number 0-1 (optional)
+ *   simLabel:   string (default 'to cluster')
+ *   delay:      animation delay ms (optional)
+ * }
+ * Returns: { card: container, body: bodyEl, cats, colHeader, text }
+ */
+window.buildCardContent = function(container, opts) {
+  var r       = opts.row || {};
+  var cells   = r.row && r.row.cells ? r.row.cells : (r.cells || []);
+  var cats    = r.row && r.row.cats  ? r.row.cats.filter(function(c){ return c.trim(); }) : [];
+  var headers = r.headers || [];
+  var bestIdx = 0, bestLen = 0;
+  cells.forEach(function(c, i){ if (c.length > bestLen) { bestLen = c.length; bestIdx = i; } });
+  var best      = cells[bestIdx] || '';
+  var colHeader = headers[bestIdx] || '';
+  var parsed    = typeof parseCitation === 'function' ? parseCitation(best) : { body: best };
+  var accent    = opts.accent || '#888';
+
+  // Set CSS vars on container
+  container.style.setProperty('--ppc-bg', accent);
+  if (opts.onColor) container.style.setProperty('--ppc-on', opts.onColor);
+  if (opts.delay) container.style.animationDelay = opts.delay + 'ms';
+
+  // Top row: categories + level
+  var topRow = document.createElement('div'); topRow.className = 'pp-card-top';
+  var catNumEl = document.createElement('div'); catNumEl.className = 'pp-card-cat-num';
+  catNumEl.textContent = cats.length ? cats.join(' · ') : (opts.label ? opts.label.slice(0, 6) : '·');
+  var levelBlock = document.createElement('div'); levelBlock.className = 'pp-card-level-block';
+  if (opts.levelNum != null) {
+    var levelNum = document.createElement('div'); levelNum.className = 'pp-card-level-num';
+    levelNum.textContent = String(opts.levelNum);
+    levelBlock.appendChild(levelNum);
+  }
+  var levelLbl = document.createElement('div'); levelLbl.className = 'pp-card-level-label';
+  levelLbl.textContent = opts.label || 'Cluster';
+  levelBlock.appendChild(levelLbl);
+  topRow.appendChild(catNumEl); topRow.appendChild(levelBlock);
+  container.appendChild(topRow);
+
+  // Rule
+  var rule = document.createElement('div'); rule.className = 'pp-card-rule';
+  container.appendChild(rule);
+
+  // Body
+  var body = document.createElement('div'); body.className = 'pp-card-body';
+
+  // Column header
+  if (colHeader) {
+    var ce = document.createElement('div'); ce.className = 'pp-card-col-label';
+    ce.textContent = colHeader; body.appendChild(ce);
+  }
+
+  // Text
+  var te = document.createElement('div'); te.className = 'pp-card-text';
+  te.textContent = parsed.body; body.appendChild(te);
+
+  // Split badge
+  if (r._splitN && r._splitT && r._splitT > 1) {
+    var sp = document.createElement('div'); sp.className = 'pp-card-split-badge';
+    sp.textContent = r._splitN + '/' + r._splitT + ' Split'; body.appendChild(sp);
+  }
+
+  // Boundary / outlier badges
+  if (r._borderline || r._outlier) {
+    var badges = document.createElement('div'); badges.className = 'pp-card-badge-row';
+    if (r._borderline) {
+      var b = document.createElement('span'); b.className = 'pp-card-badge';
+      b.textContent = '~ boundary';
+      b.title = 'This card\u2019s cluster assignment is unstable.';
+      badges.appendChild(b);
+    }
+    if (r._outlier) {
+      var o = document.createElement('span'); o.className = 'pp-card-badge';
+      o.textContent = '\u2197 outlier';
+      o.title = 'Least similar card in its cluster.';
+      badges.appendChild(o);
+    }
+    body.appendChild(badges);
+  }
+
+  // Similarity row
+  if (typeof opts.similarity === 'number') {
+    var pct = Math.round(opts.similarity * 100);
+    var sim = document.createElement('div'); sim.className = 'pp-card-sim-row';
+    sim.innerHTML =
+      '<span>\u2191</span>' +
+      '<span class="pp-card-sim-pct">' + pct + '%</span>' +
+      '<div class="pp-card-sim-bar"><div class="pp-card-sim-fill" style="width:' + pct + '%"></div></div>' +
+      '<span>' + (opts.simLabel || 'to cluster') + '</span>';
+    body.appendChild(sim);
+  }
+
+  container.appendChild(body);
+  return { body: body, cats: cats, colHeader: colHeader, text: parsed.body };
+};
+
+
+// ════════════════════════════════════════════════════════════════
 // BACKGROUND DATA LOADER
 // ════════════════════════════════════════════════════════════════
 
