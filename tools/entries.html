@@ -437,6 +437,22 @@
     </div>
   </div>
 
+  <!-- Manual APA input dialog -->
+  <div class="en-modal-bg" id="en-ref-apa-bg">
+    <div class="en-modal" style="width:500px">
+      <div class="en-modal-title">Add citation manually</div>
+      <div class="en-field">
+        <label class="en-field-label">Full APA citation</label>
+        <textarea id="en-ref-apa-input" class="en-input" style="height:auto;min-height:80px;padding:10px 12px;resize:vertical;line-height:1.5" placeholder="Tummers, L. (2015). The re-emergence of self-managed co-housing in Europe. Urban Studies, 53(10), 2023–2040."></textarea>
+      </div>
+      <div id="en-ref-apa-preview" style="display:none;padding:8px 12px;border-radius:8px;margin-bottom:12px;font-size:12px"></div>
+      <div class="en-modal-foot">
+        <button class="en-btn en-btn-ghost" id="en-ref-apa-cancel">Cancel</button>
+        <button class="en-btn en-btn-primary" id="en-ref-apa-confirm" disabled>Add reference</button>
+      </div>
+    </div>
+  </div>
+
   <script>
   (function(){
     var SY = window.SynthesisData;
@@ -451,7 +467,6 @@
     var _filter      = 'all';
     var _screenFilter = 'all';   // all | unscreened | included | excluded
     var _browseSearch = '';
-    var _importMode   = null;    // 'bib' | 'csv'
     var _searchResults = [];
     var _searching  = false;
     var _topN       = 20;
@@ -469,12 +484,6 @@
     var _globalHtml = window.GlobalPanel.html(
       '<div class="pp-side-panel-section-label" style="padding:8px 0 2px">Screening</div>' +
       '<div id="en-screening-progress" style="font-size:11px;color:var(--md-sys-color-on-surface-variant);padding:2px 0 4px">–</div>' +
-      '<div class="pp-side-panel-section-label" style="padding:8px 0 2px">Import references</div>' +
-      '<div style="display:flex;flex-direction:column;gap:4px;padding:2px 0 6px">' +
-        '<button class="en-panel-chip" id="en-import-bib-btn" style="text-align:left;height:28px;border-radius:6px">BibTeX file…</button>' +
-        '<button class="en-panel-chip" id="en-import-csv-btn" style="text-align:left;height:28px;border-radius:6px">CSV file…</button>' +
-      '</div>' +
-      '<input type="file" id="en-file-input" accept=".bib,.csv,.txt" style="display:none">' +
       '<div class="pp-side-panel-section-label" style="padding:8px 0 2px">Methods blurb</div>' +
       '<button class="en-panel-chip" id="en-methods-btn" style="text-align:left;height:28px;border-radius:6px;width:100%">Generate…</button>' +
       '<div id="en-methods-blurb" style="display:none;font-size:11px;line-height:1.5;color:var(--md-sys-color-on-surface-variant);padding:6px 0;white-space:pre-wrap"></div>'
@@ -651,46 +660,10 @@ var _browsePanelHtml =
       renderBrowse();
     });
 
-    // ── Import + methods blurb ───────────────────────────────────────────────
+    // ── Methods blurb ──────────────────────────────────────────────────────
     document.addEventListener('click', function(e){
-      if (e.target.id === 'en-import-bib-btn') { _importMode='bib'; _triggerFileImport('.bib,.txt'); }
-      if (e.target.id === 'en-import-csv-btn') { _importMode='csv'; _triggerFileImport('.csv,.txt'); }
       if (e.target.id === 'en-methods-btn')    { _toggleMethodsBlurb(); }
     });
-
-    function _triggerFileImport(accept) {
-      var inp = document.getElementById('en-file-input');
-      if (!inp) {
-        inp = document.createElement('input');
-        inp.type = 'file'; inp.id = 'en-file-input'; inp.style.display = 'none';
-        document.body.appendChild(inp);
-        inp.addEventListener('change', function(){
-          var file = inp.files[0]; if (!file) return;
-          var reader = new FileReader();
-          reader.onload = function(ev){
-            var text = ev.target.result;
-            var AC   = window.AcademicUtils;
-            if (!AC) return;
-            var entries = _importMode === 'bib' ? AC.parseBibTeX(text) : AC.parseCSVText(text);
-            if (!entries || !entries.length) { alert('No entries found in file.'); return; }
-            var grid    = typeof AC.citationsToGrid === 'function' ? AC.citationsToGrid(entries) : null;
-            if (!grid)  { alert('Imported '+entries.length+' entries but no grid converter available.'); return; }
-            var tabName = 'IMPORT-' + file.name.replace(/\.[^.]*$/, '').toUpperCase().slice(0,20).replace(/[^A-Z0-9]/g,'-');
-            if (!window.TABS) window.TABS = [];
-            if (!window.TABS.find(function(t){ return t.name === tabName; })) {
-              window.TABS.push({ name: tabName, grid: grid });
-              if (typeof AC.saveImportedTabs === 'function') AC.saveImportedTabs([{ name:tabName, grid:grid }]);
-            }
-            window.dispatchEvent(new CustomEvent('sheet-loaded', { detail: { tabCount: window.TABS.length } }));
-            alert('Imported '+entries.length+' entries as "'+tabName+'".');
-          };
-          reader.readAsText(file);
-          inp.value = '';
-        });
-      }
-      inp.accept = accept;
-      inp.click();
-    }
 
     function _toggleMethodsBlurb() {
       var btn   = document.getElementById('en-methods-btn');
@@ -985,14 +958,17 @@ var _browsePanelHtml =
         if (count) { ta.value = ''; renderRefs(); renderBrowse(); if (_selectedKey) renderDetail(_selectedKey); }
         else { alert('Could not parse any entries from pasted text.'); }
       }
-      // Manual add
+      // Manual add — open modal
       if (e.target.id === 'en-ref-manual-btn') {
-        var apa = prompt('Paste a full APA citation:\ne.g. Tummers, L. (2015). Title. Journal, 53(10), 23–40.');
-        if (!apa || !apa.trim()) return;
-        var AC2 = window.AcademicUtils; if (!AC2) return;
-        var added = AC2.importAPAString(apa);
-        if (added) { renderRefs(); renderBrowse(); if (_selectedKey) renderDetail(_selectedKey); }
-        else { alert('Could not extract author/year. Expected: Surname, I. (Year). Title...'); }
+        var apaBg = document.getElementById('en-ref-apa-bg');
+        var apaInput = document.getElementById('en-ref-apa-input');
+        if (apaBg && apaInput) {
+          apaInput.value = '';
+          document.getElementById('en-ref-apa-preview').style.display = 'none';
+          document.getElementById('en-ref-apa-confirm').disabled = true;
+          apaBg.classList.add('open');
+          setTimeout(function(){ apaInput.focus(); }, 60);
+        }
       }
       // Clear assignment in dialog
       if (e.target.id === 'en-ref-assign-clear') {
@@ -1027,6 +1003,56 @@ var _browsePanelHtml =
         };
         reader.readAsText(file);
         inp.value = '';
+      });
+    })();
+
+    // ── Manual APA modal wiring ──────────────────────────────────────────────
+    (function(){
+      var bg      = document.getElementById('en-ref-apa-bg');
+      var input   = document.getElementById('en-ref-apa-input');
+      var preview = document.getElementById('en-ref-apa-preview');
+      var confirm = document.getElementById('en-ref-apa-confirm');
+      var cancel  = document.getElementById('en-ref-apa-cancel');
+      if (!bg||!input||!preview||!confirm||!cancel) return;
+
+      // Live preview of extracted key
+      input.addEventListener('input', function(){
+        var AC = window.AcademicUtils; if (!AC) return;
+        var text = input.value.trim();
+        if (!text) { preview.style.display='none'; confirm.disabled=true; return; }
+        var extracted = AC.extractKeyFromAPA(text);
+        if (extracted) {
+          preview.style.display = '';
+          preview.style.background = 'rgba(46,125,50,.06)';
+          preview.style.border = '1px solid rgba(46,125,50,.2)';
+          preview.style.color = '#2e7d32';
+          preview.innerHTML = 'Auto-detected key: <span class="en-ref-key">(' + _h(extracted.key) + ')</span>';
+          confirm.disabled = false;
+        } else {
+          preview.style.display = '';
+          preview.style.background = 'rgba(183,28,28,.04)';
+          preview.style.border = '1px solid rgba(183,28,28,.15)';
+          preview.style.color = '#b71c1c';
+          preview.textContent = 'Could not detect author/year. Expected: Surname, I. (Year). Title...';
+          confirm.disabled = true;
+        }
+      });
+
+      confirm.addEventListener('click', function(){
+        var AC = window.AcademicUtils; if (!AC) return;
+        var added = AC.importAPAString(input.value);
+        if (added) {
+          bg.classList.remove('open');
+          input.value = ''; preview.style.display='none'; confirm.disabled=true;
+          renderRefs(); renderBrowse();
+          if (_selectedKey) renderDetail(_selectedKey);
+        }
+      });
+
+      cancel.addEventListener('click', function(){ bg.classList.remove('open'); });
+      bg.addEventListener('click', function(e){ if(e.target===bg) bg.classList.remove('open'); });
+      input.addEventListener('keydown', function(e){
+        if (e.key==='Escape') bg.classList.remove('open');
       });
     })();
 
