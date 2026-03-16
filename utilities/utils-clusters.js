@@ -2084,59 +2084,12 @@ function initClustersTool(paneEl, sidebarEl) {
   }
 
   function buildCard(r, col, delay, clusterLabel, similarity) {
-    const cells  = r.row && r.row.cells ? r.row.cells : (r.cells || []);
-    const cats   = r.row && r.row.cats  ? r.row.cats.filter(c => c.trim()) : [];
-    const headers = r.headers || [];
-    // Find which cell is being displayed (longest cell)
-    let bestIdx = 0, bestLen = 0;
-    cells.forEach((c, i) => { if (c.length > bestLen) { bestLen = c.length; bestIdx = i; } });
-    const best   = cells[bestIdx] || '';
-    const colHeader = headers[bestIdx] || '';
-    const parsed = typeof parseCitation === 'function' ? parseCitation(best) : { body: best };
     const card = document.createElement('div'); card.className = 'pp-cl-card';
-    card.style.setProperty('--ppc-bg', col.accent);
-    card.style.setProperty('--ppc-on', contrastFor(col.accent));
-    if (delay) card.style.animationDelay = delay + 'ms';
-    const topRow = document.createElement('div'); topRow.className = 'pp-cmap-card-top';
-    const catNumEl = document.createElement('div'); catNumEl.className = 'pp-cmap-card-cat-num'; catNumEl.textContent = cats.length ? cats.join(' · ') : (clusterLabel ? clusterLabel.slice(0, 6) : '\u00b7');
-    const levelBlock = document.createElement('div'); levelBlock.className = 'pp-cmap-card-level-block';
-    const levelLbl = document.createElement('div'); levelLbl.className = 'pp-cmap-card-level-label'; levelLbl.textContent = clusterLabel || 'Cluster';
-    levelBlock.appendChild(levelLbl); topRow.appendChild(catNumEl); topRow.appendChild(levelBlock); card.appendChild(topRow);
-    const rule = document.createElement('div'); rule.className = 'pp-cmap-card-rule'; card.appendChild(rule);
-    const body = document.createElement('div'); body.className = 'pp-cl-card-body';
-    if (colHeader) { const ce = document.createElement('div'); ce.className = 'pp-cl-card-cat'; ce.textContent = colHeader; body.appendChild(ce); }
-    const te = document.createElement('div'); te.className = 'pp-cl-card-text'; te.textContent = parsed.body; body.appendChild(te);
-    if (r._splitN && r._splitT && r._splitT > 1) { const sp = document.createElement('div'); sp.className = 'pp-cl-card-split'; sp.textContent = r._splitN + '/' + r._splitT + ' Split'; body.appendChild(sp); }
-    if (r._borderline || r._outlier) {
-      const badges = document.createElement('div'); badges.className = 'pp-cl-card-badges';
-      if (r._borderline) {
-        const b = document.createElement('span'); b.className = 'pp-cl-badge pp-cl-badge--boundary';
-        b.textContent = '~ boundary';
-        b.title = 'This card\u2019s cluster assignment is unstable \u2014 it could plausibly belong to another group. Treat its placement with lower confidence.';
-        badges.appendChild(b);
-      }
-      if (r._outlier) {
-        const o = document.createElement('span'); o.className = 'pp-cl-badge pp-cl-badge--outlier';
-        o.textContent = '\u2197 outlier';
-        o.title = 'This card is the least similar to the other cards in its cluster. It may belong elsewhere or represent an under-explored theme.';
-        badges.appendChild(o);
-      }
-      body.appendChild(badges);
-    }
-    if (typeof similarity === 'number') {
-      const pct = Math.round(similarity * 100);
-      const sim = document.createElement('div'); sim.className = 'pp-cl-sim-row';
-      sim.innerHTML =
-        '<svg class="pp-cl-sim-arrow" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="9" height="9">' +
-          '<polyline points="1,8 4,4 6.5,6.5 9,2"/>' +
-        '</svg>' +
-        '<span class="pp-cl-sim-pct">' + pct + '%</span>' +
-        '<div class="pp-cl-sim-bar"><div class="pp-cl-sim-fill" style="width:' + pct + '%"></div></div>' +
-        '<span class="pp-cl-sim-label">to cluster</span>';
-      body.appendChild(sim);
-    }
-
-    card.appendChild(body);
+    var info = window.buildCardContent(card, {
+      row: r, accent: col.accent, onColor: contrastFor(col.accent),
+      label: clusterLabel, delay: delay,
+      similarity: similarity, simLabel: 'to cluster',
+    });
     card.addEventListener('mouseenter', ev => { if (_nestDrag && _nestDrag.moved) return; showTooltip(ev, r, col.accent, clusterLabel || ''); });
     card.addEventListener('mousemove',  ev => { if (_nestDrag && _nestDrag.moved) { hideTooltip(); return; } moveTooltip(ev); });
     card.addEventListener('mouseleave', () => hideTooltip());
