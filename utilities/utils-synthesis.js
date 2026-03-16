@@ -225,30 +225,40 @@ window.SynthesisData = (function () {
   function _sentenceSplit(text) {
     var sentences = [], start = 0;
     var t = text.replace(/\r\n|\r/g, '\n');
+    var parenDepth = 0;
     for (var i = 0; i < t.length; i++) {
       var ch = t[i];
+      // Track parenthesis nesting — never split inside parens
+      if (ch === '(') { parenDepth++; continue; }
+      if (ch === ')') { if (parenDepth > 0) parenDepth--; continue; }
+      if (parenDepth > 0) continue;
+      // Double-newline paragraph break
       if (ch === '\n' && t[i+1] === '\n') {
         var seg = t.slice(start, i).trim();
-        if (seg.length >= 40) sentences.push(seg);
+        if (seg.length >= 20) sentences.push(seg);
         while (i+1 < t.length && t[i+1] === '\n') i++;
         start = i + 1; continue;
       }
       if (ch !== '.' && ch !== '!' && ch !== '?') continue;
+      // Must be followed by whitespace + uppercase (next sentence)
       var after = t.slice(i+1).match(/^(\s+)([A-Z])/);
       if (!after) continue;
+      // Avoid splitting on abbreviations (e.g., i.e., etc.)
       var wordBefore = t.slice(0, i).match(/(\b\w+)$/);
       if (wordBefore) {
         var w = wordBefore[1];
         if (_ABBREV.has(w.toLowerCase())) continue;
         if (w.length === 1 && w === w.toUpperCase()) continue;
       }
+      // Avoid splitting after numbers (e.g. "p. 23. The...")
       if (/\d$/.test(t.slice(0, i))) continue;
       var seg2 = t.slice(start, i+1).trim();
-      if (seg2.length >= 40) sentences.push(seg2);
+      if (seg2.length >= 20) sentences.push(seg2);
       start = i + 1;
     }
     var last = t.slice(start).trim();
-    if (last.length >= 40) sentences.push(last);
+    if (last.length >= 20) sentences.push(last);
+    // If we only got one segment or none, the text is effectively one sentence
     return sentences;
   }
 
@@ -305,13 +315,15 @@ window.SynthesisData = (function () {
 
     if (chunks.length <= 1) return [];
 
-    // Re-append the citation to each fragment ONLY if the fragment does not
-    // already end with its own parenthetical (to avoid double-citation on
-    // entries where the citation was mid-sentence before the split point).
-    var _trailParen = /\([^()]+\)\s*\.?\s*$/;
+    // Re-append the parent citation to each fragment that does not already
+    // contain its own in-text citation. Uses extractAllCitations if available
+    // for robust detection, otherwise falls back to a trailing-paren check.
     if (citation) {
+      var _hasCitation = (typeof extractAllCitations === 'function')
+        ? function(ch) { return extractAllCitations(ch).length > 0; }
+        : function(ch) { return /\([^()]+\)\s*\.?\s*$/.test(ch); };
       chunks = chunks.map(function(ch) {
-        return _trailParen.test(ch) ? ch : ch + ' (' + citation + ')';
+        return _hasCitation(ch) ? ch : ch + ' (' + citation + ')';
       });
     }
 
