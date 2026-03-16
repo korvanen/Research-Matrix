@@ -8,8 +8,8 @@
   <link rel="stylesheet" href="../design-system.css?v=9fa06a28">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="../utilities/utils-keywords.js?v=7"></script>
-  <script src="../utilities/utils-shared.js?v=54876d07"></script>
-  <script src="../utilities/utils-synthesis.js?v=f1508c1f"></script>
+  <script src="../utilities/utils-shared.js?v=0067db69"></script>
+  <script src="../utilities/utils-synthesis.js?v=3"></script>
   <script src="../utilities/utils-panel.js?v=7"></script>
   <script type="module" src="../utilities/utils-embedding.js?v=4"></script>
   <style>
@@ -259,6 +259,10 @@
           <button class="cl-dim-chip" data-dim="Economic">Economic</button>
         </div>
       </div>
+      <div class="cl-field">
+        <label class="cl-fl">Description <span style="font-weight:400;opacity:.5">(influences clustering)</span></label>
+        <textarea class="cl-input" id="cl-modal-desc" placeholder="Describe what this principle captures…" style="min-height:50px;resize:vertical;line-height:1.5;padding:8px 10px;font-family:var(--font-family)"></textarea>
+      </div>
       <div class="cl-modal-foot">
         <button class="cl-btn cl-btn-ghost" id="cl-modal-cancel">Cancel</button>
         <button class="cl-btn cl-btn-primary" id="cl-modal-confirm">Create</button>
@@ -404,12 +408,14 @@
     // ── Embedding ────────────────────────────────────────────────────────────
     function _triggerEmbed() {
       if (_embedding) return;
-      var keys = SY.getRowNoteKeys();
+      var keys = SY.getEffectiveNoteKeys();
       if (!keys.length || !window.EmbeddingUtils) return;
       _embedding = true;
       document.getElementById('cl-dot').className = 'pp-panel-dot loading';
       document.getElementById('cl-emb-text').textContent = 'Embedding ' + keys.length + ' entries...';
       _embedAll(keys).then(function(){
+        return _embedPrincipleDescriptions();
+      }).then(function(){
         _embedding = false; _embReady = true;
         SY.autoSplitAll();
         _embedNewSplits();
@@ -442,6 +448,23 @@
       }
     }
 
+    // Embed principle name+description so they influence cluster matching
+    async function _embedPrincipleDescriptions() {
+      if (!window.EmbeddingUtils) return;
+      var ps = SY.getPrinciples().filter(function(p){ return p.named && !p.archived; });
+      for (var i = 0; i < ps.length; i++) {
+        var p = ps[i];
+        var embedKey = '__pdesc__' + p.id;
+        var text = SY.getPrincipleEmbedText(p);
+        if (!text) continue;
+        // Always re-embed — description may have changed
+        try {
+          var vec = await window.EmbeddingUtils.getCachedEmbedding(text);
+          if (vec) _emb.set(embedKey, new Float32Array(vec));
+        } catch(e){}
+      }
+    }
+
     document.addEventListener('embedder-ready', _triggerEmbed);
     window.addEventListener('embedding-complete', function(){ if (!_embReady) _triggerEmbed(); });
     window.addEventListener('sheet-loaded', function(){
@@ -467,7 +490,7 @@
     function updateCounts() {
       var named    = SY.getPrinciples().filter(function(p){ return p.named && !p.archived; }).length;
       var assigned = new Set(SY.getAssignments().map(function(a){ return a.noteKey; }));
-      var unassigned = SY.getRowNoteKeys().filter(function(k){ return !assigned.has(k); }).length;
+      var unassigned = SY.getEffectiveNoteKeys().filter(function(k){ return !assigned.has(k); }).length;
       var pending  = SY.getAssignments().filter(function(a){ return a.status==='auto'; }).length;
       document.getElementById('cl-n-named').textContent = named + (pending?' ('+pending+')':'');
       document.getElementById('cl-n-pool').textContent  = unassigned;
@@ -481,7 +504,7 @@
     function _getClusters() {
       if (_clusters !== null) return _clusters;
       var assigned = new Set(SY.getAssignments().map(function(a){ return a.noteKey; }));
-      var items    = SY.getRowNoteKeys()
+      var items    = SY.getEffectiveNoteKeys()
         .filter(function(k){ return !assigned.has(k) && _emb.has(k); })
         .map(function(k){ return { id:k, vec:_emb.get(k) }; });
       var raw    = SY.cluster(items, _thresh);
@@ -589,7 +612,7 @@
         btn.addEventListener('click', function(e){ e.stopPropagation(); SY.getAssignments().filter(function(a){ return a.principleId===btn.dataset.pid&&a.status==='auto'; }).forEach(function(a){ SY.confirmAssignment(a.noteKey); }); _clusters=null; renderPrinciples(); });
       });
       listEl.querySelectorAll('[data-action=rename-p]').forEach(function(btn){
-        btn.addEventListener('click', function(e){ e.stopPropagation(); var p=SY.getPrinciples().find(function(x){return x.id===btn.dataset.pid;}); if(!p) return; _openModal('Rename principle', p.name, p.dimensionHint, function(name,dim){ SY.updatePrinciple(p.id,{name:name,dimensionHint:dim}); renderPrinciples(); }); });
+        btn.addEventListener('click', function(e){ e.stopPropagation(); var p=SY.getPrinciples().find(function(x){return x.id===btn.dataset.pid;}); if(!p) return; _openModal('Rename principle', p.name, p.dimensionHint, function(name,dim,desc){ SY.updatePrinciple(p.id,{name:name,dimensionHint:dim,description:desc}); _emb.delete('__pdesc__'+p.id); _clusters=null; renderPrinciples(); }, p.description||''); });
       });
       listEl.querySelectorAll('[data-action=archive-p]').forEach(function(btn){
         btn.addEventListener('click', function(e){ e.stopPropagation(); SY.updatePrinciple(btn.dataset.pid,{archived:true,named:false}); SY.getAssignments().filter(function(a){return a.principleId===btn.dataset.pid;}).forEach(function(a){SY.rejectAssignment(a.noteKey);}); _clusters=null; renderPrinciples(); });
@@ -606,7 +629,7 @@
       var clusteredKeys = new Set();
       clusters.forEach(function(c){ c.noteKeys.forEach(function(k){ clusteredKeys.add(k); }); });
       var assigned    = new Set(SY.getAssignments().map(function(a){ return a.noteKey; }));
-      var unassigned  = SY.getRowNoteKeys().filter(function(k){ return !assigned.has(k); });
+      var unassigned  = SY.getEffectiveNoteKeys().filter(function(k){ return !assigned.has(k); });
       var singletons  = unassigned.filter(function(k){ return _emb.has(k) && !clusteredKeys.has(k); });
       var notEmbedded = unassigned.filter(function(k){ return !_emb.has(k); });
 
@@ -678,8 +701,8 @@
         btn.addEventListener('click', function(e){
           e.stopPropagation();
           var ci = parseInt(btn.dataset.ci), cl = clusters[ci];
-          _openModal('Name this cluster', '', '', function(name, dim){
-            var p = SY.addPrinciple({ name:name, dimensionHint:dim });
+          _openModal('Name this cluster', '', '', function(name, dim, desc){
+            var p = SY.addPrinciple({ name:name, dimensionHint:dim, description:desc });
             if (cl) cl.noteKeys.forEach(function(k){ SY.setAssignment(k, p.id, SY.suggestRegister((SY.resolveNoteKey(k)||{text:''}).text), 'confirmed', null); });
             _clusters=null; _openP.add(p.id); renderPrinciples();
           });
@@ -701,7 +724,7 @@
 
     // New principle button
     var newPBtn = document.getElementById('cl-new-p-btn');
-    if (newPBtn) newPBtn.addEventListener('click', function(){ _openModal('New principle','','',function(name,dim){ var p=SY.addPrinciple({name:name,dimensionHint:dim}); _openP.add(p.id); renderPrinciples(); }); });
+    if (newPBtn) newPBtn.addEventListener('click', function(){ _openModal('New principle','','',function(name,dim,desc){ var p=SY.addPrinciple({name:name,dimensionHint:dim,description:desc}); _openP.add(p.id); renderPrinciples(); }); });
     var bulkBtn = document.getElementById('cl-bulk-confirm-btn');
     if (bulkBtn) bulkBtn.addEventListener('click', function(){ SY.getAssignments().filter(function(a){return a.status==='auto';}).forEach(function(a){SY.confirmAssignment(a.noteKey);}); _clusters=null; renderPrinciples(); });
 
@@ -937,8 +960,8 @@
     document.getElementById('cl-pop-new').addEventListener('click', function(){
       if (!_assignCtx) return;
       var savedCtx = _assignCtx; _closePop();
-      _openModal('New principle', '', '', function(name, dim){
-        var p = SY.addPrinciple({ name:name, dimensionHint:dim });
+      _openModal('New principle', '', '', function(name, dim, desc){
+        var p = SY.addPrinciple({ name:name, dimensionHint:dim, description:desc });
         var r = SY.resolveNoteKey(savedCtx);
         SY.setAssignment(savedCtx, p.id, r ? SY.suggestRegister(r.text) : 'what', 'confirmed', null);
         _clusters=null; _openP.add(p.id); renderPrinciples();
@@ -946,10 +969,11 @@
     });
 
     // ── Principle modal ──────────────────────────────────────────────────────
-    function _openModal(title, defaultName, defaultDim, cb) {
+    function _openModal(title, defaultName, defaultDim, cb, defaultDesc) {
       _pModalCb = cb;
       document.getElementById('cl-modal-title').textContent = title || 'New principle';
       document.getElementById('cl-modal-name').value = defaultName || '';
+      document.getElementById('cl-modal-desc').value = defaultDesc || '';
       document.getElementById('cl-modal-confirm').textContent = title && title.startsWith('Rename') ? 'Rename' : 'Create';
       document.querySelectorAll('.cl-dim-chip').forEach(function(c){ c.classList.toggle('active', c.dataset.dim === (defaultDim||'')); });
       document.getElementById('cl-modal-bg').classList.add('open');
@@ -966,8 +990,9 @@
       var name = document.getElementById('cl-modal-name').value.trim();
       if (!name) { document.getElementById('cl-modal-name').focus(); return; }
       var dim  = (document.querySelector('.cl-dim-chip.active')||{}).dataset && document.querySelector('.cl-dim-chip.active').dataset.dim || '';
+      var desc = (document.getElementById('cl-modal-desc')||{}).value || '';
       _closeModal();
-      if (_pModalCb) _pModalCb(name, dim);
+      if (_pModalCb) _pModalCb(name, dim, desc.trim());
     });
     document.getElementById('cl-modal-name').addEventListener('keydown', function(e){
       if (e.key==='Enter') document.getElementById('cl-modal-confirm').click();
