@@ -1690,6 +1690,60 @@ window.injectToolNav = function(currentTool) {
       var spacer = document.createElement('div');
       spacer.style.cssText = 'flex:1;';
       rail.appendChild(spacer);
+
+      // Theme toggle — above Home
+      var themeBtn = document.createElement('button');
+      themeBtn.className = 'pp-nav-item';
+      themeBtn.id = 'theme-toggle';
+      themeBtn.title = 'Toggle dark/light mode';
+      themeBtn.style.cssText = 'background:none;border:none;cursor:pointer;padding:0;color:inherit;width:100%;';
+
+      var themeIndicator = document.createElement('div');
+      themeIndicator.className = 'pp-nav-item-indicator';
+      var themeIcon = document.createElement('div');
+      themeIcon.className = 'pp-nav-item-icon';
+      themeIcon.id = 'theme-toggle-icon';
+      var isDark = document.documentElement.classList.contains('dark');
+      // Sun icon for dark mode (click to go light), moon for light mode (click to go dark)
+      var sunSvg = '<svg viewBox="0 0 18 18" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="9" r="3.5"/><line x1="9" y1="1.5" x2="9" y2="3"/><line x1="9" y1="15" x2="9" y2="16.5"/><line x1="2.7" y1="2.7" x2="3.75" y2="3.75"/><line x1="14.25" y1="14.25" x2="15.3" y2="15.3"/><line x1="1.5" y1="9" x2="3" y2="9"/><line x1="15" y1="9" x2="16.5" y2="9"/><line x1="2.7" y1="15.3" x2="3.75" y2="14.25"/><line x1="14.25" y1="3.75" x2="15.3" y2="2.7"/></svg>';
+      var moonSvg = '<svg viewBox="0 0 18 18" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15.1 10.4A6.5 6.5 0 017.6 2.9a7 7 0 107.5 7.5z"/></svg>';
+      themeIcon.innerHTML = isDark ? sunSvg : moonSvg;
+      themeIndicator.appendChild(themeIcon);
+
+      var themeLabel = document.createElement('span');
+      themeLabel.className = 'pp-nav-item-label';
+      themeLabel.id = 'theme-toggle-label';
+      themeLabel.textContent = isDark ? 'Light' : 'Dark';
+
+      themeBtn.appendChild(themeIndicator);
+      themeBtn.appendChild(themeLabel);
+      rail.appendChild(themeBtn);
+
+      // Wire click — toggles dark/light via same mechanism as the old theme init
+      themeBtn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        // Dispatch a synthetic click that the existing theme IIFE can pick up,
+        // or toggle directly if that init hasn't run yet
+        var html = document.documentElement;
+        var nowDark = html.classList.contains('dark');
+        var next = !nowDark;
+        html.classList.toggle('dark', next);
+        html.classList.toggle('light', !next);
+        try { localStorage.setItem('df-theme', next ? 'dark' : 'light'); } catch(e){}
+        // Clear any override stylesheet
+        var ov = document.getElementById('df-theme-override');
+        if (ov) ov.textContent = '';
+        window.dispatchEvent(new CustomEvent('df-theme-change', { detail: { dark: next } }));
+      });
+
+      // Update icon/label on theme change
+      window.addEventListener('df-theme-change', function(e) {
+        var d = e.detail && e.detail.dark;
+        var iconEl = document.getElementById('theme-toggle-icon');
+        var lblEl  = document.getElementById('theme-toggle-label');
+        if (iconEl) iconEl.innerHTML = d ? sunSvg : moonSvg;
+        if (lblEl) lblEl.textContent = d ? 'Light' : 'Dark';
+      });
     }
     var a = document.createElement('a');
     // Home link: active only if we're on index.html (no currentTool match)
