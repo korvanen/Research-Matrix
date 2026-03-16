@@ -664,16 +664,18 @@ var _browsePanelHtml =
 
     // Sync global status
 
-    function _embedNewSplits() {
+    async function _embedNewSplits() {
       if (!window.EmbeddingUtils || !_embReady) return;
       var keys = SY.getEffectiveNoteKeys();
-      keys.forEach(function(key) {
-        if (_emb.has(key)) return;
-        var r = SY.resolveNoteKey(key); if (!r || !r.text.trim()) return;
-        window.EmbeddingUtils.getCachedEmbedding(r.text).then(function(vec){
+      for (var i = 0; i < keys.length; i++) {
+        var key = keys[i];
+        if (_emb.has(key)) continue;
+        var r = SY.resolveNoteKey(key); if (!r || !r.text.trim()) continue;
+        try {
+          var vec = await window.EmbeddingUtils.getCachedEmbedding(r.text);
           if (vec) _emb.set(key, new Float32Array(vec));
-        }).catch(function(){});
-      });
+        } catch(e){}
+      }
     }
 
     // ── Sub-tab switching (pp-panel-tab buttons live in panel) ──────────────
@@ -806,7 +808,8 @@ var _browsePanelHtml =
         _embedding = false; _embReady = true;
         // Auto-split long entries now that we can embed the fragments
         SY.autoSplitAll();
-        _embedNewSplits();
+        return _embedNewSplits();
+      }).then(function(){
         document.getElementById('en-dot').className = 'pp-panel-dot ready';
         var _statusMsg = _emb.size + ' entries indexed';
         document.getElementById('en-status-text').textContent = _statusMsg;
@@ -847,24 +850,22 @@ var _browsePanelHtml =
           if (vec) _emb.set('__pdesc__' + p.id, new Float32Array(vec));
         } catch(e){}
       }
-      // Register descriptions
+      // Register descriptions — always embed label, with description if available
       var regs = SY.getRegisters();
       for (var ri = 0; ri < regs.length; ri++) {
         var r = regs[ri];
         var rDesc = SY.getSchemaDescription('registers', r.key);
-        if (!rDesc) continue;
-        var rText = r.label + '. ' + rDesc;
+        var rText = (r.label || r.key.toUpperCase()) + (rDesc ? '. ' + rDesc : '');
         try {
           var rv = await window.EmbeddingUtils.getCachedEmbedding(rText);
           if (rv) _emb.set('__rdesc__' + r.key, new Float32Array(rv));
         } catch(e){}
       }
-      // Dimension descriptions
+      // Dimension descriptions — always embed name, with description if available
       var dims = SY.getDimensions();
       for (var di = 0; di < dims.length; di++) {
         var dDesc = SY.getSchemaDescription('dimensions', dims[di]);
-        if (!dDesc) continue;
-        var dText = dims[di] + '. ' + dDesc;
+        var dText = dims[di] + (dDesc ? '. ' + dDesc : '');
         try {
           var dv = await window.EmbeddingUtils.getCachedEmbedding(dText);
           if (dv) _emb.set('__ddesc__' + dims[di], new Float32Array(dv));
