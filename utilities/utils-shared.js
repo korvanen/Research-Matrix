@@ -129,11 +129,86 @@ function panelHighlight(text, kwSet) {
 
 var _citationRe = /\s*\(([^)]+)\)\s*\.?\s*$/;
 
+// Legacy: returns last trailing (…) as the citation — kept for backward compat
 function parseCitation(text) {
   text = String(text == null ? '' : text);
   var m = _citationRe.exec(text);
-  if (!m) return { body: text, citation: null };
-  return { body: text.slice(0, m.index).trimEnd(), citation: m[1] };
+  if (!m) return { body: text, citation: null, citations: extractAllCitations(text) };
+  return { body: text.slice(0, m.index).trimEnd(), citation: m[1], citations: extractAllCitations(text) };
+}
+
+// ── Robust in-text citation extractor ────────────────────────
+// Finds ALL academic in-text citations in a string, including:
+//   (Author, Year)  (Author, Year, p. 12)  (Author, Year, pp. 12-34)
+//   (Author & Author, Year)  (Author et al., Year)
+//   (see Author, Year)  (e.g., Author, Year)  (cf. Author, Year)
+//   (Author, Year; Author, Year)  — multi-cites in one parens
+//
+// Returns: [ { raw, key, start, end }, … ]
+//   raw  = full text including parens, e.g. "(Tummers, 2015, p. 23)"
+//   key  = normalised matching key, e.g. "Tummers, 2015"
+//   start/end = indices in the source string
+
+// Regex for a SINGLE citation element (no outer parens):
+//   OptionalPrefix  Author(s)  ,  Year  OptionalPageRef
+var _nameChar  = '[A-Za-z\u00C0-\u024F\u0027\u2019\\-]';
+var _singleCiteRe = new RegExp(
+  '(?:see\\s+|e\\.g\\.\\s*,?\\s*|cf\\.\\s*|i\\.e\\.\\s*,?\\s*)?' +  // optional prefix
+  '(' + _nameChar + '+' +                                             // first author surname
+    '(?:\\s(?:&|and)\\s' + _nameChar + '+)?' +                        // optional second author
+    '(?:\\set\\sal\\.)?' +                                            // optional et al.
+  ')' +
+  ',\\s*(\\d{4}[a-z]?)' +                                            // , Year (with optional letter)
+  '(?:,\\s*(?:pp?|ch|sec|para)\\.\\s*[\\d\\-\u2013]+)?' +            // optional p./pp./ch./sec.
+  '(?:,\\s*(?:pp?|ch|sec|para)\\.\\s*[\\d\\-\u2013]+)?',             // second optional locator
+  'g'
+);
+
+function extractAllCitations(text) {
+  text = String(text == null ? '' : text);
+  var results = [];
+  var seen = {};
+  // Find all parenthesised groups: ( … )
+  var parenRe = /\(([^)]+)\)/g;
+  var pm;
+  while ((pm = parenRe.exec(text)) !== null) {
+    var inner = pm[1];
+    var outerStart = pm.index;
+    var outerRaw   = pm[0];
+    // Split on ; for multi-cites: (Author, 2015; Author, 2020)
+    var parts = inner.split(/\s*;\s*/);
+    for (var pi = 0; pi < parts.length; pi++) {
+      _singleCiteRe.lastIndex = 0;
+      var cm = _singleCiteRe.exec(parts[pi]);
+      if (!cm) continue;
+      var authorPart = cm[1].trim();
+      var yearPart   = cm[2];
+      var key = authorPart + ', ' + yearPart;
+      var entry = {
+        raw:   outerRaw,
+        key:   key,
+        start: outerStart,
+        end:   outerStart + outerRaw.length,
+      };
+      // Deduplicate by key — track all occurrences
+      if (!seen[key]) {
+        seen[key] = { key: key, occurrences: [] };
+        results.push(seen[key]);
+      }
+      seen[key].occurrences.push(entry);
+    }
+  }
+  return results;
+}
+
+// Normalise a raw citation string to a matching key
+// "Tummers, 2015, p. 23" → "Tummers, 2015"
+function citationToKey(raw) {
+  if (!raw) return '';
+  return raw
+    .replace(/^(?:see\s+|e\.g\.\s*,?\s*|cf\.\s*|i\.e\.\s*,?\s*)/i, '')
+    .replace(/,\s*(?:pp?|ch|sec|para)\.\s*[\d\-\u2013]+/g, '')
+    .trim();
 }
 
 function citationPillHtml(citation, accentColor, textColor) {
