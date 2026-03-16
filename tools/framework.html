@@ -9,7 +9,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="../utilities/utils-keywords.js?v=7"></script>
   <script src="../utilities/utils-shared.js?v=0067db69"></script>
-  <script src="../utilities/utils-synthesis.js?v=ea7a2c35"></script>
+  <script src="../utilities/utils-synthesis.js?v=b4058e56"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; }
     html, body { height: 100%; overflow: hidden; margin: 0; padding: 0; }
@@ -459,36 +459,42 @@
             var regAs     = byReg[reg];
             var mv        = mbr[reg] || '';
             var mt        = tbr[reg] || '';
-            var noteCount = Math.max(regAs.length, 1);
 
-            // Render one row per assigned note
-            regAs.forEach(function(a, ai){
-              var ruleText = (SY.resolveNoteKey(a.noteKey)||{text:''}).text;
-              var parsed   = typeof parseCitation === 'function' ? parseCitation(ruleText) : { body:ruleText, citation:null };
-              var pillHtml = parsed.citation
-                ? ' <span class="pp-cite-pill" style="background:'+_h(p.color||'#555')+';color:#fff">'+_h(parsed.citation)+'</span>'
-                : '';
-              html += '<tr>';
-              if (ai === 0) {
-                html += '<td class="fw-id" rowspan="'+noteCount+'"></td>';
-                html += '<td class="fw-cat '+reg+'" rowspan="'+noteCount+'">'+REG_LABEL[reg]+'</td>';
-              }
-              html += '<td><div class="fw-rule-edit has-ref" contenteditable="false" data-pid="'+_h(p.id)+'" data-reg="'+reg+'" data-field="rule">'+_h(parsed.body)+pillHtml+'</div></td>';
-              if (ai === 0) {
-                html += '<td rowspan="'+noteCount+'"><div class="fw-editable'+(mv?'':' gap')+'" contenteditable="true" spellcheck="false" data-pid="'+_h(p.id)+'" data-reg="'+reg+'" data-field="move">'+(mv||'Click to add...')+'</div></td>';
-                html += '<td rowspan="'+noteCount+'"><div class="fw-editable'+(mt?'':' gap')+'" contenteditable="true" spellcheck="false" data-pid="'+_h(p.id)+'" data-reg="'+reg+'" data-field="metric">'+(mt||'Click to add...')+'</div></td>';
-              }
-              html += '</tr>';
+            // Group entries by column (0=rule, 1=move, 2=metric)
+            var byCols = [[],[],[]];
+            regAs.forEach(function(a){
+              var col = (a.column != null && a.column >= 0 && a.column <= 2) ? a.column : 0;
+              byCols[col].push(a);
             });
+            var maxRows = Math.max(1, byCols[0].length, byCols[1].length, byCols[2].length);
 
-            // Empty row when no notes assigned
-            if (!regAs.length) {
+            for (var ri = 0; ri < maxRows; ri++) {
               html += '<tr>';
-              html += '<td class="fw-id"></td>';
-              html += '<td class="fw-cat '+reg+'">'+REG_LABEL[reg]+'</td>';
-              html += '<td><div class="fw-rule-edit no-note" contenteditable="true" spellcheck="false" data-pid="'+_h(p.id)+'" data-reg="'+reg+'" data-field="rule">No note assigned</div></td>';
-              html += '<td><div class="fw-editable'+(mv?'':' gap')+'" contenteditable="true" spellcheck="false" data-pid="'+_h(p.id)+'" data-reg="'+reg+'" data-field="move">'+(mv||'Click to add...')+'</div></td>';
-              html += '<td><div class="fw-editable'+(mt?'':' gap')+'" contenteditable="true" spellcheck="false" data-pid="'+_h(p.id)+'" data-reg="'+reg+'" data-field="metric">'+(mt||'Click to add...')+'</div></td>';
+              if (ri === 0) {
+                html += '<td class="fw-id" rowspan="'+maxRows+'"></td>';
+                html += '<td class="fw-cat '+reg+'" rowspan="'+maxRows+'">'+REG_LABEL[reg]+'</td>';
+              }
+              // Render each column cell
+              for (var ci = 0; ci < 3; ci++) {
+                var colAs = byCols[ci];
+                if (ri < colAs.length) {
+                  var a = colAs[ri];
+                  var ruleText = (SY.resolveNoteKey(a.noteKey)||{text:''}).text;
+                  var parsed   = typeof parseCitation === 'function' ? parseCitation(ruleText) : { body:ruleText, citation:null };
+                  var pillHtml = parsed.citation
+                    ? ' <span class="pp-cite-pill" style="background:'+_h(p.color||'#555')+';color:#fff">'+_h(parsed.citation)+'</span>'
+                    : '';
+                  html += '<td><div class="fw-rule-edit has-ref" contenteditable="false" data-pid="'+_h(p.id)+'" data-reg="'+reg+'" data-col="'+ci+'" data-field="rule">'+_h(parsed.body)+pillHtml+'</div></td>';
+                } else if (ri === 0) {
+                  // Empty cell — show editable placeholder or moveByReg/metricByReg text
+                  var prefill = ci===1 ? mv : ci===2 ? mt : '';
+                  var rowspan = maxRows - colAs.length;
+                  if (rowspan > 1) html += '<td rowspan="'+rowspan+'">';
+                  else html += '<td>';
+                  html += '<div class="fw-editable'+(prefill?'':' gap')+'" contenteditable="true" spellcheck="false" data-pid="'+_h(p.id)+'" data-reg="'+reg+'" data-col="'+ci+'" data-field="'+(ci===1?'move':ci===2?'metric':'rule')+'">'+(prefill||'Click to add...')+'</div></td>';
+                }
+                // For rows beyond both colAs and the first empty, skip (covered by rowspan)
+              }
               html += '</tr>';
             }
           });
