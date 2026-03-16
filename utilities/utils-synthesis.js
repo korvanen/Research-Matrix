@@ -27,6 +27,7 @@ window.SynthesisData = (function () {
     SETTINGS:    'sy2_settings',    // { threshold, maxWords }
     REGISTERS:   'sy2_registers',   // [{key,label}]
     DIMENSIONS:  'sy2_dimensions',  // string[]
+    SCHEMA_DESC: 'sy2_schema_desc', // {registers:{key:desc}, dimensions:{name:desc}}
     SCRIPT_URL:  'sy2_script_url',
     LAST_SYNC:   'sy2_last_sync',
   };
@@ -85,6 +86,21 @@ window.SynthesisData = (function () {
     setRegisters(regs);
   }
 
+  // ── Schema descriptions (for registers, dimensions) ────────────────────
+  function getSchemaDescriptions() {
+    return _load(SK.SCHEMA_DESC, { registers:{}, dimensions:{} });
+  }
+  function setSchemaDescription(type, key, desc) {
+    var sd = getSchemaDescriptions();
+    if (!sd[type]) sd[type] = {};
+    sd[type][key] = desc || '';
+    _save(SK.SCHEMA_DESC, sd);
+  }
+  function getSchemaDescription(type, key) {
+    var sd = getSchemaDescriptions();
+    return (sd[type] && sd[type][key]) || '';
+  }
+
   // ── Dimensions ────────────────────────────────────────────────────────────
   function getDimensions() {
     var stored = _load(SK.DIMENSIONS, null);
@@ -119,6 +135,44 @@ window.SynthesisData = (function () {
   function addDimension(name) {
     var dims = getDimensions();
     if (!dims.includes(name)) { dims.push(name); setDimensions(dims); }
+  }
+
+  // ── Schema descriptions ─────────────────────────────────────────────────
+  // Stored as { registers: {key: desc}, dimensions: {name: desc}, columns: {idx: desc} }
+  function _getSchemaDesc() { return _load(SK.SCHEMA_DESC, { registers:{}, dimensions:{}, columns:{} }); }
+  function _setSchemaDesc(d) { _save(SK.SCHEMA_DESC, d); }
+
+  function getSchemaDescription(type, key) {
+    var d = _getSchemaDesc();
+    return (d[type] && d[type][key]) || '';
+  }
+  function setSchemaDescription(type, key, desc) {
+    var d = _getSchemaDesc();
+    if (!d[type]) d[type] = {};
+    if (desc && desc.trim()) d[type][key] = desc.trim();
+    else delete d[type][key];
+    _setSchemaDesc(d);
+  }
+  // Get all descriptions as a flat array of {type, key, label, description} for embedding
+  function getAllSchemaDescriptions() {
+    var result = [];
+    var d = _getSchemaDesc();
+    var regs = getRegisters();
+    regs.forEach(function(r) {
+      var desc = (d.registers && d.registers[r.key]) || '';
+      result.push({ type:'register', key:r.key, label:r.label, description:desc });
+    });
+    getDimensions().forEach(function(dim) {
+      var desc = (d.dimensions && d.dimensions[dim]) || '';
+      result.push({ type:'dimension', key:dim, label:dim, description:desc });
+    });
+    // Column titles
+    var colKeys = ['0','1','2'];
+    colKeys.forEach(function(k) {
+      var desc = (d.columns && d.columns[k]) || '';
+      if (desc) result.push({ type:'column', key:k, label:'Column '+(parseInt(k)+1), description:desc });
+    });
+    return result;
   }
 
   // ── Global settings ───────────────────────────────────────────────────────
@@ -339,17 +393,25 @@ window.SynthesisData = (function () {
     var changed   = false;
 
     getRowNoteKeys().forEach(function(key) {
-      if (assigned.has(key)) return; // never split assigned
+      if (assigned.has(key)) return; // never split assigned parent
+
+      // If this key has existing splits, check if any fragment is assigned
+      if (existing[key]) {
+        var anyFragAssigned = false;
+        existing[key].forEach(function(_, i) {
+          if (assigned.has(makeSplitKey(key, i))) anyFragAssigned = true;
+        });
+        if (anyFragAssigned) return; // preserve splits with assigned fragments
+      }
+
       var r = resolveNoteKey(key); if (!r || !r.text.trim()) return;
       var wordCount = r.text.trim().split(/\s+/).length;
 
       if (wordCount > settings.maxWords) {
-        // Always re-split — the stored split may have been made at a different
-        // maxWords threshold. splitNote overwrites the stored fragments.
         splitNote(key);
         changed = true;
       } else if (existing[key]) {
-        // Entry now fits under threshold — remove stale split
+        // Entry now fits under threshold and no fragments assigned — remove split
         removeSplit(key);
         changed = true;
       }
@@ -494,6 +556,7 @@ window.SynthesisData = (function () {
     var p   = {
       id: _id('p'), sheetId: _sheetId(),
       name: String(data.name||'').trim(), named: !!(data.name&&data.name.trim()),
+      description: String(data.description||'').trim(),
       dimensionHint: String(data.dimensionHint||'').trim(),
       color: data.color || COLORS[(seq-1) % COLORS.length],
       move:'', metric:'',
@@ -649,12 +712,22 @@ window.SynthesisData = (function () {
   }
 
   // ── Auto-assignment tiers ─────────────────────────────────────────────────
+  // Returns text that should be embedded for a principle (name + description)
+  function getPrincipleEmbedText(p) {
+    var text = p.name || '';
+    if (p.description) text += '. ' + p.description;
+    return text.trim();
+  }
+
   function buildPrincipleVectors(embeddings) {
     var principles  = getPrinciples().filter(function(p){return p.named&&!p.archived;});
     var assignments = getAssignments().filter(function(a){return a.status==='confirmed';});
     return principles.map(function(p){
       var vecs = assignments.filter(function(a){return a.principleId===p.id;})
         .map(function(a){return embeddings.get(a.noteKey);}).filter(Boolean);
+      // Include principle description embedding if available
+      var descVec = embeddings.get('__pdesc__' + p.id);
+      if (descVec) vecs.push(descVec);
       return { principle:p, centroid: vecs.length ? centroid(vecs) : null };
     }).filter(function(pv){return pv.centroid!==null;});
   }
@@ -931,7 +1004,10 @@ window.SynthesisData = (function () {
     // Registers & dimensions
     getRegisters, setRegisters, updateRegister, deleteRegister, addRegister,
     getDimensions, setDimensions, updateDimension, deleteDimension, addDimension,
+    getSchemaDescriptions, getSchemaDescription, setSchemaDescription,
     DEFAULT_REGISTERS, DEFAULT_DIMENSIONS,
+    // Schema descriptions
+    getSchemaDescription, setSchemaDescription, getAllSchemaDescriptions,
     // Helpers
     makeNoteKey, makeSplitKey, isSplitKey, splitKeyParts,
     parseNoteKey, resolveNoteKey,
@@ -940,7 +1016,7 @@ window.SynthesisData = (function () {
     // Splits
     getSplits, getFragments, storeSplit, removeSplit, splitNote, autoSplitAll,
     // Principles
-    getPrinciples, addPrinciple, updatePrinciple, deletePrinciple,
+    getPrinciples, addPrinciple, updatePrinciple, deletePrinciple, getPrincipleEmbedText,
     // Assignments
     getAssignments, getAssignment, setAssignment, confirmAssignment,
     rejectAssignment, updateAssignmentRegister,
