@@ -9,7 +9,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="../utilities/utils-keywords.js?v=7"></script>
   <script src="../utilities/utils-shared.js?v=0067db69"></script>
-  <script src="../utilities/utils-synthesis.js?v=65b18144"></script>
+  <script src="../utilities/utils-synthesis.js?v=b4058e56"></script>
   <script src="../utilities/utils-academic.js?v=66257bc0"></script>
   <script type="module" src="../utilities/utils-embedding.js?v=4"></script>
   <style>
@@ -216,6 +216,18 @@
       color: var(--md-sys-color-on-secondary-container);
       border-color: transparent;
     }
+    .en-sugg-chip {
+      display: inline-flex; align-items: center; gap: 3px;
+      height: 22px; padding: 0 8px; border-radius: 11px;
+      font-size: 11px; font-weight: 500; white-space: nowrap;
+      background: var(--md-sys-color-surface-container-highest);
+      color: var(--md-sys-color-on-surface-variant);
+    }
+    .en-sugg-chip.top {
+      background: var(--md-sys-color-primary-container);
+      color: var(--md-sys-color-on-primary-container);
+    }
+    .en-sugg-chip strong { font-weight: 700; font-variant-numeric: tabular-nums; }
     .en-split-hint {
       font-size: 11px; color: var(--md-sys-color-on-surface-variant); margin-top: 8px;
       display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
@@ -1401,6 +1413,81 @@ var _browsePanelHtml =
         html += '<div style="font-size:12px;color:var(--md-sys-color-on-surface-variant)">This entry has been split. Assign individual fragments above.</div>';
       }
       html += '</div>';
+
+      // ── Semantic suggestions ────────────────────────────────────────────
+      var _entryVec = _emb.get(key);
+      if (_entryVec) {
+        var _an = SY.analyzePlacement(_entryVec, r.text, _emb);
+        html += '<div class="en-assign-area">';
+        html += '<span class="en-section-label">Semantic suggestions</span>';
+
+        // Dimension suggestion
+        if (_an.dimension.scores.length) {
+          html += '<div style="margin-bottom:8px">';
+          html += '<div style="font-size:11px;font-weight:600;color:var(--md-sys-color-on-surface-variant);margin-bottom:4px">Dimension</div>';
+          html += '<div style="display:flex;flex-wrap:wrap;gap:4px">';
+          _an.dimension.scores.forEach(function(ds){
+            var pct = Math.round(ds.sim * 100);
+            if (pct < 20) return;
+            var isTop = ds.name === _an.dimension.name;
+            html += '<span class="en-sugg-chip'+(isTop?' top':'')+'">' + _h(ds.name) + ' <strong>' + pct + '%</strong></span>';
+          });
+          html += '</div></div>';
+        }
+
+        // Register suggestion
+        if (_an.register.scores.length) {
+          html += '<div style="margin-bottom:8px">';
+          html += '<div style="font-size:11px;font-weight:600;color:var(--md-sys-color-on-surface-variant);margin-bottom:4px">Register</div>';
+          html += '<div style="display:flex;flex-wrap:wrap;gap:4px">';
+          var regColors = {what:'#1565c0',why:'#e65100',who:'#2e7d32',how:'#6a1b9a'};
+          _an.register.scores.forEach(function(rs){
+            var pct = Math.round(rs.sim * 100);
+            if (pct < 20) return;
+            var isTop = rs.key === _an.register.key;
+            html += '<span class="en-sugg-chip'+(isTop?' top':'')+'" style="'+(isTop?'color:'+(regColors[rs.key]||'var(--md-sys-color-primary)'):'')+'">'+_h(rs.label||rs.key.toUpperCase())+' <strong>'+pct+'%</strong></span>';
+          });
+          html += '</div></div>';
+        }
+
+        // Column suggestion
+        var _colTitlesS;
+        try { _colTitlesS = JSON.parse(localStorage.getItem('df_fw_col_titles')); } catch(e){}
+        if (!Array.isArray(_colTitlesS)||_colTitlesS.length!==3) _colTitlesS = ['Rule / Constraint','Move / Intervention','Metric / Proof'];
+        if (_an.column.scores.length) {
+          html += '<div style="margin-bottom:8px">';
+          html += '<div style="font-size:11px;font-weight:600;color:var(--md-sys-color-on-surface-variant);margin-bottom:4px">Column</div>';
+          html += '<div style="display:flex;flex-wrap:wrap;gap:4px">';
+          _an.column.scores.forEach(function(cs){
+            var pct = Math.round(cs.sim * 100);
+            if (pct < 20) return;
+            var isTop = cs.index === _an.column.index;
+            html += '<span class="en-sugg-chip'+(isTop?' top':'')+'">'+_h(_colTitlesS[cs.index])+' <strong>'+pct+'%</strong></span>';
+          });
+          html += '</div></div>';
+        }
+
+        // Principle suggestions
+        var pSugg = _an.principles.filter(function(ps){ return ps.similarity >= SY.SUGGEST_THRESHOLD; });
+        if (pSugg.length) {
+          html += '<div style="margin-bottom:4px">';
+          html += '<div style="font-size:11px;font-weight:600;color:var(--md-sys-color-on-surface-variant);margin-bottom:4px">Principles</div>';
+          pSugg.slice(0, 5).forEach(function(ps){
+            var pct = Math.round(ps.similarity * 100);
+            html += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">';
+            html += '<span style="width:8px;height:8px;border-radius:50%;background:'+_h(ps.color)+';flex-shrink:0"></span>';
+            html += '<span style="font-size:12px;font-weight:500;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+_h(ps.name)+'</span>';
+            if (ps.dimensionHint) html += '<span style="font-size:10px;color:var(--md-sys-color-on-surface-variant)">'+_h(ps.dimensionHint)+'</span>';
+            html += '<span style="font-size:11px;font-weight:700;font-variant-numeric:tabular-nums;'+(pct>=60?'color:#2e7d32':pct>=45?'color:var(--md-sys-color-primary)':'color:var(--md-sys-color-on-surface-variant)')+'">'+pct+'%</span>';
+            html += '</div>';
+          });
+          html += '</div>';
+        } else {
+          html += '<div style="font-size:11px;color:var(--md-sys-color-on-surface-variant);font-style:italic">No principle matches above threshold.</div>';
+        }
+
+        html += '</div>';
+      }
 
       // ── Annotation + screening ────────────────────────────────────────────
       if (window.AcademicUtils) {
