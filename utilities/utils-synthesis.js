@@ -28,6 +28,7 @@ window.SynthesisData = (function () {
     REGISTERS:   'sy2_registers',   // [{key,label}]
     DIMENSIONS:  'sy2_dimensions',  // string[]
     SCHEMA_DESC: 'sy2_schema_desc', // {registers:{key:desc}, dimensions:{name:desc}}
+    ENTRIES_SNAPSHOT: 'sy2_entries_snapshot', // {noteKey: {text, cats, headers, tabName, ...}}
     SCRIPT_URL:  'sy2_script_url',
     LAST_SYNC:   'sy2_last_sync',
   };
@@ -51,6 +52,58 @@ window.SynthesisData = (function () {
   }
   function _id(pfx) {
     return (pfx||'x') + Date.now().toString(36) + Math.random().toString(36).slice(2,6);
+  }
+
+  // ── Entries snapshot — fallback store for when source tabs are unavailable ──
+  // Maps noteKey → {text, cats, headers, tabName, tabTitle, citation}
+  // Updated every time buildFrameworkGrid runs; restored from FRAMEWORK tab.
+  var _entriesSnapshot = _load(SK.ENTRIES_SNAPSHOT, {});
+
+  function _snapshotEntry(noteKey, resolved) {
+    if (!resolved || !resolved.text) return;
+    // Strip to plain-text essentials — no grid coords (those are ephemeral)
+    _entriesSnapshot[noteKey] = {
+      text:     resolved.text,
+      cats:     resolved.cats || [],
+      headers:  resolved.headers || [],
+      tabName:  resolved.tabName || '',
+      tabTitle: resolved.tabTitle || '',
+      isSplit:  !!resolved.isSplit,
+    };
+  }
+
+  function _saveEntriesSnapshot() {
+    _save(SK.ENTRIES_SNAPSHOT, _entriesSnapshot);
+  }
+
+  function _restoreEntriesSnapshot(snapshotObj) {
+    if (!snapshotObj || typeof snapshotObj !== 'object') return;
+    // Merge: incoming wins for missing keys, local wins for existing
+    Object.keys(snapshotObj).forEach(function(key) {
+      if (!_entriesSnapshot[key]) _entriesSnapshot[key] = snapshotObj[key];
+    });
+    _saveEntriesSnapshot();
+  }
+
+  // Look up an entry from the snapshot when the live tab isn't available
+  function _resolveFromSnapshot(key) {
+    var snap = _entriesSnapshot[key];
+    if (!snap) return null;
+    return {
+      noteKey:    key,
+      text:       snap.text,
+      cats:       snap.cats || [],
+      allCells:   [snap.text],
+      headers:    snap.headers || [],
+      tabName:    snap.tabName || '',
+      tabTitle:   snap.tabTitle || '',
+      dataRowIdx: 0,
+      cellIdx:    0,
+      gridRow:    -1,        // no live grid position
+      gridCol:    -1,
+      isSplit:    !!snap.isSplit,
+      _fromSnapshot: true,   // flag so callers know this is restored
+    };
   }
 
   // ── Registers (WHAT/WHY/WHO/HOW) ─────────────────────────────────────────
@@ -446,9 +499,9 @@ window.SynthesisData = (function () {
     // Base key
     var p   = parseNoteKey(key);
     var tab = (window.TABS||[]).find(function(t){ return t.name === p.tabName; });
-    if (!tab) return null;
+    if (!tab) return _resolveFromSnapshot(key);
     var data = typeof processSheetData === 'function' ? processSheetData(tab.grid) : null;
-    if (!data || !data.rows[p.dataRowIdx]) return null;
+    if (!data || !data.rows[p.dataRowIdx]) return _resolveFromSnapshot(key);
     var row  = data.rows[p.dataRowIdx];
     var cell = row.cells[p.cellIdx] || '';
     var grid = tab.grid;
@@ -489,7 +542,7 @@ window.SynthesisData = (function () {
     }
     var gridRow = found !== -1 ? found : (headerRowIdx + p.dataRowIdx + 1);
 
-    return {
+    var result = {
       noteKey:    key,
       text:       cell,
       cats:       row.cats,
@@ -503,6 +556,11 @@ window.SynthesisData = (function () {
       gridCol:    gridCol,
       isSplit:    false,
     };
+
+    // Auto-snapshot every successfully resolved entry
+    _snapshotEntry(key, result);
+
+    return result;
   }
 
   // ── All note keys (including split children for unassigned long notes) ─────
@@ -887,7 +945,7 @@ window.SynthesisData = (function () {
       if(c===META_END)   metaEnd=r;
     }
     if(metaStart===-1||metaEnd===-1||metaEnd<=metaStart) return null;
-    var principles=[], assignments=[], splits={}, settings=null, registers=null, dimensions=null, schemaDesc=null, colTitles=null, references=null, refOverrides=null;
+    var principles=[], assignments=[], splits={}, settings=null, registers=null, dimensions=null, schemaDesc=null, colTitles=null, references=null, refOverrides=null, entries=null;
     for(var r=metaStart+1;r<metaEnd;r++){
       var key=String(grid[r][0]||'').trim(), val=String(grid[r][1]||'').trim();
       if(!val) continue;
@@ -902,9 +960,10 @@ window.SynthesisData = (function () {
         if(key==='COL_TITLES')  colTitles   = JSON.parse(val);
         if(key==='REFERENCES')  references  = JSON.parse(val);
         if(key==='REF_OVERRIDES') refOverrides = JSON.parse(val);
+        if(key==='ENTRIES')     entries     = JSON.parse(val);
       } catch(e){}
     }
-    return { principles, assignments, splits, settings, registers, dimensions, schemaDesc, colTitles, references, refOverrides };
+    return { principles, assignments, splits, settings, registers, dimensions, schemaDesc, colTitles, references, refOverrides, entries };
   }
 
   function loadFromFrameworkTab(grid) {
@@ -974,6 +1033,13 @@ window.SynthesisData = (function () {
       if (!Object.keys(localOv).length) {
         if (typeof AC.setRefOverrides === 'function') AC.setRefOverrides(parsed.refOverrides);
       }
+    }
+
+    // Restore entries snapshot — allows resolveNoteKey to work even when
+    // the original source sheets/CSVs are not loaded
+    if (parsed.entries) {
+      _restoreEntriesSnapshot(parsed.entries);
+      console.log('[synthesis] Restored', Object.keys(parsed.entries).length, 'entry snapshots from FRAMEWORK tab');
     }
 
     return true;
@@ -1046,7 +1112,14 @@ window.SynthesisData = (function () {
               var row = ['', ai===0?(REG_LABEL[reg]||reg.toUpperCase()+'?'):''];
               for (var ci = 0; ci < numCols; ci++) {
                 if (ci === assignedCol) {
-                  row.push(resolved ? cellRef(resolved.tabName,resolved.gridRow,resolved.gridCol) : '[source missing]');
+                  if (!resolved) {
+                    row.push('[source missing]');
+                  } else if (resolved._fromSnapshot || resolved.gridRow === -1) {
+                    // Entry from snapshot — write plain text instead of cell reference
+                    row.push(resolved.text);
+                  } else {
+                    row.push(cellRef(resolved.tabName,resolved.gridRow,resolved.gridCol));
+                  }
                 } else if (ai === 0) {
                   var text = (ctbr[ci] && ctbr[ci][reg]) ? ctbr[ci][reg] : (ci===1 ? mbr[reg] : ci===2 ? tbr[reg] : '') || '';
                   row.push(text);
@@ -1062,6 +1135,20 @@ window.SynthesisData = (function () {
     });
 
     rows.push(['']); rows.push(['']); rows.push(['']);
+
+    // Snapshot all assigned entries before writing meta —
+    // resolves every noteKey and stores text + metadata so the
+    // framework tab is self-contained even without the source sheets.
+    var allNoteKeys = new Set();
+    assignments.forEach(function(a){ allNoteKeys.add(a.noteKey); });
+    // Also snapshot split parents
+    Object.keys(splits).forEach(function(parentKey){ allNoteKeys.add(parentKey); });
+    allNoteKeys.forEach(function(nk){
+      var resolved = resolveNoteKey(nk);
+      if (resolved) _snapshotEntry(nk, resolved);
+    });
+    _saveEntriesSnapshot();
+
     rows.push([META_START]);
     rows.push(['PRINCIPLES',  JSON.stringify(principles)]);
     rows.push(['ASSIGNMENTS', JSON.stringify(assignments)]);
@@ -1071,6 +1158,7 @@ window.SynthesisData = (function () {
     rows.push(['DIMENSIONS',  JSON.stringify(dims)]);
     rows.push(['SCHEMA_DESC', JSON.stringify(schemaDesc)]);
     rows.push(['COL_TITLES',  JSON.stringify(colTitles)]);
+    rows.push(['ENTRIES',     JSON.stringify(_entriesSnapshot)]);
     // References (from AcademicUtils if available)
     var AC = window.AcademicUtils;
     if (AC) {
@@ -1101,7 +1189,8 @@ window.SynthesisData = (function () {
              first==='SPLITS'||first==='SETTINGS'||
              first==='REGISTERS'||first==='DIMENSIONS'||
              first==='SCHEMA_DESC'||first==='COL_TITLES'||
-             first==='REFERENCES'||first==='REF_OVERRIDES';
+             first==='REFERENCES'||first==='REF_OVERRIDES'||
+             first==='ENTRIES';
     }
     var existSet = new Set((existingGrid||[]).filter(function(r){return !isMeta(r);}).map(normalise).filter(Boolean));
     var propSet  = new Set(proposedGrid.filter(function(r){return !isMeta(r);}).map(normalise).filter(Boolean));
@@ -1257,6 +1346,9 @@ window.SynthesisData = (function () {
     parseNoteKey, resolveNoteKey,
     getRowNoteKeys, getEffectiveNoteKeys,
     bestCellIdx, hashText, colLetter, cellRef,
+    // Entries snapshot
+    getEntriesSnapshot: function() { return _entriesSnapshot; },
+    saveEntriesSnapshot: _saveEntriesSnapshot,
     // Splits
     getSplits, getFragments, storeSplit, removeSplit, splitNote, autoSplitAll,
     // Principles
