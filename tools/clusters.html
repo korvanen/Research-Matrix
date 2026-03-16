@@ -470,24 +470,22 @@
           if (vec) _emb.set(embedKey, new Float32Array(vec));
         } catch(e){}
       }
-      // Register descriptions
+      // Register descriptions — always embed label, with description if available
       var regs = SY.getRegisters();
       for (var ri = 0; ri < regs.length; ri++) {
         var r = regs[ri];
         var rDesc = SY.getSchemaDescription('registers', r.key);
-        if (!rDesc) continue;
-        var rText = r.label + '. ' + rDesc;
+        var rText = (r.label || r.key.toUpperCase()) + (rDesc ? '. ' + rDesc : '');
         try {
           var rv = await window.EmbeddingUtils.getCachedEmbedding(rText);
           if (rv) _emb.set('__rdesc__' + r.key, new Float32Array(rv));
         } catch(e){}
       }
-      // Dimension descriptions
+      // Dimension descriptions — always embed name, with description if available
       var dims = SY.getDimensions();
       for (var di = 0; di < dims.length; di++) {
         var dDesc = SY.getSchemaDescription('dimensions', dims[di]);
-        if (!dDesc) continue;
-        var dText = dims[di] + '. ' + dDesc;
+        var dText = dims[di] + (dDesc ? '. ' + dDesc : '');
         try {
           var dv = await window.EmbeddingUtils.getCachedEmbedding(dText);
           if (dv) _emb.set('__ddesc__' + dims[di], new Float32Array(dv));
