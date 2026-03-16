@@ -9,7 +9,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="../utilities/utils-keywords.js?v=7"></script>
   <script src="../utilities/utils-shared.js?v=0067db69"></script>
-  <script src="../utilities/utils-synthesis.js?v=65b18144"></script>
+  <script src="../utilities/utils-synthesis.js?v=b4058e56"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; }
     html, body { height: 100%; overflow: hidden; margin: 0; padding: 0; }
@@ -221,7 +221,7 @@
     var _COL_DEFAULTS = ['Rule / Constraint', 'Move / Intervention', 'Metric / Proof'];
     var _COL_STORAGE  = 'df_fw_col_titles';
     function _getColTitles() {
-      try { var s = JSON.parse(localStorage.getItem(_COL_STORAGE)); if (Array.isArray(s)&&s.length===3) return s; } catch(e){}
+      try { var s = JSON.parse(localStorage.getItem(_COL_STORAGE)); if (Array.isArray(s) && s.length >= 1) return s; } catch(e){}
       return _COL_DEFAULTS.slice();
     }
     function _setColTitles(titles) {
@@ -435,11 +435,19 @@
       dimOrder2.forEach(function(dim){
         var dps   = byDim2[dim];
         var color = dps[0] ? dps[0].color : '#555';
+        var _ct   = _getColTitles();
+        var _numCols = _ct.length;
+        var _totalCols = _numCols + 2; // ID + Category + data columns
+        var colWidth = Math.floor(75 / _numCols); // distribute ~75% among data columns
+
         html += '<div class="fw-section">';
         html += '<div class="fw-dim-hdr" style="background:'+_h(color)+'">The '+_h(dim)+' Dimension</div>';
-        html += '<table class="fw-table"><colgroup><col style="width:60px"><col style="width:80px"><col style="width:25%"><col style="width:25%"><col style="width:25%"></colgroup>';
-        var _ct = _getColTitles();
-        html += '<thead><tr><th>ID</th><th>Category</th><th>'+_h(_ct[0])+'</th><th>'+_h(_ct[1])+'</th><th>'+_h(_ct[2])+'</th></tr></thead><tbody>';
+        html += '<table class="fw-table"><colgroup><col style="width:60px"><col style="width:80px">';
+        for (var ci = 0; ci < _numCols; ci++) html += '<col style="width:'+colWidth+'%">';
+        html += '</colgroup>';
+        html += '<thead><tr><th>ID</th><th>Category</th>';
+        for (var ci = 0; ci < _numCols; ci++) html += '<th>'+_h(_ct[ci])+'</th>';
+        html += '</tr></thead><tbody>';
 
         dps.forEach(function(p){
           var pId  = p.sheetId || ('P-'+String(p.seq).padStart(2,'0'));
@@ -448,25 +456,27 @@
           REGS.forEach(function(k){ byReg[k] = []; });
           pAs.forEach(function(a){ if (byReg[a.register]) byReg[a.register].push(a); });
 
-          html += '<tr class="fw-sep"><td colspan="5"></td></tr>';
-          html += '<tr class="fw-p-name"><td class="fw-id">'+_h(pId)+'</td><td colspan="4" style="font-weight:600">'+_h(p.name)+'</td></tr>';
+          html += '<tr class="fw-sep"><td colspan="'+_totalCols+'"></td></tr>';
+          html += '<tr class="fw-p-name"><td class="fw-id">'+_h(pId)+'</td><td colspan="'+(_totalCols-1)+'" style="font-weight:600">'+_h(p.name)+(p.description?' <span style="font-weight:400;font-size:12px;color:var(--md-sys-color-on-surface-variant)"> — '+_h(p.description)+'</span>':'')+'</td></tr>';
 
-          var _mbrDef = {}; REGS.forEach(function(k){ _mbrDef[k]=''; });
-          var mbr = Object.assign({}, _mbrDef, p.moveByReg   || {});
-          var tbr = Object.assign({}, _mbrDef, p.metricByReg || {});
+          // Get stored text per column per register
+          var ctbr = p.colTextByReg || {};
+          // Backward compat: migrate moveByReg/metricByReg
+          var mbr = p.moveByReg || {};
+          var tbr = p.metricByReg || {};
 
           REGS.forEach(function(reg){
-            var regAs     = byReg[reg];
-            var mv        = mbr[reg] || '';
-            var mt        = tbr[reg] || '';
+            var regAs = byReg[reg];
 
-            // Group entries by column (0=rule, 1=move, 2=metric)
-            var byCols = [[],[],[]];
+            // Group entries by column
+            var byCols = [];
+            for (var i = 0; i < _numCols; i++) byCols.push([]);
             regAs.forEach(function(a){
-              var col = (a.column != null && a.column >= 0 && a.column <= 2) ? a.column : 0;
+              var col = (a.column != null && a.column >= 0 && a.column < _numCols) ? a.column : 0;
               byCols[col].push(a);
             });
-            var maxRows = Math.max(1, byCols[0].length, byCols[1].length, byCols[2].length);
+            var maxRows = 1;
+            for (var i = 0; i < _numCols; i++) if (byCols[i].length > maxRows) maxRows = byCols[i].length;
 
             for (var ri = 0; ri < maxRows; ri++) {
               html += '<tr>';
@@ -474,8 +484,7 @@
                 html += '<td class="fw-id" rowspan="'+maxRows+'"></td>';
                 html += '<td class="fw-cat '+reg+'" rowspan="'+maxRows+'">'+REG_LABEL[reg]+'</td>';
               }
-              // Render each column cell
-              for (var ci = 0; ci < 3; ci++) {
+              for (var ci = 0; ci < _numCols; ci++) {
                 var colAs = byCols[ci];
                 if (ri < colAs.length) {
                   var a = colAs[ri];
@@ -484,16 +493,14 @@
                   var pillHtml = parsed.citation
                     ? ' <span class="pp-cite-pill" style="background:'+_h(p.color||'#555')+';color:#fff">'+_h(parsed.citation)+'</span>'
                     : '';
-                  html += '<td><div class="fw-rule-edit has-ref" contenteditable="false" data-pid="'+_h(p.id)+'" data-reg="'+reg+'" data-col="'+ci+'" data-field="rule">'+_h(parsed.body)+pillHtml+'</div></td>';
+                  html += '<td><div class="fw-rule-edit has-ref" contenteditable="false" data-pid="'+_h(p.id)+'" data-reg="'+reg+'" data-col="'+ci+'">'+_h(parsed.body)+pillHtml+'</div></td>';
                 } else if (ri === 0) {
-                  // Empty cell — show editable placeholder or moveByReg/metricByReg text
-                  var prefill = ci===1 ? mv : ci===2 ? mt : '';
+                  // Editable cell — read from colTextByReg, falling back to legacy fields
+                  var prefill = (ctbr[ci] && ctbr[ci][reg]) ? ctbr[ci][reg] : (ci===1 ? mbr[reg] : ci===2 ? tbr[reg] : '') || '';
                   var rowspan = maxRows - colAs.length;
-                  if (rowspan > 1) html += '<td rowspan="'+rowspan+'">';
-                  else html += '<td>';
-                  html += '<div class="fw-editable'+(prefill?'':' gap')+'" contenteditable="true" spellcheck="false" data-pid="'+_h(p.id)+'" data-reg="'+reg+'" data-col="'+ci+'" data-field="'+(ci===1?'move':ci===2?'metric':'rule')+'">'+(prefill||'Click to add...')+'</div></td>';
+                  html += rowspan > 1 ? '<td rowspan="'+rowspan+'">' : '<td>';
+                  html += '<div class="fw-editable'+(prefill?'':' gap')+'" contenteditable="true" spellcheck="false" data-pid="'+_h(p.id)+'" data-reg="'+reg+'" data-col="'+ci+'">'+(prefill||'Click to add...')+'</div></td>';
                 }
-                // For rows beyond both colAs and the first empty, skip (covered by rowspan)
               }
               html += '</tr>';
             }
@@ -516,19 +523,20 @@
           var v     = el.textContent.trim();
           var pid   = el.dataset.pid;
           var reg   = el.dataset.reg;
-          var field = el.dataset.field;
+          var col   = parseInt(el.dataset.col);
           if (!v) { el.textContent = 'Click to add...'; el.classList.add('gap'); }
           else el.classList.remove('gap');
           var val = (v === 'Click to add...') ? '' : v;
-          if (field === 'move') {
-            var p = SY.getPrinciples().find(function(x){ return x.id === pid; }); if (!p) return;
-            var mbr = Object.assign({}, p.moveByReg || {}); mbr[reg] = val;
-            SY.updatePrinciple(pid, { moveByReg:mbr });
-          } else if (field === 'metric') {
-            var p = SY.getPrinciples().find(function(x){ return x.id === pid; }); if (!p) return;
-            var tbr = Object.assign({}, p.metricByReg || {}); tbr[reg] = val;
-            SY.updatePrinciple(pid, { metricByReg:tbr });
-          }
+          var p = SY.getPrinciples().find(function(x){ return x.id === pid; }); if (!p) return;
+          // Save to colTextByReg generic store
+          var ctbr = Object.assign({}, p.colTextByReg || {});
+          if (!ctbr[col]) ctbr[col] = {};
+          ctbr[col][reg] = val;
+          var update = { colTextByReg: ctbr };
+          // Keep legacy fields in sync for backward compat
+          if (col === 1) { var mbr = Object.assign({}, p.moveByReg || {}); mbr[reg] = val; update.moveByReg = mbr; }
+          if (col === 2) { var tbr = Object.assign({}, p.metricByReg || {}); tbr[reg] = val; update.metricByReg = tbr; }
+          SY.updatePrinciple(pid, update);
         });
         el.addEventListener('keydown', function(e){
           if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); el.blur(); }
@@ -581,17 +589,18 @@
       });
       html += '<button class="fw-schema-add" data-action="add-dim">+ Add dimension</button>';
 
-      html += '<div class="fw-panel-label" style="margin-top:10px">Column titles</div>';
+      html += '<div class="fw-panel-label" style="margin-top:10px">Columns</div>';
       var _ct = _getColTitles();
-      ['0','1','2'].forEach(function(ci){
-        var desc = SY.getSchemaDescription('columns', ci);
+      _ct.forEach(function(title, ci){
+        var desc = SY.getSchemaDescription('columns', String(ci));
         html += '<div class="fw-schema-item" data-col="'+ci+'">';
-        html += '<span class="fw-schema-label">'+_h(_ct[parseInt(ci)])+'</span>';
+        html += '<span class="fw-schema-label">'+_h(title)+'</span>';
         html += '<button class="fw-schema-btn" data-action="edit-col" data-col="'+ci+'">Edit</button>';
-        html += '<button class="fw-schema-btn" data-action="reset-col" data-col="'+ci+'" style="font-size:10px;color:var(--md-sys-color-on-surface-variant)">Reset</button>';
+        if (_ct.length > 1) html += '<button class="fw-schema-btn del" data-action="del-col" data-col="'+ci+'">Delete</button>';
         html += '<div class="fw-schema-desc" data-action="edit-desc" data-desc-type="columns" data-desc-key="'+ci+'">'+(desc ? _h(desc) : '<span style="opacity:.4">+ Add description…</span>')+'</div>';
         html += '</div>';
       });
+      html += '<button class="fw-schema-add" data-action="add-col">+ Add column</button>';
 
       el.innerHTML = html;
 
@@ -686,11 +695,58 @@
         });
       });
 
-      el.querySelectorAll('[data-action=reset-col]').forEach(function(btn){
+      el.querySelectorAll('[data-action=del-col]').forEach(function(btn){
         btn.addEventListener('click', function(){
           var ci = parseInt(btn.dataset.col);
           var ct = _getColTitles();
-          ct[ci] = _COL_DEFAULTS[ci];
+          if (ct.length <= 1) return;
+          // Count entries assigned to this column
+          var affected = SY.getAssignments().filter(function(a){ return a.column === ci; }).length;
+          var msg = 'Delete column "' + ct[ci] + '"?';
+          if (affected) msg += ' ' + affected + ' assigned entr' + (affected===1?'y':'ies') + ' will move to column 0.';
+          if (!confirm(msg)) return;
+          ct.splice(ci, 1);
+          _setColTitles(ct);
+          // Reassign entries: shift columns above deleted index down
+          var as = SY.getAssignments();
+          as.forEach(function(a){
+            if (a.column === ci) a.column = 0;
+            else if (a.column > ci) a.column = a.column - 1;
+          });
+          // Shift colTextByReg indices
+          SY.getPrinciples().forEach(function(p){
+            var ctbr = p.colTextByReg; if (!ctbr) return;
+            var newCtbr = {};
+            Object.keys(ctbr).forEach(function(k){
+              var ki = parseInt(k);
+              if (ki === ci) return; // drop deleted column
+              var newIdx = ki > ci ? ki - 1 : ki;
+              newCtbr[newIdx] = ctbr[k];
+            });
+            SY.updatePrinciple(p.id, { colTextByReg: newCtbr });
+          });
+          // Shift schema descriptions
+          var sd = SY.getSchemaDescriptions();
+          if (sd.columns) {
+            var newCols = {};
+            Object.keys(sd.columns).forEach(function(k){
+              var ki = parseInt(k);
+              if (ki === ci) return;
+              newCols[ki > ci ? ki - 1 : ki] = sd.columns[k];
+            });
+            sd.columns = newCols;
+            try { localStorage.setItem('sy2_schema_desc', JSON.stringify(sd)); } catch(e){}
+          }
+          render(); renderSchema();
+        });
+      });
+
+      el.querySelectorAll('[data-action=add-col]').forEach(function(btn){
+        btn.addEventListener('click', function(){
+          var name = prompt('New column title:');
+          if (!name || !name.trim()) return;
+          var ct = _getColTitles();
+          ct.push(name.trim());
           _setColTitles(ct);
           render(); renderSchema();
         });
