@@ -1762,8 +1762,6 @@ window.GlobalPanel = (function() {
     var s  = sy ? sy.getSettings() : { threshold: 0.42, maxWords: 80 };
     var tv = Math.round(s.threshold * 100);
     return (
-      '<div class="pp-side-panel-section-label" style="padding:8px 0 2px">Status</div>' +
-      '<div id="' + IDS.STATUS + '" style="font-size:11px;color:var(--md-sys-color-on-surface-variant);padding:2px 0 6px">—</div>' +
       '<div class="pp-side-panel-section-label" style="padding:8px 0 2px">Cluster threshold</div>' +
       '<div class="pp-range-row">' +
         '<input class="pp-range" type="range" id="' + IDS.THRESH + '" min="20" max="70" step="1" value="' + tv + '">' +
