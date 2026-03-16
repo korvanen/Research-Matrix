@@ -9,7 +9,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="../utilities/utils-keywords.js?v=7"></script>
   <script src="../utilities/utils-shared.js?v=0067db69"></script>
-  <script src="../utilities/utils-synthesis.js?v=c685386c"></script>
+  <script src="../utilities/utils-synthesis.js?v=3"></script>
   <script src="../utilities/utils-panel.js?v=7"></script>
   <script type="module" src="../utilities/utils-embedding.js?v=4"></script>
   <style>
@@ -494,8 +494,8 @@
       // Column title descriptions
       var colTitles;
       try { colTitles = JSON.parse(localStorage.getItem('df_fw_col_titles')); } catch(e){}
-      if (!Array.isArray(colTitles)||colTitles.length!==3) colTitles = ['Rule / Constraint','Move / Intervention','Metric / Proof'];
-      for (var ci = 0; ci < 3; ci++) {
+      if (!Array.isArray(colTitles)||colTitles.length<1) colTitles = ['Rule / Constraint','Move / Intervention','Metric / Proof'];
+      for (var ci = 0; ci < colTitles.length; ci++) {
         var cDesc = SY.getSchemaDescription('columns', String(ci));
         var cText = colTitles[ci] + (cDesc ? '. ' + cDesc : '');
         try {
@@ -713,7 +713,7 @@
           }
           // Column
           if (a.column.scores.length && a.column.scores[0].sim > 0.20) {
-            var _colT; try{_colT=JSON.parse(localStorage.getItem('df_fw_col_titles'));}catch(e){} if(!Array.isArray(_colT)||_colT.length!==3) _colT=['Rule','Move','Metric'];
+            var _colT; try{_colT=JSON.parse(localStorage.getItem('df_fw_col_titles'));}catch(e){} if(!Array.isArray(_colT)||_colT.length<1) _colT=['Rule','Move','Metric'];
             var topCol = a.column.scores[0];
             html += '<span class="cl-sim-badge">'+_h(_colT[topCol.index])+' '+Math.round(topCol.sim*100)+'%</span>';
           }
