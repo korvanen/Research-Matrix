@@ -662,6 +662,22 @@ window.SynthesisData = (function () {
     return 'what';
   }
 
+  // Embedding-based register suggestion: compares entry vector against
+  // register description embeddings stored as __rdesc__<key> in the map.
+  // Falls back to keyword heuristic if no embeddings available.
+  function suggestRegisterByVec(vec, embeddings) {
+    if (!vec || !embeddings) return 'what';
+    var regs = getRegisters();
+    var best = null, bestSim = 0.30;
+    regs.forEach(function(r) {
+      var rv = embeddings.get('__rdesc__' + r.key);
+      if (!rv) return;
+      var sim = cosine(vec, rv);
+      if (sim > bestSim) { bestSim = sim; best = r.key; }
+    });
+    return best || 'what';
+  }
+
   // ── Auto-label ────────────────────────────────────────────────────────────
   var STOP = new Set(['a','an','the','is','are','was','were','be','been','have','has','had',
     'and','but','or','for','in','on','at','to','of','as','by','from','with','into','through',
@@ -728,9 +744,14 @@ window.SynthesisData = (function () {
     return principles.map(function(p){
       var vecs = assignments.filter(function(a){return a.principleId===p.id;})
         .map(function(a){return embeddings.get(a.noteKey);}).filter(Boolean);
-      // Include principle description embedding if available
+      // Include principle description embedding
       var descVec = embeddings.get('__pdesc__' + p.id);
       if (descVec) vecs.push(descVec);
+      // Include dimension description embedding
+      if (p.dimensionHint) {
+        var dimVec = embeddings.get('__ddesc__' + p.dimensionHint);
+        if (dimVec) vecs.push(dimVec);
+      }
       return { principle:p, centroid: vecs.length ? centroid(vecs) : null };
     }).filter(function(pv){return pv.centroid!==null;});
   }
@@ -760,7 +781,7 @@ window.SynthesisData = (function () {
       if(c===META_END)   metaEnd=r;
     }
     if(metaStart===-1||metaEnd===-1||metaEnd<=metaStart) return null;
-    var principles=[], assignments=[], splits={}, settings=null;
+    var principles=[], assignments=[], splits={}, settings=null, registers=null, dimensions=null, schemaDesc=null, colTitles=null;
     for(var r=metaStart+1;r<metaEnd;r++){
       var key=String(grid[r][0]||'').trim(), val=String(grid[r][1]||'').trim();
       if(!val) continue;
@@ -769,9 +790,13 @@ window.SynthesisData = (function () {
         if(key==='ASSIGNMENTS') assignments = JSON.parse(val);
         if(key==='SPLITS')      splits      = JSON.parse(val);
         if(key==='SETTINGS')    settings    = JSON.parse(val);
+        if(key==='REGISTERS')   registers   = JSON.parse(val);
+        if(key==='DIMENSIONS')  dimensions  = JSON.parse(val);
+        if(key==='SCHEMA_DESC') schemaDesc  = JSON.parse(val);
+        if(key==='COL_TITLES')  colTitles   = JSON.parse(val);
       } catch(e){}
     }
-    return { principles, assignments, splits, settings };
+    return { principles, assignments, splits, settings, registers, dimensions, schemaDesc, colTitles };
   }
 
   function loadFromFrameworkTab(grid) {
@@ -804,14 +829,28 @@ window.SynthesisData = (function () {
     }
 
     // Restore settings only if localStorage has no user-set values yet.
-    // Local settings always win — the sheet copy is only a seed for fresh installs.
     if (parsed.settings) {
       var localRaw = _load(SK.SETTINGS, null);
       if (!localRaw) {
-        // No local settings yet — seed from sheet
         updateSettings(parsed.settings);
       }
-      // If local settings exist, leave them alone. The user's last change wins.
+    }
+
+    // Restore registers, dimensions, schema descriptions (sheet seeds, local wins)
+    if (parsed.registers && parsed.registers.length) {
+      var localRegs = _load(SK.REGISTERS, null);
+      if (!localRegs) setRegisters(parsed.registers);
+    }
+    if (parsed.dimensions && parsed.dimensions.length) {
+      var localDims = _load(SK.DIMENSIONS, null);
+      if (!localDims) setDimensions(parsed.dimensions);
+    }
+    if (parsed.schemaDesc) {
+      var localSD = _load(SK.SCHEMA_DESC, null);
+      if (!localSD) _save(SK.SCHEMA_DESC, parsed.schemaDesc);
+    }
+    if (parsed.colTitles && Array.isArray(parsed.colTitles)) {
+      try { if (!localStorage.getItem('df_fw_col_titles')) localStorage.setItem('df_fw_col_titles', JSON.stringify(parsed.colTitles)); } catch(e){}
     }
 
     return true;
@@ -823,8 +862,17 @@ window.SynthesisData = (function () {
     var assignments = getAssignments().filter(function(a){return a.status==='confirmed';});
     var splits      = getSplits();
     var settings    = getSettings();
-    var REGS        = ['what','why','who','how'];
-    var REG_LABEL   = {what:'WHAT?',why:'WHY?',who:'WHO?',how:'HOW?'};
+    var regs        = getRegisters();
+    var dims        = getDimensions();
+    var schemaDesc  = getSchemaDescriptions();
+    var REGS        = regs.map(function(r){ return r.key; });
+    var REG_LABEL   = {};
+    regs.forEach(function(r){ REG_LABEL[r.key] = r.label; });
+
+    // Column titles from localStorage (framework.html stores these)
+    var colTitles;
+    try { colTitles = JSON.parse(localStorage.getItem('df_fw_col_titles')); } catch(e){}
+    if (!Array.isArray(colTitles) || colTitles.length !== 3) colTitles = ['Rule / Constraint','Move / Intervention','Metric / Proof'];
 
     var byDim={}, dimOrder=[];
     principles.forEach(function(p){
@@ -838,25 +886,26 @@ window.SynthesisData = (function () {
     dimOrder.forEach(function(dim){
       rows.push(['']);
       rows.push(['The '+dim+' Dimension','','','','']);
-      rows.push(['ID','Category','Rule / Constraint','Move / Intervention','Metric / Proof']);
+      rows.push(['ID','Category',colTitles[0],colTitles[1],colTitles[2]]);
       byDim[dim].forEach(function(p){
         var pId = p.sheetId || ('P-'+String(p.seq).padStart(2,'0'));
         var pAs = assignments.filter(function(a){return a.principleId===p.id;});
-        var byReg={what:[],why:[],who:[],how:[]};
+        var byReg={};
+        REGS.forEach(function(k){ byReg[k]=[]; });
         pAs.forEach(function(a){if(byReg[a.register]) byReg[a.register].push(a);});
-        rows.push([pId, p.name, '', '', '']);
-        var mbr = p.moveByReg   || {what:'',why:'',who:'',how:''};
-        var tbr = p.metricByReg || {what:'',why:'',who:'',how:''};
+        rows.push([pId, p.name + (p.description ? ' — ' + p.description : ''), '', '', '']);
+        var mbr = p.moveByReg   || {};
+        var tbr = p.metricByReg || {};
         REGS.forEach(function(reg){
           var regAs=byReg[reg];
           var mv=mbr[reg]||'N/A', mt=tbr[reg]||'N/A';
           if (!regAs.length) {
-            rows.push(['', REG_LABEL[reg], '', mv, mt]);
+            rows.push(['', REG_LABEL[reg]||reg.toUpperCase()+'?', '', mv, mt]);
           } else {
             regAs.forEach(function(a, ai){
               var resolved = resolveNoteKey(a.noteKey);
               var ruleCell = resolved ? cellRef(resolved.tabName,resolved.gridRow,resolved.gridCol) : '[source missing]';
-              rows.push(['', ai===0?REG_LABEL[reg]:'', ruleCell, ai===0?mv:'', ai===0?mt:'']);
+              rows.push(['', ai===0?(REG_LABEL[reg]||reg.toUpperCase()+'?'):'', ruleCell, ai===0?mv:'', ai===0?mt:'']);
             });
           }
         });
@@ -869,6 +918,10 @@ window.SynthesisData = (function () {
     rows.push(['ASSIGNMENTS', JSON.stringify(assignments)]);
     rows.push(['SPLITS',      JSON.stringify(splits)]);
     rows.push(['SETTINGS',    JSON.stringify(settings)]);
+    rows.push(['REGISTERS',   JSON.stringify(regs)]);
+    rows.push(['DIMENSIONS',  JSON.stringify(dims)]);
+    rows.push(['SCHEMA_DESC', JSON.stringify(schemaDesc)]);
+    rows.push(['COL_TITLES',  JSON.stringify(colTitles)]);
     rows.push([META_END]);
     return rows;
   }
@@ -888,7 +941,9 @@ window.SynthesisData = (function () {
       var first = String((row||[])[0]||'').trim();
       return first===META_START||first===META_END||
              first==='PRINCIPLES'||first==='ASSIGNMENTS'||
-             first==='SPLITS'||first==='SETTINGS';
+             first==='SPLITS'||first==='SETTINGS'||
+             first==='REGISTERS'||first==='DIMENSIONS'||
+             first==='SCHEMA_DESC'||first==='COL_TITLES';
     }
     var existSet = new Set((existingGrid||[]).filter(function(r){return !isMeta(r);}).map(normalise).filter(Boolean));
     var propSet  = new Set(proposedGrid.filter(function(r){return !isMeta(r);}).map(normalise).filter(Boolean));
@@ -947,22 +1002,29 @@ window.SynthesisData = (function () {
   function exportCSV() {
     var principles  = getPrinciples().filter(function(p){return p.named&&!p.archived;});
     var assignments = getAssignments().filter(function(a){return a.status==='confirmed';});
-    var REGS=['what','why','who','how'];
+    var regs = getRegisters();
+    var REGS = regs.map(function(r){ return r.key; });
+    var REG_LABEL = {}; regs.forEach(function(r){ REG_LABEL[r.key]=r.label; });
+    var colTitles;
+    try { colTitles = JSON.parse(localStorage.getItem('df_fw_col_titles')); } catch(e){}
+    if (!Array.isArray(colTitles) || colTitles.length !== 3) colTitles = ['Rule / Constraint','Move / Intervention','Metric / Proof'];
     var byDim={},dimOrder=[];
     principles.forEach(function(p){var d=p.dimensionHint||'Undimensioned';if(!byDim[d]){byDim[d]=[];dimOrder.push(d);}byDim[d].push(p);});
-    var lines=[['Dimension','ID','Category','Rule / Constraint','Move / Intervention','Metric / Proof'].map(_esc).join(',')];
+    var lines=[['Dimension','ID','Category','Description',colTitles[0],colTitles[1],colTitles[2]].map(_esc).join(',')];
     dimOrder.forEach(function(dim){
+      var dimDesc = getSchemaDescription('dimensions', dim);
       byDim[dim].forEach(function(p){
         var pId=p.sheetId||('P-'+String(p.seq).padStart(2,'0'));
         var pAs=assignments.filter(function(a){return a.principleId===p.id;});
-        var byReg={what:[],why:[],who:[],how:[]}; pAs.forEach(function(a){if(byReg[a.register])byReg[a.register].push(a);});
+        var byReg={}; REGS.forEach(function(k){ byReg[k]=[]; });
+        pAs.forEach(function(a){if(byReg[a.register])byReg[a.register].push(a);});
         REGS.forEach(function(reg,ri){
-          var rAs=byReg[reg];
+          var rAs=byReg[reg]||[];
           var mv=(p.moveByReg||{})[reg]||'N/A', mt=(p.metricByReg||{})[reg]||'N/A';
-          if(!rAs.length){lines.push([ri===0?dim:'',pId,reg.toUpperCase()+'?','',mv,mt].map(_esc).join(','));}
+          if(!rAs.length){lines.push([ri===0?dim+(dimDesc?' ('+dimDesc+')':''):'',pId,REG_LABEL[reg]||reg.toUpperCase()+'?',ri===0?(p.description||''):'','',mv,mt].map(_esc).join(','));}
           else rAs.forEach(function(a,ai){
             var r=resolveNoteKey(a.noteKey);
-            lines.push([ri===0&&ai===0?dim:'',ai===0?pId:'',ai===0?reg.toUpperCase()+'?':'',(r?r.text:a.noteKey),ai===0?mv:'',ai===0?mt:''].map(_esc).join(','));
+            lines.push([ri===0&&ai===0?dim+(dimDesc?' ('+dimDesc+')':''):'',ai===0?pId:'',ai===0?(REG_LABEL[reg]||reg.toUpperCase()+'?'):'',ri===0&&ai===0?(p.description||''):'',(r?r.text:a.noteKey),ai===0?mv:'',ai===0?mt:''].map(_esc).join(','));
           });
         });
       });
@@ -973,18 +1035,25 @@ window.SynthesisData = (function () {
   function exportMarkdown() {
     var principles  = getPrinciples().filter(function(p){return p.named&&!p.archived;});
     var assignments = getAssignments().filter(function(a){return a.status==='confirmed';});
-    var REGS=['what','why','who','how'];
+    var regs = getRegisters();
+    var REGS = regs.map(function(r){ return r.key; });
+    var REG_LABEL = {}; regs.forEach(function(r){ REG_LABEL[r.key]=r.label; });
     var byDim={},dimOrder=[];
     principles.forEach(function(p){var d=p.dimensionHint||'Undimensioned';if(!byDim[d]){byDim[d]=[];dimOrder.push(d);}byDim[d].push(p);});
     var lines=['# Design Framework\n'];
     dimOrder.forEach(function(dim){
-      lines.push('\n## The '+dim+' Dimension\n');
+      var dimDesc = getSchemaDescription('dimensions', dim);
+      lines.push('\n## The '+dim+' Dimension' + (dimDesc ? '\n_'+dimDesc+'_' : '') + '\n');
       byDim[dim].forEach(function(p){
-        lines.push('\n### P-'+String(p.seq).padStart(2,'0')+': '+p.name+'\n');
+        lines.push('\n### P-'+String(p.seq).padStart(2,'0')+': '+p.name);
+        if (p.description) lines.push('_'+p.description+'_');
+        lines.push('');
         var pAs=assignments.filter(function(a){return a.principleId===p.id;});
-        var byReg={what:[],why:[],who:[],how:[]}; pAs.forEach(function(a){if(byReg[a.register]) byReg[a.register].push(a);});
+        var byReg={}; REGS.forEach(function(k){ byReg[k]=[]; });
+        pAs.forEach(function(a){if(byReg[a.register]) byReg[a.register].push(a);});
         REGS.forEach(function(reg){
-          lines.push('**'+reg.toUpperCase()+'?**');
+          var regDesc = getSchemaDescription('registers', reg);
+          lines.push('**'+(REG_LABEL[reg]||reg.toUpperCase()+'?')+'**' + (regDesc ? ' — _'+regDesc+'_' : ''));
           var rAs=byReg[reg]||[];
           rAs.forEach(function(a){var r=resolveNoteKey(a.noteKey);if(r) lines.push('- '+r.text+' _('+r.tabName+')_');});
           if(!rAs.length) lines.push('- _No note assigned_');
@@ -1025,7 +1094,7 @@ window.SynthesisData = (function () {
     rejectAssignment, updateAssignmentRegister,
     getChangedSources, acknowledgeChangedSource,
     // Analysis
-    suggestRegister, autoLabel, cosine, centroid, cluster,
+    suggestRegister, suggestRegisterByVec, autoLabel, cosine, centroid, cluster,
     buildPrincipleVectors, computeAssignmentTiers,
     // Sheet I/O
     parseFrameworkTab, loadFromFrameworkTab, buildFrameworkGrid, diffFramework,
