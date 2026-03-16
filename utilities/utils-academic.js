@@ -1219,6 +1219,7 @@ window.AcademicUtils = (function () {
   }
 
   function getReferences() { return _loadRefs(); }
+  function setReferences(refs) { _saveRefs(refs || []); }
 
   // Add a fully-formed reference: { apa, inTextKey, year, doi? }
   // Returns the reference if added, null if duplicate
@@ -1266,6 +1267,8 @@ window.AcademicUtils = (function () {
   var _overrideKey = 'df_ref_overrides';
   function _loadOverrides() { try{return JSON.parse(localStorage.getItem(_overrideKey)||'{}');}catch(e){return {};} }
   function _saveOverrides(o) { try{localStorage.setItem(_overrideKey,JSON.stringify(o));}catch(e){} }
+  function getRefOverrides() { return _loadOverrides(); }
+  function setRefOverrides(o) { _saveOverrides(o || {}); }
   function setRefOverride(citeKey, refInTextKey) {
     var o = _loadOverrides(); o[citeKey.toLowerCase().trim()] = refInTextKey; _saveOverrides(o);
   }
@@ -1341,9 +1344,10 @@ window.AcademicUtils = (function () {
     loadImportedTabs:loadImportedTabs, clearImportedTabs:clearImportedTabs, normaliseDOI:normaliseDOI,
     // Reference management
     formatAPA:formatAPA, extractKeyFromAPA:extractKeyFromAPA, parseRIS:parseRIS,
-    getReferences:getReferences, addReference:addReference, removeReference:removeReference,
+    getReferences:getReferences, setReferences:setReferences, addReference:addReference, removeReference:removeReference,
     importReferences:importReferences, importAPAString:importAPAString,
     matchReference:matchReference, setRefOverride:setRefOverride, clearRefOverride:clearRefOverride,
+    getRefOverrides:getRefOverrides, setRefOverrides:setRefOverrides,
     getRefMatchSummary:getRefMatchSummary,
   };
 })();
