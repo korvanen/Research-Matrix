@@ -9,7 +9,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="../utilities/utils-keywords.js?v=7"></script>
   <script src="../utilities/utils-shared.js?v=0067db69"></script>
-  <script src="../utilities/utils-synthesis.js?v=287f5a66"></script>
+  <script src="../utilities/utils-synthesis.js?v=3"></script>
   <script src="../utilities/utils-panel.js?v=7"></script>
   <script type="module" src="../utilities/utils-embedding.js?v=4"></script>
   <style>
@@ -449,18 +449,42 @@
     }
 
     // Embed principle name+description so they influence cluster matching
+    // Also embed register and dimension descriptions for richer vector enrichment
     async function _embedPrincipleDescriptions() {
       if (!window.EmbeddingUtils) return;
+      // Principle descriptions
       var ps = SY.getPrinciples().filter(function(p){ return p.named && !p.archived; });
       for (var i = 0; i < ps.length; i++) {
         var p = ps[i];
         var embedKey = '__pdesc__' + p.id;
         var text = SY.getPrincipleEmbedText(p);
         if (!text) continue;
-        // Always re-embed — description may have changed
         try {
           var vec = await window.EmbeddingUtils.getCachedEmbedding(text);
           if (vec) _emb.set(embedKey, new Float32Array(vec));
+        } catch(e){}
+      }
+      // Register descriptions
+      var regs = SY.getRegisters();
+      for (var ri = 0; ri < regs.length; ri++) {
+        var r = regs[ri];
+        var rDesc = SY.getSchemaDescription('registers', r.key);
+        if (!rDesc) continue;
+        var rText = r.label + '. ' + rDesc;
+        try {
+          var rv = await window.EmbeddingUtils.getCachedEmbedding(rText);
+          if (rv) _emb.set('__rdesc__' + r.key, new Float32Array(rv));
+        } catch(e){}
+      }
+      // Dimension descriptions
+      var dims = SY.getDimensions();
+      for (var di = 0; di < dims.length; di++) {
+        var dDesc = SY.getSchemaDescription('dimensions', dims[di]);
+        if (!dDesc) continue;
+        var dText = dims[di] + '. ' + dDesc;
+        try {
+          var dv = await window.EmbeddingUtils.getCachedEmbedding(dText);
+          if (dv) _emb.set('__ddesc__' + dims[di], new Float32Array(dv));
         } catch(e){}
       }
     }
