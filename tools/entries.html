@@ -8,8 +8,8 @@
   <link rel="stylesheet" href="../design-system.css?v=9fa06a28">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="../utilities/utils-keywords.js?v=7"></script>
-  <script src="../utilities/utils-shared.js?v=54876d07"></script>
-  <script src="../utilities/utils-synthesis.js?v=f1508c1f"></script>
+  <script src="../utilities/utils-shared.js?v=0067db69"></script>
+  <script src="../utilities/utils-synthesis.js?v=b4058e56"></script>
   <script src="../utilities/utils-academic.js?v=66257bc0"></script>
   <script type="module" src="../utilities/utils-embedding.js?v=4"></script>
   <style>
@@ -1705,8 +1705,9 @@ var _browsePanelHtml =
       var name = document.getElementById('en-modal-name').value.trim();
       if (!name) { document.getElementById('en-modal-name').focus(); return; }
       var dim  = (document.querySelector('.en-dim-chip.active')||{}).dataset && document.querySelector('.en-dim-chip.active').dataset.dim || '';
+      var cb = _pModalCb;
       _closeModal();
-      if (_pModalCb) _pModalCb(name, dim);
+      if (cb) cb(name, dim);
     });
     document.getElementById('en-modal-name').addEventListener('keydown', function(e){
       if (e.key==='Enter')  document.getElementById('en-modal-confirm').click();
