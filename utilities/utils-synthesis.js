@@ -642,6 +642,10 @@ window.SynthesisData = (function () {
     });
     _save(SK.ASSIGNMENTS, as);
     _save(SK.PRINCIPLES, getPrinciples().filter(function(p){ return p.id!==id; }));
+    // Track deletion so auto-load from sheet doesn't resurrect it
+    var deleted = _load('sy2_deleted_principles', []);
+    if (deleted.indexOf(id) === -1) deleted.push(id);
+    _save('sy2_deleted_principles', deleted);
   }
 
   // ── Assignments ───────────────────────────────────────────────────────────
@@ -970,23 +974,38 @@ window.SynthesisData = (function () {
     var parsed = parseFrameworkTab(grid);
     if (!parsed) return false;
 
-    // Merge principles (sheet wins for named/move/metric, local wins for unsaved work)
+    var deletedIds = _load('sy2_deleted_principles', []);
+
+    // ── Principles: local is authoritative ──────────────────────────────
+    // Only add sheet principles that (a) don't exist locally and (b) haven't been deleted.
     var existing = getPrinciples();
-    var merged = parsed.principles.map(function(sp){
-      var lp = existing.find(function(p){return p.id===sp.id;});
-      return Object.assign({}, sp, lp ? {move:lp.move||sp.move, metric:lp.metric||sp.metric,
-        moveByReg:lp.moveByReg||sp.moveByReg, metricByReg:lp.metricByReg||sp.metricByReg} : {});
-    });
-    existing.forEach(function(p){ if(!merged.find(function(m){return m.id===p.id;})) merged.push(p); });
+    var existingIds = new Set(existing.map(function(p){ return p.id; }));
+    var merged = existing.slice(); // start with local as-is
+    if (parsed.principles && parsed.principles.length) {
+      parsed.principles.forEach(function(sp) {
+        // Skip if locally deleted or already present
+        if (deletedIds.indexOf(sp.id) !== -1) return;
+        if (existingIds.has(sp.id)) return;
+        merged.push(sp);
+      });
+    }
     _save(SK.PRINCIPLES, merged);
 
-    // Merge assignments
+    // ── Assignments: local is authoritative ─────────────────────────────
+    // Only add sheet assignments whose noteKey isn't already assigned locally
+    // and whose principle hasn't been deleted.
     var localAs = getAssignments();
-    var mergedAs = parsed.assignments.slice();
-    localAs.forEach(function(a){ if(!mergedAs.find(function(m){return m.noteKey===a.noteKey;})) mergedAs.push(a); });
-    _saveAssignments(mergedAs);
+    var localNoteKeys = new Set(localAs.map(function(a){ return a.noteKey; }));
+    if (parsed.assignments && parsed.assignments.length) {
+      parsed.assignments.forEach(function(a) {
+        if (localNoteKeys.has(a.noteKey)) return;
+        if (a.principleId && deletedIds.indexOf(a.principleId) !== -1) return;
+        localAs.push(a);
+      });
+    }
+    _saveAssignments(localAs);
 
-    // Restore splits
+    // ── Splits: local wins, sheet seeds missing ─────────────────────────
     if (parsed.splits && Object.keys(parsed.splits).length) {
       var localSplits = getSplits();
       Object.keys(parsed.splits).forEach(function(k){
@@ -995,15 +1014,13 @@ window.SynthesisData = (function () {
       _save(SK.SPLITS, localSplits);
     }
 
-    // Restore settings only if localStorage has no user-set values yet.
+    // ── Settings: only seed if no local settings ────────────────────────
     if (parsed.settings) {
       var localRaw = _load(SK.SETTINGS, null);
-      if (!localRaw) {
-        updateSettings(parsed.settings);
-      }
+      if (!localRaw) updateSettings(parsed.settings);
     }
 
-    // Restore registers, dimensions, schema descriptions (sheet seeds, local wins)
+    // ── Registers, dimensions, schema: only seed if missing locally ─────
     if (parsed.registers && parsed.registers.length) {
       var localRegs = _load(SK.REGISTERS, null);
       if (!localRegs) setRegisters(parsed.registers);
@@ -1020,7 +1037,7 @@ window.SynthesisData = (function () {
       try { if (!localStorage.getItem('df_fw_col_titles')) localStorage.setItem('df_fw_col_titles', JSON.stringify(parsed.colTitles)); } catch(e){}
     }
 
-    // Restore references and overrides (seed from sheet, local wins)
+    // ── References: seed only if missing ────────────────────────────────
     var AC = window.AcademicUtils;
     if (AC && parsed.references && parsed.references.length) {
       var localRefs = typeof AC.getReferences === 'function' ? AC.getReferences() : [];
@@ -1035,8 +1052,7 @@ window.SynthesisData = (function () {
       }
     }
 
-    // Restore entries snapshot — allows resolveNoteKey to work even when
-    // the original source sheets/CSVs are not loaded
+    // ── Entries snapshot: always merge (supplementary data) ──────────────
     if (parsed.entries) {
       _restoreEntriesSnapshot(parsed.entries);
       console.log('[synthesis] Restored', Object.keys(parsed.entries).length, 'entry snapshots from FRAMEWORK tab');
@@ -1112,14 +1128,8 @@ window.SynthesisData = (function () {
               var row = ['', ai===0?(REG_LABEL[reg]||reg.toUpperCase()+'?'):''];
               for (var ci = 0; ci < numCols; ci++) {
                 if (ci === assignedCol) {
-                  if (!resolved) {
-                    row.push('[source missing]');
-                  } else if (resolved._fromSnapshot || resolved.gridRow === -1) {
-                    // Entry from snapshot — write plain text instead of cell reference
-                    row.push(resolved.text);
-                  } else {
-                    row.push(cellRef(resolved.tabName,resolved.gridRow,resolved.gridCol));
-                  }
+                  // Always write plain text — portable, diffable, self-contained
+                  row.push(resolved ? resolved.text : '[source missing]');
                 } else if (ai === 0) {
                   var text = (ctbr[ci] && ctbr[ci][reg]) ? ctbr[ci][reg] : (ci===1 ? mbr[reg] : ci===2 ? tbr[reg] : '') || '';
                   row.push(text);
@@ -1178,7 +1188,9 @@ window.SynthesisData = (function () {
       return (row||[]).map(function(v){
         v = String(v==null?'':v).trim();
         v = v.replace(/Generated: \d{4}-\d{2}-\d{2}T[\d:.]+Z/,'Generated:');
-        if (v.charAt(0)==='=') v = '=REF';
+        // Strip old cell reference formulas (='Tab'!B5) — these are no longer generated
+        // but may exist in the sheet from before the plain-text switch
+        if (v.charAt(0)==='=') return '';
         return v;
       }).filter(Boolean).join('||');
     }
@@ -1353,6 +1365,7 @@ window.SynthesisData = (function () {
     getSplits, getFragments, storeSplit, removeSplit, splitNote, autoSplitAll,
     // Principles
     getPrinciples, addPrinciple, updatePrinciple, deletePrinciple, getPrincipleEmbedText,
+    clearDeletedPrinciples: function() { _save('sy2_deleted_principles', []); },
     // Assignments
     getAssignments, getAssignment, setAssignment, confirmAssignment,
     rejectAssignment, updateAssignmentRegister, updateAssignmentColumn,
